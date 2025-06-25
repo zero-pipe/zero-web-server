@@ -1,0 +1,32 @@
+version: '3.8'
+
+# 开发依赖：MySQL + Redis。流媒体请单独部署 zero-media-kit（默认 HTTP :8080）。
+services:
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: wvp
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../migrations/004_init_wvp_mysql_native.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ../migrations/002_add_onvif_tables.sql:/docker-entrypoint-initdb.d/02-onvif.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mysql_data:
+  redis_data:

@@ -1,0 +1,49 @@
+# Dependencies
+web/node_modules/
+web/dist/
+
+# Build outputs
+bin/
+server.exe
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Runtime / secrets
+config/jwk.json
+configs/config.yaml
+configs/config.local.yaml
+configs/config.*.local.yaml
+configs/config.zms.yaml
+logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Go
+coverage.out
+coverage.html
+
+# Frontend caches / backups
+web/node_modules/.cache/
+*.bak
+*_bak.*
+
+# Local env
+.env
+.env.*
+
+# Temporary
+tmp/
+temp/

@@ -1,0 +1,103 @@
+# zero-web-kit 数据库表清单（单一真相源）
+# 用于逐步脱离 wvp-GB28181-pro，新环境请用 004_init_wvp_mysql_native.sql
+
+version: "0.7.0"
+mysql_min: "8.0"
+
+migrations:
+  new_install:
+    - 004_init_wvp_mysql_native.sql
+    - 002_add_onvif_tables.sql
+  legacy_install:
+    - 001_init_wvp_mysql.sql
+    - 002_add_onvif_tables.sql
+    - 003_update_wvp_mysql.sql
+  existing_upgrade:
+    - 003_update_wvp_mysql.sql
+    - 005_fix_mobile_position.sql
+    - 006_drop_legacy_tables.sql
+
+required:
+  description: 后端 v0.7.0 已实现功能依赖，缺失会导致运行错误
+  tables:
+    - name: wvp_user
+      module: auth
+    - name: wvp_user_role
+      module: auth
+    - name: wvp_device
+      module: gb28181
+    - name: wvp_device_channel
+      module: gb28181
+    - name: wvp_media_server
+      module: media
+    - name: wvp_platform
+      module: cascade
+    - name: wvp_platform_channel
+      module: cascade
+    - name: wvp_stream_push
+      module: stream
+    - name: wvp_stream_proxy
+      module: stream
+    - name: wvp_cloud_record
+      module: record
+    - name: wvp_record_plan
+      module: record
+    - name: wvp_record_plan_item
+      module: record
+    - name: wvp_alarm
+      module: alarm
+    - name: wvp_mobile_position
+      module: position
+      notes: channel_id 必须为 INT，对应 wvp_device_channel.id
+    - name: wvp_onvif_device
+      module: onvif
+      migration: 002_add_onvif_tables.sql
+    - name: wvp_onvif_channel
+      module: onvif
+      migration: 002_add_onvif_tables.sql
+
+optional:
+  description: 表已建但 API 未实现或仅占位，不影响当前核心功能
+  tables:
+    - name: wvp_user_api_key
+      module: auth
+      status: api_pending
+    - name: wvp_common_group
+      module: channel
+      status: api_stub
+    - name: wvp_common_region
+      module: channel
+      status: api_stub
+    - name: wvp_platform_group
+      module: cascade
+      status: api_pending
+    - name: wvp_platform_region
+      module: cascade
+      status: api_pending
+    - name: wvp_jt_terminal
+      module: jt1078
+      status: api_pending
+    - name: wvp_jt_channel
+      module: jt1078
+      status: api_pending
+
+deprecated:
+  description: 旧版 WVP 遗留，zero-web-kit 不读写，可用 006 清理
+  tables:
+    - name: wvp_device_alarm
+      replaced_by: wvp_alarm
+    - name: wvp_device_mobile_position
+      replaced_by: wvp_mobile_position
+    - name: wvp_gb_stream
+    - name: wvp_log
+    - name: wvp_platform_catalog
+    - name: wvp_platform_gb_channel
+    - name: wvp_platform_gb_stream
+    - name: wvp_resources_tree
+
+column_fixes:
+  - table: wvp_mobile_position
+    column: channel_id
+    expect_type: int
+    legacy_type: varchar
+    fix_migration: 005_fix_mobile_position.sql

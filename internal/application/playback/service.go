@@ -1,0 +1,269 @@
+package playbackapp
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"sync"
+	"time"
+
+	domainchannel "zero-web-kit/internal/domain/channel"
+	domaindevice "zero-web-kit/internal/domain/device"
+	domainrecord "zero-web-kit/internal/domain/record"
+	"zero-web-kit/internal/infrastructure/config"
+	"zero-web-kit/internal/infrastructure/media/mediakit"
+	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	"zero-web-kit/internal/interfaces/http/dto"
+)
+
+type DownloadProgress struct {
+	Progress      float64 `json:"progress"`
+	DownloadSpeed int     `json:"downloadSpeed"`
+	Stream        string  `json:"stream"`
+}
+
+type Service struct {
+	devices       domaindevice.Repository
+	channels      domainchannel.Repository
+	sip           *sipinfra.Server
+	zlm           *mediakit.Client
+	mediaCfg      config.MediaConfig
+	serverID      string
+	ssrcSeq       int
+	sessions      sync.Map
+	recordTimeout time.Duration
+}
+
+func NewService(
+	devices domaindevice.Repository,
+	channels domainchannel.Repository,
+	sipServer *sipinfra.Server,
+	zlmClient *mediakit.Client,
+	mediaCfg config.MediaConfig,
+	serverID string,
+	recordTimeoutSec int,
+) *Service {
+	if recordTimeoutSec <= 0 {
+		recordTimeoutSec = 30
+	}
+	return &Service{
+		devices: devices, channels: channels, sip: sipServer, zlm: zlmClient,
+		mediaCfg: mediaCfg, serverID: serverID,
+		recordTimeout: time.Duration(recordTimeoutSec) * time.Second,
+	}
+}
+
+func (s *Service) QueryRecord(ctx context.Context, deviceID, channelDeviceID, startTime, endTime string) (*domainrecord.RecordInfo, error) {
+	device, err := s.devices.GetByDeviceID(deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	channel, err := s.channels.GetOne(deviceID, channelDeviceID)
+	if err != nil {
+		return nil, fmt.Errorf("通道不存在")
+	}
+	sn, ch := s.sip.SendRecordInfoQuery(device, channel.GBDeviceID, startTime, endTime)
+	select {
+	case info := <-ch:
+		return info, nil
+	case <-ctx.Done():
+		s.sip.CancelRecordQuery(sn)
+		return nil, ctx.Err()
+	case <-time.After(s.recordTimeout):
+		s.sip.CancelRecordQuery(sn)
+		return nil, sipinfra.ErrRecordTimeout
+	}
+}
+
+func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, startTime, endTime string) (*dto.StreamContent, error) {
+	device, channel, err := s.loadDeviceChannel(deviceID, channelDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	app := "rtp"
+	stream := fmt.Sprintf("%s_%s_playback", device.DeviceID, channel.GBDeviceID)
+	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionPlayback, startTime, endTime, 0,
+		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string) string {
+			sdpIP := d.SDPIP
+			if sdpIP == "" {
+				sdpIP = s.mediaCfg.IP
+			}
+			return sipinfra.BuildPlaybackSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, sipinfra.NormalizeStreamMode(d.StreamMode), startTime, endTime)
+		})
+	if err != nil {
+		return nil, err
+	}
+	content.Stream = stream
+	return content, nil
+}
+
+func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, startTime, endTime string, downloadSpeed int) (*dto.StreamContent, error) {
+	device, channel, err := s.loadDeviceChannel(deviceID, channelDeviceID)
+	if err != nil {
+		return nil, err
+	}
+	if downloadSpeed <= 0 {
+		downloadSpeed = 4
+	}
+	app := "rtp"
+	stream := fmt.Sprintf("%s_%s_download", device.DeviceID, channel.GBDeviceID)
+	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionDownload, startTime, endTime, downloadSpeed,
+		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string) string {
+			sdpIP := d.SDPIP
+			if sdpIP == "" {
+				sdpIP = s.mediaCfg.IP
+			}
+			return sipinfra.BuildDownloadSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, sipinfra.NormalizeStreamMode(d.StreamMode), startTime, endTime, downloadSpeed)
+		})
+	if err != nil {
+		return nil, err
+	}
+	content.Stream = stream
+	return content, nil
+}
+
+func (s *Service) StopPlayback(deviceID, channelDeviceID, stream string) error {
+	if stream == "" {
+		stream = fmt.Sprintf("%s_%s_playback", deviceID, channelDeviceID)
+	}
+	_ = s.sip.CloseInviteSession(stream)
+	_, err := s.zlm.CloseStreams(context.Background(), "__defaultVhost__", "rtp", stream)
+	return err
+}
+
+func (s *Service) StopDownload(deviceID, channelDeviceID, stream string) error {
+	if stream == "" {
+		stream = fmt.Sprintf("%s_%s_download", deviceID, channelDeviceID)
+	}
+	_ = s.sip.CloseInviteSession(stream)
+	_, err := s.zlm.CloseStreams(context.Background(), "__defaultVhost__", "rtp", stream)
+	return err
+}
+
+func (s *Service) DownloadProgress(stream string) (*DownloadProgress, error) {
+	sess, ok := s.sip.InviteManager().Get(stream)
+	if !ok {
+		return &DownloadProgress{Progress: 100, Stream: stream}, nil
+	}
+	return &DownloadProgress{
+		Progress:      sess.Progress(),
+		DownloadSpeed: sess.DownloadSpeed,
+		Stream:        stream,
+	}, nil
+}
+
+func (s *Service) PausePlayback(streamID string) error {
+	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackPause(s.sip.NextInfoCSeq()))
+}
+
+func (s *Service) ResumePlayback(streamID string) error {
+	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackResume(s.sip.NextInfoCSeq()))
+}
+
+func (s *Service) SpeedPlayback(streamID string, speed float64) error {
+	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackSpeed(s.sip.NextInfoCSeq(), speed))
+}
+
+func (s *Service) SeekPlayback(streamID string, seekTime int64) error {
+	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackSeek(s.sip.NextInfoCSeq(), seekTime))
+}
+
+func (s *Service) OnStreamStarted(app, stream string) {
+	key := streamKey(app, stream)
+	if v, ok := s.sessions.Load(key); ok {
+		if ch, ok := v.(chan *dto.StreamContent); ok {
+			select {
+			case ch <- s.buildStreamContent(app, stream):
+			default:
+			}
+		}
+	}
+}
+
+func (s *Service) loadDeviceChannel(deviceID, channelDeviceID string) (*domaindevice.Device, *domainchannel.Channel, error) {
+	device, err := s.devices.GetByDeviceID(deviceID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("设备不存在")
+	}
+	channel, err := s.channels.GetOne(deviceID, channelDeviceID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("通道不存在")
+	}
+	return device, channel, nil
+}
+
+type sdpBuilder func(*domaindevice.Device, *domainchannel.Channel, int, string) string
+
+func (s *Service) startMediaInvite(
+	ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel,
+	app, stream string, sessionType sipinfra.SessionType,
+	startTime, endTime string, downloadSpeed int, buildSDP sdpBuilder,
+) (*dto.StreamContent, error) {
+	mediaMode := sipinfra.NormalizeStreamMode(device.StreamMode)
+	rtpResp, err := s.zlm.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(mediaMode))
+	if err != nil {
+		return nil, fmt.Errorf("打开RTP端口失败: %w", err)
+	}
+
+	ssrc := sipinfra.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
+	sdp := buildSDP(device, channel, rtpResp.Port, ssrc)
+
+	done := make(chan *dto.StreamContent, 1)
+	s.sessions.Store(streamKey(app, stream), done)
+	defer s.sessions.Delete(streamKey(app, stream))
+
+	go func() {
+		_ = s.sip.SendInviteSession(device, channel, sdp, ssrc, stream, sessionType, startTime, endTime, downloadSpeed)
+	}()
+
+	select {
+	case content := <-done:
+		return content, nil
+	case <-time.After(15 * time.Second):
+		return s.buildStreamContent(app, stream), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (s *Service) buildStreamContent(app, stream string) *dto.StreamContent {
+	urls := mediakit.BuildStreamPlayURLs(s.mediaCfg, app, stream, false, 0)
+	content := &dto.StreamContent{
+		App: app, Stream: stream, IP: s.mediaCfg.IP,
+		Flv: urls.Flv, WsFlv: urls.WsFlv, Hls: urls.Hls,
+		Rtmp: urls.Rtmp, Rtsp: urls.Rtsp,
+		Rtc: urls.Rtc, Rtcs: urls.Rtcs,
+		MediaServerID: s.mediaCfg.ID, ServerID: s.serverID,
+	}
+	if info := s.zlm.LookupStreamMediaInfo(context.Background(), app, stream); info != nil {
+		content.VideoCodec = info.VideoCodec
+		content.AudioCodec = info.AudioCodec
+	}
+	return content
+}
+
+func (s *Service) nextSSRCSeq() int {
+	s.ssrcSeq++
+	return s.ssrcSeq
+}
+
+func streamKey(app, stream string) string { return app + "/" + stream }
+
+func streamModeToTCP(mode string) int {
+	switch mode {
+	case "TCP-ACTIVE":
+		return 2
+	case "TCP-PASSIVE":
+		return 1
+	default:
+		return 0
+	}
+}
+
+func ParseDownloadSpeed(v string) int {
+	speed, _ := strconv.Atoi(v)
+	if speed <= 0 {
+		return 4
+	}
+	return speed
+}
