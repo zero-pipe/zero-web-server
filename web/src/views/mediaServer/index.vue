@@ -126,7 +126,7 @@ export default {
   }
   .card-img-zms{
     width: 200px; height: 200px;
-    background: url('../../assets/zero-media-server-logo.png') no-repeat center;
+    background: url('../../assets/brand/zero-logo-256.png') no-repeat center;
     background-position: center;
     background-size: contain;
     margin: 0 auto;

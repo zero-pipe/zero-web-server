@@ -65,7 +65,7 @@ export default {
     return {
       menus: primaryMenus,
       activePrimary: null,
-      logo: require('@/assets/zero-media-server-logo.png'),
+      logo: require('@/assets/brand/zero-logo-64.png'),
       resizing: false
     }
   },
@@ -193,11 +193,12 @@ export default {
   flex-shrink: 0;
 
   .brand-logo {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
     background: #fff;
     object-fit: contain;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
   }
 
   .brand-text {

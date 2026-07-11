@@ -41,18 +41,28 @@
               :class="getPlayerClass(spiltIndex, i)"
               @click="playerIdx = (i-1)"
             >
-              <div v-if="!streamInfo[i-1]" class="no-signal">{{ videoTip[i-1]?videoTip[i-1]:"无信号" }}</div>
+              <div v-if="!streamInfo[i-1]" class="no-signal">
+                <div class="no-signal-icon" aria-hidden="true">
+                  <svg viewBox="0 0 48 48" width="36" height="36">
+                    <rect x="8" y="12" width="32" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <path d="M20 20l10 6-10 6V20z" fill="currentColor" opacity="0.55"/>
+                    <path d="M14 38h20" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35"/>
+                  </svg>
+                </div>
+                <div class="no-signal-title">{{ videoTip[i-1] ? videoTip[i-1] : '无信号' }}</div>
+              </div>
               <PlayerTabs
                 v-else
                 :ref="'playerTabs' + i"
                 :show-tab="false"
                 :show-button="true"
+                :preferred-player="globalPlayer"
               />
             </div>
           </div>
         </div>
       </div>
-      <div class="ptz-panel" v-show="ptzVisible">
+      <div v-if="ptzVisible" class="ptz-panel">
         <div class="ptz-panel-header">
           <span>云台控制</span>
           <i class="el-icon-close" @click="ptzVisible = false" />
@@ -61,7 +71,7 @@
           <template v-if="currentChannelId">
             <div class="ptz-preset-section">
               <div class="section-title">预置位</div>
-              <LivePtzPreset :channel-id="currentChannelId" />
+              <LivePtzPreset :channel-id="String(currentChannelId)" />
             </div>
             <div class="ptz-control-section">
               <div class="section-title">方向控制</div>
@@ -149,8 +159,8 @@ export default {
         display: 'grid',
         gridTemplateColumns: this.layout[this.spiltIndex].columns,
         gridTemplateRows: this.layout[this.spiltIndex].rows,
-        gap: '4px',
-        backgroundColor: '#a9a8a8'
+        gap: '10px',
+        backgroundColor: 'transparent'
       }
     }
   },
@@ -190,6 +200,17 @@ export default {
     this.handleResize()
   },
   created() {
+    const savedPlayer = window.localStorage.getItem('globalPlayer')
+    if (savedPlayer && ['jessibuca', 'webRTC', 'h265web'].includes(savedPlayer)) {
+      this.globalPlayer = savedPlayer
+    }
+    const savedSplit = window.localStorage.getItem('split')
+    if (savedSplit !== null && savedSplit !== '') {
+      const n = parseInt(savedSplit, 10)
+      if (!Number.isNaN(n) && n >= 0 && n < this.layout.length) {
+        this.spiltIndex = n
+      }
+    }
     this.checkPlayByParam()
   },
   destroyed() {
@@ -260,6 +281,16 @@ export default {
     },
     // 通知设备上传媒体流
     sendDevicePush: function(channelId) {
+      if (!channelId) return
+      // 树节点双击会触发两次 click，防抖避免重复 openRtpServer / INVITE 打崩 ZMS
+      const now = Date.now()
+      if (this._playBusy || (this._lastPlayChannelId === channelId && now - (this._lastPlayAt || 0) < 800)) {
+        console.warn('[live] ignore duplicate play', channelId)
+        return
+      }
+      this._playBusy = true
+      this._lastPlayChannelId = channelId
+      this._lastPlayAt = now
       this.save(channelId)
       const idxTmp = this.playerIdx
       this.$set(this.streamInfo, idxTmp, null)
@@ -273,19 +304,22 @@ export default {
         })
         .finally(() => {
           this.loading = false
+          this._playBusy = false
         })
     },
     setPlayStream(streamInfo, idx) {
       this.$set(this.streamInfo, idx, streamInfo)
+      // 等 PlayerTabs 挂载且格子有宽高后再播（Jessibuca 首播对 0 尺寸敏感）
       this.$nextTick(() => {
-        const refName = 'playerTabs' + (idx + 1)
-        const ref = this.$refs[refName]
-        if (ref) {
+        this.$nextTick(() => {
+          const refName = 'playerTabs' + (idx + 1)
+          const ref = this.$refs[refName]
+          if (!ref) return
           const instance = ref instanceof Array ? ref[0] : ref
           if (instance && instance.setStreamInfo) {
             instance.setStreamInfo(streamInfo)
           }
-        }
+        })
       })
     },
     checkPlayByParam() {
@@ -365,15 +399,20 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: #f0f4f8;
 }
 
 .control-bar {
   height: 5vh;
-  min-height: 40px;
+  min-height: 44px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 17px;
+  font-size: 15px;
+  color: #334155;
+  padding: 0 4px;
+  background: #ffffff;
+  border-bottom: 1px solid #e3ebf5;
 }
 
 .split-controls {
@@ -392,7 +431,7 @@ export default {
 }
 
 .ptz-toggle-control .btn.active {
-  color: #409EFF;
+  color: #1565c0;
 }
 
 .ptz-panel {
@@ -479,8 +518,9 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px;
+  padding: 14px 16px 16px;
   overflow: hidden;
+  background: #f0f4f8;
 }
 
 .play-grid {
@@ -488,20 +528,25 @@ export default {
   height: 100%;
   max-height: calc(100vh - 180px);
   aspect-ratio: 16/9;
-  border: 4px solid rgb(169, 168, 168);
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
 }
 
 .btn {
   margin: 0 10px;
   cursor: pointer;
+  color: #64748b;
+  transition: color 0.15s ease;
 }
 
 .btn:hover {
-  color: #409EFF;
+  color: #1565c0;
 }
 
 .btn.active {
-  color: #409EFF;
+  color: #1565c0;
 }
 
 .sidebar-toggle {
@@ -514,27 +559,73 @@ export default {
   display: inline-block;
   width: 1px;
   height: 16px;
-  background-color: #dcdfe6;
+  background-color: #d8e2ee;
   margin: 0 8px;
   vertical-align: middle;
 }
 
 .redborder {
-  outline: 4px solid rgb(0, 198, 255);
+  outline: none;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 3.5px rgba(21, 101, 192, 0.85),
+    0 10px 24px rgba(21, 101, 192, 0.12);
+  z-index: 1;
 }
 
 .play-box {
-  background-color: #000000;
+  /* 独立圆角卡片 + 中性灰蓝，减少「黑窗贴浅蓝缝」的割裂感 */
+  background: linear-gradient(165deg, #4a5568 0%, #3a4556 46%, #323c4b 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.play-box::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(80% 60% at 50% 38%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 70%);
+  pointer-events: none;
 }
 
 .no-signal {
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: bold;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #b7c2d0;
+  user-select: none;
+  padding: 16px;
+  text-align: center;
+}
+
+.no-signal-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: rgba(226, 232, 240, 0.72);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.no-signal-title {
+  color: rgba(241, 245, 249, 0.88);
+  font-size: 13px;
+  font-weight: 560;
+  letter-spacing: 0.06em;
 }
 
 .play-box-2-1 {

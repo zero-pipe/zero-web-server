@@ -66,10 +66,14 @@ export default {
   },
   mounted() {},
   destroyed() {
+    clearTimeout(this._sizeWaitTimer)
+    this._sizeWaitTimer = null
+    this._pendingPlayUrl = null
     if (jessibucaPlayer[this._uid]) {
       jessibucaPlayer[this._uid].videoPTS = 0
       jessibucaPlayer[this._uid].destroy()
     }
+    jessibucaPlayer[this._uid] = null
     this.playing = false
     this.loaded = false
     this.performance = ''
@@ -83,6 +87,10 @@ export default {
       return !!url && /^wss?:\/\//i.test(url) && this.isLiveFlvUrl(url)
     },
     create(url) {
+      if (!this.$refs.container) {
+        console.warn('Jessibuca -> container not ready')
+        return
+      }
       if (jessibucaPlayer[this._uid]) {
         jessibucaPlayer[this._uid].destroy()
       }
@@ -227,6 +235,25 @@ export default {
         console.warn('Jessibuca -> invalid url, skip play')
         return
       }
+      // 分屏首次挂载时容器常为 0x0，Jessibuca 会黑屏；等有尺寸再初始化
+      const container = this.$refs.container
+      if (container && (container.clientWidth < 2 || container.clientHeight < 2)) {
+        this._pendingPlayUrl = url
+        this._sizeWaitTries = (this._sizeWaitTries || 0) + 1
+        if (this._sizeWaitTries > 40) {
+          console.warn('Jessibuca -> container still 0-size, play anyway')
+          this._sizeWaitTries = 0
+        } else {
+          clearTimeout(this._sizeWaitTimer)
+          this._sizeWaitTimer = setTimeout(() => {
+            this.play(this._pendingPlayUrl || url)
+          }, 50)
+          return
+        }
+      }
+      this._sizeWaitTries = 0
+      this._pendingPlayUrl = null
+
       if (this.playing) {
         this.stop()
       }
@@ -239,21 +266,39 @@ export default {
       }
       if (!jessibucaPlayer[this._uid]) {
         this.create(url)
+        if (!jessibucaPlayer[this._uid]) {
+          return
+        }
         jessibucaPlayer[this._uid]._zmsIsFlv = isFlv
       }
+      let started = false
       const start = () => {
+        if (started) return
         const p = jessibucaPlayer[this._uid]
+        if (!p) return
+        started = true
         const ret = p.play(url)
+        // 布局稳定后再 resize，避免首帧画布尺寸为 0
+        this.$nextTick(() => {
+          try {
+            if (typeof p.resize === 'function') p.resize()
+          } catch (e) { /* ignore */ }
+        })
         if (ret && typeof ret.then === 'function') {
           ret.then(() => this.ensureAudioOn()).catch(() => this.ensureAudioOn())
         } else {
           this.$nextTick(() => this.ensureAudioOn())
         }
       }
-      if (jessibucaPlayer[this._uid].hasLoaded()) {
+      const player = jessibucaPlayer[this._uid]
+      if (typeof player.hasLoaded === 'function' && player.hasLoaded()) {
         start()
       } else {
-        jessibucaPlayer[this._uid].on('load', start)
+        // decoder 缓存命中时 load 可能在 on() 之前已触发，加兜底避免首播卡住
+        player.on('load', start)
+        setTimeout(() => {
+          if (!started) start()
+        }, 120)
       }
     },
     pause: function() {

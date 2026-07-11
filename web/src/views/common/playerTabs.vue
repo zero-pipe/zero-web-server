@@ -193,10 +193,12 @@ export default {
     setStreamInfo(streamInfo) {
       this.streamInfo = streamInfo
       this.applyPreferredPlayer()
+      // 分屏首次从「无信号」切到播放器时，等 DOM/布局完成再播，避免 Jessibuca 黑屏
       this.$nextTick(() => {
-        this.$nextTick(() => {
+        requestAnimationFrame(() => {
           this.play()
           this.syncPlayerSize()
+          setTimeout(() => this.syncPlayerSize(), 200)
         })
       })
     },
@@ -210,8 +212,9 @@ export default {
         return
       }
       setTimeout(() => {
-        this.invokePlayerPlay(playUrl, 8)
-      }, 50)
+        this.invokePlayerPlay(playUrl, 12)
+        this.syncPlayerSize()
+      }, 80)
       const typeMap = { jessibuca: 0, webRTC: 1, h265web: 2 }
       const type = typeMap[this.activePlayer] || 0
       const playerUrl = window.location.origin + '/#/play/share?type=' + type + '&url=' + encodeURIComponent(playUrl)
@@ -272,7 +275,7 @@ export default {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #000;
+  background: #2f3846;
 }
 .player-tabs-wrapper .el-tabs {
   margin-bottom: 0;
@@ -286,7 +289,7 @@ export default {
   flex: 1;
   min-height: 0;
   width: 100%;
-  background: #000;
+  background: #2a3340;
   overflow: hidden;
 }
 .player-instance {

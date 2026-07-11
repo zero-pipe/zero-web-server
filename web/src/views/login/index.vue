@@ -207,12 +207,7 @@
       >
         <div class="panel-brand">
           <div class="zero-logo" aria-hidden="true">
-            <svg viewBox="0 0 48 48" class="zero-logo-svg">
-              <circle cx="24" cy="24" r="18" fill="none" stroke="#1565c0" stroke-width="2.4" />
-              <circle cx="24" cy="24" r="7" fill="#1565c0" />
-              <path d="M24 6v6M24 36v6M6 24h6M36 24h6" stroke="#90caf9" stroke-width="2" stroke-linecap="round" />
-              <path d="M14 14l4 4M30 30l4 4M34 14l-4 4M18 30l-4 4" stroke="#1565c0" stroke-width="1.6" stroke-linecap="round" opacity="0.55" />
-            </svg>
+            <img :src="brandLogo" alt="" class="zero-logo-img">
           </div>
           <div class="panel-brand-text">
             <h3>Zero</h3>
@@ -285,6 +280,7 @@ export default {
       callback()
     }
     return {
+      brandLogo: require('@/assets/brand/zero-logo.svg'),
       loginForm: {
         username: '',
         password: ''
@@ -539,15 +535,25 @@ $muted: #64748b;
 }
 
 .zero-logo {
-  width: 52px;
-  height: 52px;
+  width: 64px;
+  height: 64px;
   flex-shrink: 0;
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+  line-height: 0;
 }
 
-.zero-logo-svg {
-  width: 100%;
-  height: 100%;
+.zero-logo-img {
+  width: 64px;
+  height: 64px;
   display: block;
+  object-fit: contain;
+  object-position: center;
+  /* SVG 自带圆角底板，避免再裁切导致右侧波纹残缺 */
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(21, 101, 192, 0.12);
 }
 
 .panel-brand-text h3 {
