@@ -41,7 +41,23 @@
               :class="getPlayerClass(spiltIndex, i)"
               @click="playerIdx = (i-1)"
             >
-              <div v-if="!streamInfo[i-1]" class="no-signal">
+              <PlayerTabs
+                v-if="streamInfo[i-1]"
+                :ref="'playerTabs' + i"
+                :show-tab="false"
+                :show-button="true"
+                :preferred-player="globalPlayer"
+                @playStatusChange="onPlayerPlayStatus(i - 1, $event)"
+              />
+              <div v-if="isPulling(i - 1)" class="pull-countdown" aria-live="polite">
+                <div
+                  class="pull-countdown-num"
+                  :key="'cd-' + (i - 1) + '-' + pullCountdown[i - 1] + '-' + pullCycle[i - 1]"
+                >
+                  {{ pullCountdown[i - 1] }}
+                </div>
+              </div>
+              <div v-else-if="!streamInfo[i-1]" class="no-signal">
                 <div class="no-signal-icon" aria-hidden="true">
                   <svg viewBox="0 0 48 48" width="36" height="36">
                     <rect x="8" y="12" width="32" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -51,13 +67,6 @@
                 </div>
                 <div class="no-signal-title">{{ videoTip[i-1] ? videoTip[i-1] : '无信号' }}</div>
               </div>
-              <PlayerTabs
-                v-else
-                :ref="'playerTabs' + i"
-                :show-tab="false"
-                :show-button="true"
-                :preferred-player="globalPlayer"
-              />
             </div>
           </div>
         </div>
@@ -102,6 +111,9 @@ export default {
     return {
       streamInfo: [null],
       videoTip: [''],
+      pullLoading: [],
+      pullCountdown: [],
+      pullCycle: [],
       globalPlayer: 'jessibuca',
       sidebarVisible: true, // 侧边栏
       ptzVisible: false, // 云台面板
@@ -215,10 +227,65 @@ export default {
   },
   destroyed() {
     clearTimeout(this.updateLooper)
+    this.clearAllPullCountdowns()
     // Remove event listener when component is destroyed
     window.removeEventListener('resize', this.handleResize)
   },
   methods: {
+    startPullCountdown(idx) {
+      this.stopPullCountdown(idx)
+      this.$set(this.pullLoading, idx, true)
+      this.$set(this.pullCountdown, idx, 3)
+      this.$set(this.pullCycle, idx, 0)
+      if (!this._countdownTimers) this._countdownTimers = {}
+      this._countdownTimers[idx] = setInterval(() => {
+        if (!this.pullLoading[idx]) return
+        const cur = this.pullCountdown[idx]
+        if (cur <= 1) {
+          this.$set(this.pullCycle, idx, (this.pullCycle[idx] || 0) + 1)
+          this.$set(this.pullCountdown, idx, 3)
+        } else {
+          this.$set(this.pullCountdown, idx, cur - 1)
+        }
+      }, 780)
+    },
+    stopPullCountdown(idx) {
+      if (this._countdownTimers && this._countdownTimers[idx]) {
+        clearInterval(this._countdownTimers[idx])
+        this._countdownTimers[idx] = null
+      }
+      if (this._countdownWatchdogs && this._countdownWatchdogs[idx]) {
+        clearTimeout(this._countdownWatchdogs[idx])
+        this._countdownWatchdogs[idx] = null
+      }
+      this.$set(this.pullLoading, idx, false)
+      this.$set(this.pullCountdown, idx, null)
+    },
+    isPulling(idx) {
+      return !!this.pullLoading[idx]
+    },
+    onPlayerPlayStatus(idx, playing) {
+      if (playing && this.pullLoading[idx]) {
+        this.stopPullCountdown(idx)
+      }
+    },
+    clearAllPullCountdowns() {
+      if (this._countdownTimers) {
+        Object.keys(this._countdownTimers).forEach(k => {
+          clearInterval(this._countdownTimers[k])
+        })
+      }
+      if (this._countdownWatchdogs) {
+        Object.keys(this._countdownWatchdogs).forEach(k => {
+          clearTimeout(this._countdownWatchdogs[k])
+        })
+      }
+      this._countdownTimers = {}
+      this._countdownWatchdogs = {}
+      this.pullLoading = []
+      this.pullCountdown = []
+      this.pullCycle = []
+    },
     toggleSidebar() {
       this.sidebarVisible = !this.sidebarVisible
       if (this.sidebarVisible) {
@@ -294,12 +361,23 @@ export default {
       this.save(channelId)
       const idxTmp = this.playerIdx
       this.$set(this.streamInfo, idxTmp, null)
-      this.$set(this.videoTip, idxTmp, '正在拉流...')
+      this.$set(this.videoTip, idxTmp, '')
+      this.startPullCountdown(idxTmp)
       this.$store.dispatch('commonChanel/playChannel', channelId)
         .then(data => {
+          // 接口很快返回，真正出画才停倒计时；先挂播放器在底层拉流
           this.setPlayStream(data.transcodeStream || data, idxTmp)
+          // 兜底：部分播放器不抛 play 事件时，最多等 12s 后仍停表，避免永远挡画面
+          if (!this._countdownWatchdogs) this._countdownWatchdogs = {}
+          clearTimeout(this._countdownWatchdogs[idxTmp])
+          this._countdownWatchdogs[idxTmp] = setTimeout(() => {
+            if (this.pullLoading[idxTmp] && this.streamInfo[idxTmp]) {
+              this.stopPullCountdown(idxTmp)
+            }
+          }, 12000)
         })
         .catch(err => {
+          this.stopPullCountdown(idxTmp)
           this.$set(this.videoTip, idxTmp, '播放失败: ' + err)
         })
         .finally(() => {
@@ -564,15 +642,6 @@ export default {
   vertical-align: middle;
 }
 
-.redborder {
-  outline: none;
-  box-shadow:
-    0 0 0 2px #ffffff,
-    0 0 0 3.5px rgba(21, 101, 192, 0.85),
-    0 10px 24px rgba(21, 101, 192, 0.12);
-  z-index: 1;
-}
-
 .play-box {
   /* 独立圆角卡片 + 中性灰蓝，减少「黑窗贴浅蓝缝」的割裂感 */
   background: linear-gradient(165deg, #4a5568 0%, #3a4556 46%, #323c4b 100%);
@@ -584,6 +653,8 @@ export default {
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .play-box::before {
@@ -593,6 +664,29 @@ export default {
   background:
     radial-gradient(80% 60% at 50% 38%, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 70%);
   pointer-events: none;
+  z-index: 0;
+}
+
+/* 内侧选中环：不受 overflow:hidden 裁切，空窗/有画面都可见 */
+.play-box.redborder {
+  border-color: rgba(21, 101, 192, 0.55);
+  z-index: 2;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 20px rgba(21, 101, 192, 0.14);
+}
+
+.play-box.redborder::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 9px;
+  border: 2.5px solid #1565c0;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.92),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  z-index: 12;
 }
 
 .no-signal {
@@ -626,6 +720,54 @@ export default {
   font-size: 13px;
   font-weight: 560;
   letter-spacing: 0.06em;
+}
+
+.pull-countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(30, 38, 48, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: inherit;
+}
+
+.pull-countdown-num {
+  font-size: clamp(56px, 12vw, 92px);
+  font-weight: 620;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  text-shadow: 0 8px 28px rgba(15, 23, 42, 0.28);
+  font-variant-numeric: tabular-nums;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  animation: pull-count-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
+
+@keyframes pull-count-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.28);
+    filter: blur(2px);
+  }
+  28% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pull-countdown-num {
+    animation: none;
+  }
 }
 
 .play-box-2-1 {
