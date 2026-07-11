@@ -30,7 +30,7 @@ zero-web-kit/
 │   ├── domain/              # 领域模型与仓储接口
 │   ├── infrastructure/      # DB / Redis / SIP / zero-media-server 客户端 / ONVIF
 │   └── interfaces/          # HTTP API、Hook 回调
-├── migrations/              # SQL 迁移（表名 zws_*）
+├── sql/                     # 建表 SQL（表名 zws_*）
 ├── pkg/
 │   ├── jwt/                 # JWT 签发
 │   ├── log/                 # 结构化日志 + 文件轮转

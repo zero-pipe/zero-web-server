@@ -1,4 +1,4 @@
-# zero-web-kit 编译、部署、运行与验证
+﻿# zero-web-kit 编译、部署、运行与验证
 
 本文档覆盖 **Windows（无 Docker）**、**Windows（Docker）**、**Linux（无 Docker）**、**Linux（Docker）** 四种场景。
 
@@ -73,8 +73,8 @@ docker compose version
 ```bash
 # Linux / macOS / Git Bash
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p zws < migrations/004_init_zws_mysql_native.sql
-mysql -u root -p zws < migrations/002_add_onvif_tables.sql
+mysql -u root -p zws < sql/init_zws_mysql.sql
+mysql -u root -p zws < sql/add_onvif_tables.sql
 ```
 
 **Windows PowerShell**（把 `$mysql` 换成你的 mysql.exe 路径）：
@@ -83,8 +83,8 @@ mysql -u root -p zws < migrations/002_add_onvif_tables.sql
 cd E:\16_project\zero-web-kit
 $mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 & $mysql -u root -p你的密码 -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-Get-Content migrations\004_init_zws_mysql_native.sql -Raw | & $mysql -u root -p你的密码 zws
-Get-Content migrations\002_add_onvif_tables.sql -Raw | & $mysql -u root -p你的密码 zws
+Get-Content sql\init_zws_mysql.sql -Raw | & $mysql -u root -p你的密码 zws
+Get-Content sql\add_onvif_tables.sql -Raw | & $mysql -u root -p你的密码 zws
 ```
 
 默认管理员：**admin / admin**
@@ -171,7 +171,7 @@ docker compose -f docker/docker-compose.yml ps
 docker compose -f docker/docker-compose.yml logs mysql --tail 20
 ```
 
-MySQL 首次启动会自动执行 `migrations/004_*.sql` 与 `002_*.sql`。
+MySQL 首次启动会自动执行 `sql/init_zws_mysql.sql` 与 `sql/add_onvif_tables.sql`。
 
 ---
 
@@ -210,8 +210,8 @@ sudo apt install -y mysql-server redis-server
 sudo systemctl enable --now mysql redis-server
 
 # 导入数据库（第三节）
-mysql -u root -p zws < migrations/004_init_zws_mysql_native.sql
-mysql -u root -p zws < migrations/002_add_onvif_tables.sql
+mysql -u root -p zws < sql/init_zws_mysql.sql
+mysql -u root -p zws < sql/add_onvif_tables.sql
 
 # 防火墙（若启用 ufw）
 sudo ufw allow 18080/tcp
@@ -525,4 +525,4 @@ Get-Content logs\zero-web-kit.log -Wait -Tail 50
 | 前端开发 | `make frontend-dev` | `cd web; npm run dev` |
 | 健康检查 | `curl localhost:18080/health` | `Invoke-RestMethod localhost:18080/health` |
 
-更多表结构说明见 [migrations/README.md](../migrations/README.md)。
+更多表结构说明见 [sql/README.md](../sql/README.md)。
