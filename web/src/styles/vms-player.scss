@@ -120,15 +120,13 @@
 .vms-player-dialog .player-stage {
   width: 100%;
   flex: 0 0 auto;
-  display: flex;
-  justify-content: stretch;
-  align-items: stretch;
-  /* 与分屏 play-box 同色，避免纯黑「相框」 */
+  display: block;
   background: linear-gradient(165deg, #4a5568 0%, #3a4556 46%, #323c4b 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(21, 101, 192, 0.05);
+  line-height: 0;
 }
 
 .vms-player-dialog .player-container {
@@ -137,6 +135,7 @@
   height: auto !important;
   margin: 0;
   background: transparent;
+  line-height: 0;
 }
 
 .vms-player-dialog .player-under {
@@ -156,30 +155,45 @@
   background: transparent !important;
 }
 
-/* 铺满舞台，去掉居中小窗四周大块黑边 */
+/* 只用 aspect-ratio，不再叠 max-height，避免容器变扁后 Jess 左右留黑边 */
 .vms-player-dialog .player-video-area {
   position: relative;
   width: 100%;
-  max-width: none;
   aspect-ratio: 16 / 9;
-  max-height: min(48vh, 480px);
   flex: none !important;
   height: auto !important;
   margin: 0;
-  background: transparent !important;
+  background: #3a4556 !important;
+  overflow: hidden;
 }
 
-.vms-player-dialog .player-instance,
+.vms-player-dialog .player-instance {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 .vms-player-dialog .jessibuca-container,
 .vms-player-dialog .rtc-player-wrapper,
-.vms-player-dialog .rtc-player-video {
-  background-color: transparent !important;
-  background: transparent !important;
+.vms-player-dialog .rtc-player-video,
+.vms-player-dialog [id^='h265Player-'] {
+  background-color: #3a4556 !important;
+  background: #3a4556 !important;
 }
 
-/* h265web 容器行内写了 #000，弹窗内跟分屏底色对齐 */
-.vms-player-dialog [id^='h265Player-'] {
-  background-color: transparent !important;
+.vms-player-dialog .jessibuca-container,
+.vms-player-dialog .jessibuca-container canvas,
+.vms-player-dialog .jessibuca-container video,
+.vms-player-dialog .rtc-player-video,
+.vms-player-dialog [id^='h265Player-'],
+.vms-player-dialog [id^='h265Player-'] canvas,
+.vms-player-dialog [id^='h265Player-'] video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: contain;
 }
 
 .vms-player-dialog .player-error-tip {
@@ -400,7 +414,6 @@
   }
 
   .vms-player-dialog .player-video-area {
-    max-width: none;
-    max-height: min(40vh, 400px);
+    width: 100%;
   }
 }
