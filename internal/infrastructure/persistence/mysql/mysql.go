@@ -119,6 +119,40 @@ func autoMigrateAll(db *gorm.DB) error {
 			applog.Info("created table", "model", fmt.Sprintf("%T", m))
 		}
 	}
+	// 历史库若由精简 AutoMigrate 建表，可能缺行政区划相关列；再兜底补一次
+	if err := ensureDeviceChannelColumns(db); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ensureDeviceChannelColumns(db *gorm.DB) error {
+	type col struct {
+		name string
+		ddl  string
+	}
+	cols := []col{
+		{"channel_type", "ALTER TABLE zws_device_channel ADD COLUMN channel_type INT NOT NULL DEFAULT 0 COMMENT '通道类型'"},
+		{"civil_code", "ALTER TABLE zws_device_channel ADD COLUMN civil_code VARCHAR(50) NULL COMMENT '行政区划代码'"},
+		{"business_group_id", "ALTER TABLE zws_device_channel ADD COLUMN business_group_id VARCHAR(255) NULL COMMENT '业务分组ID'"},
+		{"gb_name", "ALTER TABLE zws_device_channel ADD COLUMN gb_name VARCHAR(255) NULL"},
+		{"gb_civil_code", "ALTER TABLE zws_device_channel ADD COLUMN gb_civil_code VARCHAR(255) NULL"},
+		{"gb_parent_id", "ALTER TABLE zws_device_channel ADD COLUMN gb_parent_id VARCHAR(255) NULL"},
+		{"gb_status", "ALTER TABLE zws_device_channel ADD COLUMN gb_status VARCHAR(50) NULL"},
+		{"gb_business_group_id", "ALTER TABLE zws_device_channel ADD COLUMN gb_business_group_id VARCHAR(50) NULL"},
+		{"gb_longitude", "ALTER TABLE zws_device_channel ADD COLUMN gb_longitude DOUBLE NULL"},
+		{"gb_latitude", "ALTER TABLE zws_device_channel ADD COLUMN gb_latitude DOUBLE NULL"},
+		{"gb_ptz_type", "ALTER TABLE zws_device_channel ADD COLUMN gb_ptz_type INT NULL"},
+	}
+	for _, c := range cols {
+		if db.Migrator().HasColumn(&model.GBDeviceChannel{}, c.name) {
+			continue
+		}
+		if err := db.Exec(c.ddl).Error; err != nil {
+			return fmt.Errorf("add column %s: %w", c.name, err)
+		}
+		applog.Info("added missing column", "table", "zws_device_channel", "column", c.name)
+	}
 	return nil
 }
 

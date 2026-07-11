@@ -486,12 +486,11 @@ export default {
         id: 0,
         name: '',
         deviceId: '',
-        civilCode: '',
+        civilCode: node.data.civilCode || '',
         parentDeviceId: node.level > 2 ? node.data.deviceId : '',
         parentId: node.data.id,
         businessGroup: node.level > 2 ? node.data.businessGroup : node.data.deviceId
       }, form => {
-        console.log(node)
         node.loaded = false
         node.expand()
       }, id)

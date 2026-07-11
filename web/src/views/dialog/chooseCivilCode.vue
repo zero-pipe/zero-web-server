@@ -10,15 +10,25 @@
       :destroy-on-close="true"
       @close="close()"
     >
+      <el-alert
+        title="在下方树中点选一个行政区划节点，再点保存。若树为空，请先到「行政区划」页面创建，或关闭本窗留空。"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      />
       <RegionTree
         ref="regionTree"
         :show-header="true"
-        :edit="true"
+        :edit="false"
         :enable-add-channel="false"
         @clickEvent="treeNodeClickEvent"
         :on-channel-change="onChannelChange"
         :tree-height="'45vh'"
       />
+      <div v-if="regionDeviceId" style="margin: 8px 0; color: #606266; font-size: 13px;">
+        已选：{{ regionName }}（{{ regionDeviceId }}）
+      </div>
       <el-form>
         <el-form-item>
           <div style="text-align: right">

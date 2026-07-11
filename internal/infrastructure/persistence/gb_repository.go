@@ -427,6 +427,38 @@ func (r *ChannelRepository) ClearCivilCodeByDataDeviceIDs(dataDeviceIDs []int) e
 	).Error
 }
 
+func (r *ChannelRepository) SetGroupByDataDeviceIDs(parentID, businessGroup string, dataDeviceIDs []int) error {
+	if len(dataDeviceIDs) == 0 {
+		return fmt.Errorf("设备ID不可为空")
+	}
+	return r.db.Exec(
+		`UPDATE zws_device_channel SET gb_parent_id = ?, parent_id = ?, gb_business_group_id = ?, business_group_id = ?, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		parentID, parentID, businessGroup, businessGroup, nowTimeStr(), dataDeviceIDs,
+	).Error
+}
+
+func (r *ChannelRepository) ClearGroupByDataDeviceIDs(dataDeviceIDs []int) error {
+	if len(dataDeviceIDs) == 0 {
+		return fmt.Errorf("设备ID不可为空")
+	}
+	return r.db.Exec(
+		`UPDATE zws_device_channel SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		nowTimeStr(), dataDeviceIDs,
+	).Error
+}
+
+func (r *ChannelRepository) CountCommonByDataDeviceIDs(dataDeviceIDs []int) (int64, error) {
+	if len(dataDeviceIDs) == 0 {
+		return 0, nil
+	}
+	var cnt int64
+	err := r.db.Raw(
+		`SELECT COUNT(1) FROM zws_device_channel WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		dataDeviceIDs,
+	).Scan(&cnt).Error
+	return cnt, err
+}
+
 func nowTimeStr() string {
 	return time.Now().Format("2006-01-02 15:04:05")
 }

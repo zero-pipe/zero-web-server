@@ -69,13 +69,101 @@ func (h *CommonChannelHandler) Add(c *gin.Context)    { h.Update(c) }
 func (h *CommonChannelHandler) Reset(c *gin.Context)  { response.OK(c, nil) }
 
 func (h *CommonChannelHandler) IndustryList(c *gin.Context) {
-	response.OK(c, []gin.H{{"code": "00", "name": "社会治安"}})
+	// GB/T 28181 行业编码，按 code 升序
+	response.OK(c, []gin.H{
+		{"code": "00", "name": "社会治安"},
+		{"code": "01", "name": "交通管理"},
+		{"code": "02", "name": "刑侦"},
+		{"code": "03", "name": "禁毒"},
+		{"code": "04", "name": "安保"},
+		{"code": "05", "name": "出入境"},
+		{"code": "06", "name": "网安"},
+		{"code": "07", "name": "其他警务"},
+		{"code": "08", "name": "防火"},
+		{"code": "09", "name": "其他"},
+		{"code": "10", "name": "司法行政"},
+		{"code": "11", "name": "纪检监察"},
+		{"code": "12", "name": "安全防范"},
+		{"code": "13", "name": "检察"},
+		{"code": "14", "name": "法院"},
+		{"code": "15", "name": "海关"},
+		{"code": "16", "name": "出入境检验检疫"},
+		{"code": "20", "name": "教育"},
+		{"code": "21", "name": "卫生"},
+		{"code": "22", "name": "民政"},
+		{"code": "23", "name": "文旅"},
+		{"code": "24", "name": "环保"},
+		{"code": "25", "name": "安监"},
+		{"code": "26", "name": "金融"},
+		{"code": "27", "name": "住建"},
+		{"code": "28", "name": "水利"},
+		{"code": "29", "name": "农业"},
+		{"code": "30", "name": "商务"},
+		{"code": "31", "name": "国土资源"},
+		{"code": "32", "name": "信息产业"},
+		{"code": "33", "name": "质量监督检验检疫"},
+		{"code": "34", "name": "新闻出版"},
+		{"code": "35", "name": "食品药品监督"},
+		{"code": "36", "name": "气象"},
+		{"code": "37", "name": "地震"},
+		{"code": "38", "name": "测绘"},
+		{"code": "39", "name": "烟草专卖"},
+		{"code": "40", "name": "邮政"},
+		{"code": "41", "name": "社保"},
+		{"code": "42", "name": "广电"},
+		{"code": "43", "name": "铁路"},
+		{"code": "44", "name": "交通"},
+		{"code": "45", "name": "民航"},
+		{"code": "46", "name": "航运"},
+		{"code": "47", "name": "林业"},
+		{"code": "80", "name": "社区/村镇"},
+		{"code": "81", "name": "商企"},
+		{"code": "82", "name": "机关事业单位"},
+		{"code": "99", "name": "其他行业"},
+	})
 }
 func (h *CommonChannelHandler) TypeList(c *gin.Context) {
-	response.OK(c, []gin.H{{"code": "131", "name": "摄像机"}})
+	// GB/T 28181 类型编码，按 code 升序
+	response.OK(c, []gin.H{
+		{"code": "111", "name": "DVR"},
+		{"code": "112", "name": "视频服务器"},
+		{"code": "113", "name": "编码器"},
+		{"code": "114", "name": "解码器"},
+		{"code": "115", "name": "视频切换矩阵"},
+		{"code": "116", "name": "音频切换矩阵"},
+		{"code": "117", "name": "报警控制器"},
+		{"code": "118", "name": "NVR"},
+		{"code": "130", "name": "摄像机扩展"},
+		{"code": "131", "name": "摄像机"},
+		{"code": "132", "name": "网络摄像机"},
+		{"code": "200", "name": "中心信令控制服务器"},
+		{"code": "201", "name": "Web应用服务器"},
+		{"code": "202", "name": "媒体服务器"},
+		{"code": "203", "name": "代理服务器"},
+		{"code": "204", "name": "安全服务器"},
+		{"code": "205", "name": "报警服务器"},
+		{"code": "206", "name": "数据库服务器"},
+		{"code": "207", "name": "GIS服务器"},
+		{"code": "208", "name": "管理服务器"},
+		{"code": "209", "name": "接入网关"},
+		{"code": "210", "name": "媒体存储服务器"},
+		{"code": "211", "name": "信令安全路由网关"},
+		{"code": "212", "name": "业务分组扩展"},
+		{"code": "215", "name": "业务分组"},
+		{"code": "216", "name": "虚拟组织"},
+		{"code": "500", "name": "视频画面分割器"},
+	})
 }
 func (h *CommonChannelHandler) NetworkList(c *gin.Context) {
-	response.OK(c, []gin.H{{"code": "0", "name": "监控报警专网"}})
+	// GB/T 28181 网络标识，按 code 升序
+	response.OK(c, []gin.H{
+		{"code": "0", "name": "监控报警专网"},
+		{"code": "1", "name": "公安信息网"},
+		{"code": "2", "name": "政务网"},
+		{"code": "3", "name": "Internet"},
+		{"code": "4", "name": "社会资源接入网"},
+		{"code": "5", "name": "其他"},
+	})
 }
 
 func (h *CommonChannelHandler) Play(c *gin.Context) {
@@ -332,6 +420,11 @@ type channelToRegionParam struct {
 	ChannelIDs []int  `json:"channelIds"`
 }
 
+type channelToRegionByDeviceParam struct {
+	CivilCode string `json:"civilCode"`
+	DeviceIDs []int  `json:"deviceIds"`
+}
+
 func (h *CommonChannelHandler) RegionAdd(c *gin.Context) {
 	var body channelToRegionParam
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -358,10 +451,42 @@ func (h *CommonChannelHandler) RegionDelete(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+func (h *CommonChannelHandler) RegionDeviceAdd(c *gin.Context) {
+	var body channelToRegionByDeviceParam
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.svc.AddToRegionByDevices(body.CivilCode, body.DeviceIDs); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *CommonChannelHandler) RegionDeviceDelete(c *gin.Context) {
+	var body channelToRegionByDeviceParam
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.svc.DeleteFromRegionByDevices(body.DeviceIDs); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
 type channelToGroupParam struct {
 	ParentID      string `json:"parentId"`
 	BusinessGroup string `json:"businessGroup"`
 	ChannelIDs    []int  `json:"channelIds"`
+}
+
+type channelToGroupByDeviceParam struct {
+	ParentID      string `json:"parentId"`
+	BusinessGroup string `json:"businessGroup"`
+	DeviceIDs     []int  `json:"deviceIds"`
 }
 
 func (h *CommonChannelHandler) GroupAdd(c *gin.Context) {
@@ -384,6 +509,32 @@ func (h *CommonChannelHandler) GroupDelete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteFromGroup(body.ChannelIDs); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *CommonChannelHandler) GroupDeviceAdd(c *gin.Context) {
+	var body channelToGroupByDeviceParam
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.svc.AddToGroupByDevices(body.ParentID, body.BusinessGroup, body.DeviceIDs); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *CommonChannelHandler) GroupDeviceDelete(c *gin.Context) {
+	var body channelToGroupByDeviceParam
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.svc.DeleteFromGroupByDevices(body.DeviceIDs); err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
 	}

@@ -363,6 +363,37 @@ func (s *Service) DeleteFromRegion(channelIDs []int) error {
 	return s.channels.ClearCivilCode(channelIDs)
 }
 
+func (s *Service) AddToRegionByDevices(civilCode string, deviceIDs []int) error {
+	if civilCode == "" {
+		return fmt.Errorf("未添加行政区划")
+	}
+	if len(deviceIDs) == 0 {
+		return fmt.Errorf("参数异常")
+	}
+	cnt, err := s.channels.CountCommonByDataDeviceIDs(deviceIDs)
+	if err != nil {
+		return err
+	}
+	if cnt == 0 {
+		return fmt.Errorf("所选设备下无可用通道")
+	}
+	return s.channels.SetCivilCodeByDataDeviceIDs(civilCode, deviceIDs)
+}
+
+func (s *Service) DeleteFromRegionByDevices(deviceIDs []int) error {
+	if len(deviceIDs) == 0 {
+		return fmt.Errorf("参数异常")
+	}
+	cnt, err := s.channels.CountCommonByDataDeviceIDs(deviceIDs)
+	if err != nil {
+		return err
+	}
+	if cnt == 0 {
+		return fmt.Errorf("所选设备下无可用通道")
+	}
+	return s.channels.ClearCivilCodeByDataDeviceIDs(deviceIDs)
+}
+
 func (s *Service) AddToGroup(parentID, businessGroup string, channelIDs []int) error {
 	parentID = strings.TrimSpace(parentID)
 	businessGroup = strings.TrimSpace(businessGroup)
@@ -389,6 +420,35 @@ func (s *Service) AddToGroup(parentID, businessGroup string, channelIDs []int) e
 	return s.channels.SetGroup(parentID, businessGroup, channelIDs)
 }
 
+func (s *Service) AddToGroupByDevices(parentID, businessGroup string, deviceIDs []int) error {
+	parentID = strings.TrimSpace(parentID)
+	businessGroup = strings.TrimSpace(businessGroup)
+	if parentID == "" {
+		return fmt.Errorf("请选择虚拟组织节点，不要选择业务分组根节点")
+	}
+	if businessGroup == "" {
+		resolved, err := s.groups.ResolveBusinessGroup(parentID)
+		if err != nil {
+			return fmt.Errorf("未找到所属业务分组，请重新选择虚拟组织节点")
+		}
+		businessGroup = resolved
+	}
+	if gbGroupTypeCode(parentID) == "215" {
+		return fmt.Errorf("请选择虚拟组织节点（216），通道不能挂在业务分组根节点上")
+	}
+	if len(deviceIDs) == 0 {
+		return fmt.Errorf("参数异常")
+	}
+	cnt, err := s.channels.CountCommonByDataDeviceIDs(deviceIDs)
+	if err != nil {
+		return err
+	}
+	if cnt == 0 {
+		return fmt.Errorf("所选设备下无可用通道")
+	}
+	return s.channels.SetGroupByDataDeviceIDs(parentID, businessGroup, deviceIDs)
+}
+
 func gbGroupTypeCode(deviceID string) string {
 	if len(deviceID) < 13 {
 		return ""
@@ -412,4 +472,18 @@ func (s *Service) DeleteFromGroup(channelIDs []int) error {
 		return fmt.Errorf("所有通道Id不存在")
 	}
 	return s.channels.ClearGroupParent(channelIDs)
+}
+
+func (s *Service) DeleteFromGroupByDevices(deviceIDs []int) error {
+	if len(deviceIDs) == 0 {
+		return fmt.Errorf("参数异常")
+	}
+	cnt, err := s.channels.CountCommonByDataDeviceIDs(deviceIDs)
+	if err != nil {
+		return err
+	}
+	if cnt == 0 {
+		return fmt.Errorf("所选设备下无可用通道")
+	}
+	return s.channels.ClearGroupByDataDeviceIDs(deviceIDs)
 }

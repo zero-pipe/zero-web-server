@@ -389,8 +389,12 @@ func Setup(r *gin.Engine, deps Deps) {
 			common.GET("/map/thin/progress", commonChannelHandler.MapThinProgress)
 			common.POST("/region/add", commonChannelHandler.RegionAdd)
 			common.POST("/region/delete", commonChannelHandler.RegionDelete)
+			common.POST("/region/device/add", commonChannelHandler.RegionDeviceAdd)
+			common.POST("/region/device/delete", commonChannelHandler.RegionDeviceDelete)
 			common.POST("/group/add", commonChannelHandler.GroupAdd)
 			common.POST("/group/delete", commonChannelHandler.GroupDelete)
+			common.POST("/group/device/add", commonChannelHandler.GroupDeviceAdd)
+			common.POST("/group/device/delete", commonChannelHandler.GroupDeviceDelete)
 			common.GET("/civilcode/list", commonChannelHandler.CivilCodeList)
 			common.GET("/parent/list", commonChannelHandler.ParentList)
 		}

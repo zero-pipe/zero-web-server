@@ -3,6 +3,7 @@ package civilcode
 import (
 	"bufio"
 	_ "embed"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -77,6 +78,10 @@ func GetAllChild(parent string) []RegionItem {
 			})
 		}
 	}
+	// 按行政区划编码升序，保证省/市/区列表稳定可读
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].DeviceID < out[j].DeviceID
+	})
 	return out
 }
 

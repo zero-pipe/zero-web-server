@@ -35,6 +35,7 @@ WHERE 1=1`
 		like := fmt.Sprintf("%%%s%%", query)
 		args = append(args, like, like)
 	}
+	sql += " ORDER BY device_id ASC"
 	var rows []domaintree.Node
 	if err := r.db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -106,6 +107,7 @@ WHERE 1=1`
 	} else {
 		sql += " AND parent_id IS NULL"
 	}
+	sql += " ORDER BY device_id ASC"
 	var rows []domaintree.Node
 	if err := r.db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
