@@ -10,6 +10,7 @@ import (
 	"time"
 
 	domainonvif "zero-web-kit/internal/domain/onvif"
+	domainptz "zero-web-kit/internal/domain/ptz"
 	"zero-web-kit/internal/infrastructure/config"
 	onvifinfra "zero-web-kit/internal/infrastructure/onvif"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
@@ -483,6 +484,82 @@ func (s *Service) PTZControl(ctx context.Context, req PTZRequest) error {
 
 	timeout := "PT1S"
 	return client.ContinuousMove(ctx, ch.ProfileToken, velocity, &timeout)
+}
+
+// QueryPresets returns presets reported by the ONVIF camera.
+func (s *Service) QueryPresets(ctx context.Context, channelID int64) ([]domainptz.Preset, error) {
+	ch, _, client, err := s.ptzClient(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+	list, err := client.GetPresets(ctx, ch.ProfileToken)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domainptz.Preset, 0, len(list))
+	for _, p := range list {
+		if p == nil {
+			continue
+		}
+		out = append(out, domainptz.Preset{
+			PresetID:   p.Token,
+			PresetName: p.Name,
+		})
+	}
+	return out, nil
+}
+
+func (s *Service) GotoPreset(ctx context.Context, channelID int64, presetToken string) error {
+	ch, _, client, err := s.ptzClient(ctx, channelID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(presetToken) == "" {
+		return fmt.Errorf("预置位编号不能为空")
+	}
+	return client.GotoPreset(ctx, ch.ProfileToken, presetToken, nil)
+}
+
+func (s *Service) SetPreset(ctx context.Context, channelID int64, presetToken, presetName string) (string, error) {
+	ch, _, client, err := s.ptzClient(ctx, channelID)
+	if err != nil {
+		return "", err
+	}
+	token, err := client.SetPreset(ctx, ch.ProfileToken, presetName, presetToken)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func (s *Service) RemovePreset(ctx context.Context, channelID int64, presetToken string) error {
+	ch, _, client, err := s.ptzClient(ctx, channelID)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(presetToken) == "" {
+		return fmt.Errorf("预置位编号不能为空")
+	}
+	return client.RemovePreset(ctx, ch.ProfileToken, presetToken)
+}
+
+func (s *Service) ptzClient(ctx context.Context, channelID int64) (*domainonvif.Channel, *domainonvif.Device, *onviflib.Client, error) {
+	ch, err := s.channels.GetByID(ctx, channelID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if !ch.HasPTZ {
+		return nil, nil, nil, fmt.Errorf("该通道不支持PTZ")
+	}
+	device, err := s.devices.GetByID(ctx, ch.DeviceID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	client, err := s.factory.Initialize(ctx, device.DeviceURI, device.Username, device.Password)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return ch, device, client, nil
 }
 
 func injectRTSPAuth(rawURL, username, password string) string {

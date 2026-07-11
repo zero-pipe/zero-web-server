@@ -134,6 +134,58 @@ func (h *CommonChannelHandler) PTZ(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+func (h *CommonChannelHandler) QueryPreset(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Query("channelId"))
+	list, err := h.svc.QueryPreset(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, list)
+}
+
+func (h *CommonChannelHandler) AddPreset(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Query("channelId"))
+	presetID := c.Query("presetId")
+	if presetID == "" {
+		response.Error(c, response.CodeBadReq, "presetId 不能为空")
+		return
+	}
+	if err := h.svc.AddPreset(c.Request.Context(), id, presetID, c.Query("presetName")); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *CommonChannelHandler) CallPreset(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Query("channelId"))
+	presetID := c.Query("presetId")
+	if presetID == "" {
+		response.Error(c, response.CodeBadReq, "presetId 不能为空")
+		return
+	}
+	if err := h.svc.CallPreset(c.Request.Context(), id, presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *CommonChannelHandler) DeletePreset(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Query("channelId"))
+	presetID := c.Query("presetId")
+	if presetID == "" {
+		response.Error(c, response.CodeBadReq, "presetId 不能为空")
+		return
+	}
+	if err := h.svc.DeletePreset(c.Request.Context(), id, presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
 func (h *CommonChannelHandler) PlaybackQuery(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	data, err := h.svc.PlaybackQuery(id, c.Query("startTime"), c.Query("endTime"))

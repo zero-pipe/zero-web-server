@@ -5,8 +5,11 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
+
+	domainptz "zero-web-kit/internal/domain/ptz"
 )
 
 type GBMessage struct {
@@ -18,6 +21,7 @@ type GBMessage struct {
 	Raw         []byte
 	Items       []CatalogItem
 	RecordItems []RecordItem
+	PresetItems []domainptz.Preset
 	Alarm       *AlarmNotify
 	Position    *MobilePositionNotify
 }
@@ -151,6 +155,16 @@ func ParseGBXML(body []byte) (*GBMessage, error) {
 	}
 	if msg.CmdType == "RecordInfo" {
 		msg.RecordItems = parseRecordItemsFallback(body)
+	}
+	if msg.CmdType == "PresetQuery" {
+		msg.PresetItems = parsePresetItemsFallback(body)
+		if msg.SumNum == 0 {
+			if n := extractPresetListNum(body); n > 0 {
+				msg.SumNum = n
+			} else {
+				msg.SumNum = len(msg.PresetItems)
+			}
+		}
 	}
 	if msg.CmdType == "Alarm" {
 		msg.Alarm = parseAlarmNotify(body)
@@ -287,6 +301,85 @@ func BuildDeviceControlPTZ(deviceID, channelID, ptzCmd string) string {
 <DeviceID>%s</DeviceID>
 <PTZCmd>%s</PTZCmd>
 </Control>`, 1, channelID, ptzCmd)
+}
+
+// BuildPresetQuery builds GB28181 PresetQuery MESSAGE body (aligned with wvp).
+func BuildPresetQuery(channelID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>PresetQuery</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+</Query>`, sn, channelID)
+}
+
+// FrontEndCmdString builds 8-byte PTZCmd hex string (wvp SIPCommander.frontEndCmdString).
+func FrontEndCmdString(cmdCode, parameter1, parameter2, combineCode2 int) string {
+	b7 := (combineCode2 << 4) & 0xFF
+	check := (0xA5 + 0x0F + 0x01 + cmdCode + parameter1 + parameter2 + b7) % 0x100
+	return fmt.Sprintf("A50F01%02X%02X%02X%02X%02X",
+		byte(cmdCode), byte(parameter1), byte(parameter2), byte(b7), byte(check))
+}
+
+func BuildDeviceControlFrontEnd(channelID, sn, ptzCmd string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Control>
+<CmdType>DeviceControl</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<PTZCmd>%s</PTZCmd>
+</Control>`, sn, channelID, ptzCmd)
+}
+
+var presetListNumRe = regexp.MustCompile(`(?i)<PresetList[^>]*\bNum\s*=\s*["']?(\d+)`)
+
+func extractPresetListNum(body []byte) int {
+	m := presetListNumRe.FindSubmatch(body)
+	if len(m) < 2 {
+		return 0
+	}
+	var n int
+	fmt.Sscanf(string(m[1]), "%d", &n)
+	return n
+}
+
+func parsePresetItemsFallback(body []byte) []domainptz.Preset {
+	s := string(body)
+	lower := strings.ToLower(s)
+	items := make([]domainptz.Preset, 0)
+
+	// Prefer items inside PresetList; fall back to any Item with PresetID.
+	search := s
+	searchLower := lower
+	if i := strings.Index(lower, "<presetlist"); i >= 0 {
+		if j := strings.Index(lower[i:], "</presetlist>"); j >= 0 {
+			search = s[i : i+j]
+			searchLower = strings.ToLower(search)
+		}
+	}
+
+	rest := search
+	restLower := searchLower
+	for {
+		i := strings.Index(restLower, "<item")
+		if i < 0 {
+			break
+		}
+		closeIdx := strings.Index(restLower[i:], "</item>")
+		if closeIdx < 0 {
+			break
+		}
+		end := i + closeIdx + len("</item>")
+		chunk := rest[i:end]
+		id := extractTagFold(chunk, "PresetID")
+		name := extractTagFold(chunk, "PresetName")
+		if id != "" {
+			items = append(items, domainptz.Preset{PresetID: id, PresetName: name})
+		}
+		rest = rest[end:]
+		restLower = restLower[end:]
+	}
+	return items
 }
 
 func BuildRecordInfoQuery(channelID, sn, startTime, endTime string) string {

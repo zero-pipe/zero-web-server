@@ -30,3 +30,51 @@ func (h *PTZHandler) PTZ(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+func (h *PTZHandler) QueryPreset(c *gin.Context) {
+	list, err := h.svc.QueryPreset(c.Request.Context(), c.Param("deviceId"), c.Param("channelId"))
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, list)
+}
+
+func (h *PTZHandler) AddPreset(c *gin.Context) {
+	presetID, err := strconv.Atoi(c.Query("presetId"))
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "presetId 无效")
+		return
+	}
+	if err := h.svc.AddPreset(c.Param("deviceId"), c.Param("channelId"), presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *PTZHandler) CallPreset(c *gin.Context) {
+	presetID, err := strconv.Atoi(c.Query("presetId"))
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "presetId 无效")
+		return
+	}
+	if err := h.svc.CallPreset(c.Param("deviceId"), c.Param("channelId"), presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *PTZHandler) DeletePreset(c *gin.Context) {
+	presetID, err := strconv.Atoi(c.Query("presetId"))
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "presetId 无效")
+		return
+	}
+	if err := h.svc.DeletePreset(c.Param("deviceId"), c.Param("channelId"), presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}

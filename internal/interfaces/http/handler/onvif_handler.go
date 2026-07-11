@@ -155,3 +155,65 @@ func (h *ONVIFHandler) PTZControl(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+func (h *ONVIFHandler) QueryPresets(c *gin.Context) {
+	channelID, err := strconv.ParseInt(c.Query("channelId"), 10, 64)
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的通道ID")
+		return
+	}
+	list, err := h.svc.QueryPresets(c.Request.Context(), channelID)
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, list)
+}
+
+func (h *ONVIFHandler) GotoPreset(c *gin.Context) {
+	channelID, err := strconv.ParseInt(c.Query("channelId"), 10, 64)
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的通道ID")
+		return
+	}
+	presetID := c.Query("presetId")
+	if presetID == "" {
+		presetID = c.Query("presetToken")
+	}
+	if err := h.svc.GotoPreset(c.Request.Context(), channelID, presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *ONVIFHandler) SetPreset(c *gin.Context) {
+	channelID, err := strconv.ParseInt(c.Query("channelId"), 10, 64)
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的通道ID")
+		return
+	}
+	token, err := h.svc.SetPreset(c.Request.Context(), channelID, c.Query("presetId"), c.Query("presetName"))
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, gin.H{"presetId": token})
+}
+
+func (h *ONVIFHandler) RemovePreset(c *gin.Context) {
+	channelID, err := strconv.ParseInt(c.Query("channelId"), 10, 64)
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的通道ID")
+		return
+	}
+	presetID := c.Query("presetId")
+	if presetID == "" {
+		presetID = c.Query("presetToken")
+	}
+	if err := h.svc.RemovePreset(c.Request.Context(), channelID, presetID); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}

@@ -171,6 +171,10 @@ func Setup(r *gin.Engine, deps Deps) {
 			onvif.GET("/play/start", onvifHandler.StartPlay)
 			onvif.GET("/play/stop", onvifHandler.StopPlay)
 			onvif.POST("/ptz/control", onvifHandler.PTZControl)
+			onvif.GET("/ptz/preset/query", onvifHandler.QueryPresets)
+			onvif.GET("/ptz/preset/call", onvifHandler.GotoPreset)
+			onvif.GET("/ptz/preset/add", onvifHandler.SetPreset)
+			onvif.GET("/ptz/preset/delete", onvifHandler.RemovePreset)
 		}
 
 		jt1078 := auth.Group("/jt1078")
@@ -341,6 +345,10 @@ func Setup(r *gin.Engine, deps Deps) {
 		frontEnd := auth.Group("/front-end")
 		{
 			frontEnd.GET("/ptz/:deviceId/:channelId", ptzHandler.PTZ)
+			frontEnd.GET("/preset/query/:deviceId/:channelId", ptzHandler.QueryPreset)
+			frontEnd.GET("/preset/add/:deviceId/:channelId", ptzHandler.AddPreset)
+			frontEnd.GET("/preset/call/:deviceId/:channelId", ptzHandler.CallPreset)
+			frontEnd.GET("/preset/delete/:deviceId/:channelId", ptzHandler.DeletePreset)
 		}
 
 		common := auth.Group("/common/channel")
@@ -360,6 +368,10 @@ func Setup(r *gin.Engine, deps Deps) {
 			common.GET("/broadcast/start", commonChannelHandler.BroadcastStart)
 			common.GET("/broadcast/stop", commonChannelHandler.BroadcastStop)
 			common.GET("/front-end/ptz", commonChannelHandler.PTZ)
+			common.GET("/front-end/preset/query", commonChannelHandler.QueryPreset)
+			common.GET("/front-end/preset/add", commonChannelHandler.AddPreset)
+			common.GET("/front-end/preset/call", commonChannelHandler.CallPreset)
+			common.GET("/front-end/preset/delete", commonChannelHandler.DeletePreset)
 			common.GET("/playback/query", commonChannelHandler.PlaybackQuery)
 			common.GET("/playback", commonChannelHandler.Playback)
 			common.GET("/playback/stop", commonChannelHandler.PlaybackStop)

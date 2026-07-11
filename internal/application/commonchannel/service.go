@@ -3,13 +3,17 @@ package commonchannel
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
+	onvifapp "zero-web-kit/internal/application/onvif"
 	playapp "zero-web-kit/internal/application/play"
 	playbackapp "zero-web-kit/internal/application/playback"
 	ptzapp "zero-web-kit/internal/application/ptz"
+	domainchannel "zero-web-kit/internal/domain/channel"
+	domainptz "zero-web-kit/internal/domain/ptz"
+	"zero-web-kit/internal/domain/shared"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/model"
 	"zero-web-kit/internal/interfaces/http/dto"
@@ -38,10 +42,18 @@ type Service struct {
 	play     *playapp.Service
 	playback *playbackapp.Service
 	ptz      *ptzapp.Service
+	onvif    *onvifapp.Service
 }
 
-func NewService(ch *persistence.ChannelRepository, groups *persistence.GroupRegionRepository, play *playapp.Service, playback *playbackapp.Service, ptz *ptzapp.Service) *Service {
-	return &Service{channels: ch, groups: groups, play: play, playback: playback, ptz: ptz}
+func NewService(
+	ch *persistence.ChannelRepository,
+	groups *persistence.GroupRegionRepository,
+	play *playapp.Service,
+	playback *playbackapp.Service,
+	ptz *ptzapp.Service,
+	onvif *onvifapp.Service,
+) *Service {
+	return &Service{channels: ch, groups: groups, play: play, playback: playback, ptz: ptz, onvif: onvif}
 }
 
 func toView(ch *domainchannel.Channel) View {
@@ -150,7 +162,104 @@ func (s *Service) PTZ(channelID int, command string, panSpeed, tiltSpeed, zoomSp
 	if err != nil {
 		return err
 	}
-	return s.ptz.Control(ch.DeviceID, ch.GBDeviceID, command, panSpeed, tiltSpeed, zoomSpeed)
+	switch ch.DataType {
+	case shared.ChannelDataTypeONVIF:
+		if s.onvif == nil {
+			return fmt.Errorf("ONVIF 服务未启用")
+		}
+		return s.onvif.PTZControl(context.Background(), onvifapp.PTZRequest{
+			ChannelID: int64(ch.DataDeviceID),
+			Command:   command,
+			Speed:     float64(panSpeed) / 255.0,
+		})
+	default:
+		return s.ptz.Control(ch.DeviceID, ch.GBDeviceID, command, panSpeed, tiltSpeed, zoomSpeed)
+	}
+}
+
+func (s *Service) QueryPreset(ctx context.Context, channelID int) ([]domainptz.Preset, error) {
+	ch, err := s.channels.GetByID(channelID)
+	if err != nil {
+		return nil, fmt.Errorf("通道不存在")
+	}
+	switch ch.DataType {
+	case shared.ChannelDataTypeONVIF:
+		if s.onvif == nil {
+			return nil, fmt.Errorf("ONVIF 服务未启用")
+		}
+		return s.onvif.QueryPresets(ctx, int64(ch.DataDeviceID))
+	case shared.ChannelDataTypeGB28181, 0:
+		return s.ptz.QueryPreset(ctx, ch.DeviceID, ch.GBDeviceID)
+	default:
+		return nil, fmt.Errorf("该通道类型不支持预置位查询")
+	}
+}
+
+func (s *Service) AddPreset(ctx context.Context, channelID int, presetID, presetName string) error {
+	ch, err := s.channels.GetByID(channelID)
+	if err != nil {
+		return fmt.Errorf("通道不存在")
+	}
+	switch ch.DataType {
+	case shared.ChannelDataTypeONVIF:
+		if s.onvif == nil {
+			return fmt.Errorf("ONVIF 服务未启用")
+		}
+		_, err := s.onvif.SetPreset(ctx, int64(ch.DataDeviceID), presetID, presetName)
+		return err
+	case shared.ChannelDataTypeGB28181, 0:
+		id, err := strconv.Atoi(presetID)
+		if err != nil {
+			return fmt.Errorf("无效的预置位编号")
+		}
+		return s.ptz.AddPreset(ch.DeviceID, ch.GBDeviceID, id)
+	default:
+		return fmt.Errorf("该通道类型不支持预置位设置")
+	}
+}
+
+func (s *Service) CallPreset(ctx context.Context, channelID int, presetID string) error {
+	ch, err := s.channels.GetByID(channelID)
+	if err != nil {
+		return fmt.Errorf("通道不存在")
+	}
+	switch ch.DataType {
+	case shared.ChannelDataTypeONVIF:
+		if s.onvif == nil {
+			return fmt.Errorf("ONVIF 服务未启用")
+		}
+		return s.onvif.GotoPreset(ctx, int64(ch.DataDeviceID), presetID)
+	case shared.ChannelDataTypeGB28181, 0:
+		id, err := strconv.Atoi(presetID)
+		if err != nil {
+			return fmt.Errorf("无效的预置位编号")
+		}
+		return s.ptz.CallPreset(ch.DeviceID, ch.GBDeviceID, id)
+	default:
+		return fmt.Errorf("该通道类型不支持预置位调用")
+	}
+}
+
+func (s *Service) DeletePreset(ctx context.Context, channelID int, presetID string) error {
+	ch, err := s.channels.GetByID(channelID)
+	if err != nil {
+		return fmt.Errorf("通道不存在")
+	}
+	switch ch.DataType {
+	case shared.ChannelDataTypeONVIF:
+		if s.onvif == nil {
+			return fmt.Errorf("ONVIF 服务未启用")
+		}
+		return s.onvif.RemovePreset(ctx, int64(ch.DataDeviceID), presetID)
+	case shared.ChannelDataTypeGB28181, 0:
+		id, err := strconv.Atoi(presetID)
+		if err != nil {
+			return fmt.Errorf("无效的预置位编号")
+		}
+		return s.ptz.DeletePreset(ch.DeviceID, ch.GBDeviceID, id)
+	default:
+		return fmt.Errorf("该通道类型不支持预置位删除")
+	}
 }
 
 func (s *Service) PlaybackQuery(channelID int, startTime, endTime string) (any, error) {

@@ -146,7 +146,7 @@ func main() {
 	recordPlanService.Start()
 	defer recordPlanService.Stop()
 
-	commonChannelService := commonchannelapp.NewService(channelRepo, groupRegionRepo, playService, playbackService, ptzService)
+	commonChannelService := commonchannelapp.NewService(channelRepo, groupRegionRepo, playService, playbackService, ptzService, onvifService)
 	groupService := groupapp.NewService(groupRegionRepo)
 	regionService := regionapp.NewService(groupRegionRepo)
 

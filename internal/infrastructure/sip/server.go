@@ -13,6 +13,7 @@ import (
 
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domaindevice "zero-web-kit/internal/domain/device"
+	domainptz "zero-web-kit/internal/domain/ptz"
 	domainrecord "zero-web-kit/internal/domain/record"
 	"zero-web-kit/internal/infrastructure/config"
 	redisinfra "zero-web-kit/internal/infrastructure/redis"
@@ -55,6 +56,7 @@ type Server struct {
 	challenges     sync.Map
 	sn             atomic.Int64
 	recordMgr      *RecordManager
+	presetMgr      *PresetManager
 	inviteMgr      *InviteManager
 	infoCSeq       atomic.Int64
 }
@@ -82,6 +84,7 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		deviceSvc: deviceSvc,
 		redis:     redis,
 		recordMgr: NewRecordManager(),
+		presetMgr: NewPresetManager(),
 		inviteMgr: NewInviteManager(),
 	}
 	s.registerHandlers()
@@ -94,6 +97,7 @@ func (s *Server) SetLocalIP(ip string)                 { s.localIP = ip }
 func (s *Server) Domain() string                       { return s.cfg.Domain }
 
 func (s *Server) RecordManager() *RecordManager { return s.recordMgr }
+func (s *Server) PresetManager() *PresetManager { return s.presetMgr }
 
 func (s *Server) SendRecordInfoQuery(device *domaindevice.Device, channelID, startTime, endTime string) (string, <-chan *domainrecord.RecordInfo) {
 	sn := strconv.FormatInt(s.sn.Add(1), 10)
@@ -104,6 +108,24 @@ func (s *Server) SendRecordInfoQuery(device *domaindevice.Device, channelID, sta
 }
 
 func (s *Server) CancelRecordQuery(sn string) { s.recordMgr.Cancel(sn) }
+
+func (s *Server) SendPresetQuery(device *domaindevice.Device, channelID string) (string, <-chan []domainptz.Preset) {
+	sn := strconv.FormatInt(s.sn.Add(1), 10)
+	ch := s.presetMgr.Register(sn)
+	body := BuildPresetQuery(channelID, sn)
+	_ = s.sendMessage(device, body)
+	return sn, ch
+}
+
+func (s *Server) CancelPresetQuery(sn string) { s.presetMgr.Cancel(sn) }
+
+// SendFrontEndCmd sends DeviceControl PTZCmd built like wvp frontEndCmd.
+func (s *Server) SendFrontEndCmd(device *domaindevice.Device, channelID string, cmdCode, parameter1, parameter2, combineCode2 int) error {
+	sn := strconv.FormatInt(s.sn.Add(1), 10)
+	cmd := FrontEndCmdString(cmdCode, parameter1, parameter2, combineCode2)
+	body := BuildDeviceControlFrontEnd(channelID, sn, cmd)
+	return s.sendMessage(device, body)
+}
 
 func (s *Server) registerHandlers() {
 	s.srv.OnRegister(s.handleRegister)
@@ -291,6 +313,8 @@ func (s *Server) handleMessage(req *sip.Request, tx sip.ServerTransaction) {
 			)
 		case "RecordInfo":
 			s.recordMgr.HandleRecordInfo(deviceID, msg.DeviceID, msg.SN, msg.SumNum, msg.RecordItems)
+		case "PresetQuery":
+			s.presetMgr.HandlePresetQuery(msg.SN, msg.SumNum, msg.PresetItems)
 		}
 	}
 
