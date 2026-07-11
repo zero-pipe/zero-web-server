@@ -3,11 +3,11 @@
     <el-tabs v-if="showTab && playerList.length > 1" v-model="activePlayer" type="card" :stretch="true" @tab-click="changePlayer">
       <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key"></el-tab-pane>
     </el-tabs>
-    <div class="player-video-area" :style="{ height: showTab ? 'calc(100% - 36px)' : '100%' }">
+    <div class="player-video-area">
       <jessibucaPlayer
         v-if="activePlayer === 'jessibuca'"
         ref="jessibuca"
-        style="width: 100%; height: 100%;"
+        class="player-instance"
         :has-audio="hasAudio"
         :show-button="showButton"
         fluent autoplay live
@@ -17,7 +17,7 @@
       <rtc-player
         v-if="activePlayer === 'webRTC'"
         ref="webRTC"
-        style="width: 100%; height: 100%;"
+        class="player-instance"
         :has-audio="hasAudio"
         :show-button="showButton"
         fluent autoplay live
@@ -27,7 +27,7 @@
       <h265web
         v-if="activePlayer === 'h265web'"
         ref="h265web"
-        style="width: 100%; height: 100%;"
+        class="player-instance"
         :has-audio="hasAudio"
         :show-button="showButton"
         fluent autoplay live
@@ -177,8 +177,18 @@ export default {
       this.warnIfPlayerMismatch(tab.name)
       this.$nextTick(() => {
         this.play()
+        this.syncPlayerSize()
       })
       this.$emit('player-changed', this.activePlayer)
+    },
+    syncPlayerSize() {
+      const player = this.$refs[this.activePlayer]
+      if (!player) return
+      if (player.updatePlayerDomSize) {
+        player.updatePlayerDomSize()
+      } else if (player.resize) {
+        player.resize()
+      }
     },
     setStreamInfo(streamInfo) {
       this.streamInfo = streamInfo
@@ -186,6 +196,7 @@ export default {
       this.$nextTick(() => {
         this.$nextTick(() => {
           this.play()
+          this.syncPlayerSize()
         })
       })
     },
@@ -258,16 +269,30 @@ export default {
 .player-tabs-wrapper {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #000;
 }
 .player-tabs-wrapper .el-tabs {
   margin-bottom: 0;
+  flex-shrink: 0;
 }
 .player-tabs-wrapper .el-tabs >>> .el-tabs__header {
   margin-bottom: 0;
 }
 .player-video-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: #000;
+  overflow: hidden;
+}
+.player-instance {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  background: #000;
 }
 </style>

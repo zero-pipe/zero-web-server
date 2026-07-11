@@ -316,9 +316,10 @@ export default {
     // 通知设备上传媒体流
     sendDevicePush: function(itemData) {
       itemData.playLoading = true
-      this.$refs.devicePlayer.openDialog('media', itemData.gbId, {
+      this.$refs.devicePlayer.openDialog('codec', itemData.gbId, {
         pending: true,
-        hasAudio: itemData.hasAudio
+        hasAudio: itemData.hasAudio,
+        ptzType: itemData.ptzType
       })
       this.$store.dispatch('commonChanel/playChannel', itemData.gbId)
         .then((data) => {

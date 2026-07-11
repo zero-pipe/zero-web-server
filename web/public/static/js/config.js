@@ -11,10 +11,10 @@ window.mapParam = {
   tilesUrl: "http://webrd0{1-4}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scale=1&style=8",
   // 瓦片大小
   tileSize: 256,
-  // 默认层级
-  zoom:10,
-  // 默认地图中心点
-  center:[116.41020, 39.915119],
+  // 默认层级（街道级，便于看到设备点位）
+  zoom:15,
+  // 默认地图中心点：成都高新区新川公用附近（WGS84，前端会按瓦片坐标系转换）
+  center:[104.07329, 30.54496],
   // 地图最大层级
   maxZoom:18,
   // 地图最小层级

@@ -1,57 +1,85 @@
 <template>
   <div id="devicePlayer">
-
     <el-dialog
       v-if="showVideoDialog"
       v-el-drag-dialog
-      title="视频播放"
-      top="10vh"
-      width="65vw"
+      custom-class="vms-player-dialog"
+      top="8vh"
+      width="72vw"
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
     >
-      <div class="dhsdk-player-body">
+      <div slot="title" class="vms-player-header">
+        <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
+        <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
+        <span>视频播放</span>
+      </div>
 
+      <div class="dhsdk-player-body">
         <div class="player-side">
-          <div
-            class="player-container"
-            :style="{ height: playerHeight }"
-            v-loading="isLoging"
-            element-loading-text="正在邀请设备推流…"
-            element-loading-background="rgba(0, 0, 0, 0.72)"
-          >
-            <div v-if="playError" class="player-error-tip">{{ playError }}</div>
-            <playerTabs ref="playerTabs" :has-audio="hasAudio" :show-button="true"
-              @playerChanged="playerChanged" />
+          <div class="player-stage">
+            <div
+              class="player-container"
+              v-loading="isLoging"
+              element-loading-text="正在邀请设备推流…"
+              element-loading-background="rgba(0, 0, 0, 0.72)"
+              element-loading-spinner="el-icon-loading"
+            >
+              <div v-if="playError" class="player-error-tip">{{ playError }}</div>
+              <playerTabs
+                ref="playerTabs"
+                :has-audio="hasAudio"
+                :show-button="true"
+                @playerChanged="playerChanged"
+              />
+            </div>
           </div>
         </div>
 
         <div class="control-side">
-          <devicePtzPanel
-            :device-id="deviceId"
-            :channel-id="channelId"
-            @drag-zoom-start="toggleDragZoom"
-          />
-
-          <el-tabs v-model="tabActiveName" @tab-click="tabHandleClick" class="control-tabs">
-            <el-tab-pane label="预置位" name="preset">
-              <ptzPreset
-                v-if="tabActiveName === 'preset'"
-                :device-id="deviceId"
-                :channel-device-id="channelId"
-                style="margin-top: 8px;"
+          <el-tabs
+            v-model="tabActiveName"
+            tab-position="left"
+            class="control-tabs"
+            @tab-click="tabHandleClick"
+          >
+            <el-tab-pane label="编码信息" name="codec">
+              <mediaInfo
+                v-if="tabActiveName === 'codec'"
+                ref="mediaInfo"
+                :app="app"
+                :stream="streamId"
+                :media-server-id="mediaServerId"
               />
             </el-tab-pane>
             <el-tab-pane label="实时视频" name="media">
-              <streamMediaPanel v-if="tabActiveName === 'media'" :player-url="playerUrlInfo.playerUrl" :play-url="playerUrlInfo.playUrl" :stream-info="streamInfo" />
+              <streamMediaPanel
+                v-if="tabActiveName === 'media'"
+                :player-url="playerUrlInfo.playerUrl"
+                :play-url="playerUrlInfo.playUrl"
+                :stream-info="streamInfo"
+              />
             </el-tab-pane>
-            <el-tab-pane label="编码信息" name="codec">
-              <mediaInfo v-if="tabActiveName === 'codec'" ref="mediaInfo" :app="app" :stream="streamId" :media-server-id="mediaServerId" />
+            <el-tab-pane label="云台控制" name="ptz" :disabled="!ptzEnabled">
+              <devicePtzPanel
+                v-if="tabActiveName === 'ptz' && ptzEnabled"
+                :device-id="deviceId"
+                :channel-id="channelId"
+                @drag-zoom-start="toggleDragZoom"
+              />
+              <div v-else-if="tabActiveName === 'ptz'" class="panel-disabled-tip">当前通道为枪机，不支持云台控制</div>
+            </el-tab-pane>
+            <el-tab-pane label="预置位" name="preset" :disabled="!ptzEnabled">
+              <ptzPreset
+                v-if="tabActiveName === 'preset' && ptzEnabled"
+                :device-id="deviceId"
+                :channel-device-id="channelId"
+              />
+              <div v-else-if="tabActiveName === 'preset'" class="panel-disabled-tip">当前通道为枪机，不支持预置位</div>
             </el-tab-pane>
           </el-tabs>
         </div>
-
       </div>
     </el-dialog>
   </div>
@@ -65,11 +93,16 @@ import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
 import streamMediaPanel from '../../common/streamMediaPanel.vue'
 
+/** GB28181 ptzType: 1 球机 / 2 半球 可云台；3 固定枪机 / 4 遥控枪机 不可 */
+function isDomeCamera(ptzType) {
+  const t = Number(ptzType)
+  return t === 1 || t === 2
+}
+
 export default {
   name: 'DevicePlayer',
   directives: { elDragDialog },
   components: { playerTabs, devicePtzPanel, PtzPreset, mediaInfo, streamMediaPanel },
-  props: {},
   data() {
     return {
       videoUrl: '',
@@ -78,33 +111,51 @@ export default {
       mediaServerId: '',
       deviceId: '',
       channelId: '',
-      tabActiveName: 'preset',
+      ptzType: 0,
+      tabActiveName: 'codec',
       hasAudio: false,
       isLoging: false,
       playError: '',
       showVideoDialog: false,
       streamInfo: null,
-      playerHeight: '48vh',
       playerUrlInfo: {
         playerUrl: null,
-        playUrl: null,
+        playUrl: null
       },
       dragZoomDirection: ''
     }
   },
+  computed: {
+    ptzEnabled() {
+      return isDomeCamera(this.ptzType)
+    },
+    isStreaming() {
+      return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
+    }
+  },
   methods: {
-    tabHandleClick: function(tab) {
+    tabHandleClick(tab) {
       if (tab.name === 'codec') {
-        this.$refs.mediaInfo && this.$refs.mediaInfo.startTask()
+        this.$nextTick(() => {
+          this.$refs.mediaInfo && this.$refs.mediaInfo.startTask()
+        })
       } else {
         this.$refs.mediaInfo && this.$refs.mediaInfo.stopTask()
       }
     },
-    openDialog: function(tab, deviceId, channelId, param) {
+    resolveTab(tab) {
+      const name = tab === 'streamPlay' ? 'media' : (tab || 'codec')
+      if ((name === 'ptz' || name === 'preset') && !this.ptzEnabled) {
+        return 'codec'
+      }
+      return name
+    },
+    openDialog(tab, deviceId, channelId, param) {
       if (this.showVideoDialog) return
-      this.tabActiveName = tab === 'streamPlay' ? 'media' : (tab || 'preset')
       this.deviceId = deviceId
       this.channelId = channelId
+      this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
+      this.tabActiveName = this.resolveTab(tab)
       this.streamId = ''
       this.mediaServerId = ''
       this.app = ''
@@ -121,18 +172,18 @@ export default {
         this.play(param.streamInfo, param.hasAudio)
       }
     },
-    onStreamReady: function(streamInfo, hasAudio) {
+    onStreamReady(streamInfo, hasAudio) {
       if (!this.showVideoDialog) return
       this.play(streamInfo, hasAudio)
     },
-    onStreamError: function(error) {
+    onStreamError(error) {
       if (!this.showVideoDialog) return
       this.isLoging = false
       const msg = typeof error === 'string' ? error : (error && error.message) || '取流失败，请稍后重试'
       this.playError = msg
       this.$message({ showClose: true, message: msg, type: 'error' })
     },
-    play: function(streamInfo, hasAudio) {
+    play(streamInfo, hasAudio) {
       this.streamInfo = streamInfo
       this.hasAudio = hasAudio
       this.isLoging = false
@@ -144,20 +195,29 @@ export default {
       this.$nextTick(() => {
         if (this.$refs.playerTabs) {
           this.$refs.playerTabs.setStreamInfo(streamInfo.transcodeStream || streamInfo)
+          this.$refs.playerTabs.syncPlayerSize && this.$refs.playerTabs.syncPlayerSize()
+        }
+        if (this.tabActiveName === 'codec' && this.$refs.mediaInfo) {
+          this.$refs.mediaInfo.startTask()
         }
       })
     },
-    playerChanged: function(playerUrlInfo) {
+    playerChanged(playerUrlInfo) {
       this.playerUrlInfo = playerUrlInfo
     },
-    close: function() {
+    close() {
       if (this.$refs.playerTabs) {
         this.$refs.playerTabs.stop()
+      }
+      if (this.$refs.mediaInfo) {
+        this.$refs.mediaInfo.stopTask()
       }
       this.isLoging = false
       this.playError = ''
       this.streamInfo = null
       this.videoUrl = ''
+      this.ptzType = 0
+      this.tabActiveName = 'codec'
       this.showVideoDialog = false
     },
     toggleDragZoom(direction) {
@@ -175,32 +235,7 @@ export default {
         })
         this.dragZoomDirection = ''
       })
-    },
+    }
   }
 }
 </script>
-
-<style>
-#devicePlayer .el-dialog__body { padding: 10px 20px; }
-.dhsdk-player-body { display: flex; gap: 16px; }
-.player-side { flex: 3; min-width: 0; }
-.player-container { width: 100%; position: relative; }
-.player-error-tip {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  color: #f56c6c;
-  font-size: 14px;
-  text-align: center;
-  padding: 0 12px;
-}
-.control-side { flex: 2; min-width: 340px; display: flex; flex-direction: column; }
-.control-tabs { flex: 1; display: flex; flex-direction: column; min-height: 220px}
-.control-tabs .el-tabs__content { flex: 1; overflow: auto; }
-.media-info-content { overflow: auto; }
-.media-row { display: flex; margin-bottom: 0.5rem; height: 2.5rem; }
-.media-label { width: 6rem; line-height: 2.5rem; text-align: right; flex-shrink: 0; }
-.trank { width: 80%; height: 180px; text-align: left; padding: 0 10%; overflow: auto; }
-</style>

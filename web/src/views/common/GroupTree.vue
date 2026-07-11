@@ -1,23 +1,21 @@
 <template>
-  <div id="groupTree" style="border-right: 1px solid #EBEEF5; height: 100%; display: flex; flex-direction: column;">
-    <div style="padding: 0 20px 0 10px; flex-shrink: 0;">
-      <el-input size="small" v-model="searchStr" @input="searchChange" suffix-icon="el-icon-search" placeholder="请输入搜索内容" clearable>
-        <!--        <el-select v-model="searchType" slot="prepend" placeholder="搜索类型" style="width: 80px">-->
-        <!--          <el-option label="目录" :value="0"></el-option>-->
-        <!--          <el-option label="通道" :value="1"></el-option>-->
-        <!--        </el-select>-->
-      </el-input>
+  <div id="groupTree" class="org-tree-panel">
+    <div class="org-tree-search">
+      <el-input size="small" v-model="searchStr" @input="searchChange" suffix-icon="el-icon-search" placeholder="请输入搜索内容" clearable />
     </div>
-    <div v-if="!searchStr" style="flex: 1; min-height: 0;">
+    <div v-if="!searchStr" class="org-tree-body">
       <el-alert
         v-if="showAlert && edit"
         title="操作提示"
         description="你可以使用右键菜单管理节点"
         type="info"
-        style="text-align: left"
+        show-icon
+        :closable="false"
+        class="org-tree-alert"
       />
-      <div v-if="edit" style="margin-top: 10px; font-size: 14px;position: absolute;left: 270px;z-index: 100;" >
-        显示编号： <el-checkbox v-model="showCode" />
+      <div v-if="edit" class="org-tree-toolbar">
+        <span class="org-tree-toolbar-label">显示编号</span>
+        <el-checkbox v-model="showCode" />
       </div>
 
       <vue-easy-tree
@@ -70,9 +68,9 @@
         </template>
       </vue-easy-tree>
     </div>
-    <div v-if="searchStr" style="color: #606266; flex: 1; min-height: 0; overflow: auto;">
-      <ul v-if="groupList.length > 0" style="list-style: none; margin: 0; padding: 10px">
-        <li v-for="item in groupList" :key="item.id" class="channel-list-li" style="height: 26px; align-items: center;cursor: pointer;" @click="listClickHandler(item)" >
+    <div v-if="searchStr" class="org-tree-body org-tree-search-result">
+      <ul v-if="groupList.length > 0" class="org-result-list">
+        <li v-for="item in groupList" :key="item.id" class="channel-list-li" @click="listClickHandler(item)" >
           <span
             v-if="chooseId !== item.deviceId"
             style="color: #409EFF; font-size: 20px"
@@ -90,7 +88,7 @@
         </li>
       </ul>
 
-      <ul v-if="channelList.length > 0" style="list-style: none; margin: 0; padding: 10px; overflow: auto">
+      <ul v-if="channelList.length > 0" class="org-result-list">
         <li v-for="item in channelList" :key="item.id" class="channel-list-li" @click="channelLstClickHandler(item)" @contextmenu.prevent="contextmenuEventHandlerForLi($event, item)">
           <span
             v-if="item.gbStatus === 'ON'"
@@ -579,24 +577,102 @@ export default {
 </script>
 
 <style scoped>
+.org-tree-panel {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e3ebf5;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(21, 101, 192, 0.06);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.org-tree-search {
+  flex-shrink: 0;
+  padding: 14px 14px 10px;
+}
+
+.org-tree-search ::v-deep .el-input__inner {
+  border-radius: 8px;
+  border-color: #d7e3f2;
+  background: #f7faff;
+}
+
+.org-tree-search ::v-deep .el-input__inner:focus {
+  border-color: #1565c0;
+  background: #fff;
+}
+
+.org-tree-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 12px;
+  color: #606266;
+  overflow: hidden;
+}
+
+.org-tree-alert {
+  margin: 0 6px 10px;
+  border-radius: 8px;
+}
+
+.org-tree-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 6px 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #f5f8fc;
+  font-size: 13px;
+  color: #5a6a7a;
+  flex-shrink: 0;
+}
+
+.org-tree-toolbar-label {
+  line-height: 1;
+}
+
 .custom-tree-node .el-radio__label {
   padding-left: 4px !important;
 }
 
 .flow-tree {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
-  padding-top: 10px;
+  padding: 4px 6px 8px;
 }
-.flow-tree  .vue-recycle-scroller__item-wrapper{
+
+.flow-tree ::v-deep .vue-recycle-scroller__item-wrapper {
   height: 100%;
   overflow-x: auto;
 }
+
+.org-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px;
+}
+
 .channel-list-li {
-  height: 40px;
+  min-height: 40px;
   align-items: center;
   cursor: pointer;
   display: grid;
   grid-template-columns: 26px 1fr;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.channel-list-li:hover {
+  background: #f0f6ff;
 }
 </style>

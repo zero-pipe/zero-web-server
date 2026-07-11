@@ -226,9 +226,10 @@ export default {
             this.getSnapErrorEvent(snapId)
           }, 5000)
           itemData.streamId = data.stream
-          this.$refs.devicePlayer.openDialog('media', this.device.phoneNumber, channelId, {
+          this.$refs.devicePlayer.openDialog('codec', this.device.phoneNumber, channelId, {
             streamInfo: data,
-            hasAudio: itemData.hasAudio
+            hasAudio: itemData.hasAudio,
+            ptzType: itemData.ptzType
           })
           setTimeout(() => {
             this.initData()

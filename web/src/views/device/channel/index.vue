@@ -361,9 +361,10 @@ export default {
       const deviceId = this.deviceId
       const channelId = itemData.deviceId
       itemData.playLoading = true
-      this.$refs.devicePlayer.openDialog('media', deviceId, channelId, {
+      this.$refs.devicePlayer.openDialog('codec', deviceId, channelId, {
         pending: true,
-        hasAudio: itemData.hasAudio
+        hasAudio: itemData.hasAudio,
+        ptzType: itemData.ptzType
       })
       this.$store.dispatch('play/play', [deviceId, channelId])
         .then((data) => {

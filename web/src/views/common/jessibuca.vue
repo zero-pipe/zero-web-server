@@ -1,31 +1,34 @@
 <template>
     <div
       ref="container"
+      class="jessibuca-container"
       style="width:100%; height: 100%; background-color: #000000;margin:0 auto;position: relative;"
       @dblclick="fullscreenSwich"
       @mouseenter="showBar = true" @mouseleave="showBar = false"
+      @click="onUserGestureUnlockAudio"
     >
       <div id="buttonsBox" class="buttons-box" v-if="showButton === undefined || showButton" :style="{ opacity: showBar ? 1 : 0, pointerEvents: showBar ? 'auto' : 'none' }">
         <div class="buttons-box-left">
-          <i v-if="!playing" class="iconfont icon-play jessibuca-btn" @click="playBtnClick" />
-          <i v-if="playing" class="iconfont icon-pause jessibuca-btn" @click="pause" />
-          <i class="iconfont icon-stop jessibuca-btn" @click="stop" />
-          <i v-if="isNotMute" class="iconfont icon-audio-high jessibuca-btn" @click="mute()" />
-          <i v-if="!isNotMute" class="iconfont icon-audio-mute jessibuca-btn" @click="cancelMute()" />
+          <i v-if="!playing" class="iconfont icon-play jessibuca-btn" @click.stop="playBtnClick" />
+          <i v-if="playing" class="iconfont icon-pause jessibuca-btn" @click.stop="pause" />
+          <i class="iconfont icon-stop jessibuca-btn" @click.stop="stop" />
+          <i v-if="isNotMute" class="iconfont icon-audio-high jessibuca-btn" @click.stop="mute()" />
+          <i v-if="!isNotMute" class="iconfont icon-audio-mute jessibuca-btn" title="点击开启声音" @click.stop="cancelMute()" />
         </div>
         <div class="buttons-box-right">
           <span class="jessibuca-btn">{{ kBps }} kb/s</span>
-          <!--          <i class="iconfont icon-file-record1 jessibuca-btn"></i>-->
-          <!--          <i class="iconfont icon-xiangqing2 jessibuca-btn" ></i>-->
           <i
             class="iconfont icon-camera1196054easyiconnet jessibuca-btn"
             style="font-size: 1rem !important"
-            @click="screenshot"
+            @click.stop="screenshot"
           />
-          <i class="iconfont icon-shuaxin11 jessibuca-btn" @click="playBtnClick" />
-          <i v-if="!fullscreen" class="iconfont icon-weibiaoti10 jessibuca-btn" @click="fullscreenSwich" />
-          <i v-if="fullscreen" class="iconfont icon-weibiaoti11 jessibuca-btn" @click="fullscreenSwich" />
+          <i class="iconfont icon-shuaxin11 jessibuca-btn" @click.stop="playBtnClick" />
+          <i v-if="!fullscreen" class="iconfont icon-weibiaoti10 jessibuca-btn" @click.stop="fullscreenSwich" />
+          <i v-if="fullscreen" class="iconfont icon-weibiaoti11 jessibuca-btn" @click.stop="fullscreenSwich" />
         </div>
+      </div>
+      <div v-if="playing && !isNotMute" class="jessibuca-unmute-tip" @click.stop="cancelMute()">
+        点击开启声音
       </div>
     </div>
 </template>
@@ -92,33 +95,32 @@ export default {
       }
       const isFlv = this.isLiveFlvUrl(url)
       const isWsFlv = this.isWsFlvUrl(url)
+      // 与 H265web ignoreAudio=0 对齐：播放器始终解 FLV 音轨。
+      // 通道 hasAudio 只影响国标是否带音频邀请，不能用来关掉已推流 AAC。
       const options = {
         container: this.$refs.container,
         videoBuffer: isFlv ? 0.2 : 0,
         isResize: true,
-        // WS-FLV 走 wasm 解码；HTTP-FLV 可用 MSE
+        // WS-FLV 走 wasm 解码；HTTP-FLV 可用 MSE（AAC 走浏览器解码）
         useMSE: isFlv && !isWsFlv,
         useWCS: false,
         text: '',
-        // background: '',
         controlAutoHide: false,
         debug: false,
         hotKey: true,
         decoder: '/static/js/jessibuca/decoder.js',
-        sNotMute: true,
         timeout: 15,
         recordType: 'mp4',
         isFlv: isFlv,
         vod: !isFlv,
         forceNoOffscreen: true,
-        hasAudio: typeof (this.hasAudio) === 'undefined' ? true : this.hasAudio,
+        hasAudio: true,
         heartTimeout: 10,
         heartTimeoutReplay: true,
         heartTimeoutReplayTimes: 2,
         hiddenAutoPause: false,
         isFullResize: false,
-
-        isNotMute: this.isNotMute,
+        isNotMute: true,
         keepScreenOn: true,
         loadingText: '请稍等, 视频加载中......',
         loadingTimeout: 15,
@@ -132,12 +134,9 @@ export default {
           audio: false,
           recorder: false
         },
-        // rotate: 0,
         showBandwidth: false,
         supportDblclickFullscreen: false,
-
         useWebFullSreen: true,
-
         wasmDecodeErrorReplay: true,
         wcsUseVideoRendcer: true
       }
@@ -150,7 +149,11 @@ export default {
       })
       jessibuca.on('play', () => {
         this.playing = true
+        this.loaded = true
+        this.quieting = jessibuca.quieting
         this.$emit('playStatusChange', true)
+        // 浏览器自动播放策略常强制静音；对齐 H265web setVoice(1.0)
+        this.ensureAudioOn()
       })
       jessibuca.on('fullscreen', (msg) => {
         this.fullscreen = msg
@@ -186,13 +189,37 @@ export default {
         }
         jessibuca.videoPTS = videoPTS
       })
-      jessibuca.on('play', () => {
-        this.playing = true
-        this.loaded = true
-        this.quieting = jessibuca.quieting
-      })
+    },
+    ensureAudioOn() {
+      const player = jessibucaPlayer[this._uid]
+      if (!player) {
+        return
+      }
+      try {
+        // Jessibuca 文档：Chrome 自动播放必须静音，需真实用户手势调用 audioResume
+        if (typeof player.audioResume === 'function') {
+          player.audioResume()
+        }
+        if (typeof player.cancelMute === 'function') {
+          player.cancelMute()
+        }
+        if (typeof player.setVolume === 'function') {
+          player.setVolume(1)
+        }
+        if (typeof player.isMute === 'function') {
+          this.isNotMute = !player.isMute()
+        } else {
+          this.isNotMute = true
+        }
+      } catch (e) {
+        console.warn('Jessibuca unmute failed:', e)
+      }
+    },
+    onUserGestureUnlockAudio() {
+      this.ensureAudioOn()
     },
     playBtnClick: function() {
+      this.ensureAudioOn()
       this.play(this.videoUrl)
     },
     play: function(url) {
@@ -214,14 +241,20 @@ export default {
         this.create(url)
         jessibucaPlayer[this._uid]._zmsIsFlv = isFlv
       }
-      if (jessibucaPlayer[this._uid].hasLoaded()) {
-        jessibucaPlayer[this._uid].play(url)
-      } else {
-        jessibucaPlayer[this._uid].on('load', () => {
-          jessibucaPlayer[this._uid].play(url)
-        })
+      const start = () => {
+        const p = jessibucaPlayer[this._uid]
+        const ret = p.play(url)
+        if (ret && typeof ret.then === 'function') {
+          ret.then(() => this.ensureAudioOn()).catch(() => this.ensureAudioOn())
+        } else {
+          this.$nextTick(() => this.ensureAudioOn())
+        }
       }
-
+      if (jessibucaPlayer[this._uid].hasLoaded()) {
+        start()
+      } else {
+        jessibucaPlayer[this._uid].on('load', start)
+      }
     },
     pause: function() {
       if (jessibucaPlayer[this._uid]) {
@@ -249,11 +282,10 @@ export default {
       if (jessibucaPlayer[this._uid]) {
         jessibucaPlayer[this._uid].mute()
       }
+      this.isNotMute = false
     },
     cancelMute: function() {
-      if (jessibucaPlayer[this._uid]) {
-        jessibucaPlayer[this._uid].cancelMute()
-      }
+      this.ensureAudioOn()
     },
     destroy: function() {
       if (jessibucaPlayer[this._uid]) {
@@ -299,6 +331,27 @@ export default {
 </script>
 
 <style>
+.jessibuca-container {
+  position: relative;
+}
+.jessibuca-unmute-tip {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  padding: 8px 14px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.jessibuca-unmute-tip:hover {
+  background: rgba(61, 139, 253, 0.85);
+}
 .buttons-box {
   width: 100%;
   height: 28px;

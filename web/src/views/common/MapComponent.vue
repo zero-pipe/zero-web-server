@@ -82,7 +82,7 @@ export default {
         })
     },
     initMap(){
-      let center = fromLonLat([116.41020, 39.915119])
+      let center = fromLonLat([104.07329, 30.54496])
       window.coordinateSystem = this.mapTileList[this.mapTileIndex].coordinateSystem
       if (window.mapParam.center) {
         center = fromLonLat(window.mapParam.center)

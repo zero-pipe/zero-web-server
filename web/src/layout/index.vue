@@ -1,5 +1,5 @@
 <template>
-  <div :class="classObj" class="app-wrapper">
+  <div :class="classObj" class="app-wrapper" :style="wrapperStyle">
     <div v-if="device==='mobile'&&sidebar.opened" class="drawer-bg" @click="handleClickOutside" />
     <sidebar class="sidebar-container" />
     <div class="main-container">
@@ -34,6 +34,14 @@ export default {
     },
     fixedHeader() {
       return this.$store.state.settings.fixedHeader
+    },
+    wrapperStyle() {
+      const w = this.sidebar.opened
+        ? (this.sidebar.totalWidth || 260)
+        : 64
+      return {
+        '--sidebar-width': w + 'px'
+      }
     },
     classObj() {
       return {
@@ -81,12 +89,12 @@ export default {
     top: 0;
     right: 0;
     z-index: 9;
-    width: calc(100% - #{$sideBarWidth});
+    width: calc(100% - var(--sidebar-width, #{$sideBarWidth}));
     transition: width 0.28s;
   }
 
   .hideSidebar .fixed-header {
-    width: calc(100% - 54px)
+    width: calc(100% - 64px);
   }
 
   .mobile .fixed-header {

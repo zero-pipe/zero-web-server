@@ -1,18 +1,17 @@
-// sidebar
-$menuText:#bfcbd9;
-$menuActiveText:#409EFF;
-$subMenuActiveText: #f4f4f5; //https://github.com/ElemeFE/element/issues/12951
+// sidebar — 蓝白双列主题
+$menuText: #64748b;
+$menuActiveText: #1565c0;
+$subMenuActiveText: #1565c0;
 
-$menuBg: #304156;
-$menuHover:#263445;
+$menuBg: #1565c0;
+$menuHover: #1976d2;
 
-$subMenuBg:#1f2d3d;
-$subMenuHover:#001528;
+$subMenuBg: #f5f8fc;
+$subMenuHover: #e8f1fb;
 
-$sideBarWidth: 210px;
+// 默认展开宽度（一级 84 + 二级 176）
+$sideBarWidth: 260px;
 
-// the :export directive is the magic sauce for webpack
-// https://www.bluematador.com/blog/how-to-share-variables-between-js-and-sass
 :export {
   menuText: $menuText;
   menuActiveText: $menuActiveText;

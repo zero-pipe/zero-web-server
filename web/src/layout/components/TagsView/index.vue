@@ -12,8 +12,12 @@
         @click.middle.native="!isAffix(tag)?closeSelectedTag(tag):''"
         @contextmenu.prevent.native="openMenu(tag,$event)"
       >
-        {{ tag.title }}
-        <span v-if="!isAffix(tag)" class="el-icon-close" @click.prevent.stop="closeSelectedTag(tag)" />
+        <span class="tags-view-title">{{ tag.title }}</span>
+        <span
+          v-if="!isAffix(tag)"
+          class="tags-view-close el-icon-close"
+          @click.prevent.stop="closeSelectedTag(tag)"
+        />
       </router-link>
     </scroll-pane>
     <ul v-show="visible" :style="{left:left+'px',top:top+'px'}" class="contextmenu">
@@ -96,7 +100,6 @@ export default {
     initTags() {
       const affixTags = this.affixTags = this.filterAffixTags(this.routes)
       for (const tag of affixTags) {
-        // Must have tag name
         if (tag.name) {
           this.$store.dispatch('tagsView/addVisitedView', tag)
         }
@@ -115,7 +118,6 @@ export default {
         for (const tag of tags) {
           if (tag.to.path === this.$route.path) {
             this.$refs.scrollPane.moveToTarget(tag)
-            // when query is different then update
             if (tag.to.fullPath !== this.$route.fullPath) {
               this.$store.dispatch('tagsView/updateVisitedView', this.$route)
             }
@@ -160,10 +162,7 @@ export default {
       if (latestView) {
         this.$router.push(latestView.fullPath)
       } else {
-        // now the default is to redirect to the home page if there is no tags-view,
-        // you can adjust it according to your needs.
         if (view.name === 'Dashboard') {
-          // to reload home page
           this.$router.replace({ path: '/redirect' + view.fullPath })
         } else {
           this.$router.push('/')
@@ -172,10 +171,10 @@ export default {
     },
     openMenu(tag, e) {
       const menuMinWidth = 105
-      const offsetLeft = this.$el.getBoundingClientRect().left // container margin left
-      const offsetWidth = this.$el.offsetWidth // container width
-      const maxLeft = offsetWidth - menuMinWidth // left boundary
-      const left = e.clientX - offsetLeft + 15 // 15: margin right
+      const offsetLeft = this.$el.getBoundingClientRect().left
+      const offsetWidth = this.$el.offsetWidth
+      const maxLeft = offsetWidth - menuMinWidth
+      const left = e.clientX - offsetLeft + 15
 
       if (left > maxLeft) {
         this.left = maxLeft
@@ -199,66 +198,119 @@ export default {
 
 <style lang="scss" scoped>
 .tags-view-container {
-  height: 34px;
+  height: 40px;
   width: 100%;
-  background: #fff;
-  border-bottom: 1px solid #d8dce5;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, .12), 0 0 3px 0 rgba(0, 0, 0, .04);
+  background: #f5f8fc;
+  border-bottom: 1px solid #e3ebf5;
+  box-shadow: none;
+
   .tags-view-wrapper {
     .tags-view-item {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
       position: relative;
       cursor: pointer;
-      height: 26px;
-      line-height: 26px;
-      border: 1px solid #d8dce5;
-      color: #495060;
-      background: #fff;
-      padding: 0 8px;
-      font-size: 12px;
-      margin-left: 5px;
-      margin-top: 4px;
+      height: 40px;
+      line-height: 40px;
+      border: none;
+      border-right: 1px solid #e8eef5;
+      color: #64748b;
+      background: transparent;
+      padding: 0 16px;
+      font-size: 13px;
+      margin: 0;
+      transition: color 0.15s ease, background 0.15s ease;
+
       &:first-of-type {
-        margin-left: 15px;
+        margin-left: 0;
+        padding-left: 18px;
       }
+
       &:last-of-type {
-        margin-right: 15px;
+        margin-right: 8px;
       }
+
+      &:hover {
+        color: #1565c0;
+        background: rgba(21, 101, 192, 0.04);
+      }
+
+      /* 行业常见页签：当前项白底 + 顶部蓝条，去掉绿色小方块/圆点 */
       &.active {
-        background-color: #42b983;
-        color: #fff;
-        border-color: #42b983;
+        background: #fff;
+        color: #1565c0;
+        font-weight: 600;
+        border-right-color: #e3ebf5;
+
         &::before {
           content: '';
-          background: #fff;
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 2px;
+          background: #1565c0;
+        }
+
+        .tags-view-close:hover {
+          background: #1565c0;
+          color: #fff;
+        }
+      }
+
+      .tags-view-title {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tags-view-close {
+        width: 16px;
+        height: 16px;
+        margin-left: 8px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 16px;
+        font-size: 12px;
+        color: #94a3b8;
+        transition: all 0.15s ease;
+
+        &:before {
           display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          position: relative;
-          margin-right: 2px;
+          transform: scale(0.85);
+        }
+
+        &:hover {
+          background: #cbd5e1;
+          color: #fff;
         }
       }
     }
   }
+
   .contextmenu {
     margin: 0;
     background: #fff;
     z-index: 3000;
     position: absolute;
     list-style-type: none;
-    padding: 5px 0;
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 6px 0;
+    border-radius: 8px;
+    font-size: 13px;
     font-weight: 400;
-    color: #333;
-    box-shadow: 2px 2px 3px 0 rgba(0, 0, 0, .3);
+    color: #334155;
+    border: 1px solid #e3ebf5;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+
     li {
       margin: 0;
-      padding: 7px 16px;
+      padding: 8px 16px;
       cursor: pointer;
+
       &:hover {
-        background: #eee;
+        background: #f0f6ff;
+        color: #1565c0;
       }
     }
   }
@@ -266,27 +318,11 @@ export default {
 </style>
 
 <style lang="scss">
-//reset element css of el-icon-close
 .tags-view-wrapper {
-  .tags-view-item {
-    .el-icon-close {
-      width: 16px;
-      height: 16px;
-      vertical-align: 2px;
-      border-radius: 50%;
-      text-align: center;
-      transition: all .3s cubic-bezier(.645, .045, .355, 1);
-      transform-origin: 100% 50%;
-      &:before {
-        transform: scale(.6);
-        display: inline-block;
-        vertical-align: -3px;
-      }
-      &:hover {
-        background-color: #b4bccc;
-        color: #fff;
-      }
-    }
+  .tags-view-item .el-icon-close {
+    width: auto;
+    height: auto;
+    vertical-align: middle;
   }
 }
 </style>

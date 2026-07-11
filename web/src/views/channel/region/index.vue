@@ -1,5 +1,5 @@
 <template>
-  <div id="region" class="app-container" style="height: calc(100vh - 118px);display: grid; grid-template-columns: 400px auto">
+  <div id="region" class="app-container" style="height: calc(100vh - 118px); display: grid; grid-template-columns: 400px auto; gap: 12px;">
     <RegionTree
       ref="regionTree"
       :show-header="true"
@@ -9,13 +9,13 @@
       :enable-add-channel="true"
       :add-channel-to-civil-code="addChannelToCivilCode"
     />
-    <div style="padding: 0 20px">
+    <div style="padding: 0 12px; min-width: 0;">
       <el-form :inline="true" size="mini">
         <el-form-item>
           <el-breadcrumb v-if="regionParents.length > 0" separator="/" style="display: ruby">
             <el-breadcrumb-item v-for="key in regionParents" :key="key">{{ key }}</el-breadcrumb-item>
           </el-breadcrumb>
-          <div v-else style="color: #00c6ff">未选择行政区划</div>
+          <div v-else style="color: #1565c0">未选择行政区划</div>
         </el-form-item>
         <div style="float: right;">
           <el-form-item label="搜索">
@@ -86,7 +86,14 @@
         <el-table-column label="类型" min-width="100">
           <template v-slot:default="scope">
             <div slot="reference" class="name-wrapper">
-              <el-tag size="medium" effect="plain" type="success" :style="$channelTypeList[scope.row.dataType].style">{{ $channelTypeList[scope.row.dataType].name }}</el-tag>
+              <el-tag
+                v-if="$channelTypeList[scope.row.dataType]"
+                size="medium"
+                effect="plain"
+                type="success"
+                :style="$channelTypeList[scope.row.dataType].style"
+              >{{ $channelTypeList[scope.row.dataType].name }}</el-tag>
+              <el-tag v-else size="medium" effect="plain" type="info">未知</el-tag>
             </div>
           </template>
         </el-table-column>

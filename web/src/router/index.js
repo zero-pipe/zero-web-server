@@ -43,18 +43,29 @@ export const constantRoutes = [
     hidden: true
   },
 
+  // 侧栏由 layout/menu.js 驱动双列展示；此处仅保留路由，hidden 避免旧 el-menu 重复
   {
     path: '/',
     component: Layout,
-    redirect: '/dashboard',
+    redirect: '/map',
     children: [{
       path: 'dashboard',
       name: '控制台',
       component: () => import('@/views/dashboard/index'),
-      meta: { title: '控制台', icon: 'dashboard', affix: true }
+      meta: { title: '控制台', icon: 'dashboard' }
     }]
   },
-
+  {
+    path: '/map',
+    component: Layout,
+    redirect: '/map',
+    children: [{
+      path: '',
+      name: 'Map',
+      component: () => import('@/views/map/index'),
+      meta: { title: '电子地图', icon: 'map', affix: true }
+    }]
+  },
   {
     path: '/live',
     component: Layout,
@@ -86,21 +97,8 @@ export const constantRoutes = [
     ]
   },
   {
-    path: '/map',
-    component: Layout,
-    redirect: '/map',
-    children: [{
-      path: '',
-      name: 'Map',
-      component: () => import('@/views/map/index'),
-      meta: { title: '电子地图', icon: 'map' }
-    }]
-  },
-  {
     path: '/device',
     component: Layout,
-    name: '设备接入',
-    meta: { title: '设备接入', icon: 'devices' },
     children: [
       {
         path: '/device',
@@ -152,8 +150,6 @@ export const constantRoutes = [
     path: '/commonChannel',
     component: Layout,
     redirect: '/commonChannel/region',
-    name: '组织结构',
-    meta: { title: '组织结构', icon: 'tree' },
     children: [
       {
         path: 'region',
@@ -254,23 +250,9 @@ export const constantRoutes = [
       }
     ]
   },
-  // {
-  //   path: '/setting',
-  //   component: Layout,
-  //   redirect: '/setting',
-  //   children: [
-  //     {
-  //       path: '',
-  //       name: '系统设置',
-  //       component: () => import('@/views/platform/index'),
-  //       meta: { title: '系统设置', icon: 'setting' }
-  //     }
-  //   ]
-  // },
   {
     path: '/operations',
     component: Layout,
-    meta: { title: '运维中心', icon: 'operations' },
     redirect: '/operations/systemInfo',
     children: [
       {

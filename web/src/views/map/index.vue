@@ -176,21 +176,50 @@ export default {
   methods: {
     initChannelLayer: function () {
       this.mapTileList = this.$refs.mapComponent.mapTileList
-      // 获取所有有位置的通道
       this.closeInfoBox()
 
-      let clientEvent = data => {
+      const clientEvent = data => {
         this.closeInfoBox()
         this.$nextTick(() => {
           if (data[0].edit) {
             this.showEditInfo(data[0])
-          }else {
+          } else {
             this.showChannelInfo(data[0])
           }
         })
       }
 
-      channelLayer = this.$refs.mapComponent.addPointLayer([], clientEvent, null)
+      if (channelLayer) {
+        this.$refs.mapComponent.removeLayer(channelLayer)
+        channelLayer = null
+      }
+
+      this.$store.dispatch('commonChanel/getAllForMap', {})
+        .then(list => {
+          const points = (list || [])
+            .filter(ch => ch.gbLongitude > 0 && ch.gbLatitude > 0)
+            .map(ch => ({
+              id: ch.gbId,
+              position: [ch.gbLongitude, ch.gbLatitude],
+              data: ch,
+              status: ch.gbStatus || ch.status || 'OFF'
+            }))
+          channelLayer = this.$refs.mapComponent.addPointLayer(points, clientEvent, null)
+          if (points.length === 1) {
+            this.$refs.mapComponent.panTo(points[0].position, window.mapParam.zoom || 15)
+          } else if (points.length > 1) {
+            const lons = points.map(p => p.position[0])
+            const lats = points.map(p => p.position[1])
+            const mid = [
+              (Math.min(...lons) + Math.max(...lons)) / 2,
+              (Math.min(...lats) + Math.max(...lats)) / 2
+            ]
+            this.$refs.mapComponent.panTo(mid, window.mapParam.zoom || 15)
+          }
+        })
+        .catch(() => {
+          channelLayer = this.$refs.mapComponent.addPointLayer([], clientEvent, null)
+        })
     },
     refreshLayer(){
       this.closeInfoBox()
@@ -350,9 +379,10 @@ export default {
       this.dragChannel = null
     },
     play: function (channel) {
-      this.$refs.player.openDialog('media', channel.gbId, {
+      this.$refs.player.openDialog('codec', channel.gbId, {
         pending: true,
-        hasAudio: channel.hasAudio
+        hasAudio: channel.hasAudio,
+        ptzType: channel.ptzType
       })
       this.$store.dispatch('commonChanel/playChannel', channel.gbId)
         .then((data) => {

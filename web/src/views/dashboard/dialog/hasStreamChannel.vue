@@ -120,9 +120,10 @@ export default {
       const deviceId = row.parentDeviceId
       const channelId = row.deviceId
       this.$set(row, "playing", true)
-      this.$refs.devicePlayer.openDialog("media", deviceId, channelId, {
+      this.$refs.devicePlayer.openDialog("codec", deviceId, channelId, {
         pending: true,
-        hasAudio: row.hasAudio
+        hasAudio: row.hasAudio,
+        ptzType: row.ptzType
       })
       this.$store.dispatch("play/play", [deviceId, channelId])
         .then((data) => {
