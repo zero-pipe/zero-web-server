@@ -227,23 +227,26 @@ func (c *Client) post(ctx context.Context, api string, params url.Values) (*APIR
 
 // StreamMediaInfo zero-media-server getMediaInfo 响应。
 type StreamMediaInfo struct {
-	Code         int    `json:"code"`
-	Msg          string `json:"msg"`
-	Schema       string `json:"schema"`
-	App          string `json:"app"`
-	Stream       string `json:"stream"`
-	VideoCodec   string `json:"videoCodec"`
-	AudioCodec   string `json:"audioCodec"`
-	Video        bool   `json:"video"`
-	Audio        bool   `json:"audio"`
-	ReaderCount  int    `json:"readerCount"`
-	AliveSecond  int64  `json:"aliveSecond"`
-	BytesSpeed   int64  `json:"bytesSpeed"`
-	VideoFps     uint   `json:"videoFps"`
-	Width        int    `json:"width"`
-	Height       int    `json:"height"`
-	OriginType   int    `json:"originType"`
-	OriginTypeStr string `json:"originTypeStr"`
+	Code          int     `json:"code"`
+	Msg           string  `json:"msg"`
+	Schema        string  `json:"schema"`
+	App           string  `json:"app"`
+	Stream        string  `json:"stream"`
+	VideoCodec    string  `json:"videoCodec"`
+	AudioCodec    string  `json:"audioCodec"`
+	Video         bool    `json:"video"`
+	Audio         bool    `json:"audio"`
+	ReaderCount   int     `json:"readerCount"`
+	AliveSecond   int64   `json:"aliveSecond"`
+	BytesSpeed    int64   `json:"bytesSpeed"`
+	VideoFps      uint    `json:"videoFps"` // 统计估算帧率
+	Fps           float64 `json:"fps"`      // SPS/元数据帧率
+	Width         int     `json:"width"`
+	Height        int     `json:"height"`
+	SampleRate    int     `json:"sampleRate"`
+	Channels      int     `json:"channels"`
+	OriginType    int     `json:"originType"`
+	OriginTypeStr string  `json:"originTypeStr"`
 }
 
 func (c *Client) GetMediaInfo(ctx context.Context, schema, app, stream string) (*StreamMediaInfo, error) {

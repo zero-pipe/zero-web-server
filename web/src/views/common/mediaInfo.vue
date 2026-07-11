@@ -30,7 +30,7 @@
           </div>
           <div class="mi-kv-item">
             <span class="mi-k">分辨率</span>
-            <span class="mi-v">{{ info.width }}×{{ info.height }}</span>
+            <span class="mi-v">{{ formatResolution() }}</span>
           </div>
           <div class="mi-kv-item">
             <span class="mi-k">帧率</span>
@@ -52,7 +52,11 @@
           </div>
           <div class="mi-kv-item">
             <span class="mi-k">采样率</span>
-            <span class="mi-v">{{ info.audioSampleRate || '—' }}</span>
+            <span class="mi-v">{{ formatSampleRate() }}</span>
+          </div>
+          <div v-if="info.channels" class="mi-kv-item">
+            <span class="mi-k">声道</span>
+            <span class="mi-v">{{ info.channels }}</span>
           </div>
         </div>
       </div>
@@ -125,6 +129,17 @@ export default {
         return `${h}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`
       }
       return `${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`
+    },
+    formatSampleRate() {
+      const rate = this.info.audioSampleRate || this.info.sampleRate
+      if (!rate) return '—'
+      return rate >= 1000 ? `${rate} Hz` : String(rate)
+    },
+    formatResolution() {
+      const w = Number(this.info.width) || 0
+      const h = Number(this.info.height) || 0
+      if (w <= 0 || h <= 0) return '—'
+      return `${w}×${h}`
     }
   }
 }

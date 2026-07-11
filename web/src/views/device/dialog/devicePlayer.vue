@@ -4,8 +4,8 @@
       v-if="showVideoDialog"
       v-el-drag-dialog
       custom-class="vms-player-dialog"
-      top="8vh"
-      width="72vw"
+      top="5vh"
+      width="1040px"
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
@@ -23,7 +23,7 @@
               class="player-container"
               v-loading="isLoging"
               element-loading-text="正在邀请设备推流…"
-              element-loading-background="rgba(0, 0, 0, 0.72)"
+              element-loading-background="rgba(240, 244, 248, 0.85)"
               element-loading-spinner="el-icon-loading"
             >
               <div v-if="playError" class="player-error-tip">{{ playError }}</div>
@@ -35,50 +35,55 @@
               />
             </div>
           </div>
+
+          <div class="player-under panel-block control-extra">
+            <el-tabs v-model="extraTab" @tab-click="extraTabClick">
+              <el-tab-pane label="实时视频" name="media">
+                <streamMediaPanel
+                  v-if="extraTab === 'media'"
+                  :player-url="playerUrlInfo.playerUrl"
+                  :play-url="playerUrlInfo.playUrl"
+                  :stream-info="streamInfo"
+                />
+              </el-tab-pane>
+              <el-tab-pane label="预置位" name="preset">
+                <ptzPreset
+                  v-if="extraTab === 'preset'"
+                  :device-id="deviceId"
+                  :channel-device-id="channelId"
+                />
+              </el-tab-pane>
+            </el-tabs>
+          </div>
         </div>
 
         <div class="control-side">
-          <el-tabs
-            v-model="tabActiveName"
-            tab-position="left"
-            class="control-tabs"
-            @tab-click="tabHandleClick"
-          >
-            <el-tab-pane label="编码信息" name="codec">
-              <mediaInfo
-                v-if="tabActiveName === 'codec'"
-                ref="mediaInfo"
-                :app="app"
-                :stream="streamId"
-                :media-server-id="mediaServerId"
+          <div class="panel-block">
+            <div class="panel-block-title">
+              <span>编码信息</span>
+              <el-button
+                icon="el-icon-refresh-right"
+                circle
+                size="mini"
+                @click="refreshMediaInfo"
               />
-            </el-tab-pane>
-            <el-tab-pane label="实时视频" name="media">
-              <streamMediaPanel
-                v-if="tabActiveName === 'media'"
-                :player-url="playerUrlInfo.playerUrl"
-                :play-url="playerUrlInfo.playUrl"
-                :stream-info="streamInfo"
-              />
-            </el-tab-pane>
-            <el-tab-pane label="云台控制" name="ptz" :disabled="!ptzEnabled">
-              <devicePtzPanel
-                v-if="tabActiveName === 'ptz' && ptzEnabled"
-                :device-id="deviceId"
-                :channel-id="channelId"
-                @drag-zoom-start="toggleDragZoom"
-              />
-              <div v-else-if="tabActiveName === 'ptz'" class="panel-disabled-tip">当前通道为枪机，不支持云台控制</div>
-            </el-tab-pane>
-            <el-tab-pane label="预置位" name="preset" :disabled="!ptzEnabled">
-              <ptzPreset
-                v-if="tabActiveName === 'preset' && ptzEnabled"
-                :device-id="deviceId"
-                :channel-device-id="channelId"
-              />
-              <div v-else-if="tabActiveName === 'preset'" class="panel-disabled-tip">当前通道为枪机，不支持预置位</div>
-            </el-tab-pane>
-          </el-tabs>
+            </div>
+            <mediaInfo
+              ref="mediaInfo"
+              :app="app"
+              :stream="streamId"
+              :media-server-id="mediaServerId"
+            />
+          </div>
+
+          <div class="panel-block is-ptz">
+            <div class="panel-block-title">云台控制</div>
+            <devicePtzPanel
+              :device-id="deviceId"
+              :channel-id="channelId"
+              @drag-zoom-start="toggleDragZoom"
+            />
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -93,7 +98,6 @@ import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
 import streamMediaPanel from '../../common/streamMediaPanel.vue'
 
-/** GB28181 ptzType: 1 球机 / 2 半球 可云台；3 固定枪机 / 4 遥控枪机 不可 */
 function isDomeCamera(ptzType) {
   const t = Number(ptzType)
   return t === 1 || t === 2
@@ -112,7 +116,7 @@ export default {
       deviceId: '',
       channelId: '',
       ptzType: 0,
-      tabActiveName: 'codec',
+      extraTab: 'media',
       hasAudio: false,
       isLoging: false,
       playError: '',
@@ -134,28 +138,16 @@ export default {
     }
   },
   methods: {
-    tabHandleClick(tab) {
-      if (tab.name === 'codec') {
-        this.$nextTick(() => {
-          this.$refs.mediaInfo && this.$refs.mediaInfo.startTask()
-        })
-      } else {
-        this.$refs.mediaInfo && this.$refs.mediaInfo.stopTask()
-      }
-    },
-    resolveTab(tab) {
-      const name = tab === 'streamPlay' ? 'media' : (tab || 'codec')
-      if ((name === 'ptz' || name === 'preset') && !this.ptzEnabled) {
-        return 'codec'
-      }
-      return name
+    extraTabClick() {},
+    refreshMediaInfo() {
+      this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo()
     },
     openDialog(tab, deviceId, channelId, param) {
       if (this.showVideoDialog) return
       this.deviceId = deviceId
       this.channelId = channelId
       this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
-      this.tabActiveName = this.resolveTab(tab)
+      this.extraTab = tab === 'preset' ? 'preset' : 'media'
       this.streamId = ''
       this.mediaServerId = ''
       this.app = ''
@@ -197,7 +189,7 @@ export default {
           this.$refs.playerTabs.setStreamInfo(streamInfo.transcodeStream || streamInfo)
           this.$refs.playerTabs.syncPlayerSize && this.$refs.playerTabs.syncPlayerSize()
         }
-        if (this.tabActiveName === 'codec' && this.$refs.mediaInfo) {
+        if (this.$refs.mediaInfo) {
           this.$refs.mediaInfo.startTask()
         }
       })
@@ -217,7 +209,7 @@ export default {
       this.streamInfo = null
       this.videoUrl = ''
       this.ptzType = 0
-      this.tabActiveName = 'codec'
+      this.extraTab = 'media'
       this.showVideoDialog = false
     },
     toggleDragZoom(direction) {

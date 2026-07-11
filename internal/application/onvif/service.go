@@ -261,6 +261,7 @@ func (s *Service) ProbeAll(ctx context.Context) error {
 type PlayResult struct {
 	App              string            `json:"app"`
 	Stream           string            `json:"stream"`
+	MediaServerID    string            `json:"mediaServerId"`
 	ConfigCodec      string            `json:"configCodec"`
 	VideoCodec       string            `json:"videoCodec"`
 	AudioCodec       string            `json:"audioCodec"`
@@ -395,6 +396,7 @@ func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, i
 	return &PlayResult{
 		App:             app,
 		Stream:          stream,
+		MediaServerID:   s.mediaCfg.ID,
 		ConfigCodec:     configCodec,
 		VideoCodec:      videoCodec,
 		AudioCodec:      mediaAudio,

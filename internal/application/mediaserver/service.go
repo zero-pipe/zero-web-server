@@ -126,20 +126,34 @@ func (s *Service) MediaInfo(app, stream, mediaServerID string) (map[string]any, 
 	if info == nil {
 		return nil, fmt.Errorf("流不存在或已离线")
 	}
+	fps := any(info.VideoFps)
+	if info.Fps > 0 {
+		fps = info.Fps
+	}
+	var audioSampleRate any
+	if info.SampleRate > 0 {
+		audioSampleRate = info.SampleRate
+	}
+	var channels any
+	if info.Channels > 0 {
+		channels = info.Channels
+	}
 	return map[string]any{
-		"app":           info.App,
-		"stream":        info.Stream,
-		"schema":        info.Schema,
-		"videoCodec":    info.VideoCodec,
-		"audioCodec":    info.AudioCodec,
-		"readerCount":   info.ReaderCount,
-		"aliveSecond":   info.AliveSecond,
-		"bytesSpeed":    info.BytesSpeed,
-		"fps":           info.VideoFps,
-		"width":         info.Width,
-		"height":        info.Height,
-		"originType":    info.OriginType,
-		"originTypeStr": info.OriginTypeStr,
+		"app":             info.App,
+		"stream":          info.Stream,
+		"schema":          info.Schema,
+		"videoCodec":      info.VideoCodec,
+		"audioCodec":      info.AudioCodec,
+		"readerCount":     info.ReaderCount,
+		"aliveSecond":     info.AliveSecond,
+		"bytesSpeed":      info.BytesSpeed,
+		"fps":             fps,
+		"width":           info.Width,
+		"height":          info.Height,
+		"audioSampleRate": audioSampleRate,
+		"channels":        channels,
+		"originType":      info.OriginType,
+		"originTypeStr":   info.OriginTypeStr,
 	}, nil
 }
 

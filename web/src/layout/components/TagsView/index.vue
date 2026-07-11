@@ -200,9 +200,12 @@ export default {
 .tags-view-container {
   height: 40px;
   width: 100%;
-  background: #f5f8fc;
+  /* 与主内容区同色，选中页签才能“连”下去 */
+  background: #f0f4f8;
   border-bottom: 1px solid #e3ebf5;
   box-shadow: none;
+  position: relative;
+  z-index: 1;
 
   .tags-view-wrapper {
     .tags-view-item {
@@ -213,17 +216,16 @@ export default {
       height: 40px;
       line-height: 40px;
       border: none;
-      border-right: 1px solid #e8eef5;
       color: #64748b;
       background: transparent;
-      padding: 0 16px;
+      padding: 0 18px;
       font-size: 13px;
       margin: 0;
       transition: color 0.15s ease, background 0.15s ease;
 
       &:first-of-type {
         margin-left: 0;
-        padding-left: 18px;
+        padding-left: 20px;
       }
 
       &:last-of-type {
@@ -232,29 +234,29 @@ export default {
 
       &:hover {
         color: #1565c0;
-        background: rgba(21, 101, 192, 0.04);
       }
 
-      /* 行业常见页签：当前项白底 + 顶部蓝条，去掉绿色小方块/圆点 */
+      /* 与下方内容同色并盖住底部分割线，形成一体 */
       &.active {
-        background: #fff;
+        background: #f0f4f8;
         color: #1565c0;
         font-weight: 600;
-        border-right-color: #e3ebf5;
+        z-index: 2;
+        margin-bottom: -1px;
+        border-bottom: 1px solid #f0f4f8;
 
-        &::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 0;
-          height: 2px;
-          background: #1565c0;
+        &::before,
+        &::after {
+          content: none;
         }
 
-        .tags-view-close:hover {
-          background: #1565c0;
-          color: #fff;
+        .tags-view-close {
+          color: #5b8fd9;
+
+          &:hover {
+            background: #1565c0;
+            color: #fff;
+          }
         }
       }
 
