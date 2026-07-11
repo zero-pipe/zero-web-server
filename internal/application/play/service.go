@@ -66,6 +66,23 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 		return nil, err
 	}
 
+	// 已有 INVITE 会话，或流已在推：只返回拉流地址，禁止二次 INVITE。
+	// 二次 INVITE 会让摄像机掐掉旧 RTP → HLS 空片几百字节 → 播放器 0FPS / 循环缓存。
+	if _, hasInvite := s.sip.InviteManager().Get(stream); hasInvite {
+		applog.Infof("[GB28181 play] skip re-INVITE, invite session exists stream=%s", stream)
+		s.mediaServers.BindStream(app, stream, node.ID())
+		return s.buildStreamContent(app, stream, node), nil
+	}
+	if info := node.Client.LookupStreamMediaInfo(ctx, app, stream); gbLiveStreamReady(info) {
+		applog.Infof("[GB28181 play] skip re-INVITE, stream live app=%s stream=%s bytesSpeed=%d fps=%d readers=%d",
+			app, stream, info.BytesSpeed, info.VideoFps, info.ReaderCount)
+		s.mediaServers.BindStream(app, stream, node.ID())
+		content := s.buildStreamContent(app, stream, node)
+		mediakit.LogPlayStreamPaths("[GB28181 play] reuse live URLs", app, stream, "",
+			mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream))
+		return content, nil
+	}
+
 	sdpIP := device.SDPIP
 	if sdpIP == "" {
 		sdpIP = node.SDPIP()
@@ -109,6 +126,24 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 	mediakit.LogPlayStreamPaths("[GB28181 play 6/6] URLs ready (invite async)", app, stream, pushURL,
 		mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream))
 	return content, nil
+}
+
+// gbLiveStreamReady 国标实时流是否已有可播数据（与 ONVIF isStreamReadyForPlay 同思路）。
+func gbLiveStreamReady(info *mediakit.StreamMediaInfo) bool {
+	if info == nil || !info.Video {
+		return false
+	}
+	const minBytes int64 = 2048
+	if info.BytesSpeed >= minBytes {
+		return true
+	}
+	if info.VideoFps > 0 && info.BytesSpeed > 0 {
+		return true
+	}
+	if info.Width >= 320 && info.Height >= 240 && info.BytesSpeed > 0 {
+		return true
+	}
+	return false
 }
 
 func (s *Service) StopPlay(deviceID, channelDeviceID string) error {

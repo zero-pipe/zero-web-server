@@ -32,13 +32,37 @@
           <el-tag v-else size="mini" type="info">否</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="320" fixed="right">
+      <el-table-column label="操作" min-width="300" fixed="right">
         <template v-slot:default="scope">
-          <el-button size="mini" type="primary" @click="handlePlay(scope.row)">播放</el-button>
-          <el-button size="mini" @click="handleStop(scope.row)">停止</el-button>
-          <el-button v-if="scope.row.hasPtz" size="mini" @click="handlePtz(scope.row, 'LEFT')">左</el-button>
-          <el-button v-if="scope.row.hasPtz" size="mini" @click="handlePtz(scope.row, 'RIGHT')">右</el-button>
-          <el-button v-if="scope.row.hasPtz" size="mini" @click="handlePtz(scope.row, 'STOP')">停</el-button>
+          <el-button
+            size="medium"
+            type="text"
+            icon="el-icon-video-play"
+            :loading="scope.row.playLoading"
+            @click="handlePlay(scope.row)"
+          >播放
+          </el-button>
+          <el-button
+            size="medium"
+            type="text"
+            icon="el-icon-switch-button"
+            style="color: #f56c6c"
+            @click="handleStop(scope.row)"
+          >停止
+          </el-button>
+          <template v-if="scope.row.hasPtz">
+            <el-divider direction="vertical" />
+            <el-dropdown @command="(cmd) => handlePtz(scope.row, cmd)">
+              <el-button size="medium" type="text">
+                云台<i class="el-icon-arrow-down el-icon--right" />
+              </el-button>
+              <el-dropdown-menu>
+                <el-dropdown-item command="LEFT">左转</el-dropdown-item>
+                <el-dropdown-item command="RIGHT">右转</el-dropdown-item>
+                <el-dropdown-item command="STOP">停止</el-dropdown-item>
+              </el-dropdown-menu>
+            </el-dropdown>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -55,7 +79,6 @@
       <div slot="title" class="vms-player-header">
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
-        <span>视频播放</span>
         <span v-if="playMeta && playMeta.streamType" class="onvif-header-sub">{{ playMeta.streamType }}</span>
       </div>
 

@@ -154,6 +154,10 @@ func ensureDeviceChannelColumns(db *gorm.DB) error {
 		}
 		applog.Info("added missing column", "table", "zws_device_channel", "column", c.name)
 	}
+	// 空串会被 COALESCE 当成有效值，导致树节点无名/离线；统一洗成 NULL
+	_ = db.Exec(`UPDATE zws_device_channel SET gb_name = NULL WHERE gb_name IS NOT NULL AND TRIM(gb_name) = ''`).Error
+	_ = db.Exec(`UPDATE zws_device_channel SET gb_status = NULL WHERE gb_status IS NOT NULL AND TRIM(gb_status) = ''`).Error
+	_ = db.Exec(`UPDATE zws_device_channel SET gb_device_id = NULL WHERE gb_device_id IS NOT NULL AND TRIM(gb_device_id) = ''`).Error
 	return nil
 }
 

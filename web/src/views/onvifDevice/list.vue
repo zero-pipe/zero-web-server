@@ -35,11 +35,32 @@
           <el-tag v-else size="mini" type="info">离线</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
+      <el-table-column label="操作" min-width="280" fixed="right">
         <template v-slot:default="scope">
-          <el-button size="mini" type="primary" @click="$emit('show-channel', scope.row.id)">通道</el-button>
-          <el-button size="mini" @click="handleSync(scope.row.id)">同步</el-button>
-          <el-button size="mini" type="danger" @click="handleDelete(scope.row.id)">删除</el-button>
+          <el-button
+            type="text"
+            size="medium"
+            icon="el-icon-video-camera"
+            @click="$emit('show-channel', scope.row.id)"
+          >通道
+          </el-button>
+          <el-divider direction="vertical" />
+          <el-button
+            type="text"
+            size="medium"
+            icon="el-icon-refresh"
+            @click="handleSync(scope.row.id)"
+          >同步
+          </el-button>
+          <el-divider direction="vertical" />
+          <el-button
+            type="text"
+            size="medium"
+            icon="el-icon-delete"
+            style="color: #f56c6c"
+            @click="handleDelete(scope.row.id)"
+          >删除
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -77,7 +98,13 @@
         <el-table-column prop="location" label="位置" />
         <el-table-column label="操作" width="100">
           <template v-slot:default="scope">
-            <el-button size="mini" type="primary" @click="addDiscovered(scope.row)">添加</el-button>
+            <el-button
+              type="text"
+              size="medium"
+              icon="el-icon-plus"
+              @click="addDiscovered(scope.row)"
+            >添加
+            </el-button>
           </template>
         </el-table-column>
       </el-table>

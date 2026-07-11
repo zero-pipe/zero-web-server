@@ -65,18 +65,18 @@ func (r *GroupRegionRepository) QueryGroupChannels(query, parentDeviceID string)
 	sql := `
 SELECT id,
        CONCAT('channel', id) AS tree_id,
-       COALESCE(gb_device_id, device_id) AS device_id,
-       COALESCE(gb_name, name) AS name,
+       COALESCE(NULLIF(TRIM(gb_device_id), ''), device_id) AS device_id,
+       COALESCE(NULLIF(TRIM(gb_name), ''), NULLIF(TRIM(name), ''), NULLIF(TRIM(gb_device_id), ''), '未命名') AS name,
        gb_parent_id AS parent_device_id,
        gb_business_group_id AS business_group,
-       COALESCE(gb_status, status) AS status,
+       COALESCE(NULLIF(TRIM(gb_status), ''), NULLIF(TRIM(status), ''), 'OFF') AS status,
        1 AS type,
        1 AS is_leaf
 FROM zws_device_channel
 WHERE channel_type = 0 AND gb_parent_id = ?`
 	args := []any{parentDeviceID}
 	if query != "" {
-		sql += " AND (COALESCE(gb_device_id, device_id) LIKE ? OR COALESCE(gb_name, name) LIKE ?)"
+		sql += " AND (COALESCE(NULLIF(TRIM(gb_device_id), ''), device_id) LIKE ? OR COALESCE(NULLIF(TRIM(gb_name), ''), name) LIKE ?)"
 		like := fmt.Sprintf("%%%s%%", query)
 		args = append(args, like, like)
 	}
@@ -137,10 +137,10 @@ func (r *GroupRegionRepository) QueryRegionChannels(parentDeviceID string) ([]do
 	sql := `
 SELECT id,
        CONCAT('channel', id) AS tree_id,
-       COALESCE(gb_device_id, device_id) AS device_id,
-       COALESCE(gb_name, name) AS name,
+       COALESCE(NULLIF(TRIM(gb_device_id), ''), device_id) AS device_id,
+       COALESCE(NULLIF(TRIM(gb_name), ''), NULLIF(TRIM(name), ''), NULLIF(TRIM(gb_device_id), ''), '未命名') AS name,
        gb_parent_id AS parent_device_id,
-       COALESCE(gb_status, status) AS status,
+       COALESCE(NULLIF(TRIM(gb_status), ''), NULLIF(TRIM(status), ''), 'OFF') AS status,
        1 AS type,
        1 AS is_leaf
 FROM zws_device_channel

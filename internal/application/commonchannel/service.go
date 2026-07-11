@@ -128,6 +128,9 @@ func (s *Service) Play(channelID int) (*dto.StreamContent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("通道不存在")
 	}
+	if strings.TrimSpace(ch.DeviceID) == "" || strings.TrimSpace(ch.GBDeviceID) == "" {
+		return nil, fmt.Errorf("通道编号不完整，请在国标设备中刷新目录后重试")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return s.play.StartPlay(ctx, ch.DeviceID, ch.GBDeviceID)

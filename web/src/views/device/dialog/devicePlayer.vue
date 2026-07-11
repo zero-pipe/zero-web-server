@@ -4,8 +4,8 @@
       v-if="showVideoDialog"
       v-el-drag-dialog
       custom-class="vms-player-dialog"
-      top="2vh"
-      width="1280px"
+      top="5vh"
+      width="1040px"
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
@@ -13,71 +13,86 @@
       <div slot="title" class="vms-player-header">
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
-        <span>视频播放</span>
+        <span class="vms-player-select">
+          播放器:
+          <el-select v-model="selectedPlayer" size="mini" style="width: 120px" @change="onPlayerChange">
+            <el-option label="Jessibuca" value="jessibuca" />
+            <el-option label="WebRTC" value="webRTC" />
+            <el-option label="H265web" value="h265web" />
+          </el-select>
+        </span>
       </div>
 
       <div class="dhsdk-player-body">
-        <div
-          class="player-container"
-          v-loading="isLoging"
-          element-loading-text="正在邀请设备推流…"
-          element-loading-background="rgba(240, 244, 248, 0.85)"
-          element-loading-spinner="el-icon-loading"
-        >
-          <div v-if="playError" class="player-error-tip">{{ playError }}</div>
-          <playerTabs
-            ref="playerTabs"
-            :has-audio="hasAudio"
-            :show-button="true"
-            @playerChanged="playerChanged"
-          />
+        <div class="player-side">
+          <div class="player-stage">
+            <div
+              class="player-container"
+              v-loading="isLoging"
+              element-loading-text="正在邀请设备推流…"
+              element-loading-background="rgba(240, 244, 248, 0.85)"
+              element-loading-spinner="el-icon-loading"
+            >
+              <div v-if="playError" class="player-error-tip">{{ playError }}</div>
+              <playerTabs
+                ref="playerTabs"
+                :has-audio="hasAudio"
+                :show-button="true"
+                :show-tab="false"
+                :preferred-player="selectedPlayer"
+                @playerChanged="playerChanged"
+              />
+            </div>
+          </div>
+
+          <div class="player-under panel-block control-extra">
+            <el-tabs v-model="extraTab" @tab-click="extraTabClick">
+              <el-tab-pane label="实时视频" name="media">
+                <streamMediaPanel
+                  v-if="extraTab === 'media'"
+                  :player-url="playerUrlInfo.playerUrl"
+                  :play-url="playerUrlInfo.playUrl"
+                  :stream-info="streamInfo"
+                />
+              </el-tab-pane>
+              <el-tab-pane label="预置位" name="preset">
+                <ptzPreset
+                  v-if="extraTab === 'preset'"
+                  :device-id="deviceId"
+                  :channel-device-id="channelId"
+                />
+              </el-tab-pane>
+            </el-tabs>
+          </div>
         </div>
 
-        <div class="panel-block panel-encoding">
-          <div class="panel-block-title">
-            <span>编码信息</span>
-            <el-button
-              icon="el-icon-refresh-right"
-              circle
-              size="mini"
-              @click="refreshMediaInfo"
+        <div class="control-side">
+          <div class="panel-block">
+            <div class="panel-block-title">
+              <span>编码信息</span>
+              <el-button
+                icon="el-icon-refresh-right"
+                circle
+                size="mini"
+                @click="refreshMediaInfo"
+              />
+            </div>
+            <mediaInfo
+              ref="mediaInfo"
+              :app="app"
+              :stream="streamId"
+              :media-server-id="mediaServerId"
             />
           </div>
-          <mediaInfo
-            ref="mediaInfo"
-            :app="app"
-            :stream="streamId"
-            :media-server-id="mediaServerId"
-          />
-        </div>
 
-        <div class="player-under panel-block control-extra">
-          <el-tabs v-model="extraTab" @tab-click="extraTabClick">
-            <el-tab-pane label="分享与地址" name="media">
-              <streamMediaPanel
-                v-if="extraTab === 'media'"
-                :player-url="playerUrlInfo.playerUrl"
-                :play-url="playerUrlInfo.playUrl"
-                :stream-info="streamInfo"
-              />
-            </el-tab-pane>
-            <el-tab-pane label="预置位" name="preset">
-              <ptzPreset
-                v-if="extraTab === 'preset'"
-                :device-id="deviceId"
-                :channel-device-id="channelId"
-              />
-            </el-tab-pane>
-          </el-tabs>
-        </div>
-
-        <div class="panel-block is-ptz">
-          <div class="panel-block-title">云台控制</div>
-          <devicePtzPanel
-            :device-id="deviceId"
-            :channel-id="channelId"
-            @drag-zoom-start="toggleDragZoom"
-          />
+          <div class="panel-block is-ptz">
+            <div class="panel-block-title">云台控制</div>
+            <devicePtzPanel
+              :device-id="deviceId"
+              :channel-id="channelId"
+              @drag-zoom-start="toggleDragZoom"
+            />
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -116,11 +131,18 @@ export default {
       playError: '',
       showVideoDialog: false,
       streamInfo: null,
+      selectedPlayer: 'jessibuca',
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
       },
       dragZoomDirection: ''
+    }
+  },
+  created() {
+    const saved = window.localStorage.getItem('globalPlayer')
+    if (saved && ['jessibuca', 'webRTC', 'h265web'].includes(saved)) {
+      this.selectedPlayer = saved
     }
   },
   computed: {
@@ -132,6 +154,13 @@ export default {
     }
   },
   methods: {
+    onPlayerChange(key) {
+      this.selectedPlayer = key
+      window.localStorage.setItem('globalPlayer', key)
+      if (this.$refs.playerTabs) {
+        this.$refs.playerTabs.switchPlayer(key)
+      }
+    },
     extraTabClick() {},
     refreshMediaInfo() {
       this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo()

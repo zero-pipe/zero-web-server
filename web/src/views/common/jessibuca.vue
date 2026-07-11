@@ -2,7 +2,7 @@
     <div
       ref="container"
       class="jessibuca-container"
-      style="width:100%; height: 100%; background-color: #3a4556;margin:0 auto;position: relative;"
+      style="width:100%; height: 100%; background-color: #000000;margin:0 auto;position: relative;"
       @dblclick="fullscreenSwich"
       @mouseenter="showBar = true" @mouseleave="showBar = false"
       @click="onUserGestureUnlockAudio"
@@ -64,15 +64,10 @@ export default {
   created() {
     this.btnDom = document.getElementById('buttonsBox')
   },
-  mounted() {
-    this.bindResizeObserver()
-  },
+  mounted() {},
   destroyed() {
-    this.unbindResizeObserver()
     clearTimeout(this._sizeWaitTimer)
     this._sizeWaitTimer = null
-    clearTimeout(this._resizeDebounce)
-    this._resizeDebounce = null
     this._pendingPlayUrl = null
     if (jessibucaPlayer[this._uid]) {
       jessibucaPlayer[this._uid].videoPTS = 0
@@ -167,8 +162,6 @@ export default {
         this.$emit('playStatusChange', true)
         // 浏览器自动播放策略常强制静音；对齐 H265web setVoice(1.0)
         this.ensureAudioOn()
-        // 国标等异步出流时弹窗布局后才稳定，补几次 resize 消四边黑框
-        this.scheduleResize([0, 50, 200, 500])
       })
       jessibuca.on('fullscreen', (msg) => {
         this.fullscreen = msg
@@ -188,9 +181,7 @@ export default {
       jessibuca.on('kBps', (kBps) => {
         this.kBps = Math.round(kBps)
       })
-      jessibuca.on('videoInfo', () => {
-        this.scheduleResize([0, 80])
-      })
+      jessibuca.on('videoInfo', () => {})
       jessibuca.on('audioInfo', () => {})
       jessibuca.on('error', (msg) => {
         console.warn('Jessibuca error:', msg)
@@ -368,35 +359,8 @@ export default {
 
     },
     resize(width, height) {
-      const player = jessibucaPlayer[this._uid]
-      if (!player || typeof player.resize !== 'function') return
-      try {
-        player.resize()
-      } catch (e) { /* ignore */ }
-    },
-    updatePlayerDomSize() {
-      this.resize()
-    },
-    scheduleResize(delays) {
-      const list = Array.isArray(delays) ? delays : [0]
-      list.forEach((ms) => {
-        setTimeout(() => this.resize(), ms)
-      })
-    },
-    bindResizeObserver() {
-      if (typeof ResizeObserver === 'undefined') return
-      const el = this.$refs.container
-      if (!el || this._ro) return
-      this._ro = new ResizeObserver(() => {
-        clearTimeout(this._resizeDebounce)
-        this._resizeDebounce = setTimeout(() => this.resize(), 40)
-      })
-      this._ro.observe(el)
-    },
-    unbindResizeObserver() {
-      if (this._ro) {
-        try { this._ro.disconnect() } catch (e) { /* ignore */ }
-        this._ro = null
+      if (jessibucaPlayer[this._uid]) {
+        jessibucaPlayer[this._uid].resize()
       }
     },
     getVideoElement() {

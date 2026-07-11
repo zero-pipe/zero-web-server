@@ -1,5 +1,5 @@
 <template>
-  <div :id="'h265Player-' + _uid" ref="container" style="background-color: #3a4556; position: relative; display: flex; align-items: center; justify-content: center;" @dblclick="fullscreenSwich" @mouseenter="showBar = true" @mouseleave="showBar = false">
+  <div :id="'h265Player-' + _uid" ref="container" style="background-color: #000000; position: relative; display: flex; align-items: center; justify-content: center;" @dblclick="fullscreenSwich" @mouseenter="showBar = true" @mouseleave="showBar = false">
     <div :id="'glplayer-' + _uid" ref="playerBox" style="width: 100%; height: 100%; margin: 0 auto;">
       <div v-if="playerLoading" class="play-loading">
         <i class="el-icon-loading" />

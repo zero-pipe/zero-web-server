@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	domainchannel "zero-web-kit/internal/domain/channel"
@@ -186,11 +187,13 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 				DataDeviceID: dataDeviceID,
 				GBDeviceID:   ch.GBDeviceID,
 				Name:         ch.Name,
+				GBName:       ch.Name,
 				Manufacturer: ch.Manufacturer,
 				Model:        ch.Model,
 				Parental:     ch.Parental,
 				ParentID:     ch.ParentID,
 				Status:       ch.Status,
+				GBStatus:     ch.Status,
 				Longitude:    ch.Longitude,
 				Latitude:     ch.Latitude,
 				PTZType:      ch.PTZType,
@@ -206,7 +209,19 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 
 func (r *ChannelRepository) Update(m *model.GBDeviceChannel) error {
 	m.UpdateTime = nowTimeStr()
-	return r.db.Save(m).Error
+	// 勿用 Save 全字段覆盖：会把未赋值的 gb_name/gb_status 写成空串，
+	// 树查询 COALESCE(gb_name, name) 遇到 '' 不会回退到 name，导致分屏/地图无名。
+	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", m.ID).Updates(map[string]interface{}{
+		"name":         m.Name,
+		"gb_name":      m.Name,
+		"gb_device_id": m.GBDeviceID,
+		"longitude":    m.Longitude,
+		"gb_longitude": m.Longitude,
+		"latitude":     m.Latitude,
+		"gb_latitude":  m.Latitude,
+		"ptz_type":     m.PTZType,
+		"update_time":  m.UpdateTime,
+	}).Error
 }
 
 func (r *ChannelRepository) ListCommon(page, count int, query string, channelType *int, online *bool, hasRecordPlan *bool) ([]*domainchannel.Channel, int64, error) {
@@ -333,9 +348,9 @@ func (r *ChannelRepository) listCommonByAssociation(page, count int, query strin
 	}
 	if online != nil {
 		if *online {
-			q = q.Where("COALESCE(gb_status, status) = ?", "ON")
+			q = q.Where("COALESCE(NULLIF(TRIM(gb_status), ''), NULLIF(TRIM(status), ''), 'OFF') = ?", "ON")
 		} else {
-			q = q.Where("COALESCE(gb_status, status) <> ?", "ON")
+			q = q.Where("COALESCE(NULLIF(TRIM(gb_status), ''), NULLIF(TRIM(status), ''), 'OFF') <> ?", "ON")
 		}
 	}
 	// 平台挂载只用 gb_*；parent_id/civil_code 可能是设备目录同步写入的国标字段，
@@ -532,21 +547,40 @@ func toModelDevice(d *domaindevice.Device) *model.GBDevice {
 }
 
 func toDomainChannel(m *model.GBDeviceChannel) *domainchannel.Channel {
+	name := strings.TrimSpace(m.GBName)
+	if name == "" {
+		name = strings.TrimSpace(m.Name)
+	}
+	status := strings.TrimSpace(m.GBStatus)
+	if status == "" {
+		status = strings.TrimSpace(m.Status)
+	}
+	lon, lat := m.Longitude, m.Latitude
+	if m.GBLongitude != 0 {
+		lon = m.GBLongitude
+	}
+	if m.GBLatitude != 0 {
+		lat = m.GBLatitude
+	}
+	ptz := m.PTZType
+	if m.GBPTZType > 0 {
+		ptz = m.GBPTZType
+	}
 	return &domainchannel.Channel{
 		ID:           m.ID,
 		DeviceID:     m.DeviceID,
 		DataType:     m.DataType,
 		DataDeviceID: m.DataDeviceID,
-		GBDeviceID:   m.GBDeviceID,
-		Name:         m.Name,
+		GBDeviceID:   strings.TrimSpace(m.GBDeviceID),
+		Name:         name,
 		Manufacturer: m.Manufacturer,
 		Model:        m.Model,
-		Status:       m.Status,
-		PTZType:      m.PTZType,
+		Status:       status,
+		PTZType:      ptz,
 		Parental:     m.Parental,
 		ParentID:     m.ParentID,
-		Longitude:    m.Longitude,
-		Latitude:     m.Latitude,
+		Longitude:    lon,
+		Latitude:     lat,
 		HasAudio:     m.HasAudio,
 		SubCount:     m.SubCount,
 		CreateTime:   m.CreateTime,
