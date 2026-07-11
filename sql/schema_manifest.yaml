@@ -22,6 +22,8 @@ required:
       module: gb28181
     - name: zws_media_server
       module: media
+    - name: zws_gb_sip_config
+      module: gb28181
     - name: zws_platform
       module: cascade
     - name: zws_platform_channel

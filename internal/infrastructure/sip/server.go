@@ -66,7 +66,11 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 	if localIP == "" || localIP == "0.0.0.0" || localIP == "127.0.0.1" {
 		localIP = guessLocalIP()
 	}
-	uaOpts := []sipgo.UserAgentOption{sipgo.WithUserAgent(cfg.ID)}
+	uaName := strings.TrimSpace(cfg.ID)
+	if uaName == "" {
+		uaName = "zero-web-kit"
+	}
+	uaOpts := []sipgo.UserAgentOption{sipgo.WithUserAgent(uaName)}
 	if localIP != "" {
 		uaOpts = append(uaOpts, sipgo.WithUserAgentHostname(localIP))
 	}
@@ -79,8 +83,7 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		return nil, err
 	}
 	clientOpts := []sipgo.ClientOption{}
-	if localIP != "" {
-		// Via 必须带平台可达 IP + SIP 监听端口，否则摄像机 200 OK 回不到平台（Timer_B）
+	if localIP != "" && cfg.Port > 0 {
 		clientOpts = append(clientOpts,
 			sipgo.WithClientHostname(localIP),
 			sipgo.WithClientPort(cfg.Port),
@@ -106,8 +109,10 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		inviteMgr: NewInviteManager(),
 	}
 	s.registerHandlers()
-	if localIP == "" {
-		log.Printf("[GB28181 sip] WARNING: sip.ip 未配置且自动探测失败，国标 INVITE 可能超时；请在 config.yaml 设置 sip.ip 为摄像机可达的网卡地址")
+	if cfg.Port <= 0 || strings.TrimSpace(cfg.ID) == "" {
+		log.Printf("[GB28181 sip] 未配置国标 SIP（请到「系统管理 → 国标配置」填写并保存）")
+	} else if localIP == "" {
+		log.Printf("[GB28181 sip] WARNING: sip.ip 未配置且自动探测失败，国标 INVITE 可能超时")
 	} else {
 		log.Printf("[GB28181 sip] localIP=%s (Contact/Via)", localIP)
 	}
@@ -127,8 +132,22 @@ func (s *Server) SetLocalIP(ip string) {
 		log.Printf("[GB28181 sip] localIP set from media node: %s", ip)
 	}
 }
-func (s *Server) LocalIP() string { return s.localIP }
-func (s *Server) Domain() string  { return s.cfg.Domain }
+
+// ApplyConfig 热更新国标身份/密码/域/可达 IP。监听端口变更需重启进程。
+func (s *Server) ApplyConfig(cfg config.SIPConfig) {
+	s.cfg = cfg
+	s.password = cfg.Password
+	ip := strings.TrimSpace(cfg.IP)
+	if ip != "" && ip != "0.0.0.0" && ip != "127.0.0.1" {
+		s.localIP = ip
+	}
+	log.Printf("[GB28181 sip] config applied id=%s domain=%s ip=%s port=%d (listen port change needs restart)",
+		cfg.ID, cfg.Domain, s.localIP, cfg.Port)
+}
+
+func (s *Server) Config() config.SIPConfig { return s.cfg }
+func (s *Server) LocalIP() string          { return s.localIP }
+func (s *Server) Domain() string           { return s.cfg.Domain }
 
 // guessLocalIP 取第一块非回环 IPv4，作为 sip.ip 未配置时的兜底。
 func guessLocalIP() string {
@@ -228,6 +247,10 @@ func (s *Server) handleBye(req *sip.Request, tx sip.ServerTransaction) {
 }
 
 func (s *Server) Start(ctx context.Context) error {
+	if s.cfg.Port <= 0 {
+		log.Printf("GB28181 SIP 未监听：端口未配置，请到「系统管理 → 国标配置」保存后重启服务")
+		return nil
+	}
 	addr := fmt.Sprintf("0.0.0.0:%d", s.cfg.Port)
 	go func() {
 		if err := s.srv.ListenAndServe(ctx, "udp", addr); err != nil && ctx.Err() == nil {

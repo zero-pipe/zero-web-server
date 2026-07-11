@@ -74,6 +74,21 @@ export function getSystemConfig() {
   })
 }
 
+export function getGbSipConfig() {
+  return request({
+    method: 'get',
+    url: `/api/server/gb_sip_config`
+  })
+}
+
+export function saveGbSipConfig(formData) {
+  return request({
+    method: 'post',
+    url: `/api/server/gb_sip_config/save`,
+    data: formData
+  })
+}
+
 export function getMediaInfo(params) {
   const { app, stream, mediaServerId } = params
   return request({

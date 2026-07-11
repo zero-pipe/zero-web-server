@@ -125,11 +125,7 @@ media:
   http_port: 8080            # zero-media-server HTTP 端口
   secret: "与流媒体一致的secret"
 
-sip:
-  port: 8116
-  domain: "4101050000"       # 与设备/平台国标域一致
-  id: "41010500002000000001"
-  password: "12345678"       # 设备注册鉴权密码
+# 国标 SIP 请在页面「系统管理 → 国标配置」填写，存库表 zws_gb_sip_config。
 ```
 
 > **注意**：若用本文 Docker Compose 起 MySQL，root 密码为 `root`，请把 `config.yaml` 里 `mysql.password` 改为 `"root"`，而不是 example 里的 `12345678`。

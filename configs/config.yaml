@@ -19,14 +19,7 @@ redis:
   database: 7
   pool_size: 10
 
-sip:
-  # 摄像机可达的本机局域网 IP（INVITE Contact/Via）。与摄像机同网段，勿填 127.0.0.1。
-  ip: "192.168.1.5"
-  port: 8116
-  domain: "3402000000"
-  id: "34020000002000000001"
-  password: "12345678"
-  alarm: false
+# 国标 SIP 已迁至页面「系统管理 → 国标配置」，存库表 zws_gb_sip_config，此处不再配置。
 
 # 媒体节点改为页面「媒体节点」动态添加并落库，启动时可为空。
 # 如需兼容临时指定，可取消注释（IP+http_port 非空才生效）。

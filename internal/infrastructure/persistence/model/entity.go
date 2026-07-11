@@ -337,3 +337,18 @@ type CommonRegion struct {
 }
 
 func (CommonRegion) TableName() string { return "zws_common_region" }
+
+// GbSipConfig 本平台唯一国标 SIP 配置（设备接入 / 上下级级联共用）。
+type GbSipConfig struct {
+	ID         int    `gorm:"column:id;primaryKey" json:"id"`
+	IP         string `gorm:"column:ip;size:64;not null" json:"ip"`
+	Port       int    `gorm:"column:port;not null" json:"port"`
+	Domain     string `gorm:"column:domain;size:32;not null" json:"domain"`
+	DeviceID   string `gorm:"column:device_id;size:32;not null" json:"deviceId"`
+	Password   string `gorm:"column:password;size:64;not null" json:"password"`
+	Alarm      bool   `gorm:"column:alarm;not null;default:0" json:"alarm"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (GbSipConfig) TableName() string { return "zws_gb_sip_config" }

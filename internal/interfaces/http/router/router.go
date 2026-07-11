@@ -19,6 +19,7 @@ import (
 	recordplanapp "zero-web-kit/internal/application/recordplan"
 	streampushapp "zero-web-kit/internal/application/streampush"
 	streamproxyapp "zero-web-kit/internal/application/streamproxy"
+	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/interfaces/hook"
@@ -58,6 +59,7 @@ type Deps struct {
 	PlayTimeoutMs       int
 	RecordInfoTimeoutMs int
 	SIPConfig           config.SIPConfig
+	GbSipConfigService  *gbsipconfig.Service
 	ServerPort          int
 	MediaIP             string
 }
@@ -90,12 +92,14 @@ func Setup(r *gin.Engine, deps Deps) {
 	recordPlanHandler := handler.NewRecordPlanHandler(deps.RecordPlanService)
 	mediaServerHandler := handler.NewMediaServerHandler(
 		deps.MediaServerService,
+		deps.GbSipConfigService,
 		deps.SIPConfig,
 		deps.MediaIP,
 		deps.ServerPort,
 		deps.ServerID,
 		deps.Version,
 	)
+	gbSipConfigHandler := handler.NewGbSipConfigHandler(deps.GbSipConfigService)
 	jt1078Handler := handler.NewJT1078Handler()
 	commonChannelHandler := handler.NewCommonChannelHandler(deps.CommonChannelSvc)
 	groupHandler := handler.NewGroupHandler(deps.GroupService)
@@ -152,6 +156,8 @@ func Setup(r *gin.Engine, deps Deps) {
 			serverAPI.GET("/media_server/media_info", mediaServerHandler.MediaInfo)
 			serverAPI.GET("/media_server/load", mediaServerHandler.Load)
 			serverAPI.GET("/system/configInfo", mediaServerHandler.SystemConfigInfo)
+			serverAPI.GET("/gb_sip_config", gbSipConfigHandler.Get)
+			serverAPI.POST("/gb_sip_config/save", gbSipConfigHandler.Save)
 			serverAPI.GET("/resource/info", mediaServerHandler.ResourceInfo)
 			serverAPI.GET("/info", mediaServerHandler.Info)
 			serverAPI.GET("/map/config", mediaServerHandler.MapConfig)

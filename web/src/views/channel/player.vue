@@ -4,8 +4,8 @@
       v-if="showVideoDialog"
       v-el-drag-dialog
       custom-class="vms-player-dialog"
-      top="5vh"
-      width="1040px"
+      top="2vh"
+      width="1280px"
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
@@ -17,71 +17,65 @@
       </div>
 
       <div class="dhsdk-player-body">
-        <div class="player-side">
-          <div class="player-stage">
-            <div
-              class="player-container"
-              v-loading="isLoging"
-              element-loading-text="正在邀请设备推流…"
-              element-loading-background="rgba(240, 244, 248, 0.85)"
-              element-loading-spinner="el-icon-loading"
-            >
-              <div v-if="playError" class="player-error-tip">{{ playError }}</div>
-              <playerTabs
-                ref="playerTabs"
-                :has-audio="hasAudio"
-                :show-button="true"
-                @playerChanged="playerChanged"
-              />
-            </div>
-          </div>
-
-          <div class="player-under panel-block control-extra">
-            <el-tabs v-model="extraTab">
-              <el-tab-pane label="实时视频" name="media">
-                <streamMediaPanel
-                  v-if="extraTab === 'media'"
-                  :player-url="playerUrlInfo.playerUrl"
-                  :play-url="playerUrlInfo.playUrl"
-                  :stream-info="streamInfo"
-                />
-              </el-tab-pane>
-              <el-tab-pane label="预置位" name="preset">
-                <channelPreset
-                  v-if="extraTab === 'preset'"
-                  :channel-id="channelId"
-                />
-              </el-tab-pane>
-            </el-tabs>
-          </div>
+        <div
+          class="player-container"
+          v-loading="isLoging"
+          element-loading-text="正在邀请设备推流…"
+          element-loading-background="rgba(240, 244, 248, 0.85)"
+          element-loading-spinner="el-icon-loading"
+        >
+          <div v-if="playError" class="player-error-tip">{{ playError }}</div>
+          <playerTabs
+            ref="playerTabs"
+            :has-audio="hasAudio"
+            :show-button="true"
+            @playerChanged="playerChanged"
+          />
         </div>
 
-        <div class="control-side">
-          <div class="panel-block">
-            <div class="panel-block-title">
-              <span>编码信息</span>
-              <el-button
-                icon="el-icon-refresh-right"
-                circle
-                size="mini"
-                @click="refreshMediaInfo"
-              />
-            </div>
-            <mediaInfo
-              ref="mediaInfo"
-              :app="app"
-              :stream="streamId"
-              :media-server-id="mediaServerId"
+        <div class="panel-block panel-encoding">
+          <div class="panel-block-title">
+            <span>编码信息</span>
+            <el-button
+              icon="el-icon-refresh-right"
+              circle
+              size="mini"
+              @click="refreshMediaInfo"
             />
           </div>
+          <mediaInfo
+            ref="mediaInfo"
+            :app="app"
+            :stream="streamId"
+            :media-server-id="mediaServerId"
+          />
+        </div>
 
-          <div class="panel-block is-ptz">
-            <div class="panel-block-title">云台控制</div>
-            <channelPtzPanel
-              :channel-id="channelId"
-              @drag-zoom-start="toggleDragZoom"
-            />
-          </div>
+        <div class="player-under panel-block control-extra">
+          <el-tabs v-model="extraTab">
+            <el-tab-pane label="分享与地址" name="media">
+              <streamMediaPanel
+                v-if="extraTab === 'media'"
+                :player-url="playerUrlInfo.playerUrl"
+                :play-url="playerUrlInfo.playUrl"
+                :stream-info="streamInfo"
+              />
+            </el-tab-pane>
+            <el-tab-pane label="预置位" name="preset">
+              <channelPreset
+                v-if="extraTab === 'preset'"
+                :channel-id="channelId"
+              />
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+
+        <div class="panel-block is-ptz">
+          <div class="panel-block-title">云台控制</div>
+          <channelPtzPanel
+            :channel-id="channelId"
+            @drag-zoom-start="toggleDragZoom"
+          />
         </div>
       </div>
     </el-dialog>

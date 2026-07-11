@@ -109,6 +109,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.OnvifChannel{},
 		&model.CommonGroup{},
 		&model.CommonRegion{},
+		&model.GbSipConfig{},
 	}
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)

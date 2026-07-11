@@ -1,8 +1,15 @@
 <template>
-  <div :id="'rtcPlayer-' + _uid" class="rtc-player-wrapper">
-    <video :id="'webRtcPlayerBox-' + _uid" class="rtc-player-video" :controls="showControls" autoplay style="text-align:left;">
-      Your browser is too old which doesn't support HTML5 video.
-    </video>
+  <div :id="'rtcPlayer-' + _uid" ref="wrapper" class="rtc-player-wrapper">
+    <video
+      :id="'webRtcPlayerBox-' + _uid"
+      ref="video"
+      class="rtc-player-video"
+      :controls="showControls"
+      autoplay
+      muted
+      playsinline
+      webkit-playsinline
+    />
   </div>
 </template>
 
@@ -41,12 +48,22 @@ export default {
       if (webrtcPlayer[this._uid]) {
         this.pause()
       }
+      const el = this.$refs.video || document.getElementById('webRtcPlayerBox-' + this._uid)
+      if (!el) {
+        if (attempt < 12) {
+          this.timer = setTimeout(() => this.play(url, attempt + 1), 80)
+        } else {
+          console.warn('[RtcPlayer] video element missing')
+        }
+        return
+      }
+      // 必须用平台下发的绝对地址（streamIp，不能是 127.0.0.1），SDP/ICE 才能对上媒体口
       console.log('[RtcPlayer] play', url, 'attempt=', attempt)
       webrtcPlayer[this._uid] = new ZLMRTCClient.Endpoint({
-        element: document.getElementById('webRtcPlayerBox-' + this._uid),
+        element: el,
         debug: true,
         zlmsdpUrl: url,
-        simulecast: false,
+        simulcast: false,
         useCamera: false,
         audioEnable: true,
         videoEnable: true,
@@ -55,13 +72,15 @@ export default {
       })
       const player = webrtcPlayer[this._uid]
       player.on(ZLMRTCClient.Events.WEBRTC_ICE_CANDIDATE_ERROR, (e) => {
-        console.error('ICE 协商出错')
+        console.error('ICE 协商出错', e)
         this.eventcallbacK('ICE ERROR', 'ICE 协商出错')
       })
 
       player.on(ZLMRTCClient.Events.WEBRTC_ON_REMOTE_STREAMS, (e) => {
         console.log('播放成功', e.streams)
+        this.ensureVideoPlaying()
         this.eventcallbacK('playing', '播放成功')
+        this.$emit('playStatusChange', true)
       })
 
       player.on(ZLMRTCClient.Events.WEBRTC_OFFER_ANWSER_EXCHANGE_FAILED, (e) => {
@@ -78,10 +97,25 @@ export default {
         this.eventcallbacK('LOCAL STREAM', '获取到了本地流')
       })
     },
+    ensureVideoPlaying() {
+      const el = this.$refs.video || document.getElementById('webRtcPlayerBox-' + this._uid)
+      if (!el) return
+      el.muted = true
+      const p = el.play && el.play()
+      if (p && typeof p.catch === 'function') {
+        p.catch(err => console.warn('[RtcPlayer] video.play()', err))
+      }
+    },
     pause: function() {
       if (webrtcPlayer[this._uid]) {
         webrtcPlayer[this._uid].close()
         webrtcPlayer[this._uid] = null
+      }
+      const el = this.$refs.video || document.getElementById('webRtcPlayerBox-' + this._uid)
+      if (el) {
+        try {
+          el.srcObject = null
+        } catch (e) { /* ignore */ }
       }
     },
     stop: function() {
@@ -93,10 +127,11 @@ export default {
       console.log(message)
     },
     getVideoElement() {
-      return document.getElementById('webRtcPlayerBox-' + this._uid)
+      return this.$refs.video || document.getElementById('webRtcPlayerBox-' + this._uid)
     },
     getVideoRect() {
       const video = this.getVideoElement()
+      if (!video) return null
       const rect = video.getBoundingClientRect()
       if (video.videoWidth && video.videoHeight) {
         const natRatio = video.videoWidth / video.videoHeight
@@ -133,16 +168,13 @@ export default {
         width: 100%;
         height: 100%;
         position: relative;
+        background: #0f172a;
     }
     .rtc-player-video{
         width: 100%;
         height: 100%;
         max-height: 100%;
-        background-color: #000;
+        object-fit: contain;
+        background-color: #0f172a;
     }
-    /* 隐藏logo */
-    /* .iconqingxiLOGO {
-        display: none !important;
-    } */
-
 </style>

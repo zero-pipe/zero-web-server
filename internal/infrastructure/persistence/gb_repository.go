@@ -338,18 +338,20 @@ func (r *ChannelRepository) listCommonByAssociation(page, count int, query strin
 			q = q.Where("COALESCE(gb_status, status) <> ?", "ON")
 		}
 	}
+	// 平台挂载只用 gb_*；parent_id/civil_code 可能是设备目录同步写入的国标字段，
+	// 若用 COALESCE 会把已上线但未挂载的通道误判为「已挂载」，添加通道列表为空。
 	if civilCode != nil {
 		if *civilCode == "" {
-			q = q.Where("COALESCE(gb_civil_code, civil_code) IS NULL")
+			q = q.Where("(gb_civil_code IS NULL OR gb_civil_code = '')")
 		} else {
-			q = q.Where("COALESCE(gb_civil_code, civil_code) = ?", *civilCode)
+			q = q.Where("gb_civil_code = ?", *civilCode)
 		}
 	}
 	if groupDeviceID != nil {
 		if *groupDeviceID == "" {
-			q = q.Where("COALESCE(gb_parent_id, parent_id) IS NULL")
+			q = q.Where("(gb_parent_id IS NULL OR gb_parent_id = '')")
 		} else {
-			q = q.Where("COALESCE(gb_parent_id, parent_id) = ?", *groupDeviceID)
+			q = q.Where("gb_parent_id = ?", *groupDeviceID)
 		}
 	}
 	var total int64
@@ -392,8 +394,8 @@ func (r *ChannelRepository) SetGroup(parentID, businessGroup string, channelIDs 
 		return fmt.Errorf("通道ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE zws_device_channel SET gb_parent_id = ?, parent_id = ?, gb_business_group_id = ?, business_group_id = ?, update_time = ? WHERE channel_type = 0 AND id IN ?`,
-		parentID, parentID, businessGroup, businessGroup, nowTimeStr(), channelIDs,
+		`UPDATE zws_device_channel SET gb_parent_id = ?, gb_business_group_id = ?, update_time = ? WHERE channel_type = 0 AND id IN ?`,
+		parentID, businessGroup, nowTimeStr(), channelIDs,
 	).Error
 }
 
@@ -402,7 +404,7 @@ func (r *ChannelRepository) ClearGroupParent(channelIDs []int) error {
 		return fmt.Errorf("通道ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE zws_device_channel SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND id IN ?`,
+		`UPDATE zws_device_channel SET gb_parent_id = NULL, gb_business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND id IN ?`,
 		nowTimeStr(), channelIDs,
 	).Error
 }
@@ -432,8 +434,8 @@ func (r *ChannelRepository) SetGroupByDataDeviceIDs(parentID, businessGroup stri
 		return fmt.Errorf("设备ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE zws_device_channel SET gb_parent_id = ?, parent_id = ?, gb_business_group_id = ?, business_group_id = ?, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
-		parentID, parentID, businessGroup, businessGroup, nowTimeStr(), dataDeviceIDs,
+		`UPDATE zws_device_channel SET gb_parent_id = ?, gb_business_group_id = ?, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		parentID, businessGroup, nowTimeStr(), dataDeviceIDs,
 	).Error
 }
 
@@ -442,7 +444,7 @@ func (r *ChannelRepository) ClearGroupByDataDeviceIDs(dataDeviceIDs []int) error
 		return fmt.Errorf("设备ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE zws_device_channel SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		`UPDATE zws_device_channel SET gb_parent_id = NULL, gb_business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
 		nowTimeStr(), dataDeviceIDs,
 	).Error
 }

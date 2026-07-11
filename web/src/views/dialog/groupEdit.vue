@@ -11,22 +11,6 @@
       :destroy-on-close="true"
       @close="close()"
     >
-      <el-alert
-        :title="guideTitle"
-        type="info"
-        :closable="false"
-        show-icon
-        class="group-edit-guide"
-      >
-        <ol class="group-edit-steps">
-          <li>先填写<strong>节点名称</strong>（必填）</li>
-          <li>行政区划<strong>可选</strong>：点「选择」关联已有区划；没有可留空</li>
-          <li>点「生成国标编号」按向导选省市区等，系统会自动锁为 {{ typeCodeLabel }}</li>
-          <li>确认编号无误后点「确认」保存</li>
-        </ol>
-        <p class="group-edit-tip">{{ guideTip }}</p>
-      </el-alert>
-
       <el-form
         ref="form"
         :model="group"
@@ -39,7 +23,6 @@
           <el-tag :type="isBusinessGroupNode ? 'warning' : 'success'" size="small">
             {{ typeCodeLabel }}
           </el-tag>
-          <span class="group-type-desc">{{ typeDesc }}</span>
         </el-form-item>
 
         <el-form-item label="节点名称" prop="name">
@@ -47,7 +30,7 @@
             v-model="group.name"
             clearable
             maxlength="64"
-            placeholder="例如：一号楼、东区监控组"
+            placeholder="请输入名称"
           />
         </el-form-item>
 
@@ -56,7 +39,7 @@
             <el-input
               :value="civilCodeDisplay"
               readonly
-              placeholder="可选，未选不影响保存"
+              placeholder="可选"
             >
               <el-button slot="append" @click="buildCivilCode">选择</el-button>
             </el-input>
@@ -66,21 +49,17 @@
               @click="clearCivilCode"
             >清空</el-button>
           </div>
-          <div class="field-hint">用于关联行政区划树中的节点；不选也可直接生成编号</div>
         </el-form-item>
 
         <el-form-item label="国标编号" prop="deviceId">
           <el-input
             v-model="group.deviceId"
-            placeholder="20位国标编码，请点右侧生成"
+            placeholder="20位国标编码"
             maxlength="20"
             show-word-limit
           >
-            <el-button slot="append" type="primary" @click="buildDeviceIdCode">生成国标编号</el-button>
+            <el-button slot="append" type="primary" @click="buildDeviceIdCode">生成</el-button>
           </el-input>
-          <div class="field-hint">
-            第 11–13 位固定为 {{ lockedTypeCode }}（{{ isBusinessGroupNode ? '业务分组' : '虚拟组织' }}），勿手动改成其他类型
-          </div>
         </el-form-item>
 
         <el-form-item class="group-edit-actions">
@@ -125,7 +104,7 @@ export default {
           { required: true, message: '请填写节点名称', trigger: 'blur' }
         ],
         deviceId: [
-          { required: true, message: '请先生成或填写20位国标编号', trigger: 'blur' },
+          { required: true, message: '请填写国标编号', trigger: 'blur' },
           {
             validator: (rule, value, callback) => {
               const v = (value || '').trim()
@@ -139,7 +118,7 @@ export default {
               }
               const type = v.substring(10, 13)
               if (type !== '215' && type !== '216') {
-                callback(new Error('第11-13位须为215（业务分组）或216（虚拟组织）'))
+                callback(new Error('第11-13位须为215或216'))
                 return
               }
               callback()
@@ -154,8 +133,6 @@ export default {
     isEdit() {
       return !!(this.group && this.group.id)
     },
-    // 新建时：没有所属业务分组编号 → 正在建业务分组(215)
-    // 编辑时：看编号类型位
     isBusinessGroupNode() {
       const id = (this.group.deviceId || '').trim()
       if (id.length >= 13) {
@@ -172,32 +149,11 @@ export default {
     typeCodeLabel() {
       return this.isBusinessGroupNode ? '业务分组 (215)' : '虚拟组织 (216)'
     },
-    typeDesc() {
-      if (this.isBusinessGroupNode) {
-        return '顶层分组容器，不能直接挂通道'
-      }
-      return '可挂通道的组织节点'
-    },
     dialogTitle() {
       if (this.isEdit) {
         return '编辑节点'
       }
       return this.isBusinessGroupNode ? '新建业务分组' : '新建虚拟组织'
-    },
-    guideTitle() {
-      if (this.isEdit) {
-        return '按需修改名称或重新生成编号'
-      }
-      if (this.isBusinessGroupNode) {
-        return '推荐操作顺序（当前：新建业务分组）'
-      }
-      return '推荐操作顺序（当前：新建虚拟组织）'
-    },
-    guideTip() {
-      if (this.isBusinessGroupNode) {
-        return '建好后请在该分组下再「新建节点」创建虚拟组织(216)，通道只能挂在 216 上。'
-      }
-      return '保存后选中本节点，即可在右侧「添加通道」。'
     },
     civilCodeDisplay() {
       if (!this.group.civilCode) {
@@ -234,13 +190,7 @@ export default {
     },
     onSubmit: function() {
       this.$refs.form.validate(valid => {
-        if (!valid) {
-          this.$message.warning({
-            showClose: true,
-            message: '请先按提示完成必填项：名称 + 20位国标编号'
-          })
-          return
-        }
+        if (!valid) return
         const action = this.group.id ? 'group/update' : 'group/add'
         this.loading = true
         this.$store.dispatch(action, this.group)
@@ -298,13 +248,7 @@ export default {
     },
     buildCivilCode: function() {
       this.$refs.chooseCivilCode.openDialog((code, name) => {
-        if (!code) {
-          this.$message.warning({
-            showClose: true,
-            message: '未选择行政区划节点，可留空继续'
-          })
-          return
-        }
+        if (!code) return
         this.group.civilCode = code
         this.civilCodeName = name || ''
       })
@@ -321,34 +265,9 @@ export default {
 </script>
 
 <style scoped>
-.group-edit-guide {
-  margin-bottom: 16px;
-}
-.group-edit-steps {
-  margin: 6px 0 0;
-  padding-left: 1.2rem;
-  line-height: 1.7;
-  color: #606266;
-}
-.group-edit-tip {
-  margin: 8px 0 0;
-  color: #909399;
-  font-size: 12px;
-}
 .group-edit-form {
   margin-right: 0;
   padding-right: 4px;
-}
-.group-type-desc {
-  margin-left: 8px;
-  color: #909399;
-  font-size: 12px;
-}
-.field-hint {
-  margin-top: 4px;
-  line-height: 1.4;
-  color: #909399;
-  font-size: 12px;
 }
 .group-edit-actions {
   margin-bottom: 0;

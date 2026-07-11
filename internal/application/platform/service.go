@@ -74,6 +74,13 @@ func (s *Service) ServerConfig() map[string]any {
 	}
 }
 
+func (s *Service) ApplySIPConfig(cfg config.SIPConfig) {
+	s.cfg = cfg
+	if s.sip != nil {
+		s.sip.ApplyConfig(cfg)
+	}
+}
+
 func (s *Service) registerPlatform(p *domainplatform.Platform) {
 	if err := s.sip.Register(p); err != nil {
 		_ = s.platforms.UpdateStatus(p.ID, false)

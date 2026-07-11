@@ -314,11 +314,6 @@ export default {
         this.regionParents = []
         this.groupDeviceId = ''
         this.businessGroup = ''
-        this.$message.warning({
-          showClose: true,
-          message: `「${group.name}」是业务分组(215)，不能直接挂通道。请展开后右键「新建节点」创建虚拟组织(216)，再选中子节点添加通道。`,
-          duration: 8000
-        })
         return
       }
       this.groupDeviceId = group.deviceId

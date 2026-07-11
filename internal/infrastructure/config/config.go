@@ -13,11 +13,21 @@ type Config struct {
 	Server       ServerConfig       `mapstructure:"server"`
 	MySQL        MySQLConfig        `mapstructure:"mysql"`
 	Redis        RedisConfig        `mapstructure:"redis"`
-	SIP          SIPConfig          `mapstructure:"sip"`
 	Media        MediaConfig        `mapstructure:"media"`
 	Log          LogConfig          `mapstructure:"log"`
 	UserSettings UserSettingsConfig `mapstructure:"user_settings"`
 	ONVIF        ONVIFConfig        `mapstructure:"onvif"`
+}
+
+// SIPConfig 国标 SIP 运行时配置（存库，不在 yaml 中配置）。
+type SIPConfig struct {
+	// IP 摄像机可达的平台网卡地址，写入 INVITE Contact/Via。
+	IP       string
+	Port     int
+	Domain   string
+	ID       string
+	Password string
+	Alarm    bool
 }
 
 type ServerConfig struct {
@@ -51,17 +61,6 @@ type RedisConfig struct {
 
 func (c RedisConfig) Addr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
-}
-
-type SIPConfig struct {
-	// IP 摄像机可达的平台网卡地址，写入 INVITE Contact/Via。
-	// 去掉 config media 段后必须配置；为空时启动会尝试自动探测。
-	IP       string `mapstructure:"ip"`
-	Port     int    `mapstructure:"port"`
-	Domain   string `mapstructure:"domain"`
-	ID       string `mapstructure:"id"`
-	Password string `mapstructure:"password"`
-	Alarm    bool   `mapstructure:"alarm"`
 }
 
 type MediaConfig struct {
@@ -112,12 +111,24 @@ func (c MediaConfig) BaseURL() string {
 	return fmt.Sprintf("http://%s:%d", c.IP, c.HTTPPort)
 }
 
-// SignalingBaseURL WebRTC 信令走平台 HTTP（反向代理到 zero-media-server）。
+// SignalingBaseURL WebRTC 信令基址。
+// 浏览器必须能访问该 host；禁止用 127.0.0.1（本机环回对远端浏览器无效，ICE 也会对不上）。
+// signalingPort>0 时走平台 HTTP 反代到 ZMS；否则直连媒体节点 HTTP。
 func (c MediaConfig) SignalingBaseURL(serverPort int) string {
-	if serverPort <= 0 {
-		return c.BaseURL()
+	host := strings.TrimSpace(c.IP)
+	if host == "" || host == "0.0.0.0" {
+		host = "127.0.0.1"
 	}
-	return fmt.Sprintf("http://%s:%d", c.IP, serverPort)
+	if serverPort <= 0 {
+		return fmt.Sprintf("http://%s:%d", host, c.HTTPPort)
+	}
+	return fmt.Sprintf("http://%s:%d", host, serverPort)
+}
+
+// IsLoopbackHost 判断媒体/流 IP 是否为环回，WebRTC 场景应避免。
+func IsLoopbackHost(ip string) bool {
+	ip = strings.TrimSpace(strings.ToLower(ip))
+	return ip == "" || ip == "127.0.0.1" || ip == "localhost" || ip == "::1"
 }
 
 type UserSettingsConfig struct {

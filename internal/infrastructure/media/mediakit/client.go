@@ -366,9 +366,14 @@ type StreamPlayURLs struct {
 }
 
 // BuildStreamPlayURLs 生成拉流 URL；webrtcPush=false 为点播播放；signalingPort>0 时 WebRTC 走平台代理。
+// WebRTC 的 host 使用媒体节点 streamIp（cfg.IP），切勿配置成 127.0.0.1，否则浏览器 ICE/画面会异常。
 func BuildStreamPlayURLs(cfg config.MediaConfig, app, stream string, webrtcPush bool, signalingPort int) StreamPlayURLs {
 	urls := BuildPlayURLsFromConfig(cfg, app, stream)
-	rtc, rtcs := BuildWebRTCURLs(cfg.SignalingBaseURL(signalingPort), app, stream, webrtcPush)
+	rtcBase := cfg.SignalingBaseURL(signalingPort)
+	if config.IsLoopbackHost(cfg.IP) {
+		applog.Warnf("[webrtc] media streamIp=%q is loopback; set 媒体节点「流IP」to LAN IP, and ZMS [webrtc] advertise_host", cfg.IP)
+	}
+	rtc, rtcs := BuildWebRTCURLs(rtcBase, app, stream, webrtcPush)
 	return StreamPlayURLs{
 		Flv:   urls["flv"],
 		WsFlv: urls["ws"],

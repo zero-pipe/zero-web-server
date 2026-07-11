@@ -67,13 +67,13 @@ SELECT id,
        CONCAT('channel', id) AS tree_id,
        COALESCE(gb_device_id, device_id) AS device_id,
        COALESCE(gb_name, name) AS name,
-       COALESCE(gb_parent_id, parent_id) AS parent_device_id,
-       COALESCE(gb_business_group_id, business_group_id) AS business_group,
+       gb_parent_id AS parent_device_id,
+       gb_business_group_id AS business_group,
        COALESCE(gb_status, status) AS status,
        1 AS type,
        1 AS is_leaf
 FROM zws_device_channel
-WHERE channel_type = 0 AND COALESCE(gb_parent_id, parent_id) = ?`
+WHERE channel_type = 0 AND gb_parent_id = ?`
 	args := []any{parentDeviceID}
 	if query != "" {
 		sql += " AND (COALESCE(gb_device_id, device_id) LIKE ? OR COALESCE(gb_name, name) LIKE ?)"
@@ -139,12 +139,12 @@ SELECT id,
        CONCAT('channel', id) AS tree_id,
        COALESCE(gb_device_id, device_id) AS device_id,
        COALESCE(gb_name, name) AS name,
-       COALESCE(gb_parent_id, parent_id) AS parent_device_id,
+       gb_parent_id AS parent_device_id,
        COALESCE(gb_status, status) AS status,
        1 AS type,
        1 AS is_leaf
 FROM zws_device_channel
-WHERE channel_type = 0 AND COALESCE(gb_civil_code, civil_code) = ?`
+WHERE channel_type = 0 AND gb_civil_code = ?`
 	var rows []domaintree.Node
 	if err := r.db.Raw(sql, parentDeviceID).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -395,8 +395,8 @@ func (r *GroupRegionRepository) DeleteGroupsByIDs(ids []int) error {
 func (r *GroupRegionRepository) ClearChannelsByBusinessGroup(businessGroup string) error {
 	return r.db.Exec(`
 UPDATE zws_device_channel
-SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ?
-WHERE channel_type = 0 AND COALESCE(gb_business_group_id, business_group_id) = ?`, nowTimeStr(), businessGroup).Error
+SET gb_parent_id = NULL, gb_business_group_id = NULL, update_time = ?
+WHERE channel_type = 0 AND gb_business_group_id = ?`, nowTimeStr(), businessGroup).Error
 }
 
 func (r *GroupRegionRepository) ClearChannelsByParentDeviceIDs(deviceIDs []string) error {
@@ -405,6 +405,6 @@ func (r *GroupRegionRepository) ClearChannelsByParentDeviceIDs(deviceIDs []strin
 	}
 	return r.db.Exec(`
 UPDATE zws_device_channel
-SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ?
-WHERE channel_type = 0 AND COALESCE(gb_parent_id, parent_id) IN ?`, nowTimeStr(), deviceIDs).Error
+SET gb_parent_id = NULL, gb_business_group_id = NULL, update_time = ?
+WHERE channel_type = 0 AND gb_parent_id IN ?`, nowTimeStr(), deviceIDs).Error
 }

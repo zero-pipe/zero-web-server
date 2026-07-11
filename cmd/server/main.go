@@ -17,6 +17,7 @@ import (
 	groupapp "zero-web-kit/internal/application/group"
 	mediaapp "zero-web-kit/internal/application/media"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
+	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	onvifapp "zero-web-kit/internal/application/onvif"
 	platformapp "zero-web-kit/internal/application/platform"
 	positionapp "zero-web-kit/internal/application/position"
@@ -93,6 +94,14 @@ func main() {
 	recordPlanRepo := persistence.NewRecordPlanRepository(db)
 	mediaServerRepo := persistence.NewMediaServerRepository(db)
 	groupRegionRepo := persistence.NewGroupRegionRepository(db)
+	gbSipConfigRepo := persistence.NewGbSipConfigRepository(db)
+	gbSipConfigService := gbsipconfig.NewService(gbSipConfigRepo)
+
+	// 国标 SIP 以数据库为准；库空则跳过监听，由「国标配置」页面填写
+	sipCfg, err := gbSipConfigService.Load()
+	if err != nil {
+		applog.Fatalf("load gb sip config: %v", err)
+	}
 
 	authService := appauth.NewService(userRepo, jwtManager, cfg.UserSettings.ServerID)
 	deviceService := deviceapp.NewService(deviceRepo, channelRepo, redisClient)
@@ -105,15 +114,17 @@ func main() {
 	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加
 	mediaServerService := mediaserverapp.NewService(mediaServerRepo, cfg.UserSettings.ServerID)
 
-	sipServer, err := sipinfra.NewServer(cfg.SIP, cfg.UserSettings.ServerID, cfg.SIP.Password, deviceService, redisClient)
+	sipServer, err := sipinfra.NewServer(sipCfg, cfg.UserSettings.ServerID, sipCfg.Password, deviceService, redisClient)
 	if err != nil {
 		applog.Fatalf("init sip: %v", err)
 	}
-	// sip.ip 优先；未配时再用媒体节点 IP / 自动探测兜底
-	if cfg.Media.Configured() {
-		sipServer.SetLocalIP(cfg.Media.IP)
-	} else if ip := firstMediaIP(cfg, mediaServerService); ip != "" {
-		sipServer.SetLocalIP(ip)
+	// 库内未配 IP 时，再用媒体节点 IP / 自动探测兜底
+	if sipCfg.IP == "" {
+		if cfg.Media.Configured() {
+			sipServer.SetLocalIP(cfg.Media.IP)
+		} else if ip := firstMediaIP(cfg, mediaServerService); ip != "" {
+			sipServer.SetLocalIP(ip)
+		}
 	}
 	deviceService.SetSIP(sipServer)
 
@@ -129,10 +140,17 @@ func main() {
 	playbackService := playbackapp.NewService(
 		deviceRepo, channelRepo, sipServer, mediaServerService, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
-	platformService := platformapp.NewService(platformRepo, cfg.SIP, cfg.UserSettings.ServerID)
+	platformService := platformapp.NewService(platformRepo, sipCfg, cfg.UserSettings.ServerID)
+	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
 	platformChannelSvc := platformapp.NewChannelService(
-		platformRepo, channelRepo, platformRepo, sipinfra.NewPlatformClient(cfg.SIP),
+		platformRepo, channelRepo, platformRepo, platformSIPClient,
 	)
+
+	gbSipConfigService.SetOnChange(func(updated config.SIPConfig, _ bool) {
+		sipServer.ApplyConfig(updated)
+		platformService.ApplySIPConfig(updated)
+		platformSIPClient.ApplyConfig(updated)
+	})
 
 	playService := playapp.NewService(deviceRepo, channelRepo, sipServer, mediaServerService, cfg.UserSettings.ServerID, cfg.Server.Port)
 	ptzService := ptzapp.NewService(deviceRepo, sipServer)
@@ -198,7 +216,8 @@ func main() {
 		Version:             version,
 		PlayTimeoutMs:       cfg.UserSettings.PlayTimeout,
 		RecordInfoTimeoutMs: cfg.UserSettings.RecordInfoTimeout,
-		SIPConfig:           cfg.SIP,
+		SIPConfig:           sipCfg,
+		GbSipConfigService:  gbSipConfigService,
 		ServerPort:          cfg.Server.Port,
 		MediaIP:             firstMediaIP(cfg, mediaServerService),
 	})
@@ -214,7 +233,7 @@ func main() {
 	applog.Info("zero-web-kit starting",
 		"version", version,
 		"http", addr,
-		"sip_port", cfg.SIP.Port,
+		"sip_port", sipCfg.Port,
 		"media_nodes", "db-managed",
 	)
 	if err := r.Run(addr); err != nil {

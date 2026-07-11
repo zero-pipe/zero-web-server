@@ -22,6 +22,91 @@
   left: 0;
   position: relative;
   margin: 0 auto;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e8eef6;
+  box-shadow: 0 12px 36px rgba(15, 40, 80, 0.14);
+
+  .el-dialog__header {
+    padding: 14px 20px 12px;
+    background: #f7fafc;
+    border-bottom: 1px solid #e8eef6;
+  }
+
+  .el-dialog__title {
+    color: #1e293b;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .el-dialog__headerbtn {
+    top: 14px;
+    right: 16px;
+
+    .el-dialog__close {
+      color: #94a3b8;
+
+      &:hover {
+        color: #1565c0;
+      }
+    }
+  }
+
+  .el-dialog__body {
+    padding: 18px 20px 8px;
+    color: #334155;
+  }
+
+  .el-dialog__footer {
+    padding: 12px 20px 16px;
+    border-top: 1px solid #eef2f7;
+    background: #fafbfc;
+  }
+}
+
+// 弹窗内表单控件轻微圆角，避免直角生硬
+.el-dialog {
+  .el-input__inner,
+  .el-textarea__inner,
+  .el-input-group__append,
+  .el-input-group__prepend {
+    border-radius: 6px;
+    border-color: #d7e0ec;
+  }
+
+  .el-input-group--append .el-input__inner {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .el-input-group__append {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    background: #f5f8fc;
+    color: #475569;
+    border-color: #d7e0ec;
+  }
+
+  .el-button {
+    border-radius: 6px;
+  }
+
+  .el-button--primary {
+    background-color: #1565c0;
+    border-color: #1565c0;
+
+    &:hover,
+    &:focus {
+      background-color: #1976d2;
+      border-color: #1976d2;
+    }
+  }
+
+  .el-tag {
+    border-radius: 6px;
+  }
 }
 
 // refine element ui upload
@@ -38,6 +123,10 @@
 
 // dropdown
 .el-dropdown-menu {
+  border-radius: 8px;
+  border: 1px solid #e8eef6;
+  box-shadow: 0 8px 24px rgba(15, 40, 80, 0.1);
+
   a {
     display: block
   }

@@ -123,7 +123,7 @@ export const constantRoutes = [
         path: '/onvifDevice',
         name: 'OnvifDevice',
         component: () => import('@/views/onvifDevice/index'),
-        meta: { title: 'ONVIF设备', icon: 'device' }
+        meta: { title: 'ONVIF设备', icon: 'onvifDevice' }
       },
       {
         hidden: true,
@@ -221,6 +221,19 @@ export const constantRoutes = [
         name: 'MediaServer',
         component: () => import('@/views/mediaServer/index'),
         meta: { title: '媒体节点', icon: 'mediaServerList' }
+      }
+    ]
+  },
+  {
+    path: '/gbConfig',
+    component: Layout,
+    redirect: '/gbConfig',
+    children: [
+      {
+        path: '',
+        name: 'GbConfig',
+        component: () => import('@/views/gbConfig/index'),
+        meta: { title: '国标配置', icon: 'platform' }
       }
     ]
   },

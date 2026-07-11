@@ -10,13 +10,6 @@
       :destroy-on-close="true"
       @close="close()"
     >
-      <el-alert
-        title="在下方树中点选一个行政区划节点，再点保存。若树为空，请先到「行政区划」页面创建，或关闭本窗留空。"
-        type="info"
-        :closable="false"
-        show-icon
-        style="margin-bottom: 12px"
-      />
       <RegionTree
         ref="regionTree"
         :show-header="true"

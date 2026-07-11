@@ -15,10 +15,10 @@ export const primaryMenus = [
     icon: 'menu-device',
     children: [
       { title: '分屏监控', path: '/live', icon: 'live' },
-      { title: '通道列表', path: '/channel', icon: 'channelManger' },
       { title: '国标设备', path: '/device', icon: 'device' },
+      { title: 'ONVIF设备', path: '/onvifDevice', icon: 'onvifDevice' },
       { title: '部标设备', path: '/jtDevice', icon: 'jtDevice' },
-      { title: 'ONVIF设备', path: '/onvifDevice', icon: 'device' },
+      { title: '通道列表', path: '/channel', icon: 'channelManger' },
       { title: '推流列表', path: '/push', icon: 'streamPush' },
       { title: '拉流代理', path: '/proxy', icon: 'streamProxy' }
     ]
@@ -59,6 +59,7 @@ export const primaryMenus = [
     children: [
       { title: '控制台', path: '/dashboard', icon: 'dashboard' },
       { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' },
+      { title: '国标配置', path: '/gbConfig', icon: 'platform' },
       { title: '国标级联', path: '/platform', icon: 'platform' }
     ]
   },

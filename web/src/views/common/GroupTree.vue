@@ -4,18 +4,39 @@
       <el-input size="small" v-model="searchStr" @input="searchChange" suffix-icon="el-icon-search" placeholder="请输入搜索内容" clearable />
     </div>
     <div v-if="!searchStr" class="org-tree-body">
-      <el-alert
-        v-if="showAlert && edit"
-        title="操作提示"
-        description="你可以使用右键菜单管理节点"
-        type="info"
-        show-icon
-        :closable="false"
-        class="org-tree-alert"
-      />
       <div v-if="edit" class="org-tree-toolbar">
-        <span class="org-tree-toolbar-label">显示编号</span>
-        <el-checkbox v-model="showCode" />
+        <div class="org-tree-actions">
+          <el-button
+            type="primary"
+            size="mini"
+            icon="el-icon-folder-add"
+            :disabled="!canAddNode"
+            @click="toolbarAddNode"
+          >新建</el-button>
+          <el-button
+            v-if="enableAddChannel"
+            type="primary"
+            plain
+            size="mini"
+            icon="el-icon-plus"
+            :disabled="!canMountChannel"
+            @click="toolbarAddChannel"
+          >添加通道</el-button>
+          <el-dropdown size="mini" @command="toolbarMoreCommand">
+            <el-button size="mini" :disabled="!activeCatalogNode">
+              操作<i class="el-icon-arrow-down el-icon--right" />
+            </el-button>
+            <el-dropdown-menu slot="dropdown">
+              <el-dropdown-item command="refresh" :disabled="!activeCatalogNode">刷新目录</el-dropdown-item>
+              <el-dropdown-item command="edit" :disabled="!canEditNode">编辑目录</el-dropdown-item>
+              <el-dropdown-item command="delete" :disabled="!canEditNode">删除目录</el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
+        </div>
+        <label class="org-tree-toolbar-label">
+          <el-checkbox v-model="showCode" />
+          编号
+        </label>
       </div>
 
       <vue-easy-tree
@@ -141,12 +162,34 @@ export default {
       treeLimit: 50,
       searchStr: '',
       chooseId: '',
+      activeNode: null,
       treeData: [],
       currentPage: this.defaultPage | 1,
       count: this.defaultCount | 15,
       total: 0,
       groupList: [],
       channelList: []
+    }
+  },
+  computed: {
+    activeCatalogNode() {
+      return this.activeNode && this.activeNode.data && this.activeNode.data.type === 0
+        ? this.activeNode
+        : null
+    },
+    canAddNode() {
+      return !!this.activeCatalogNode
+    },
+    canEditNode() {
+      return !!(this.activeCatalogNode && this.activeCatalogNode.level > 1)
+    },
+    // 业务分组：通道只能挂在虚拟组织上（树 level > 2）
+    canMountChannel() {
+      return !!(this.enableAddChannel && this.activeCatalogNode && this.activeCatalogNode.level > 2)
+    },
+    currentNodeShort() {
+      if (!this.activeCatalogNode || !this.activeCatalogNode.data) return ''
+      return this.activeCatalogNode.data.name || this.activeCatalogNode.data.deviceId || ''
     }
   },
   created() {
@@ -248,120 +291,32 @@ export default {
       this.$forceUpdate()
     },
     contextmenuEventHandler: function(event, data, node, element) {
-
-      if (!this.edit && !this.contextmenu) {
+      // 目录管理改走顶部按钮；右键仅保留通道节点的自定义菜单（如预览）
+      if (!this.contextmenu || !node || !node.data || node.data.type !== 1) {
         return
       }
       const allMenuItem = []
-      console.log(2)
-      console.log(node.data.type)
-      if (this.edit && node.data.type === 0) {
-
-        const menuItem = [
-          {
-            label: '刷新节点',
-            icon: 'el-icon-refresh',
-            disabled: false,
+      for (let i = 0; i < this.contextmenu.length; i++) {
+        const item = this.contextmenu[i]
+        if (item.type === node.data.type) {
+          allMenuItem.push({
+            label: item.label,
+            icon: item.icon,
             onClick: () => {
-              this.refreshNode(node)
+              item.onClick(event, data, node)
             }
-          },
-          {
-            label: '新建节点',
-            icon: 'el-icon-plus',
-            disabled: false,
-            onClick: () => {
-              this.addGroup(data.id, node)
-            }
-          },
-          {
-            label: '编辑节点',
-            icon: 'el-icon-edit',
-            disabled: node.level === 1,
-            onClick: () => {
-              this.editGroup(data, node)
-            }
-          },
-          {
-            label: '删除节点',
-            icon: 'el-icon-delete',
-            disabled: node.level === 1,
-            divided: true,
-            onClick: () => {
-              this.$confirm('确定删除?', '提示', {
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                type: 'warning'
-              }).then(() => {
-                this.removeGroup(data.id, node)
-              }).catch(() => {
-
-              })
-            }
-          }
-        ]
-
-        if (this.enableAddChannel) {
-          menuItem.push(
-            {
-              label: '添加设备',
-              icon: 'el-icon-plus',
-              disabled: node.level <= 2,
-              onClick: () => {
-                this.addChannelFormDevice(data.id, node)
-              }
-            }
-          )
-          menuItem.push(
-            {
-              label: '移除设备',
-              icon: 'el-icon-delete',
-              disabled: node.level <= 2,
-              divided: true,
-              onClick: () => {
-                this.removeChannelFormDevice(data.id, node)
-              }
-            }
-          )
-          menuItem.push(
-            {
-              label: '添加通道',
-              icon: 'el-icon-plus',
-              disabled: node.level <= 2,
-              onClick: () => {
-                this.addChannel(data.id, node)
-              }
-            }
-          )
-        }
-        allMenuItem.push(...menuItem)
-      }
-      if (this.contextmenu && node.data.type === 1) {
-        console.log(this.contextmenu)
-        for (let i = 0; i < this.contextmenu.length; i++) {
-          let item = this.contextmenu[i]
-          if (item.type === node.data.type) {
-            allMenuItem.push({
-              label: item.label,
-              icon: item.icon,
-              onClick: () => {
-                item.onClick(event, data, node)
-              }
-            })
-          }
+          })
         }
       }
       if (allMenuItem.length === 0) {
         return
       }
-
       this.$contextmenu({
         items: allMenuItem,
-        event, // 鼠标事件信息
-        customClass: 'custom-class', // 自定义菜单 class
-        zIndex: 3000 // 菜单样式 z-index
+        event,
+        customClass: 'custom-class',
+        zIndex: 3000
       })
-
       return false
     },
     removeGroup: function(id, node) {
@@ -530,7 +485,41 @@ export default {
         }
       } else {
         this.chooseId = data.deviceId
+        this.activeNode = (data && data.type === 0) ? node : null
         this.$emit('clickEvent', data)
+      }
+    },
+    toolbarAddNode() {
+      if (!this.activeCatalogNode) return
+      this.addGroup(this.activeCatalogNode.data.id, this.activeCatalogNode)
+    },
+    toolbarAddChannel() {
+      if (!this.activeCatalogNode || !this.canMountChannel) {
+        this.$message.warning({
+          showClose: true,
+          message: '请先选中虚拟组织(216)节点再添加通道'
+        })
+        return
+      }
+      this.addChannel(this.activeCatalogNode.data.id, this.activeCatalogNode)
+    },
+    toolbarMoreCommand(cmd) {
+      const node = this.activeCatalogNode
+      if (!node) return
+      if (cmd === 'refresh') {
+        this.refreshNode(node)
+      } else if (cmd === 'edit') {
+        if (!this.canEditNode) return
+        this.editGroup(node.data, node)
+      } else if (cmd === 'delete') {
+        if (!this.canEditNode) return
+        this.$confirm(`确定删除目录「${this.currentNodeShort}」？其下子节点也会一并删除。`, '删除目录', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(() => {
+          this.removeGroup(node.data.id, node)
+        }).catch(() => {})
       }
     },
     listClickHandler: function(data) {
@@ -623,10 +612,10 @@ export default {
 .org-tree-toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
   margin: 0 6px 8px;
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 8px;
   background: #f5f8fc;
   font-size: 13px;
@@ -634,8 +623,37 @@ export default {
   flex-shrink: 0;
 }
 
+.org-tree-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .org-tree-toolbar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  margin: 0;
+}
+
+.org-tree-hint {
+  margin: 0 6px 8px;
+  padding: 0 2px;
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.org-tree-menu-target {
+  color: #606266 !important;
+  font-size: 12px;
+  cursor: default !important;
 }
 
 .custom-tree-node .el-radio__label {

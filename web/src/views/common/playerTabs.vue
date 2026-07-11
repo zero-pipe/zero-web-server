@@ -1,8 +1,10 @@
 <template>
   <div class="player-tabs-wrapper" ref="playerWrapper">
-    <el-tabs v-if="showTab && playerList.length > 1" v-model="activePlayer" type="card" :stretch="true" @tab-click="changePlayer">
-      <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key"></el-tab-pane>
-    </el-tabs>
+    <div v-if="showTab && playerList.length > 1" class="player-tab-bar">
+      <el-tabs v-model="activePlayer" type="card" :stretch="true" @tab-click="changePlayer">
+        <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key" />
+      </el-tabs>
+    </div>
     <div class="player-video-area">
       <jessibucaPlayer
         v-if="activePlayer === 'jessibuca'"
@@ -276,6 +278,9 @@ export default {
   flex-direction: column;
   min-height: 0;
   background: #3a4556;
+}
+.player-tab-bar {
+  flex-shrink: 0;
 }
 .player-tabs-wrapper .el-tabs {
   margin-bottom: 0;

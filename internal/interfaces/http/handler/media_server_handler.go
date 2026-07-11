@@ -1,6 +1,7 @@
 package handler
 
 import (
+	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/persistence/model"
@@ -11,6 +12,7 @@ import (
 
 type MediaServerHandler struct {
 	svc        *mediaserverapp.Service
+	gbSipSvc   *gbsipconfig.Service
 	sipCfg     config.SIPConfig
 	mediaIP    string
 	serverPort int
@@ -20,6 +22,7 @@ type MediaServerHandler struct {
 
 func NewMediaServerHandler(
 	svc *mediaserverapp.Service,
+	gbSipSvc *gbsipconfig.Service,
 	sipCfg config.SIPConfig,
 	mediaIP string,
 	serverPort int,
@@ -27,6 +30,7 @@ func NewMediaServerHandler(
 ) *MediaServerHandler {
 	return &MediaServerHandler{
 		svc:        svc,
+		gbSipSvc:   gbSipSvc,
 		sipCfg:     sipCfg,
 		mediaIP:    mediaIP,
 		serverPort: serverPort,
@@ -134,17 +138,26 @@ func (h *MediaServerHandler) MapModelIconList(c *gin.Context) {
 }
 
 func (h *MediaServerHandler) SystemConfigInfo(c *gin.Context) {
-	showIP := h.mediaIP
+	sipCfg := h.sipCfg
+	if h.gbSipSvc != nil {
+		if cur, err := h.gbSipSvc.CurrentSIP(); err == nil {
+			sipCfg = cur
+		}
+	}
+	showIP := sipCfg.IP
+	if showIP == "" {
+		showIP = h.mediaIP
+	}
 	if showIP == "" {
 		showIP = "127.0.0.1"
 	}
 	response.OK(c, gin.H{
 		"serverPort": h.serverPort,
 		"sip": gin.H{
-			"id":       h.sipCfg.ID,
-			"domain":   h.sipCfg.Domain,
-			"port":     h.sipCfg.Port,
-			"password": h.sipCfg.Password,
+			"id":       sipCfg.ID,
+			"domain":   sipCfg.Domain,
+			"port":     sipCfg.Port,
+			"password": sipCfg.Password,
 			"showIp":   showIP,
 		},
 		"addOn": gin.H{
