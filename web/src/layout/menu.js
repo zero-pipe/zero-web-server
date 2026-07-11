@@ -59,8 +59,8 @@ export const primaryMenus = [
     children: [
       { title: '控制台', path: '/dashboard', icon: 'dashboard' },
       { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' },
-      { title: '国标配置', path: '/gbConfig', icon: 'platform' },
-      { title: '国标级联', path: '/platform', icon: 'platform' }
+      { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
+      { title: '国标级联', path: '/platform', icon: 'gbCascade' }
     ]
   },
   {

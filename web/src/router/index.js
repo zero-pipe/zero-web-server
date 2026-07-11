@@ -233,7 +233,7 @@ export const constantRoutes = [
         path: '',
         name: 'GbConfig',
         component: () => import('@/views/gbConfig/index'),
-        meta: { title: '国标配置', icon: 'platform' }
+        meta: { title: '国标配置', icon: 'gbConfig' }
       }
     ]
   },
@@ -246,7 +246,7 @@ export const constantRoutes = [
         path: '',
         name: 'Platform',
         component: () => import('@/views/platform/index'),
-        meta: { title: '国标级联', icon: 'platform' }
+        meta: { title: '国标级联', icon: 'gbCascade' }
       }
     ]
   },
