@@ -12,12 +12,14 @@ server.exe
 
 # Runtime / secrets
 config/jwk.json
-configs/config.yaml
 configs/config.local.yaml
 configs/config.*.local.yaml
 configs/config.zms.yaml
 logs/
 *.log
+
+# Intermediate / source maps（运行时不需要）
+*.map
 
 # IDE
 .idea/

@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -52,6 +54,9 @@ func (c RedisConfig) Addr() string {
 }
 
 type SIPConfig struct {
+	// IP 摄像机可达的平台网卡地址，写入 INVITE Contact/Via。
+	// 去掉 config media 段后必须配置；为空时启动会尝试自动探测。
+	IP       string `mapstructure:"ip"`
 	Port     int    `mapstructure:"port"`
 	Domain   string `mapstructure:"domain"`
 	ID       string `mapstructure:"id"`
@@ -75,6 +80,11 @@ func (c MediaConfig) BackendType() string {
 	default:
 		return "zms"
 	}
+}
+
+// Configured 配置文件是否声明了媒体节点（已改为可选，节点以数据库为准）。
+func (c MediaConfig) Configured() bool {
+	return strings.TrimSpace(c.IP) != "" && c.HTTPPort > 0
 }
 
 type LogConfig struct {
@@ -134,6 +144,15 @@ func Load(path string) (*Config, error) {
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
+	}
+
+	// 可选本地覆盖：configs/config.local.yaml（不入库，放密码等）
+	localPath := filepath.Join(filepath.Dir(path), "config.local.yaml")
+	if st, err := os.Stat(localPath); err == nil && !st.IsDir() {
+		v.SetConfigFile(localPath)
+		if err := v.MergeInConfig(); err != nil {
+			return nil, fmt.Errorf("merge local config %s: %w", localPath, err)
+		}
 	}
 
 	var cfg Config

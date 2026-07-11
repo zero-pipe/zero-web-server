@@ -1,6 +1,6 @@
 package tree
 
-// Node matches WVP GroupTree / RegionTree JSON shape for lazy tree UIs.
+// Node matches ZWS GroupTree / RegionTree JSON shape for lazy tree UIs.
 type Node struct {
 	ID             int    `json:"id" gorm:"column:id"`
 	DeviceID       string `json:"deviceId" gorm:"column:device_id"`

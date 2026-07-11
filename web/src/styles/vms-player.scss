@@ -140,7 +140,7 @@
   width: 100%;
 }
 
-/* 缩小画面，避免占满整屏 */
+/* 缩小画面，避免占满整屏；底色与舞台一致，避免 resize 前露出纯黑框 */
 .vms-player-dialog .player-video-area {
   position: relative;
   width: 100%;
@@ -150,7 +150,7 @@
   flex: none !important;
   height: auto !important;
   margin: 0 auto;
-  background: #000;
+  background: #0f172a;
 }
 
 .vms-player-dialog .player-error-tip {

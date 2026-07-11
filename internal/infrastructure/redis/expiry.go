@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const DeviceExpiresPrefix = "VMP_DEVICE_EXPIRES:"
+const DeviceExpiresPrefix = "ZWS_DEVICE_EXPIRES:"
 
 func (c *Client) SetDeviceExpiry(ctx context.Context, serverID, deviceID string, expireAtMs int64) error {
 	key := DeviceExpiresPrefix + serverID

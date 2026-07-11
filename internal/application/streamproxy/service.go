@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
+	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/model"
@@ -15,15 +15,14 @@ import (
 )
 
 type Service struct {
-	repo     *persistence.StreamProxyRepository
-	zlm      *mediakit.Client
-	mediaCfg config.MediaConfig
-	serverID string
-	sessions sync.Map
+	repo         *persistence.StreamProxyRepository
+	mediaServers *mediaserverapp.Service
+	serverID     string
+	sessions     sync.Map
 }
 
-func NewService(repo *persistence.StreamProxyRepository, zlmClient *mediakit.Client, mediaCfg config.MediaConfig, serverID string) *Service {
-	return &Service{repo: repo, zlm: zlmClient, mediaCfg: mediaCfg, serverID: serverID}
+func NewService(repo *persistence.StreamProxyRepository, mediaServers *mediaserverapp.Service, serverID string) *Service {
+	return &Service{repo: repo, mediaServers: mediaServers, serverID: serverID}
 }
 
 func (s *Service) List(page, count int, query string, pulling *bool, mediaServerID string) ([]model.StreamProxy, int64, error) {
@@ -39,7 +38,7 @@ func (s *Service) Add(m *model.StreamProxy, gbDeviceID, gbName string) error {
 		m.Type = "default"
 	}
 	if m.MediaServerID == "" {
-		m.MediaServerID = s.mediaCfg.ID
+		m.MediaServerID = "auto"
 	}
 	if err := s.repo.Create(m); err != nil {
 		return err
@@ -65,7 +64,9 @@ func (s *Service) Delete(id int) error {
 		return err
 	}
 	if proxy.StreamKey != "" {
-		_, _ = s.zlm.DelStreamProxy(context.Background(), proxy.StreamKey)
+		if node, err := s.resolveProxy(proxy); err == nil {
+			_, _ = node.Client.DelStreamProxy(context.Background(), proxy.StreamKey)
+		}
 	}
 	return s.repo.Delete(id)
 }
@@ -74,6 +75,10 @@ func (s *Service) Start(ctx context.Context, id int) (*dto.StreamContent, error)
 	proxy, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("代理不存在")
+	}
+	node, err := s.resolveProxy(proxy)
+	if err != nil {
+		return nil, err
 	}
 	rtpType := proxy.RTSPType
 	if rtpType == "" {
@@ -84,7 +89,7 @@ func (s *Service) Start(ctx context.Context, id int) (*dto.StreamContent, error)
 	s.sessions.Store(key, done)
 	defer s.sessions.Delete(key)
 
-	resp, err := s.zlm.AddStreamProxy(ctx, "__defaultVhost__", proxy.App, proxy.Stream, proxy.SrcURL, rtpType, false, proxy.EnableMP4, true)
+	resp, err := node.Client.AddStreamProxy(ctx, "__defaultVhost__", proxy.App, proxy.Stream, proxy.SrcURL, rtpType, false, proxy.EnableMP4, true)
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +103,16 @@ func (s *Service) Start(ctx context.Context, id int) (*dto.StreamContent, error)
 	if data.Key != "" {
 		proxy.StreamKey = data.Key
 		proxy.Pulling = true
+		proxy.MediaServerID = node.ID()
 		_ = s.repo.Update(proxy)
 	}
+	s.mediaServers.BindStream(proxy.App, proxy.Stream, node.ID())
 
 	select {
 	case content := <-done:
 		return content, nil
 	case <-time.After(15 * time.Second):
-		return s.buildStreamContent(proxy.App, proxy.Stream), nil
+		return s.buildStreamContent(proxy.App, proxy.Stream, node), nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -116,10 +123,13 @@ func (s *Service) Stop(id int) error {
 	if err != nil {
 		return err
 	}
-	if proxy.StreamKey != "" {
-		_, _ = s.zlm.DelStreamProxy(context.Background(), proxy.StreamKey)
+	if node, err := s.resolveProxy(proxy); err == nil {
+		if proxy.StreamKey != "" {
+			_, _ = node.Client.DelStreamProxy(context.Background(), proxy.StreamKey)
+		}
+		_, _ = node.Client.CloseStreams(context.Background(), "__defaultVhost__", proxy.App, proxy.Stream)
 	}
-	_, _ = s.zlm.CloseStreams(context.Background(), "__defaultVhost__", proxy.App, proxy.Stream)
+	s.mediaServers.UnbindStream(proxy.App, proxy.Stream)
 	proxy.Pulling = false
 	proxy.StreamKey = ""
 	return s.repo.Update(proxy)
@@ -144,21 +154,33 @@ func (s *Service) OnStreamStarted(app, stream string) {
 	key := streamKey(app, stream)
 	if v, ok := s.sessions.Load(key); ok {
 		if ch, ok := v.(chan *dto.StreamContent); ok {
+			node, _ := s.mediaServers.ResolveForStream(app, stream, "auto")
 			select {
-			case ch <- s.buildStreamContent(app, stream):
+			case ch <- s.buildStreamContent(app, stream, node):
 			default:
 			}
 		}
 	}
 }
 
-func (s *Service) buildStreamContent(app, stream string) *dto.StreamContent {
-	urls := mediakit.BuildPlayURLsFromConfig(s.mediaCfg, app, stream)
+func (s *Service) resolveProxy(proxy *model.StreamProxy) (*mediaserverapp.Node, error) {
+	prefer := proxy.MediaServerID
+	if prefer == "" {
+		prefer = "auto"
+	}
+	return s.mediaServers.ResolveForStream(proxy.App, proxy.Stream, prefer)
+}
+
+func (s *Service) buildStreamContent(app, stream string, node *mediaserverapp.Node) *dto.StreamContent {
+	if node == nil {
+		return &dto.StreamContent{App: app, Stream: stream, ServerID: s.serverID}
+	}
+	urls := mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream)
 	return &dto.StreamContent{
-		App: app, Stream: stream, IP: s.mediaCfg.IP,
+		App: app, Stream: stream, IP: node.StreamIP(),
 		Flv: urls["flv"], WsFlv: urls["ws"], Hls: urls["hls"],
 		Rtmp: urls["rtmp"], Rtsp: urls["rtsp"],
-		MediaServerID: s.mediaCfg.ID, ServerID: s.serverID,
+		MediaServerID: node.ID(), ServerID: s.serverID,
 	}
 }
 

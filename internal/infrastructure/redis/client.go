@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	DevicePrefix           = "VMP_DEVICE_INFO"
-	DeviceKeepalivePrefix  = "VMP_DEVICE_KEEPALIVE:"
-	SIPInviteSessionPrefix = "VMP_SIP_INVITE_SESSION_INFO:"
-	MediaServerPrefix      = "VMP_MEDIA_SERVER_INFO:"
-	ONVIFDevicePrefix      = "VMP_ONVIF_DEVICE:"
+	DevicePrefix           = "ZWS_DEVICE_INFO"
+	DeviceKeepalivePrefix  = "ZWS_DEVICE_KEEPALIVE:"
+	SIPInviteSessionPrefix = "ZWS_SIP_INVITE_SESSION_INFO:"
+	MediaServerPrefix      = "ZWS_MEDIA_SERVER_INFO:"
+	ONVIFDevicePrefix      = "ZWS_ONVIF_DEVICE:"
 )
 
 type Client struct {

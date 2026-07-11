@@ -10,7 +10,7 @@
 |------|----------|------|
 | zero-web-kit HTTP | **18080** | REST API + Hook 回调 |
 | GB28181 SIP | **8116** | UDP/TCP，设备注册/信令 |
-| MySQL | 3306 | 库名 `wvp` |
+| MySQL | 3306 | 库名 `zws` |
 | Redis | 6379 | 设备状态、心跳统计等 |
 | zero-media-server | **8080** | 流媒体 HTTP API（需单独部署） |
 | 前端开发服 | 9528 | 仅 `npm run dev` 时使用 |
@@ -72,9 +72,9 @@ docker compose version
 
 ```bash
 # Linux / macOS / Git Bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS wvp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -p wvp < migrations/004_init_wvp_mysql_native.sql
-mysql -u root -p wvp < migrations/002_add_onvif_tables.sql
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p zws < migrations/004_init_zws_mysql_native.sql
+mysql -u root -p zws < migrations/002_add_onvif_tables.sql
 ```
 
 **Windows PowerShell**（把 `$mysql` 换成你的 mysql.exe 路径）：
@@ -82,9 +82,9 @@ mysql -u root -p wvp < migrations/002_add_onvif_tables.sql
 ```powershell
 cd E:\16_project\zero-web-kit
 $mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
-& $mysql -u root -p你的密码 -e "CREATE DATABASE IF NOT EXISTS wvp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-Get-Content migrations\004_init_wvp_mysql_native.sql -Raw | & $mysql -u root -p你的密码 wvp
-Get-Content migrations\002_add_onvif_tables.sql -Raw | & $mysql -u root -p你的密码 wvp
+& $mysql -u root -p你的密码 -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+Get-Content migrations\004_init_zws_mysql_native.sql -Raw | & $mysql -u root -p你的密码 zws
+Get-Content migrations\002_add_onvif_tables.sql -Raw | & $mysql -u root -p你的密码 zws
 ```
 
 默认管理员：**admin / admin**
@@ -92,25 +92,17 @@ Get-Content migrations\002_add_onvif_tables.sql -Raw | & $mysql -u root -p你的
 验证 SQL：
 
 ```sql
-USE wvp;
-SELECT username FROM wvp_user WHERE username = 'admin';
+USE zws;
+SELECT username FROM zws_user WHERE username = 'admin';
 ```
 
 ---
 
 ## 四、配置文件
 
-```bash
-# Linux / Git Bash
-cp configs/config.example.yaml configs/config.yaml
-```
+主配置为 `configs/config.yaml`。敏感项（密码等）可写在 `configs/config.local.yaml`（不入库，启动时自动合并）。
 
-```powershell
-# Windows
-Copy-Item configs\config.example.yaml configs\config.yaml
-```
-
-**必须核对** `configs/config.yaml`：
+**必须核对** `configs/config.yaml`（及可选的 `config.local.yaml`）：
 
 ```yaml
 mysql:
@@ -118,7 +110,7 @@ mysql:
   port: 3306
   user: root
   password: "你的MySQL密码"    # 与真实库一致
-  database: wvp
+  database: zws
 
 redis:
   host: 127.0.0.1
@@ -218,8 +210,8 @@ sudo apt install -y mysql-server redis-server
 sudo systemctl enable --now mysql redis-server
 
 # 导入数据库（第三节）
-mysql -u root -p wvp < migrations/004_init_wvp_mysql_native.sql
-mysql -u root -p wvp < migrations/002_add_onvif_tables.sql
+mysql -u root -p zws < migrations/004_init_zws_mysql_native.sql
+mysql -u root -p zws < migrations/002_add_onvif_tables.sql
 
 # 防火墙（若启用 ufw）
 sudo ufw allow 18080/tcp
@@ -474,7 +466,7 @@ curl -s "http://127.0.0.1:18080/api/user/login?username=admin&password=admin"
 
 ```bash
 # MySQL
-mysql -u root -p -e "SELECT COUNT(*) FROM wvp.wvp_device;"
+mysql -u root -p -e "SELECT COUNT(*) FROM zws.zws_device;"
 
 # Redis
 redis-cli -n 7 PING

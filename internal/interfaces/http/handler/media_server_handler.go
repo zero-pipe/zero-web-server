@@ -77,7 +77,7 @@ func (h *MediaServerHandler) Check(c *gin.Context) {
 func (h *MediaServerHandler) Save(c *gin.Context) {
 	var m model.MediaServer
 	if err := c.ShouldBindJSON(&m); err != nil {
-		response.Error(c, response.CodeBadReq, "参数错误")
+		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
 		return
 	}
 	if err := h.svc.Save(&m); err != nil {

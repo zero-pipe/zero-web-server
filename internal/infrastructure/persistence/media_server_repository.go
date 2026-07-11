@@ -43,6 +43,11 @@ func (r *MediaServerRepository) ClearDefaultExcept(id string) error {
 		Update("default_server", false).Error
 }
 
+func (r *MediaServerRepository) ClearAllDefault() error {
+	return r.db.Model(&model.MediaServer{}).Where("default_server = ?", true).
+		Update("default_server", false).Error
+}
+
 func (r *MediaServerRepository) GetDefault() (*model.MediaServer, error) {
 	var m model.MediaServer
 	err := r.db.Where("default_server = ?", true).First(&m).Error

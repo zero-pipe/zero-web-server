@@ -1,9 +1,9 @@
-﻿-- zero-web-kit MySQL patch (WVP 2.7.4 updates)
--- Source: wvp-GB28181-pro/数据库/2.7.4/更新-mysql-2.7.4.sql
--- Run after 001_init_wvp_mysql.sql on existing deployments
+-- ZWS MySQL patch (legacy upgrade)
+-- Legacy upgrade script (archived)
+-- Run after 001_init_zws_mysql.sql on existing deployments
 
 SET NAMES utf8mb4;
-create table IF NOT EXISTS wvp_jt_terminal (
+create table IF NOT EXISTS zws_jt_terminal (
                                  id serial primary key,
                                  phone_number character varying(50),
                                  terminal_id character varying(50),
@@ -27,7 +27,7 @@ create table IF NOT EXISTS wvp_jt_terminal (
                                  constraint uk_jt_device_id_device_id unique (id, phone_number)
 );
 
-create table IF NOT EXISTS wvp_jt_channel (
+create table IF NOT EXISTS zws_jt_channel (
                                id serial primary key,
                                terminal_db_id integer,
                                channel_id integer,
@@ -40,117 +40,117 @@ create table IF NOT EXISTS wvp_jt_channel (
 
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_20250708`//
-CREATE PROCEDURE `wvp_20250708`()
+DROP PROCEDURE IF EXISTS `zws_20250708`//
+CREATE PROCEDURE `zws_20250708`()
 BEGIN
     IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_media_server' and column_name = 'jtt_proxy_port')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_media_server' and column_name = 'jtt_proxy_port')
     THEN
-        ALTER TABLE wvp_media_server ADD jtt_proxy_port  integer;
+        ALTER TABLE zws_media_server ADD jtt_proxy_port  integer;
     END IF;
 END; //
 DELIMITER ;
-call wvp_20250708();
-DROP PROCEDURE wvp_20250708;
+call zws_20250708();
+DROP PROCEDURE zws_20250708;
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_20250917`//
-CREATE PROCEDURE `wvp_20250917`()
+DROP PROCEDURE IF EXISTS `zws_20250917`//
+CREATE PROCEDURE `zws_20250917`()
 BEGIN
     IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_media_server' and column_name = 'mp4_port')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_media_server' and column_name = 'mp4_port')
     THEN
-        ALTER TABLE wvp_media_server ADD mp4_port integer;
+        ALTER TABLE zws_media_server ADD mp4_port integer;
     END IF;
 
     IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_media_server' and column_name = 'mp4_ssl_port')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_media_server' and column_name = 'mp4_ssl_port')
     THEN
-        ALTER TABLE wvp_media_server ADD mp4_ssl_port integer;
+        ALTER TABLE zws_media_server ADD mp4_ssl_port integer;
     END IF;
 END; //
 DELIMITER ;
-call wvp_20250917();
-DROP PROCEDURE wvp_20250917;
+call zws_20250917();
+DROP PROCEDURE zws_20250917;
 
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_20250924`//
-CREATE PROCEDURE `wvp_20250924`()
+DROP PROCEDURE IF EXISTS `zws_20250924`//
+CREATE PROCEDURE `zws_20250924`()
 BEGIN
     IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_channel' and column_name = 'enable_broadcast')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_channel' and column_name = 'enable_broadcast')
     THEN
-        ALTER TABLE wvp_device_channel ADD enable_broadcast integer default 0;
+        ALTER TABLE zws_device_channel ADD enable_broadcast integer default 0;
     END IF;
 
     IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                       WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_channel' and column_name = 'map_level')
+                       WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_channel' and column_name = 'map_level')
     THEN
-        ALTER TABLE wvp_device_channel ADD map_level integer default 0;
+        ALTER TABLE zws_device_channel ADD map_level integer default 0;
     END IF;
 
     IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                       WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_common_group' and column_name = 'alias')
+                       WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_common_group' and column_name = 'alias')
     THEN
-        ALTER TABLE wvp_common_group ADD alias varchar(255) default null;
+        ALTER TABLE zws_common_group ADD alias varchar(255) default null;
     END IF;
 END; //
 DELIMITER ;
-call wvp_20250924();
-DROP PROCEDURE wvp_20250924;
+call zws_20250924();
+DROP PROCEDURE zws_20250924;
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_20251027`//
-CREATE PROCEDURE `wvp_20251027`()
+DROP PROCEDURE IF EXISTS `zws_20251027`//
+CREATE PROCEDURE `zws_20251027`()
 BEGIN
     IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_stream_proxy' and column_name = 'enable_remove_none_reader')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_stream_proxy' and column_name = 'enable_remove_none_reader')
     THEN
-        ALTER TABLE wvp_stream_proxy DROP enable_remove_none_reader;
+        ALTER TABLE zws_stream_proxy DROP enable_remove_none_reader;
     END IF;
 END; //
 DELIMITER ;
-call wvp_20251027();
-DROP PROCEDURE wvp_20251027;
+call zws_20251027();
+DROP PROCEDURE zws_20251027;
 
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_20251101`//
-CREATE PROCEDURE `wvp_20251101`()
+DROP PROCEDURE IF EXISTS `zws_20251101`//
+CREATE PROCEDURE `zws_20251101`()
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.STATISTICS
                WHERE TABLE_SCHEMA = (SELECT DATABASE())
-                 AND TABLE_NAME = 'wvp_media_server'
+                 AND TABLE_NAME = 'zws_media_server'
                  AND INDEX_NAME = 'uk_media_server_unique_ip_http_port')
     THEN
-        drop index uk_media_server_unique_ip_http_port on wvp_media_server;
+        drop index uk_media_server_unique_ip_http_port on zws_media_server;
     END IF;
 END; //
 DELIMITER ;
-call wvp_20251101();
-DROP PROCEDURE wvp_20251101;
+call zws_20251101();
+DROP PROCEDURE zws_20251101;
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_202601025`//
-CREATE PROCEDURE `wvp_202601025`()
+DROP PROCEDURE IF EXISTS `zws_202601025`//
+CREATE PROCEDURE `zws_202601025`()
 BEGIN
     IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device' and column_name = 'register_time')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device' and column_name = 'register_time')
     THEN
-        ALTER TABLE wvp_device DROP register_time;
+        ALTER TABLE zws_device DROP register_time;
     END IF;
     IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device' and column_name = 'keepalive_time')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device' and column_name = 'keepalive_time')
     THEN
-        ALTER TABLE wvp_device DROP keepalive_time;
+        ALTER TABLE zws_device DROP keepalive_time;
     END IF;
 END; //
 DELIMITER ;
-call wvp_202601025();
-DROP PROCEDURE wvp_202601025;
+call zws_202601025();
+DROP PROCEDURE zws_202601025;
 
-create table IF NOT EXISTS wvp_alarm (
+create table IF NOT EXISTS zws_alarm (
     id serial primary key COMMENT '主键ID',
     channel_id integer COMMENT '关联通道的数据库id',
     description character varying(255) COMMENT '报警描述',
@@ -165,76 +165,76 @@ create table IF NOT EXISTS wvp_alarm (
 
 
 DELIMITER //  -- 重定义分隔符避免分号冲突
-DROP PROCEDURE IF EXISTS `wvp_20260417`//
-CREATE PROCEDURE `wvp_20260417`()
+DROP PROCEDURE IF EXISTS `zws_20260417`//
+CREATE PROCEDURE `zws_20260417`()
 BEGIN
  IF EXISTS (SELECT table_name FROM information_schema.tables
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and table_name = 'wvp_device_mobile_position')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and table_name = 'zws_device_mobile_position')
  THEN
  IF NOT EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_mobile_position' and column_name = 'timestamp')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_mobile_position' and column_name = 'timestamp')
     THEN
-    ALTER TABLE wvp_device_mobile_position ADD timestamp BIGINT COMMENT '上报时间';
+    ALTER TABLE zws_device_mobile_position ADD timestamp BIGINT COMMENT '上报时间';
 END IF;
 IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_mobile_position' and column_name = 'time')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_mobile_position' and column_name = 'time')
     THEN
-    UPDATE wvp_device_mobile_position SET timestamp = UNIX_TIMESTAMP(time) * 1000;
-    ALTER TABLE wvp_device_mobile_position DROP time;
+    UPDATE zws_device_mobile_position SET timestamp = UNIX_TIMESTAMP(time) * 1000;
+    ALTER TABLE zws_device_mobile_position DROP time;
 END IF;
 IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_mobile_position' and column_name = 'device_id')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_mobile_position' and column_name = 'device_id')
     THEN
-    ALTER TABLE wvp_device_mobile_position DROP device_id;
+    ALTER TABLE zws_device_mobile_position DROP device_id;
 END IF;
 IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_mobile_position' and column_name = 'device_name')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_mobile_position' and column_name = 'device_name')
     THEN
-    ALTER TABLE wvp_device_mobile_position DROP device_name;
+    ALTER TABLE zws_device_mobile_position DROP device_name;
 END IF;
 IF EXISTS (SELECT column_name FROM information_schema.columns
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'wvp_device_mobile_position' and column_name = 'report_source')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and  table_name = 'zws_device_mobile_position' and column_name = 'report_source')
     THEN
-ALTER TABLE wvp_device_mobile_position DROP report_source;
+ALTER TABLE zws_device_mobile_position DROP report_source;
 END IF;
 -- 修改表名（目标表已存在时跳过，避免重复执行失败）
 IF NOT EXISTS (SELECT table_name FROM information_schema.tables
-                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and table_name = 'wvp_mobile_position')
+                   WHERE TABLE_SCHEMA = (SELECT DATABASE()) and table_name = 'zws_mobile_position')
     THEN
-ALTER TABLE wvp_device_mobile_position RENAME TO wvp_mobile_position;
+ALTER TABLE zws_device_mobile_position RENAME TO zws_mobile_position;
 END IF;
 END IF;
 
 END; //
 DELIMITER ;
-call wvp_20260417();
-DROP PROCEDURE wvp_20260417;
+call zws_20260417();
+DROP PROCEDURE zws_20260417;
 
 DELIMITER //
-DROP PROCEDURE IF EXISTS `wvp_20260521`//
-CREATE PROCEDURE `wvp_20260521`()
+DROP PROCEDURE IF EXISTS `zws_20260521`//
+CREATE PROCEDURE `zws_20260521`()
 BEGIN
     IF NOT EXISTS (SELECT 1
                    FROM information_schema.STATISTICS
                    WHERE TABLE_SCHEMA = (SELECT DATABASE())
-                     AND TABLE_NAME = 'wvp_device_channel'
+                     AND TABLE_NAME = 'zws_device_channel'
                      AND INDEX_NAME = 'uk_device_channel_source')
     THEN
         -- 用 GROUP BY + LEFT JOIN 替代自连接 DELETE
         DELETE t1
-        FROM wvp_device_channel t1
+        FROM zws_device_channel t1
                  LEFT JOIN (SELECT MAX(id) as id
-                            FROM wvp_device_channel
+                            FROM zws_device_channel
                             GROUP BY data_device_id, device_id) t2 ON t1.id = t2.id
         WHERE t2.id IS NULL;
 
-ALTER TABLE wvp_device_channel
+ALTER TABLE zws_device_channel
     ADD UNIQUE INDEX uk_device_channel_source (data_device_id, device_id);
 END IF;
 END; //
 DELIMITER ;
-call wvp_20260521();
-DROP PROCEDURE wvp_20260521;
+call zws_20260521();
+DROP PROCEDURE zws_20260521;
 
 
 

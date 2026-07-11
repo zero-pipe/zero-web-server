@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// JT1078Handler 部标 JT1078 接口占位实现，对齐 WVP 前端路径，避免 404。
+// JT1078Handler 部标 JT1078 接口占位实现，对齐 ZWS 前端路径，避免 404。
 // 完整 JT1078 协议栈尚未接入，控制类接口返回业务提示。
 type JT1078Handler struct{}
 

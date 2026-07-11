@@ -1,7 +1,7 @@
 -- ONVIF device extension tables for zero-web-kit
--- Run after WVP 2.7.4 base schema is initialized.
+-- Run after ZWS base schema is initialized.
 
-CREATE TABLE IF NOT EXISTS wvp_onvif_device (
+CREATE TABLE IF NOT EXISTS zws_onvif_device (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     name            VARCHAR(255) COMMENT '设备名称',
     ip              VARCHAR(50) NOT NULL COMMENT '设备IP',
@@ -26,9 +26,9 @@ CREATE TABLE IF NOT EXISTS wvp_onvif_device (
     UNIQUE KEY uk_onvif_ip_port (ip, port)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF设备';
 
-CREATE TABLE IF NOT EXISTS wvp_onvif_channel (
+CREATE TABLE IF NOT EXISTS zws_onvif_channel (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    device_id       BIGINT NOT NULL COMMENT '关联 wvp_onvif_device.id',
+    device_id       BIGINT NOT NULL COMMENT '关联 zws_onvif_device.id',
     profile_token   VARCHAR(255) NOT NULL COMMENT 'ONVIF Profile Token',
     name            VARCHAR(255) COMMENT '通道名称',
     video_source    VARCHAR(255) COMMENT 'VideoSource Token',

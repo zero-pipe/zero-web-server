@@ -1,4 +1,4 @@
-# zero-web-kit
+# zero-web-kit（ZWS · Zero Web Server）
 
 国标 GB28181 + ONVIF 设备管理平台。后端 Go 重写，前端 Vue 2 管理台，流媒体对接 **[zero-media-server](https://github.com/zero-pipe/zero-media-server)**（ZMS）。
 
@@ -8,7 +8,7 @@
 |------|------|
 | Web | Gin |
 | 架构 | DDD 分层 |
-| 数据库 | MySQL（兼容历史 `wvp_*` 表结构） |
+| 数据库 | MySQL（库名 `zws`，表前缀 `zws_*`） |
 | 缓存 | Redis |
 | 流媒体 | [zero-media-server](https://github.com/zero-pipe/zero-media-server)（ZMS，HTTP API + Hook） |
 | ONVIF | `3rdpart/onvif-go`（本地 vendored） |
@@ -21,7 +21,7 @@ zero-web-kit/
 ├── 3rdpart/                 # 第三方源码（vendored）
 │   └── onvif-go/            # ONVIF 客户端/发现库
 ├── cmd/server/              # 程序入口
-├── configs/                 # 配置模板（复制为 config.yaml 使用）
+├── configs/                 # config.yaml 主配置；config.local.yaml 可选本地覆盖（不入库）
 ├── config/                  # 运行时密钥（jwk.json，不入库）
 ├── docker/                  # MySQL + Redis Compose
 ├── docs/                    # 补充文档（含 DEPLOY.md 部署指南）
@@ -30,7 +30,7 @@ zero-web-kit/
 │   ├── domain/              # 领域模型与仓储接口
 │   ├── infrastructure/      # DB / Redis / SIP / zero-media-server 客户端 / ONVIF
 │   └── interfaces/          # HTTP API、Hook 回调
-├── migrations/              # SQL 迁移（历史表名 wvp_*）
+├── migrations/              # SQL 迁移（表名 zws_*）
 ├── pkg/
 │   ├── jwt/                 # JWT 签发
 │   ├── log/                 # 结构化日志 + 文件轮转
@@ -52,7 +52,8 @@ zero-web-kit/
 ### 最简流程（Linux + Docker + 本机 zero-media-server）
 
 ```bash
-cp configs/config.example.yaml configs/config.yaml   # 改 mysql.password 为 root（若用 compose）
+# 编辑 configs/config.yaml；密码可放 configs/config.local.yaml（不入库）
+# 若用 compose，mysql.password 改为 root
 make docker-up
 make tidy && make build && make run
 # 另开终端
@@ -97,7 +98,7 @@ make frontend-install && make frontend-dev
 ./tools/dev.sh check
 ```
 
-`config.yaml` 里 `mysql.password` / `redis.password` 需与本机服务一致（可从 `configs/config.example.yaml` 复制）。
+`config.yaml` 里 `mysql.password` / `redis.password` 需与本机服务一致；也可用 `configs/config.local.yaml` 覆盖敏感项。
 
 **有 Docker 时**（自动拉起 MySQL + Redis 容器）：
 
@@ -131,7 +132,7 @@ make frontend-install && make frontend-dev
 | http://localhost:18080 | Go API |
 | http://localhost:8080 | zero-media-server（`-Media` / `--media`） |
 
-日志：`.dev/logs/`。首次会自动 `npm install`、从 `config.example.yaml` 复制 `config.yaml`。
+日志：`.dev/logs/`。首次会自动 `npm install`；请确保已有 `configs/config.yaml`。
 
 ### 分开启动（传统）
 

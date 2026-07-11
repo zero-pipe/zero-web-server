@@ -149,7 +149,7 @@ func loadFromFile(path string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 		return key, &key.PublicKey, nil
 	}
 
-	// JWK set JSON (compatible with WVP jwk.json)
+	// JWK set JSON (compatible with ZWS jwk.json)
 	var set jwkSet
 	if err := json.Unmarshal(data, &set); err != nil {
 		return nil, nil, err
@@ -159,7 +159,7 @@ func loadFromFile(path string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 	}
 
 	// For simplicity, regenerate if JWK RSA parsing is complex;
-	// WVP will create new jwk.json on first run anyway.
+	// ZWS will create new jwk.json on first run anyway.
 	return nil, nil, errors.New("jwk rsa import not supported, regenerate")
 }
 

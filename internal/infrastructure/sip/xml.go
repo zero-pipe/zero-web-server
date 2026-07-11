@@ -303,7 +303,7 @@ func BuildDeviceControlPTZ(deviceID, channelID, ptzCmd string) string {
 </Control>`, 1, channelID, ptzCmd)
 }
 
-// BuildPresetQuery builds GB28181 PresetQuery MESSAGE body (aligned with wvp).
+// BuildPresetQuery builds GB28181 PresetQuery MESSAGE body.
 func BuildPresetQuery(channelID, sn string) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
 <Query>
@@ -313,7 +313,7 @@ func BuildPresetQuery(channelID, sn string) string {
 </Query>`, sn, channelID)
 }
 
-// FrontEndCmdString builds 8-byte PTZCmd hex string (wvp SIPCommander.frontEndCmdString).
+// FrontEndCmdString builds 8-byte PTZCmd hex string.
 func FrontEndCmdString(cmdCode, parameter1, parameter2, combineCode2 int) string {
 	b7 := (combineCode2 << 4) & 0xFF
 	check := (0xA5 + 0x0F + 0x01 + cmdCode + parameter1 + parameter2 + b7) % 0x100

@@ -5,7 +5,7 @@ import (
 )
 
 func TestFrontEndCmdStringPreset(t *testing.T) {
-	// set preset 1 -> A50F018100010016 (check from wvp formula)
+	// set preset 1 -> A50F018100010016 (PTZ front-end cmd formula)
 	got := FrontEndCmdString(0x81, 0, 1, 0)
 	wantPrefix := "A50F01810001"
 	if got[:12] != wantPrefix {

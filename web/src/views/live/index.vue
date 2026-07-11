@@ -49,7 +49,12 @@
                 :preferred-player="globalPlayer"
                 @playStatusChange="onPlayerPlayStatus(i - 1, $event)"
               />
-              <div v-if="isPulling(i - 1)" class="pull-countdown" aria-live="polite">
+              <div
+                v-if="isPulling(i - 1)"
+                class="pull-countdown"
+                :class="{ 'is-fading': pullFading[i - 1] }"
+                aria-live="polite"
+              >
                 <div
                   class="pull-countdown-num"
                   :key="'cd-' + (i - 1) + '-' + pullCountdown[i - 1] + '-' + pullCycle[i - 1]"
@@ -114,6 +119,7 @@ export default {
       pullLoading: [],
       pullCountdown: [],
       pullCycle: [],
+      pullFading: [],
       globalPlayer: 'jessibuca',
       sidebarVisible: true, // 侧边栏
       ptzVisible: false, // 云台面板
@@ -235,11 +241,12 @@ export default {
     startPullCountdown(idx) {
       this.stopPullCountdown(idx)
       this.$set(this.pullLoading, idx, true)
+      this.$set(this.pullFading, idx, false)
       this.$set(this.pullCountdown, idx, 3)
       this.$set(this.pullCycle, idx, 0)
       if (!this._countdownTimers) this._countdownTimers = {}
       this._countdownTimers[idx] = setInterval(() => {
-        if (!this.pullLoading[idx]) return
+        if (!this.pullLoading[idx] || this.pullFading[idx]) return
         const cur = this.pullCountdown[idx]
         if (cur <= 1) {
           this.$set(this.pullCycle, idx, (this.pullCycle[idx] || 0) + 1)
@@ -258,15 +265,38 @@ export default {
         clearTimeout(this._countdownWatchdogs[idx])
         this._countdownWatchdogs[idx] = null
       }
+      if (this._fadeTimers && this._fadeTimers[idx]) {
+        clearTimeout(this._fadeTimers[idx])
+        this._fadeTimers[idx] = null
+      }
       this.$set(this.pullLoading, idx, false)
+      this.$set(this.pullFading, idx, false)
       this.$set(this.pullCountdown, idx, null)
+    },
+    /** 出画后淡出遮罩，避免瞬删露出播放器黑底一闪 */
+    fadeOutPullCountdown(idx) {
+      if (!this.pullLoading[idx] || this.pullFading[idx]) return
+      if (this._countdownTimers && this._countdownTimers[idx]) {
+        clearInterval(this._countdownTimers[idx])
+        this._countdownTimers[idx] = null
+      }
+      if (this._countdownWatchdogs && this._countdownWatchdogs[idx]) {
+        clearTimeout(this._countdownWatchdogs[idx])
+        this._countdownWatchdogs[idx] = null
+      }
+      this.$set(this.pullFading, idx, true)
+      if (!this._fadeTimers) this._fadeTimers = {}
+      clearTimeout(this._fadeTimers[idx])
+      this._fadeTimers[idx] = setTimeout(() => {
+        this.stopPullCountdown(idx)
+      }, 320)
     },
     isPulling(idx) {
       return !!this.pullLoading[idx]
     },
     onPlayerPlayStatus(idx, playing) {
       if (playing && this.pullLoading[idx]) {
-        this.stopPullCountdown(idx)
+        this.fadeOutPullCountdown(idx)
       }
     },
     clearAllPullCountdowns() {
@@ -280,11 +310,18 @@ export default {
           clearTimeout(this._countdownWatchdogs[k])
         })
       }
+      if (this._fadeTimers) {
+        Object.keys(this._fadeTimers).forEach(k => {
+          clearTimeout(this._fadeTimers[k])
+        })
+      }
       this._countdownTimers = {}
       this._countdownWatchdogs = {}
+      this._fadeTimers = {}
       this.pullLoading = []
       this.pullCountdown = []
       this.pullCycle = []
+      this.pullFading = []
     },
     toggleSidebar() {
       this.sidebarVisible = !this.sidebarVisible
@@ -372,7 +409,7 @@ export default {
           clearTimeout(this._countdownWatchdogs[idxTmp])
           this._countdownWatchdogs[idxTmp] = setTimeout(() => {
             if (this.pullLoading[idxTmp] && this.streamInfo[idxTmp]) {
-              this.stopPullCountdown(idxTmp)
+              this.fadeOutPullCountdown(idxTmp)
             }
           }, 12000)
         })
@@ -730,10 +767,24 @@ export default {
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: rgba(30, 38, 48, 0.42);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  /* 与窗格灰蓝底同色系，略提亮半透，避免「黑罩」突兀 */
+  background:
+    linear-gradient(165deg, rgba(74, 85, 104, 0.72) 0%, rgba(58, 69, 86, 0.78) 50%, rgba(50, 60, 75, 0.82) 100%);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border-radius: inherit;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.pull-countdown.is-fading {
+  opacity: 0;
+}
+
+.pull-countdown.is-fading .pull-countdown-num {
+  animation: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .pull-countdown-num {

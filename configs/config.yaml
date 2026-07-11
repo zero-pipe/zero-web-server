@@ -7,7 +7,7 @@ mysql:
   port: 3306
   user: root
   password: "12345678"
-  database: wvp
+  database: zws
   charset: utf8mb4
   max_idle_conns: 10
   max_open_conns: 100
@@ -20,23 +20,22 @@ redis:
   pool_size: 10
 
 sip:
+  # 摄像机可达的本机局域网 IP（INVITE Contact/Via）。与摄像机同网段，勿填 127.0.0.1。
+  ip: "192.168.1.5"
   port: 8116
-  domain: "4101050000"
-  id: "41010500002000000001"
+  domain: "3402000000"
+  id: "34020000002000000001"
   password: "12345678"
   alarm: false
 
-# zero-media-server 流媒体节点（HTTP API 与 Hook 回调；zero-media-kit 为其内部依赖库，非本平台对接对象）
-media:
-  id: zms-local
-  type: zms
-  ip: 127.0.0.1
-  http_port: 8080
-  secret: "035c73f7-bb6b-4889-a715-d9eb2d1925cc"
-  rtp:
-    enable: true
-    port_range: "40000,45000"
-    send_port_range: "50000,55000"
+# 媒体节点改为页面「媒体节点」动态添加并落库，启动时可为空。
+# 如需兼容临时指定，可取消注释（IP+http_port 非空才生效）。
+# media:
+#   id: zero-media-server
+#   type: zms
+#   ip: 192.168.1.5
+#   http_port: 8080
+#   secret: ""
 
 log:
   level: info          # debug | info | warn | error
@@ -51,7 +50,10 @@ log:
 
 user_settings:
   play_timeout: 180000
+  record_info_timeout: 30000
   stream_on_demand: true
+  push_authority: false
+  record_push_live: false
   server_id: "000000"
   login_timeout: 60 # minutes
   jwk_file: "config/jwk.json"

@@ -41,7 +41,7 @@ func (c *Client) PushKeepalive(ctx context.Context, deviceID string, ts int64) e
 }
 
 func (c *Client) PushRegister(ctx context.Context, deviceID string, ts int64) error {
-	return c.pushDeviceTimestamp(ctx, fmt.Sprintf("VMP_DEVICE_REGISTER:%s", deviceID), ts, registerTTL)
+	return c.pushDeviceTimestamp(ctx, fmt.Sprintf("ZWS_DEVICE_REGISTER:%s", deviceID), ts, registerTTL)
 }
 
 func (c *Client) pushDeviceTimestamp(ctx context.Context, key string, ts int64, ttl time.Duration) error {
@@ -57,7 +57,7 @@ func (c *Client) GetKeepaliveTimeStamps(ctx context.Context, deviceID string, co
 }
 
 func (c *Client) GetRegisterTimeStamps(ctx context.Context, deviceID string, count int) ([]int64, error) {
-	return c.getDeviceTimeStamps(ctx, fmt.Sprintf("VMP_DEVICE_REGISTER:%s", deviceID), count)
+	return c.getDeviceTimeStamps(ctx, fmt.Sprintf("ZWS_DEVICE_REGISTER:%s", deviceID), count)
 }
 
 func (c *Client) getDeviceTimeStamps(ctx context.Context, key string, count int) ([]int64, error) {

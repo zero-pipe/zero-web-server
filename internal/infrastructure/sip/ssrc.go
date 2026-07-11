@@ -2,7 +2,7 @@ package sipinfra
 
 import "fmt"
 
-// PlaySSRC returns a GB28181 play SSRC matching WVP SSRCFactory (0 + domain[3:8] + 4-digit seq).
+// PlaySSRC returns a GB28181 play SSRC (0 + domain[3:8] + 4-digit seq).
 func PlaySSRC(domain string, seq int) string {
 	part := domain
 	if len(domain) >= 8 {

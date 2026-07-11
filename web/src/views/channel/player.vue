@@ -183,6 +183,8 @@ export default {
         if (this.$refs.playerTabs) {
           this.$refs.playerTabs.setStreamInfo(streamInfo.transcodeStream || streamInfo)
           this.$refs.playerTabs.syncPlayerSize && this.$refs.playerTabs.syncPlayerSize()
+          setTimeout(() => this.$refs.playerTabs && this.$refs.playerTabs.syncPlayerSize(), 120)
+          setTimeout(() => this.$refs.playerTabs && this.$refs.playerTabs.syncPlayerSize(), 400)
         }
         if (this.$refs.mediaInfo) {
           this.$refs.mediaInfo.startTask()

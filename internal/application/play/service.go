@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
+	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domaindevice "zero-web-kit/internal/domain/device"
-	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
 	sipinfra "zero-web-kit/internal/infrastructure/sip"
 	"zero-web-kit/internal/interfaces/http/dto"
@@ -15,36 +15,33 @@ import (
 )
 
 type Service struct {
-	devices    domaindevice.Repository
-	channels   domainchannel.Repository
-	sip        *sipinfra.Server
-	zlm        *mediakit.Client
-	mediaCfg   config.MediaConfig
-	serverID   string
-	serverPort int
-	ssrcSeq    int
-	sessions   sync.Map
-	broadcast  *broadcastRegistry
+	devices      domaindevice.Repository
+	channels     domainchannel.Repository
+	sip          *sipinfra.Server
+	mediaServers *mediaserverapp.Service
+	serverID     string
+	serverPort   int
+	ssrcSeq      int
+	sessions     sync.Map
+	broadcast    *broadcastRegistry
 }
 
 func NewService(
 	devices domaindevice.Repository,
 	channels domainchannel.Repository,
 	sipServer *sipinfra.Server,
-	zlmClient *mediakit.Client,
-	mediaCfg config.MediaConfig,
+	mediaServers *mediaserverapp.Service,
 	serverID string,
 	serverPort int,
 ) *Service {
 	return &Service{
-		devices:    devices,
-		channels:   channels,
-		sip:        sipServer,
-		zlm:        zlmClient,
-		mediaCfg:   mediaCfg,
-		serverID:   serverID,
-		serverPort: serverPort,
-		broadcast:  newBroadcastRegistry(),
+		devices:      devices,
+		channels:     channels,
+		sip:          sipServer,
+		mediaServers: mediaServers,
+		serverID:     serverID,
+		serverPort:   serverPort,
+		broadcast:    newBroadcastRegistry(),
 	}
 }
 
@@ -63,27 +60,35 @@ func (s *Service) StartPlay(ctx context.Context, deviceID, channelDeviceID strin
 func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel) (*dto.StreamContent, error) {
 	app := "rtp"
 	stream := fmt.Sprintf("%s_%s", device.DeviceID, channel.GBDeviceID)
+
+	node, err := s.mediaServers.ResolveForStream(app, stream, device.MediaServerID)
+	if err != nil {
+		return nil, err
+	}
+
 	sdpIP := device.SDPIP
 	if sdpIP == "" {
-		sdpIP = s.mediaCfg.IP
+		sdpIP = node.SDPIP()
 	}
 
 	streamMode := sipinfra.NormalizeStreamMode(device.StreamMode)
-	applog.Debugf("[GB28181 play 1/6] start device=%s channel=%s target=%s:%d sipTransport=%s mediaStreamMode=%s sdpIP=%s zms=%s",
-		device.DeviceID, channel.GBDeviceID, device.IP, device.Port, device.Transport, streamMode, sdpIP, s.mediaCfg.BaseURL())
+	applog.Debugf("[GB28181 play 1/6] start device=%s channel=%s target=%s:%d sipTransport=%s mediaStreamMode=%s sdpIP=%s mediaNode=%s zms=%s",
+		device.DeviceID, channel.GBDeviceID, device.IP, device.Port, device.Transport, streamMode, sdpIP, node.ID(), node.MediaConfig().BaseURL())
 
 	tcpMode := streamModeToTCP(streamMode)
-	rtpResp, err := s.zlm.OpenRtpServer(ctx, app, stream, 0, tcpMode)
+	rtpResp, err := node.Client.OpenRtpServer(ctx, app, stream, 0, tcpMode)
 	if err != nil {
 		applog.Warnf("[GB28181 play 2/6] openRtpServer FAILED stream=%s tcp_mode=%d err=%v", stream, tcpMode, err)
 		return nil, fmt.Errorf("open RTP server failed: %w", err)
 	}
-	applog.Debugf("[GB28181 play 2/6] openRtpServer OK stream=%s port=%d tcp_mode=%d", stream, rtpResp.Port, tcpMode)
+	applog.Debugf("[GB28181 play 2/6] openRtpServer OK stream=%s port=%d tcp_mode=%d node=%s", stream, rtpResp.Port, tcpMode, node.ID())
+	s.mediaServers.BindStream(app, stream, node.ID())
 
 	ssrc := sipinfra.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
 	sdp := sipinfra.BuildPlaySDP(device.DeviceID, sdpIP, rtpResp.Port, ssrc, streamMode, "")
 	applog.Debugf("[GB28181 play 3/6] SDP ready ssrc=%s streamMode=%s port=%d", ssrc, streamMode, rtpResp.Port)
 
+	zlm := node.Client
 	go func() {
 		applog.Debugf("[GB28181 play 4/6] SIP INVITE -> %s:%d channel=%s Subject SSRC=%s streamMode=%s",
 			device.IP, device.Port, channel.GBDeviceID, ssrc, streamMode)
@@ -91,7 +96,7 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 			if streamMode != "TCP-ACTIVE" {
 				return nil
 			}
-			return s.zlm.ConnectRtpServer(ctx, app, stream, host, port)
+			return zlm.ConnectRtpServer(ctx, app, stream, host, port)
 		}
 		if err := s.sip.SendInvitePlay(device, channel, sdp, ssrc, stream, streamMode, tcpConnect, nil); err != nil {
 			applog.Warnf("[GB28181 play 4/6] SIP INVITE FAILED device=%s channel=%s ssrc=%s rtpPort=%d err=%v",
@@ -100,9 +105,9 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 	}()
 
 	pushURL := mediakit.BuildGB28181PushURL(sdpIP, rtpResp.Port, tcpMode)
-	content := s.buildStreamContent(app, stream)
+	content := s.buildStreamContent(app, stream, node)
 	mediakit.LogPlayStreamPaths("[GB28181 play 6/6] URLs ready (invite async)", app, stream, pushURL,
-		mediakit.BuildPlayURLsFromConfig(s.mediaCfg, app, stream))
+		mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream))
 	return content, nil
 }
 
@@ -110,18 +115,25 @@ func (s *Service) StopPlay(deviceID, channelDeviceID string) error {
 	app := "rtp"
 	stream := fmt.Sprintf("%s_%s", deviceID, channelDeviceID)
 	_ = s.sip.CloseInviteSession(stream)
-	_, err := s.zlm.CloseStreams(context.Background(), "__defaultVhost__", app, stream)
+	client := s.clientForStream(app, stream)
+	_, err := client.CloseStreams(context.Background(), "__defaultVhost__", app, stream)
+	s.mediaServers.UnbindStream(app, stream)
 	return err
 }
 
 func (s *Service) OnStreamStarted(app, stream string) {
 	key := streamKey(app, stream)
 	applog.Debugf("[GB28181 play 5/6] hook on_stream_changed regist app=%s stream=%s key=%s", app, stream, key)
-	mediakit.LogPlayStreamPaths("[GB28181 play 5/6] pull URLs", app, stream, "", mediakit.BuildPlayURLsFromConfig(s.mediaCfg, app, stream))
+	if nodeID, ok := s.mediaServers.StreamNodeID(app, stream); ok {
+		if node, err := s.mediaServers.Resolve(nodeID); err == nil {
+			mediakit.LogPlayStreamPaths("[GB28181 play 5/6] pull URLs", app, stream, "",
+				mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream))
+		}
+	}
 	if v, ok := s.sessions.Load(key); ok {
 		if ch, ok := v.(chan *dto.StreamContent); ok {
 			select {
-			case ch <- s.buildStreamContent(app, stream):
+			case ch <- s.buildStreamContentForKey(app, stream):
 			default:
 			}
 		}
@@ -130,12 +142,21 @@ func (s *Service) OnStreamStarted(app, stream string) {
 	}
 }
 
-func (s *Service) buildStreamContent(app, stream string) *dto.StreamContent {
-	urls := mediakit.BuildStreamPlayURLs(s.mediaCfg, app, stream, false, s.serverPort)
+func (s *Service) buildStreamContentForKey(app, stream string) *dto.StreamContent {
+	node, err := s.mediaServers.ResolveForStream(app, stream, "auto")
+	if err != nil {
+		return &dto.StreamContent{App: app, Stream: stream, ServerID: s.serverID}
+	}
+	return s.buildStreamContent(app, stream, node)
+}
+
+func (s *Service) buildStreamContent(app, stream string, node *mediaserverapp.Node) *dto.StreamContent {
+	cfg := node.MediaConfig()
+	urls := mediakit.BuildStreamPlayURLs(cfg, app, stream, false, s.serverPort)
 	content := &dto.StreamContent{
 		App:           app,
 		Stream:        stream,
-		IP:            s.mediaCfg.IP,
+		IP:            node.StreamIP(),
 		Flv:           urls.Flv,
 		WsFlv:         urls.WsFlv,
 		Hls:           urls.Hls,
@@ -143,14 +164,22 @@ func (s *Service) buildStreamContent(app, stream string) *dto.StreamContent {
 		Rtsp:          urls.Rtsp,
 		Rtc:           urls.Rtc,
 		Rtcs:          urls.Rtcs,
-		MediaServerID: s.mediaCfg.ID,
+		MediaServerID: node.ID(),
 		ServerID:      s.serverID,
 	}
-	if info := s.zlm.LookupStreamMediaInfo(context.Background(), app, stream); info != nil {
+	if info := node.Client.LookupStreamMediaInfo(context.Background(), app, stream); info != nil {
 		content.VideoCodec = info.VideoCodec
 		content.AudioCodec = info.AudioCodec
 	}
 	return content
+}
+
+func (s *Service) clientForStream(app, stream string) *mediakit.Client {
+	if node, err := s.mediaServers.ResolveForStream(app, stream, "auto"); err == nil {
+		return node.Client
+	}
+	// 无节点时返回空壳，调用方会失败
+	return mediakit.NewClientAddr("127.0.0.1", 1, "")
 }
 
 func (s *Service) nextSSRCSeq() int {

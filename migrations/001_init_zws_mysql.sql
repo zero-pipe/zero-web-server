@@ -1,12 +1,12 @@
-﻿-- zero-web-kit MySQL schema (WVP 2.7.4 base)
--- Source: wvp-GB28181-pro/数据库/2.7.4/初始化-mysql-2.7.4.sql
+-- ZWS MySQL schema (legacy archive)
+-- Legacy init script (prefer 004_init_zws_mysql_native.sql)
 -- Comments normalized to SQL line comments (--)
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 -- 存储国标设备的基础信息及在线状态
-drop table IF EXISTS wvp_device;
-create table IF NOT EXISTS wvp_device
+drop table IF EXISTS zws_device;
+create table IF NOT EXISTS zws_device
 (
     id                                  serial primary key COMMENT '主键ID',
     device_id                           character varying(50) not null COMMENT '国标设备编号',
@@ -45,8 +45,8 @@ create table IF NOT EXISTS wvp_device
 );
 
 -- 记录各设备上报的报警信息
-drop table IF EXISTS wvp_device_alarm;
-create table IF NOT EXISTS wvp_device_alarm
+drop table IF EXISTS zws_device_alarm;
+create table IF NOT EXISTS zws_device_alarm
 (
     id                serial primary key COMMENT '主键ID',
     device_id         character varying(50) not null COMMENT '国标设备ID',
@@ -62,8 +62,8 @@ create table IF NOT EXISTS wvp_device_alarm
 );
 
 -- 存储移动位置订阅上报的数据
-drop table IF EXISTS wvp_mobile_position;
-create table IF NOT EXISTS wvp_mobile_position
+drop table IF EXISTS zws_mobile_position;
+create table IF NOT EXISTS zws_mobile_position
 (
     id              serial primary key COMMENT '主键ID',
     channel_id      character varying(50) not null COMMENT '通道ID',
@@ -77,8 +77,8 @@ create table IF NOT EXISTS wvp_mobile_position
 );
 
 -- 保存设备下的通道信息以及扩展属性
-drop table IF EXISTS wvp_device_channel;
-create table IF NOT EXISTS wvp_device_channel
+drop table IF EXISTS zws_device_channel;
+create table IF NOT EXISTS zws_device_channel
 (
     id                           serial primary key COMMENT '主键ID',
     device_id                    character varying(50) COMMENT '所属设备ID',
@@ -167,13 +167,13 @@ create table IF NOT EXISTS wvp_device_channel
     enable_broadcast             integer default 0 COMMENT '是否支持广播',
     index (data_type),
     index (data_device_id),
-    constraint uk_wvp_unique_channel unique (gb_device_id),
+    constraint uk_zws_unique_channel unique (gb_device_id),
     constraint uk_device_channel_source unique (data_device_id, device_id)
 );
 
 -- 媒体服务器（如 ZLM）节点信息
-drop table IF EXISTS wvp_media_server;
-create table IF NOT EXISTS wvp_media_server
+drop table IF EXISTS zws_media_server;
+create table IF NOT EXISTS zws_media_server
 (
     id                  character varying(255) primary key COMMENT '媒体服务器ID',
     ip                  character varying(50) COMMENT '服务器IP',
@@ -212,8 +212,8 @@ create table IF NOT EXISTS wvp_media_server
 );
 
 -- 上级国标平台注册信息
-drop table IF EXISTS wvp_platform;
-create table IF NOT EXISTS wvp_platform
+drop table IF EXISTS zws_platform;
+create table IF NOT EXISTS zws_platform
 (
     id                    serial primary key COMMENT '主键ID',
     enable                bool default false COMMENT '是否启用该平台注册',
@@ -254,8 +254,8 @@ create table IF NOT EXISTS wvp_platform
 );
 
 -- 国标平台下发的通道映射关系
-drop table IF EXISTS wvp_platform_channel;
-create table IF NOT EXISTS wvp_platform_channel
+drop table IF EXISTS zws_platform_channel;
+create table IF NOT EXISTS zws_platform_channel
 (
     id                           serial primary key COMMENT '主键ID',
     platform_id                  integer COMMENT '平台ID',
@@ -299,28 +299,28 @@ create table IF NOT EXISTS wvp_platform_channel
 );
 
 -- 平台与分组（行政区划/组织）关系
-drop table IF EXISTS wvp_platform_group;
-create table IF NOT EXISTS wvp_platform_group
+drop table IF EXISTS zws_platform_group;
+create table IF NOT EXISTS zws_platform_group
 (
     id          serial primary key COMMENT '主键ID',
     platform_id integer COMMENT '平台ID',
     group_id    integer COMMENT '分组ID',
-    constraint uk_wvp_platform_group_platform_id_group_id unique (platform_id, group_id)
+    constraint uk_zws_platform_group_platform_id_group_id unique (platform_id, group_id)
 );
 
 -- 平台与区域关系
-drop table IF EXISTS wvp_platform_region;
-create table IF NOT EXISTS wvp_platform_region
+drop table IF EXISTS zws_platform_region;
+create table IF NOT EXISTS zws_platform_region
 (
     id          serial primary key COMMENT '主键ID',
     platform_id integer COMMENT '平台ID',
     region_id   integer COMMENT '区域ID',
-    constraint uk_wvp_platform_region_platform_id_group_id unique (platform_id, region_id)
+    constraint uk_zws_platform_region_platform_id_group_id unique (platform_id, region_id)
 );
 
 -- 拉流代理/转推配置
-drop table IF EXISTS wvp_stream_proxy;
-create table IF NOT EXISTS wvp_stream_proxy
+drop table IF EXISTS zws_stream_proxy;
+create table IF NOT EXISTS zws_stream_proxy
 (
     id                         serial primary key COMMENT '主键ID',
     type                       character varying(50) COMMENT '代理类型（拉流/推流）',
@@ -346,8 +346,8 @@ create table IF NOT EXISTS wvp_stream_proxy
 );
 
 -- 推流会话记录
-drop table IF EXISTS wvp_stream_push;
-create table IF NOT EXISTS wvp_stream_push
+drop table IF EXISTS zws_stream_push;
+create table IF NOT EXISTS zws_stream_push
 (
     id                 serial primary key COMMENT '主键ID',
     app                character varying(255) COMMENT '应用名',
@@ -365,8 +365,8 @@ create table IF NOT EXISTS wvp_stream_push
 );
 
 -- 云端录像记录
-drop table IF EXISTS wvp_cloud_record;
-create table IF NOT EXISTS wvp_cloud_record
+drop table IF EXISTS zws_cloud_record;
+create table IF NOT EXISTS zws_cloud_record
 (
     id              serial primary key COMMENT '主键ID',
     app             character varying(255) COMMENT '应用名',
@@ -385,8 +385,8 @@ create table IF NOT EXISTS wvp_cloud_record
 );
 
 -- 平台用户信息
-drop table IF EXISTS wvp_user;
-create table IF NOT EXISTS wvp_user
+drop table IF EXISTS zws_user;
+create table IF NOT EXISTS zws_user
 (
     id          serial primary key COMMENT '主键ID',
     username    character varying(255) COMMENT '用户名',
@@ -399,8 +399,8 @@ create table IF NOT EXISTS wvp_user
 );
 
 -- 用户角色信息
-drop table IF EXISTS wvp_user_role;
-create table IF NOT EXISTS wvp_user_role
+drop table IF EXISTS zws_user_role;
+create table IF NOT EXISTS zws_user_role
 (
     id          serial primary key COMMENT '主键ID',
     name        character varying(50) COMMENT '角色名称',
@@ -410,8 +410,8 @@ create table IF NOT EXISTS wvp_user_role
 );
 
 
-drop table IF EXISTS wvp_user_api_key;
-create table IF NOT EXISTS wvp_user_api_key
+drop table IF EXISTS zws_user_api_key;
+create table IF NOT EXISTS zws_user_api_key
 (
     id          serial primary key COMMENT '主键ID',
     user_id     bigint COMMENT '关联用户ID',
@@ -427,16 +427,16 @@ create table IF NOT EXISTS wvp_user_api_key
 
 -- 初始数据
 -- 初始化管理员账号，账号admin 密码admin（MD5加密后）
-INSERT INTO wvp_user
+INSERT INTO zws_user
 VALUES (1, 'admin', '21232f297a57a5a743894a0e4a801fc3', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57',
         '3e80d1762a324d5b0ff636e0bd16f1e3');
 -- 初始化管理员角色
-INSERT INTO wvp_user_role
+INSERT INTO zws_user_role
 VALUES (1, 'admin', '0', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 
 -- 通用分组表，存储行业或组织结构
-drop table IF EXISTS wvp_common_group;
-create table IF NOT EXISTS wvp_common_group
+drop table IF EXISTS zws_common_group;
+create table IF NOT EXISTS zws_common_group
 (
     id               serial primary key COMMENT '主键ID',
     device_id        varchar(50)  NOT NULL COMMENT '分组对应的平台或设备ID',
@@ -452,8 +452,8 @@ create table IF NOT EXISTS wvp_common_group
 );
 
 -- 通用行政区域表
-drop table IF EXISTS wvp_common_region;
-create table IF NOT EXISTS wvp_common_region
+drop table IF EXISTS zws_common_region;
+create table IF NOT EXISTS zws_common_region
 (
     id               serial primary key COMMENT '主键ID',
     device_id        varchar(50)  NOT NULL COMMENT '区域对应的平台或设备ID',
@@ -466,8 +466,8 @@ create table IF NOT EXISTS wvp_common_region
 );
 
 -- 录像计划基础信息
-drop table IF EXISTS wvp_record_plan;
-create table IF NOT EXISTS wvp_record_plan
+drop table IF EXISTS zws_record_plan;
+create table IF NOT EXISTS zws_record_plan
 (
     id              serial primary key COMMENT '主键ID',
     snap            bool default false COMMENT '是否抓图计划',
@@ -477,8 +477,8 @@ create table IF NOT EXISTS wvp_record_plan
 );
 
 -- 录像计划条目表
-drop table IF EXISTS wvp_record_plan_item;
-create table IF NOT EXISTS wvp_record_plan_item
+drop table IF EXISTS zws_record_plan_item;
+create table IF NOT EXISTS zws_record_plan_item
 (
     id              serial primary key COMMENT '主键ID',
     start           int COMMENT '开始时间（分钟）',
@@ -490,8 +490,8 @@ create table IF NOT EXISTS wvp_record_plan_item
 );
 
 -- 交通部 JT/T 1076 终端信息
-drop table IF EXISTS wvp_jt_terminal;
-create table IF NOT EXISTS wvp_jt_terminal (
+drop table IF EXISTS zws_jt_terminal;
+create table IF NOT EXISTS zws_jt_terminal (
                                  id serial primary key COMMENT '主键ID',
                                  phone_number character varying(50) COMMENT '终端SIM卡号',
                                  terminal_id character varying(50) COMMENT '终端设备ID',
@@ -516,8 +516,8 @@ create table IF NOT EXISTS wvp_jt_terminal (
 );
 
 -- 交通部 JT/T 1076 通道信息
-drop table IF EXISTS wvp_jt_channel;
-create table IF NOT EXISTS wvp_jt_channel (
+drop table IF EXISTS zws_jt_channel;
+create table IF NOT EXISTS zws_jt_channel (
                                id serial primary key COMMENT '主键ID',
                                terminal_db_id integer COMMENT '所属终端记录ID',
                                channel_id integer COMMENT '通道号',
@@ -529,8 +529,8 @@ create table IF NOT EXISTS wvp_jt_channel (
 );
 
 -- 报警信息表，表结构参考alarm类
-drop table IF EXISTS wvp_alarm;
-create table IF NOT EXISTS wvp_alarm (
+drop table IF EXISTS zws_alarm;
+create table IF NOT EXISTS zws_alarm (
                           id serial primary key COMMENT '主键ID',
                           channel_id integer COMMENT '关联通道的数据库id',
                           description character varying(255) COMMENT '报警描述',

@@ -62,7 +62,15 @@ type Server struct {
 }
 
 func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc DeviceService, redis *redisinfra.Client) (*Server, error) {
-	ua, err := sipgo.NewUA(sipgo.WithUserAgent(cfg.ID))
+	localIP := strings.TrimSpace(cfg.IP)
+	if localIP == "" || localIP == "0.0.0.0" || localIP == "127.0.0.1" {
+		localIP = guessLocalIP()
+	}
+	uaOpts := []sipgo.UserAgentOption{sipgo.WithUserAgent(cfg.ID)}
+	if localIP != "" {
+		uaOpts = append(uaOpts, sipgo.WithUserAgentHostname(localIP))
+	}
+	ua, err := sipgo.NewUA(uaOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -70,12 +78,22 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 	if err != nil {
 		return nil, err
 	}
-	client, err := sipgo.NewClient(ua)
+	clientOpts := []sipgo.ClientOption{}
+	if localIP != "" {
+		// Via 必须带平台可达 IP + SIP 监听端口，否则摄像机 200 OK 回不到平台（Timer_B）
+		clientOpts = append(clientOpts,
+			sipgo.WithClientHostname(localIP),
+			sipgo.WithClientPort(cfg.Port),
+			sipgo.WithClientNAT(),
+		)
+	}
+	client, err := sipgo.NewClient(ua, clientOpts...)
 	if err != nil {
 		return nil, err
 	}
 	s := &Server{
 		cfg:       cfg,
+		localIP:   localIP,
 		serverID:  serverID,
 		password:  password,
 		ua:        ua,
@@ -88,13 +106,83 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		inviteMgr: NewInviteManager(),
 	}
 	s.registerHandlers()
+	if localIP == "" {
+		log.Printf("[GB28181 sip] WARNING: sip.ip 未配置且自动探测失败，国标 INVITE 可能超时；请在 config.yaml 设置 sip.ip 为摄像机可达的网卡地址")
+	} else {
+		log.Printf("[GB28181 sip] localIP=%s (Contact/Via)", localIP)
+	}
 	return s, nil
 }
 
 func (s *Server) SetAlarmHandler(h AlarmHandler)       { s.alarmHandler = h }
 func (s *Server) SetPositionHandler(h PositionHandler) { s.positionHandler = h }
-func (s *Server) SetLocalIP(ip string)                 { s.localIP = ip }
-func (s *Server) Domain() string                       { return s.cfg.Domain }
+func (s *Server) SetLocalIP(ip string) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" || ip == "0.0.0.0" || ip == "127.0.0.1" {
+		return
+	}
+	// 仅在尚未配置时用媒体节点 IP 兜底；已有 sip.ip 不覆盖
+	if s.localIP == "" {
+		s.localIP = ip
+		log.Printf("[GB28181 sip] localIP set from media node: %s", ip)
+	}
+}
+func (s *Server) LocalIP() string { return s.localIP }
+func (s *Server) Domain() string  { return s.cfg.Domain }
+
+// guessLocalIP 取第一块非回环 IPv4，作为 sip.ip 未配置时的兜底。
+func guessLocalIP() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+			ip = ip.To4()
+			if ip == nil {
+				continue
+			}
+			return ip.String()
+		}
+	}
+	return ""
+}
+
+// detectLocalIPForRemote 通过 UDP dial 探测访问远端时本机选用的网卡 IP。
+func detectLocalIPForRemote(remoteIP string) string {
+	remoteIP = strings.TrimSpace(remoteIP)
+	if remoteIP == "" {
+		return ""
+	}
+	conn, err := net.DialTimeout("udp", net.JoinHostPort(remoteIP, "9"), time.Second)
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	if ua, ok := conn.LocalAddr().(*net.UDPAddr); ok && ua.IP != nil {
+		if v4 := ua.IP.To4(); v4 != nil {
+			return v4.String()
+		}
+	}
+	return ""
+}
 
 func (s *Server) RecordManager() *RecordManager { return s.recordMgr }
 func (s *Server) PresetManager() *PresetManager { return s.presetMgr }
@@ -119,7 +207,7 @@ func (s *Server) SendPresetQuery(device *domaindevice.Device, channelID string) 
 
 func (s *Server) CancelPresetQuery(sn string) { s.presetMgr.Cancel(sn) }
 
-// SendFrontEndCmd sends DeviceControl PTZCmd built like wvp frontEndCmd.
+// SendFrontEndCmd sends DeviceControl PTZCmd (front-end command).
 func (s *Server) SendFrontEndCmd(device *domaindevice.Device, channelID string, cmdCode, parameter1, parameter2, combineCode2 int) error {
 	sn := strconv.FormatInt(s.sn.Add(1), 10)
 	cmd := FrontEndCmdString(cmdCode, parameter1, parameter2, combineCode2)
@@ -227,6 +315,10 @@ func (s *Server) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	device.UpdateTime = now
 	if callID := req.CallID(); callID != nil {
 		device.RegisterCallID = callID.Value()
+	}
+	// 记录平台侧可达 IP，供 INVITE Contact 使用
+	if lip := s.resolveInviteLocalIP(device); lip != "" {
+		device.LocalIP = lip
 	}
 
 	saved, err := s.deviceSvc.SaveRegister(device)
@@ -415,10 +507,29 @@ func (s *Server) NextInfoCSeq() int {
 	return int(s.infoCSeq.Add(1))
 }
 
+func (s *Server) resolveInviteLocalIP(device *domaindevice.Device) string {
+	candidates := []string{s.localIP}
+	if device != nil {
+		candidates = append(candidates, device.LocalIP, device.SDPIP)
+	}
+	for _, ip := range candidates {
+		ip = strings.TrimSpace(ip)
+		if ip != "" && ip != "0.0.0.0" && ip != "127.0.0.1" {
+			return ip
+		}
+	}
+	if device != nil && device.IP != "" {
+		if ip := detectLocalIPForRemote(device.IP); ip != "" {
+			return ip
+		}
+	}
+	return guessLocalIP()
+}
+
 func (s *Server) inviteDialog(device *domaindevice.Device, channel *domainchannel.Channel, sdp, ssrc string) (*sipgo.DialogClientSession, error) {
-	localIP := s.localIP
+	localIP := s.resolveInviteLocalIP(device)
 	if localIP == "" {
-		localIP = device.SDPIP
+		return nil, fmt.Errorf("sip.ip 未配置：INVITE Contact 需要平台可达 IP，请在 config.yaml 设置 sip.ip")
 	}
 	dialogUA := &sipgo.DialogUA{
 		Client: s.client,

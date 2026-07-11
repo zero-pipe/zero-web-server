@@ -29,7 +29,6 @@ import (
 	streamproxyapp "zero-web-kit/internal/application/streamproxy"
 	"zero-web-kit/internal/infrastructure/config"
 	onvifinfra "zero-web-kit/internal/infrastructure/onvif"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/mysql"
 	redisinfra "zero-web-kit/internal/infrastructure/redis"
@@ -97,21 +96,25 @@ func main() {
 
 	authService := appauth.NewService(userRepo, jwtManager, cfg.UserSettings.ServerID)
 	deviceService := deviceapp.NewService(deviceRepo, channelRepo, redisClient)
-	mediaClient := mediakit.NewClient(cfg.Media)
 	publishRegistry := mediaapp.NewPublishRegistry()
 	publishAuth := mediaapp.NewPublishAuth(
 		userRepo, streamPushRepo, streamProxyRepo,
 		cfg.UserSettings.PushAuthority, cfg.UserSettings.RecordPushLive,
 		publishRegistry,
 	)
-	mediaServerService := mediaserverapp.NewService(mediaServerRepo, mediaClient, cfg.Media)
-	mediaServerService.EnsureDefault()
+	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加
+	mediaServerService := mediaserverapp.NewService(mediaServerRepo, cfg.UserSettings.ServerID)
 
 	sipServer, err := sipinfra.NewServer(cfg.SIP, cfg.UserSettings.ServerID, cfg.SIP.Password, deviceService, redisClient)
 	if err != nil {
 		applog.Fatalf("init sip: %v", err)
 	}
-	sipServer.SetLocalIP(cfg.Media.IP)
+	// sip.ip 优先；未配时再用媒体节点 IP / 自动探测兜底
+	if cfg.Media.Configured() {
+		sipServer.SetLocalIP(cfg.Media.IP)
+	} else if ip := firstMediaIP(cfg, mediaServerService); ip != "" {
+		sipServer.SetLocalIP(ip)
+	}
 	deviceService.SetSIP(sipServer)
 
 	alarmService := alarmapp.NewService(alarmRepo, channelRepo)
@@ -124,24 +127,23 @@ func main() {
 		recordTimeoutSec = 30
 	}
 	playbackService := playbackapp.NewService(
-		deviceRepo, channelRepo, sipServer, mediaClient, cfg.Media, cfg.UserSettings.ServerID, recordTimeoutSec,
+		deviceRepo, channelRepo, sipServer, mediaServerService, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
 	platformService := platformapp.NewService(platformRepo, cfg.SIP, cfg.UserSettings.ServerID)
 	platformChannelSvc := platformapp.NewChannelService(
 		platformRepo, channelRepo, platformRepo, sipinfra.NewPlatformClient(cfg.SIP),
 	)
 
-	playService := playapp.NewService(deviceRepo, channelRepo, sipServer, mediaClient, cfg.Media, cfg.UserSettings.ServerID, cfg.Server.Port)
+	playService := playapp.NewService(deviceRepo, channelRepo, sipServer, mediaServerService, cfg.UserSettings.ServerID, cfg.Server.Port)
 	ptzService := ptzapp.NewService(deviceRepo, sipServer)
 	onvifFactory := onvifinfra.NewClientFactory(30)
 	onvifService := onvifapp.NewService(
-		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaClient,
-		cfg.Media, cfg.UserSettings.ServerID,
+		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaServerService, cfg.UserSettings.ServerID,
 	)
 
-	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaClient, cfg.Media, cfg.UserSettings.ServerID)
-	streamPushService := streampushapp.NewService(streamPushRepo, mediaClient, cfg.Media, cfg.UserSettings.ServerID)
-	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaClient, cfg.Media, cfg.UserSettings.ServerID)
+	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaServerService, cfg.UserSettings.ServerID)
+	streamPushService := streampushapp.NewService(streamPushRepo, mediaServerService, cfg.UserSettings.ServerID)
+	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaServerService, cfg.UserSettings.ServerID)
 	recordPlanService := recordplanapp.NewService(recordPlanRepo, playService, publishRegistry, cfg.UserSettings.ServerID)
 	recordPlanService.Start()
 	defer recordPlanService.Stop()
@@ -160,6 +162,11 @@ func main() {
 		applog.Fatalf("start sip: %v", err)
 	}
 	platformService.StartEnabledPlatforms()
+
+	mediaBaseURL := mediaServerService.FirstOnlineBaseURL()
+	if mediaBaseURL == "" && cfg.Media.Configured() {
+		mediaBaseURL = cfg.Media.BaseURL()
+	}
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -185,7 +192,7 @@ func main() {
 		UserRepo:            userRepo,
 		PublishAuth:         publishAuth,
 		StreamOnDemand:      cfg.UserSettings.StreamOnDemand,
-		MediaBaseURL:        cfg.Media.BaseURL(),
+		MediaBaseURL:        mediaBaseURL,
 		JWT:                 jwtManager,
 		ServerID:            cfg.UserSettings.ServerID,
 		Version:             version,
@@ -193,7 +200,7 @@ func main() {
 		RecordInfoTimeoutMs: cfg.UserSettings.RecordInfoTimeout,
 		SIPConfig:           cfg.SIP,
 		ServerPort:          cfg.Server.Port,
-		MediaIP:             cfg.Media.IP,
+		MediaIP:             firstMediaIP(cfg, mediaServerService),
 	})
 
 	go func() {
@@ -208,9 +215,19 @@ func main() {
 		"version", version,
 		"http", addr,
 		"sip_port", cfg.SIP.Port,
-		"media", cfg.Media.ID,
+		"media_nodes", "db-managed",
 	)
 	if err := r.Run(addr); err != nil {
 		applog.Fatalf("server exit: %v", err)
 	}
+}
+
+func firstMediaIP(cfg *config.Config, ms *mediaserverapp.Service) string {
+	if cfg.Media.Configured() {
+		return cfg.Media.IP
+	}
+	if node, err := ms.SelectMinimumLoad(); err == nil {
+		return node.StreamIP()
+	}
+	return ""
 }

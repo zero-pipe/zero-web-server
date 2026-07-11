@@ -69,8 +69,8 @@ func (r *DeviceRepository) List(page, count int, query string, online *bool) ([]
 	if count <= 0 {
 		count = 15
 	}
-	q := r.db.Table("wvp_device de").Select(`de.*,
-		(SELECT COUNT(0) FROM wvp_device_channel dc WHERE dc.data_type = 1 AND dc.data_device_id = de.id) AS channel_count`)
+	q := r.db.Table("zws_device de").Select(`de.*,
+		(SELECT COUNT(0) FROM zws_device_channel dc WHERE dc.data_type = 1 AND dc.data_device_id = de.id) AS channel_count`)
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
 		q = q.Where("de.device_id LIKE ? OR de.name LIKE ? OR de.custom_name LIKE ? OR de.ip LIKE ?", like, like, like, like)
@@ -372,7 +372,7 @@ func (r *ChannelRepository) SetCivilCode(civilCode string, channelIDs []int) err
 		return fmt.Errorf("通道ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE wvp_device_channel SET gb_civil_code = ?, update_time = ? WHERE channel_type = 0 AND id IN ?`,
+		`UPDATE zws_device_channel SET gb_civil_code = ?, update_time = ? WHERE channel_type = 0 AND id IN ?`,
 		civilCode, nowTimeStr(), channelIDs,
 	).Error
 }
@@ -382,7 +382,7 @@ func (r *ChannelRepository) ClearCivilCode(channelIDs []int) error {
 		return fmt.Errorf("通道ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE wvp_device_channel SET gb_civil_code = NULL, civil_code = NULL, update_time = ? WHERE channel_type = 0 AND id IN ?`,
+		`UPDATE zws_device_channel SET gb_civil_code = NULL, civil_code = NULL, update_time = ? WHERE channel_type = 0 AND id IN ?`,
 		nowTimeStr(), channelIDs,
 	).Error
 }
@@ -392,7 +392,7 @@ func (r *ChannelRepository) SetGroup(parentID, businessGroup string, channelIDs 
 		return fmt.Errorf("通道ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE wvp_device_channel SET gb_parent_id = ?, parent_id = ?, gb_business_group_id = ?, business_group_id = ?, update_time = ? WHERE channel_type = 0 AND id IN ?`,
+		`UPDATE zws_device_channel SET gb_parent_id = ?, parent_id = ?, gb_business_group_id = ?, business_group_id = ?, update_time = ? WHERE channel_type = 0 AND id IN ?`,
 		parentID, parentID, businessGroup, businessGroup, nowTimeStr(), channelIDs,
 	).Error
 }
@@ -402,7 +402,7 @@ func (r *ChannelRepository) ClearGroupParent(channelIDs []int) error {
 		return fmt.Errorf("通道ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE wvp_device_channel SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND id IN ?`,
+		`UPDATE zws_device_channel SET gb_parent_id = NULL, parent_id = NULL, gb_business_group_id = NULL, business_group_id = NULL, update_time = ? WHERE channel_type = 0 AND id IN ?`,
 		nowTimeStr(), channelIDs,
 	).Error
 }
@@ -412,7 +412,7 @@ func (r *ChannelRepository) SetCivilCodeByDataDeviceIDs(civilCode string, dataDe
 		return fmt.Errorf("设备ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE wvp_device_channel SET gb_civil_code = ?, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		`UPDATE zws_device_channel SET gb_civil_code = ?, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
 		civilCode, nowTimeStr(), dataDeviceIDs,
 	).Error
 }
@@ -422,7 +422,7 @@ func (r *ChannelRepository) ClearCivilCodeByDataDeviceIDs(dataDeviceIDs []int) e
 		return fmt.Errorf("设备ID不可为空")
 	}
 	return r.db.Exec(
-		`UPDATE wvp_device_channel SET gb_civil_code = NULL, civil_code = NULL, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
+		`UPDATE zws_device_channel SET gb_civil_code = NULL, civil_code = NULL, update_time = ? WHERE channel_type = 0 AND data_type = 1 AND data_device_id IN ?`,
 		nowTimeStr(), dataDeviceIDs,
 	).Error
 }

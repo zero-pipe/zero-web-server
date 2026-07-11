@@ -69,10 +69,10 @@ func (r *StreamPushRepository) List(page, count int, query string, pushing *bool
 	if count <= 0 {
 		count = 15
 	}
-	base := r.db.Table("wvp_stream_push st").
+	base := r.db.Table("zws_stream_push st").
 		Select(`st.id, st.app, st.stream, st.media_server_id, st.server_id, st.push_time, st.create_time, st.update_time, st.pushing, st.start_offline_push,
 			wdc.id as gb_id, wdc.gb_device_id, wdc.name as gb_name, wdc.name, wdc.data_type`).
-		Joins("LEFT JOIN wvp_device_channel wdc ON wdc.data_type = 2 AND st.id = wdc.data_device_id")
+		Joins("LEFT JOIN zws_device_channel wdc ON wdc.data_type = 2 AND st.id = wdc.data_device_id")
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
 		base = base.Where("st.app LIKE ? OR st.stream LIKE ? OR wdc.gb_device_id LIKE ? OR wdc.name LIKE ?", like, like, like, like)
@@ -428,9 +428,9 @@ func (r *RecordPlanRepository) CountChannels(planID int) int64 {
 
 func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) ([]model.GBDeviceChannel, error) {
 	var rows []model.GBDeviceChannel
-	err := r.db.Table("wvp_device_channel wdc").
+	err := r.db.Table("zws_device_channel wdc").
 		Select("wdc.*").
-		Joins("JOIN wvp_record_plan_item wrpi ON wrpi.plan_id = wdc.record_plan_id").
+		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = wdc.record_plan_id").
 		Where("wrpi.week_day = ? AND wrpi.start <= ? AND wrpi.stop >= ?", weekDay, minuteIndex, minuteIndex).
 		Group("wdc.id").
 		Find(&rows).Error

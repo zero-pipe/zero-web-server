@@ -191,8 +191,8 @@ stop_all() {
 ensure_config() {
     local cfg="$ROOT/$CONFIG"
     if [[ -f "$cfg" ]]; then return; fi
-    cp "$ROOT/configs/config.example.yaml" "$cfg"
-    yellow "Created $CONFIG from example — check mysql.password"
+    echo "Missing $CONFIG — create configs/config.yaml (optional: configs/config.local.yaml for secrets)" >&2
+    exit 1
 }
 
 ensure_frontend() {

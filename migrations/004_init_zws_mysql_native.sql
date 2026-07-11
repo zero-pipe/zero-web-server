@@ -1,4 +1,4 @@
-﻿-- zero-web-kit MySQL 8 native schema (canonical)
+-- zero-web-kit MySQL 8 native schema (canonical)
 -- Pure MySQL syntax; use this for new installations instead of 001
 -- See schema_manifest.yaml for required/optional/deprecated tables
 
@@ -6,8 +6,8 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- 存储国标设备的基础信息及在线状态
-DROP TABLE IF EXISTS wvp_device;
-CREATE TABLE IF NOT EXISTS wvp_device
+DROP TABLE IF EXISTS zws_device;
+CREATE TABLE IF NOT EXISTS zws_device
 (
     id                                  INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     device_id                           VARCHAR(50) not null COMMENT '国标设备编号',
@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS wvp_device
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 存储移动位置订阅上报的数据
-DROP TABLE IF EXISTS wvp_mobile_position;
-CREATE TABLE IF NOT EXISTS wvp_mobile_position
+DROP TABLE IF EXISTS zws_mobile_position;
+CREATE TABLE IF NOT EXISTS zws_mobile_position
 (
     id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     channel_id      INT NOT NULL COMMENT '通道数据库主键ID',
@@ -61,8 +61,8 @@ CREATE TABLE IF NOT EXISTS wvp_mobile_position
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 保存设备下的通道信息以及扩展属性
-DROP TABLE IF EXISTS wvp_device_channel;
-CREATE TABLE IF NOT EXISTS wvp_device_channel
+DROP TABLE IF EXISTS zws_device_channel;
+CREATE TABLE IF NOT EXISTS zws_device_channel
 (
     id                           INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     device_id                    VARCHAR(50) COMMENT '所属设备ID',
@@ -151,13 +151,13 @@ CREATE TABLE IF NOT EXISTS wvp_device_channel
     enable_broadcast             INT default 0 COMMENT '是否支持广播',
     KEY idx_data_type (data_type),
     KEY idx_data_device_id (data_device_id),
-    UNIQUE KEY uk_wvp_unique_channel (gb_device_id),
+    UNIQUE KEY uk_zws_unique_channel (gb_device_id),
     UNIQUE KEY uk_device_channel_source (data_device_id, device_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 媒体服务器（如 ZLM）节点信息
-DROP TABLE IF EXISTS wvp_media_server;
-CREATE TABLE IF NOT EXISTS wvp_media_server
+DROP TABLE IF EXISTS zws_media_server;
+CREATE TABLE IF NOT EXISTS zws_media_server
 (
     id                  VARCHAR(255) PRIMARY KEY COMMENT '媒体服务器ID',
     ip                  VARCHAR(50) COMMENT '服务器IP',
@@ -196,8 +196,8 @@ CREATE TABLE IF NOT EXISTS wvp_media_server
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 上级国标平台注册信息
-DROP TABLE IF EXISTS wvp_platform;
-CREATE TABLE IF NOT EXISTS wvp_platform
+DROP TABLE IF EXISTS zws_platform;
+CREATE TABLE IF NOT EXISTS zws_platform
 (
     id                    INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     enable                TINYINT(1) DEFAULT 0 COMMENT '是否启用该平台注册',
@@ -238,8 +238,8 @@ CREATE TABLE IF NOT EXISTS wvp_platform
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 国标平台下发的通道映射关系
-DROP TABLE IF EXISTS wvp_platform_channel;
-CREATE TABLE IF NOT EXISTS wvp_platform_channel
+DROP TABLE IF EXISTS zws_platform_channel;
+CREATE TABLE IF NOT EXISTS zws_platform_channel
 (
     id                           INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     platform_id                  INT COMMENT '平台ID',
@@ -283,28 +283,28 @@ CREATE TABLE IF NOT EXISTS wvp_platform_channel
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 平台与分组（行政区划/组织）关系
-DROP TABLE IF EXISTS wvp_platform_group;
-CREATE TABLE IF NOT EXISTS wvp_platform_group
+DROP TABLE IF EXISTS zws_platform_group;
+CREATE TABLE IF NOT EXISTS zws_platform_group
 (
     id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     platform_id INT COMMENT '平台ID',
     group_id    INT COMMENT '分组ID',
-    UNIQUE KEY uk_wvp_platform_group_platform_id_group_id (platform_id, group_id)
+    UNIQUE KEY uk_zws_platform_group_platform_id_group_id (platform_id, group_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 平台与区域关系
-DROP TABLE IF EXISTS wvp_platform_region;
-CREATE TABLE IF NOT EXISTS wvp_platform_region
+DROP TABLE IF EXISTS zws_platform_region;
+CREATE TABLE IF NOT EXISTS zws_platform_region
 (
     id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     platform_id INT COMMENT '平台ID',
     region_id   INT COMMENT '区域ID',
-    UNIQUE KEY uk_wvp_platform_region_platform_id_group_id (platform_id, region_id)
+    UNIQUE KEY uk_zws_platform_region_platform_id_group_id (platform_id, region_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 拉流代理/转推配置
-DROP TABLE IF EXISTS wvp_stream_proxy;
-CREATE TABLE IF NOT EXISTS wvp_stream_proxy
+DROP TABLE IF EXISTS zws_stream_proxy;
+CREATE TABLE IF NOT EXISTS zws_stream_proxy
 (
     id                         INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     type                       VARCHAR(50) COMMENT '代理类型（拉流/推流）',
@@ -330,8 +330,8 @@ CREATE TABLE IF NOT EXISTS wvp_stream_proxy
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 推流会话记录
-DROP TABLE IF EXISTS wvp_stream_push;
-CREATE TABLE IF NOT EXISTS wvp_stream_push
+DROP TABLE IF EXISTS zws_stream_push;
+CREATE TABLE IF NOT EXISTS zws_stream_push
 (
     id                 INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     app                VARCHAR(255) COMMENT '应用名',
@@ -349,8 +349,8 @@ CREATE TABLE IF NOT EXISTS wvp_stream_push
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 云端录像记录
-DROP TABLE IF EXISTS wvp_cloud_record;
-CREATE TABLE IF NOT EXISTS wvp_cloud_record
+DROP TABLE IF EXISTS zws_cloud_record;
+CREATE TABLE IF NOT EXISTS zws_cloud_record
 (
     id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     app             VARCHAR(255) COMMENT '应用名',
@@ -369,8 +369,8 @@ CREATE TABLE IF NOT EXISTS wvp_cloud_record
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 平台用户信息
-DROP TABLE IF EXISTS wvp_user;
-CREATE TABLE IF NOT EXISTS wvp_user
+DROP TABLE IF EXISTS zws_user;
+CREATE TABLE IF NOT EXISTS zws_user
 (
     id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     username    VARCHAR(255) COMMENT '用户名',
@@ -383,8 +383,8 @@ CREATE TABLE IF NOT EXISTS wvp_user
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 用户角色信息
-DROP TABLE IF EXISTS wvp_user_role;
-CREATE TABLE IF NOT EXISTS wvp_user_role
+DROP TABLE IF EXISTS zws_user_role;
+CREATE TABLE IF NOT EXISTS zws_user_role
 (
     id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     name        VARCHAR(50) COMMENT '角色名称',
@@ -394,8 +394,8 @@ CREATE TABLE IF NOT EXISTS wvp_user_role
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS wvp_user_api_key;
-CREATE TABLE IF NOT EXISTS wvp_user_api_key
+DROP TABLE IF EXISTS zws_user_api_key;
+CREATE TABLE IF NOT EXISTS zws_user_api_key
 (
     id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     user_id     bigint COMMENT '关联用户ID',
@@ -411,16 +411,16 @@ CREATE TABLE IF NOT EXISTS wvp_user_api_key
 
 -- 初始数据
 -- 初始化管理员账号，账号admin 密码admin（MD5加密后）
-INSERT INTO wvp_user
+INSERT INTO zws_user
 VALUES (1, 'admin', '21232f297a57a5a743894a0e4a801fc3', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57',
         '3e80d1762a324d5b0ff636e0bd16f1e3');
 -- 初始化管理员角色
-INSERT INTO wvp_user_role
+INSERT INTO zws_user_role
 VALUES (1, 'admin', '0', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 
 -- 通用分组表，存储行业或组织结构
-DROP TABLE IF EXISTS wvp_common_group;
-CREATE TABLE IF NOT EXISTS wvp_common_group
+DROP TABLE IF EXISTS zws_common_group;
+CREATE TABLE IF NOT EXISTS zws_common_group
 (
     id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     device_id        varchar(50)  NOT NULL COMMENT '分组对应的平台或设备ID',
@@ -436,8 +436,8 @@ CREATE TABLE IF NOT EXISTS wvp_common_group
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 通用行政区域表
-DROP TABLE IF EXISTS wvp_common_region;
-CREATE TABLE IF NOT EXISTS wvp_common_region
+DROP TABLE IF EXISTS zws_common_region;
+CREATE TABLE IF NOT EXISTS zws_common_region
 (
     id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     device_id        varchar(50)  NOT NULL COMMENT '区域对应的平台或设备ID',
@@ -450,8 +450,8 @@ CREATE TABLE IF NOT EXISTS wvp_common_region
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 录像计划基础信息
-DROP TABLE IF EXISTS wvp_record_plan;
-CREATE TABLE IF NOT EXISTS wvp_record_plan
+DROP TABLE IF EXISTS zws_record_plan;
+CREATE TABLE IF NOT EXISTS zws_record_plan
 (
     id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     snap            TINYINT(1) DEFAULT 0 COMMENT '是否抓图计划',
@@ -461,8 +461,8 @@ CREATE TABLE IF NOT EXISTS wvp_record_plan
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 录像计划条目表
-DROP TABLE IF EXISTS wvp_record_plan_item;
-CREATE TABLE IF NOT EXISTS wvp_record_plan_item
+DROP TABLE IF EXISTS zws_record_plan_item;
+CREATE TABLE IF NOT EXISTS zws_record_plan_item
 (
     id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     start           int COMMENT '开始时间（分钟）',
@@ -474,8 +474,8 @@ CREATE TABLE IF NOT EXISTS wvp_record_plan_item
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 交通部 JT/T 1076 终端信息
-DROP TABLE IF EXISTS wvp_jt_terminal;
-CREATE TABLE IF NOT EXISTS wvp_jt_terminal (
+DROP TABLE IF EXISTS zws_jt_terminal;
+CREATE TABLE IF NOT EXISTS zws_jt_terminal (
                                  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
                                  phone_number VARCHAR(50) COMMENT '终端SIM卡号',
                                  terminal_id VARCHAR(50) COMMENT '终端设备ID',
@@ -500,8 +500,8 @@ CREATE TABLE IF NOT EXISTS wvp_jt_terminal (
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 交通部 JT/T 1076 通道信息
-DROP TABLE IF EXISTS wvp_jt_channel;
-CREATE TABLE IF NOT EXISTS wvp_jt_channel (
+DROP TABLE IF EXISTS zws_jt_channel;
+CREATE TABLE IF NOT EXISTS zws_jt_channel (
                                id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
                                terminal_db_id INT COMMENT '所属终端记录ID',
                                channel_id INT COMMENT '通道号',
@@ -513,8 +513,8 @@ CREATE TABLE IF NOT EXISTS wvp_jt_channel (
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 报警信息表，表结构参考alarm类
-DROP TABLE IF EXISTS wvp_alarm;
-CREATE TABLE IF NOT EXISTS wvp_alarm (
+DROP TABLE IF EXISTS zws_alarm;
+CREATE TABLE IF NOT EXISTS zws_alarm (
                           id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
                           channel_id INT COMMENT '关联通道的数据库id',
                           description VARCHAR(255) COMMENT '报警描述',

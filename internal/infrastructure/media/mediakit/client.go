@@ -22,9 +22,13 @@ type Client struct {
 }
 
 func NewClient(cfg config.MediaConfig) *Client {
+	return NewClientAddr(cfg.IP, cfg.HTTPPort, cfg.Secret)
+}
+
+func NewClientAddr(ip string, httpPort int, secret string) *Client {
 	return &Client{
-		baseURL: cfg.BaseURL(),
-		secret:  cfg.Secret,
+		baseURL: fmt.Sprintf("http://%s:%d", ip, httpPort),
+		secret:  secret,
 		http:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -356,7 +360,7 @@ func BuildPlayURLsFromConfig(cfg config.MediaConfig, app, stream string) map[str
 	return BuildPlayURLsForBackend(cfg.BackendType(), cfg.IP, cfg.HTTPPort, app, stream)
 }
 
-// StreamPlayURLs 平台层播放地址（对齐 WVP StreamContent 常用字段）。
+// StreamPlayURLs 平台层播放地址（对齐 ZWS StreamContent 常用字段）。
 type StreamPlayURLs struct {
 	Flv, WsFlv, Hls, Rtmp, Rtsp, Rtc, Rtcs string
 }

@@ -3,13 +3,13 @@
 ## zero-web-kit
 
 ```bash
-cp configs/config.example.yaml configs/config.yaml   # 本地配置不入库
+# 敏感配置放 configs/config.local.yaml（已 gitignore）
 make tidy
 make test
 make build
 ```
 
-确认未 `git add`：`logs/`、`config/jwk.json`、`configs/config.yaml`。
+确认未 `git add`：`logs/`、`config/jwk.json`、`configs/config.local.yaml`。
 
 ## ZMS（`../zms`）
 

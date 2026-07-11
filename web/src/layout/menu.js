@@ -47,7 +47,6 @@ export const primaryMenus = [
     icon: 'menu-ops',
     children: [
       { title: '报警管理', path: '/alarm', icon: 'el-icon-bell' },
-      { title: '国标级联', path: '/platform', icon: 'platform' },
       { title: '平台信息', path: '/operations/systemInfo', icon: 'systemInfo' },
       { title: '历史日志', path: '/operations/historyLog', icon: 'historyLog' },
       { title: '实时日志', path: '/operations/realLog', icon: 'realLog' }
@@ -59,7 +58,8 @@ export const primaryMenus = [
     icon: 'menu-system',
     children: [
       { title: '控制台', path: '/dashboard', icon: 'dashboard' },
-      { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' }
+      { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' },
+      { title: '国标级联', path: '/platform', icon: 'platform' }
     ]
   },
   {

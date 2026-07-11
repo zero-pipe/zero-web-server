@@ -11,7 +11,7 @@ import (
 
 	domainonvif "zero-web-kit/internal/domain/onvif"
 	domainptz "zero-web-kit/internal/domain/ptz"
-	"zero-web-kit/internal/infrastructure/config"
+	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	onvifinfra "zero-web-kit/internal/infrastructure/onvif"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
 
@@ -19,30 +19,27 @@ import (
 )
 
 type Service struct {
-	devices   domainonvif.DeviceRepository
-	channels  domainonvif.ChannelRepository
-	factory   *onvifinfra.ClientFactory
-	zlm       *mediakit.Client
-	mediaCfg  config.MediaConfig
-	serverID  string
-	proxyKeys sync.Map // stream -> ZMS addStreamProxy key
+	devices      domainonvif.DeviceRepository
+	channels     domainonvif.ChannelRepository
+	factory      *onvifinfra.ClientFactory
+	mediaServers *mediaserverapp.Service
+	serverID     string
+	proxyKeys    sync.Map // stream -> ZMS addStreamProxy key
 }
 
 func NewService(
 	devices domainonvif.DeviceRepository,
 	channels domainonvif.ChannelRepository,
 	factory *onvifinfra.ClientFactory,
-	zlmClient *mediakit.Client,
-	mediaCfg config.MediaConfig,
+	mediaServers *mediaserverapp.Service,
 	serverID string,
 ) *Service {
 	return &Service{
-		devices:   devices,
-		channels:  channels,
-		factory:   factory,
-		zlm:       zlmClient,
-		mediaCfg:  mediaCfg,
-		serverID:  serverID,
+		devices:      devices,
+		channels:     channels,
+		factory:      factory,
+		mediaServers: mediaServers,
+		serverID:     serverID,
 	}
 }
 
@@ -289,10 +286,19 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64) (*PlayResult, 
 	vhost := "__defaultVhost__"
 	stream := fmt.Sprintf("%d_%s", device.ID, sanitizeStream(ch.ProfileToken))
 
-	if info := s.zlm.LookupStreamMediaInfo(ctx, app, stream); isStreamReadyForPlay(info, ch.StreamChannel) {
-		return s.buildPlayResult(app, stream, ch, info), nil
+	prefer := device.MediaServerID
+	if prefer == "" {
+		prefer = "auto"
 	}
-	s.resetONVIFStream(ctx, vhost, app, stream)
+	node, err := s.mediaServers.ResolveForStream(app, stream, prefer)
+	if err != nil {
+		return nil, err
+	}
+
+	if info := node.Client.LookupStreamMediaInfo(ctx, app, stream); isStreamReadyForPlay(info, ch.StreamChannel) {
+		return s.buildPlayResult(app, stream, ch, info, node), nil
+	}
+	s.resetONVIFStream(ctx, vhost, app, stream, node)
 	time.Sleep(150 * time.Millisecond)
 
 	rtspURL, err := s.resolveRTSPURL(ctx, device, ch, ch.StreamURI == "")
@@ -301,12 +307,12 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64) (*PlayResult, 
 	}
 
 	// rtp_type=1: RTSP over TCP（海康等仅支持 TCP 时必需）；auto_close=false 避免切换播放器时被 ZMS 拆掉代理
-	resp, err := s.zlm.AddStreamProxy(ctx, vhost, app, stream, rtspURL, "1", true, false, false)
+	resp, err := node.Client.AddStreamProxy(ctx, vhost, app, stream, rtspURL, "1", true, false, false)
 	if err != nil {
-		return nil, fmt.Errorf("ZLM拉流代理失败: %w", err)
+		return nil, fmt.Errorf("媒体节点拉流代理失败: %w", err)
 	}
 	if resp != nil && resp.Code != 0 {
-		return nil, fmt.Errorf("ZLM拉流代理失败: %s", resp.Msg)
+		return nil, fmt.Errorf("媒体节点拉流代理失败: %s", resp.Msg)
 	}
 	if resp != nil && len(resp.Data) > 0 {
 		var proxyData struct {
@@ -316,27 +322,30 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64) (*PlayResult, 
 			s.proxyKeys.Store(stream, proxyData.Key)
 		}
 	}
+	s.mediaServers.BindStream(app, stream, node.ID())
 
 	var mediaInfo *mediakit.StreamMediaInfo
-	if info := s.waitStreamReady(ctx, app, stream, ch.StreamChannel); info != nil {
+	if info := s.waitStreamReady(ctx, app, stream, ch.StreamChannel, node); info != nil {
 		mediaInfo = info
 	} else {
-		s.resetONVIFStream(ctx, vhost, app, stream)
+		s.resetONVIFStream(ctx, vhost, app, stream, node)
+		s.mediaServers.UnbindStream(app, stream)
 		return nil, fmt.Errorf("等待%s就绪超时，请点「停止」后重试，或检查摄像机编码与带宽", streamChannelLabel(ch.StreamChannel))
 	}
 
-	return s.buildPlayResult(app, stream, ch, mediaInfo), nil
+	return s.buildPlayResult(app, stream, ch, mediaInfo, node), nil
 }
 
-func (s *Service) resetONVIFStream(ctx context.Context, vhost, app, stream string) {
+func (s *Service) resetONVIFStream(ctx context.Context, vhost, app, stream string, node *mediaserverapp.Node) {
+	client := node.Client
 	if v, ok := s.proxyKeys.Load(stream); ok {
 		if key, ok := v.(string); ok && key != "" {
-			_, _ = s.zlm.DelStreamProxy(ctx, key)
+			_, _ = client.DelStreamProxy(ctx, key)
 		}
 		s.proxyKeys.Delete(stream)
 	}
-	_, _ = s.zlm.DelStreamProxy(ctx, fmt.Sprintf("%s/%s/%s", vhost, app, stream))
-	_, _ = s.zlm.CloseStreams(ctx, vhost, app, stream)
+	_, _ = client.DelStreamProxy(ctx, fmt.Sprintf("%s/%s/%s", vhost, app, stream))
+	_, _ = client.CloseStreams(ctx, vhost, app, stream)
 }
 
 func (s *Service) resolveRTSPURL(ctx context.Context, device *domainonvif.Device, ch *domainonvif.Channel, forceRefresh bool) (string, error) {
@@ -358,10 +367,10 @@ func (s *Service) resolveRTSPURL(ctx context.Context, device *domainonvif.Device
 	return rtspURL, nil
 }
 
-func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChannel string) *mediakit.StreamMediaInfo {
+func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChannel string, node *mediaserverapp.Node) *mediakit.StreamMediaInfo {
 	attempts := waitStreamReadyAttempts(streamChannel)
 	for i := 0; i < attempts; i++ {
-		if info := s.zlm.LookupStreamMediaInfo(ctx, app, stream); isStreamReadyForPlay(info, streamChannel) {
+		if info := node.Client.LookupStreamMediaInfo(ctx, app, stream); isStreamReadyForPlay(info, streamChannel) {
 			return info
 		}
 		select {
@@ -373,7 +382,7 @@ func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChanne
 	return nil
 }
 
-func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, info *mediakit.StreamMediaInfo) *PlayResult {
+func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, info *mediakit.StreamMediaInfo, node *mediaserverapp.Node) *PlayResult {
 	configCodec := ch.ConfigCodec
 	if configCodec == "" {
 		configCodec = normalizeVideoCodec(ch.Codec)
@@ -397,7 +406,7 @@ func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, i
 	return &PlayResult{
 		App:             app,
 		Stream:          stream,
-		MediaServerID:   s.mediaCfg.ID,
+		MediaServerID:   node.ID(),
 		ConfigCodec:     configCodec,
 		VideoCodec:      videoCodec,
 		AudioCodec:      mediaAudio,
@@ -406,7 +415,7 @@ func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, i
 		StreamChannel:   ch.StreamChannel,
 		StreamType:      ch.StreamType,
 		MediaResolution: mediaRes,
-		URLs:            mediakit.BuildPlayURLsFromConfig(s.mediaCfg, app, stream),
+		URLs:            mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream),
 	}
 }
 
@@ -432,7 +441,10 @@ func (s *Service) StopPlay(ctx context.Context, channelID int64) error {
 	app := "onvif"
 	vhost := "__defaultVhost__"
 	stream := fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken))
-	_, _ = s.zlm.CloseStreams(ctx, vhost, app, stream)
+	if node, err := s.mediaServers.ResolveForStream(app, stream, "auto"); err == nil {
+		s.resetONVIFStream(ctx, vhost, app, stream, node)
+	}
+	s.mediaServers.UnbindStream(app, stream)
 	return nil
 }
 

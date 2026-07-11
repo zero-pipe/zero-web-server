@@ -7,13 +7,13 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: wvp
+      MYSQL_DATABASE: zws
       TZ: Asia/Shanghai
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ../migrations/004_init_wvp_mysql_native.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ../migrations/004_init_zws_mysql_native.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ../migrations/002_add_onvif_tables.sql:/docker-entrypoint-initdb.d/02-onvif.sql:ro
     command:
       - --character-set-server=utf8mb4

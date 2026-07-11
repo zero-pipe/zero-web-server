@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
+	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/model"
@@ -14,15 +14,14 @@ import (
 )
 
 type Service struct {
-	repo     *persistence.StreamPushRepository
-	zlm      *mediakit.Client
-	mediaCfg config.MediaConfig
-	serverID string
-	sessions sync.Map
+	repo         *persistence.StreamPushRepository
+	mediaServers *mediaserverapp.Service
+	serverID     string
+	sessions     sync.Map
 }
 
-func NewService(repo *persistence.StreamPushRepository, zlmClient *mediakit.Client, mediaCfg config.MediaConfig, serverID string) *Service {
-	return &Service{repo: repo, zlm: zlmClient, mediaCfg: mediaCfg, serverID: serverID}
+func NewService(repo *persistence.StreamPushRepository, mediaServers *mediaserverapp.Service, serverID string) *Service {
+	return &Service{repo: repo, mediaServers: mediaServers, serverID: serverID}
 }
 
 func (s *Service) List(page, count int, query string, pushing *bool, mediaServerID string) ([]persistence.StreamPushView, int64, error) {
@@ -34,7 +33,9 @@ func (s *Service) Add(m *model.StreamPush, gbDeviceID, gbName string) error {
 	m.CreateTime = now
 	m.UpdateTime = now
 	m.ServerID = s.serverID
-	m.MediaServerID = s.mediaCfg.ID
+	if m.MediaServerID == "" {
+		m.MediaServerID = "auto"
+	}
 	if err := s.repo.Create(m); err != nil {
 		return err
 	}
@@ -78,17 +79,20 @@ func (s *Service) RemoveFromGB(id int) error {
 func (s *Service) Start(ctx context.Context, id int) (*dto.StreamContent, error) {
 	push, err := s.repo.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("?????")
+		return nil, fmt.Errorf("推流不存在")
 	}
 	if !push.Pushing {
-		return nil, fmt.Errorf("???????? RTMP/RTSP ??? %s/%s", push.App, push.Stream)
+		return nil, fmt.Errorf("当前未在推流，请先向媒体节点推送 RTMP/RTSP：%s/%s", push.App, push.Stream)
 	}
-	return s.buildStreamContent(push.App, push.Stream), nil
+	return s.buildStreamContent(push.App, push.Stream, push.MediaServerID), nil
 }
 
 func (s *Service) OnPublish(app, stream, mediaServerID string) {
 	if push, err := s.repo.GetByAppStream(app, stream); err == nil {
 		_ = s.repo.UpdatePushing(push.ID, true, mediaServerID)
+		if mediaServerID != "" {
+			s.mediaServers.BindStream(app, stream, mediaServerID)
+		}
 	}
 }
 
@@ -96,6 +100,7 @@ func (s *Service) OnStreamDeparture(app, stream string) {
 	if push, err := s.repo.GetByAppStream(app, stream); err == nil {
 		_ = s.repo.UpdatePushing(push.ID, false, "")
 	}
+	s.mediaServers.UnbindStream(app, stream)
 }
 
 func (s *Service) OnStreamStarted(app, stream string) {
@@ -103,20 +108,24 @@ func (s *Service) OnStreamStarted(app, stream string) {
 	if v, ok := s.sessions.Load(key); ok {
 		if ch, ok := v.(chan *dto.StreamContent); ok {
 			select {
-			case ch <- s.buildStreamContent(app, stream):
+			case ch <- s.buildStreamContent(app, stream, ""):
 			default:
 			}
 		}
 	}
 }
 
-func (s *Service) buildStreamContent(app, stream string) *dto.StreamContent {
-	urls := mediakit.BuildPlayURLsFromConfig(s.mediaCfg, app, stream)
+func (s *Service) buildStreamContent(app, stream, preferID string) *dto.StreamContent {
+	node, err := s.mediaServers.ResolveForStream(app, stream, preferID)
+	if err != nil {
+		return &dto.StreamContent{App: app, Stream: stream, ServerID: s.serverID}
+	}
+	urls := mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream)
 	return &dto.StreamContent{
-		App: app, Stream: stream, IP: s.mediaCfg.IP,
+		App: app, Stream: stream, IP: node.StreamIP(),
 		Flv: urls["flv"], WsFlv: urls["ws"], Hls: urls["hls"],
 		Rtmp: urls["rtmp"], Rtsp: urls["rtsp"],
-		MediaServerID: s.mediaCfg.ID, ServerID: s.serverID,
+		MediaServerID: node.ID(), ServerID: s.serverID,
 	}
 }
 

@@ -11,19 +11,18 @@
           <div style="padding: 14px;text-align: left">
             <span style="font-size: 16px">{{ item.id }}</span>
             <div style="float: right">
-              <el-button v-if="!item.defaultServer" icon="el-icon-delete" circle size="mini" @click="del(item)"></el-button>
-              <el-button v-if="!item.defaultServer" icon="el-icon-edit"  circle size="mini" @click="edit(item)"></el-button>
-              <el-button v-if="item.defaultServer" icon="el-icon-edit"  circle size="mini" @click="edit(item)"></el-button>
+              <el-button icon="el-icon-delete" circle size="mini" @click="del(item)"></el-button>
+              <el-button icon="el-icon-edit"  circle size="mini" @click="edit(item)"></el-button>
             </div>
 
             <div style="margin-top: 13px; line-height: 12px; ">
-              <span style="font-size: 14px; color: #999; margin-top: 5px; ">{{ item.ip }}</span>
+              <span style="font-size: 14px; color: #999; margin-top: 5px; ">{{ item.ip }}:{{ item.httpPort }}</span>
               <span style="font-size: 14px; color: #999; margin-top: 5px; float: right;">{{ item.createTime }}</span>
             </div>
           </div>
           <i v-if="item.status" class="iconfont icon-online server-card-status-online" title="在线" />
           <i v-if="!item.status" class="iconfont icon-online server-card-status-offline" title="离线" />
-          <i v-if="item.defaultServer" class="server-card-default">默认</i>
+          <span v-if="item.load !== undefined" class="server-card-load" :title="'负载 ' + item.load">{{ item.load }}</span>
         </el-card>
       </el-col>
     </el-row>
@@ -152,12 +151,16 @@ export default {
     color: #808080;
     font-size: 18px;
   }
-  .server-card-default{
+  .server-card-load{
     position: absolute;
     left: 20px;
     top: 20px;
-    color: #808080;
-    font-size: 18px;
+    color: #1565c0;
+    font-size: 14px;
+    font-weight: 600;
+    background: rgba(255,255,255,0.85);
+    padding: 2px 8px;
+    border-radius: 10px;
   }
 	.server-card:hover {
     border: 1px solid #adadad;

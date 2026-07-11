@@ -122,11 +122,7 @@ function Wait-TcpPort([int]$port, [int]$timeoutSec = 90) {
 function Ensure-Config {
     $cfgPath = Join-Path $Root $Config
     if (Test-Path $cfgPath) { return $cfgPath }
-    $example = Join-Path $Root "configs\config.example.yaml"
-    if (-not (Test-Path $example)) { Write-Error "Missing $Config and configs\config.example.yaml" }
-    Copy-Item $example $cfgPath
-    Write-Host "Created $Config from example — check mysql.password" -ForegroundColor Yellow
-    return $cfgPath
+    Write-Error "Missing $Config — create configs/config.yaml (see repo template) and optional configs/config.local.yaml for secrets"
 }
 
 function Ensure-FrontendDeps {

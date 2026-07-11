@@ -275,7 +275,7 @@ export default {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #2f3846;
+  background: #3a4556;
 }
 .player-tabs-wrapper .el-tabs {
   margin-bottom: 0;
@@ -289,7 +289,7 @@ export default {
   flex: 1;
   min-height: 0;
   width: 100%;
-  background: #2a3340;
+  background: #3a4556;
   overflow: hidden;
 }
 .player-instance {
