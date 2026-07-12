@@ -47,26 +47,55 @@ func (s *Service) SetSIP(sipServer *sipinfra.Server) {
 
 func (s *Service) GetByDeviceID(deviceID string) (*domaindevice.Device, error) {
 	dbDev, dbErr := s.devices.GetByDeviceID(deviceID)
+	if dbErr != nil {
+		// 库已删则清 Redis 设备缓存，避免删设备后重注册带回旧名称。
+		// 禁止在此调用 RemoveExpiry：它内部会再 GetByDeviceID，设备不存在时无限递归，导致 SIP 无法回 401。
+		if s.redis != nil && deviceID != "" {
+			_ = s.redis.RemoveDevice(context.Background(), deviceID)
+		}
+		return nil, dbErr
+	}
 	if s.redis != nil {
 		if d, err := s.redis.GetDevice(context.Background(), deviceID); err == nil {
-			if dbErr == nil && dbDev != nil {
-				d.ID = dbDev.ID
-				if d.Password == "" {
-					d.Password = dbDev.Password
-				}
-				if d.Name == "" || d.Name == d.DeviceID {
-					if dbDev.Name != "" {
-						d.Name = dbDev.Name
-					}
-				}
-			}
+			mergeDeviceIdentityFromDB(d, dbDev)
 			return d, nil
 		}
 	}
-	if dbErr != nil {
-		return nil, dbErr
-	}
 	return dbDev, nil
+}
+
+// mergeDeviceIdentityFromDB 用库表补齐 Redis 缓存里缺失的身份字段，避免注册/心跳把厂商等写空。
+func mergeDeviceIdentityFromDB(dst, db *domaindevice.Device) {
+	if dst == nil || db == nil {
+		return
+	}
+	dst.ID = db.ID
+	if dst.Password == "" {
+		dst.Password = db.Password
+	}
+	if dst.Name == "" || dst.Name == dst.DeviceID {
+		if db.Name != "" {
+			dst.Name = db.Name
+		}
+	}
+	if dst.Manufacturer == "" {
+		dst.Manufacturer = db.Manufacturer
+	}
+	if dst.Model == "" {
+		dst.Model = db.Model
+	}
+	if dst.Firmware == "" {
+		dst.Firmware = db.Firmware
+	}
+	if dst.StreamMode == "" {
+		dst.StreamMode = db.StreamMode
+	}
+	if dst.Charset == "" {
+		dst.Charset = db.Charset
+	}
+	if dst.CustomName == "" {
+		dst.CustomName = db.CustomName
+	}
 }
 
 func (s *Service) ensureDeviceDBID(device *domaindevice.Device) {
@@ -87,11 +116,19 @@ func (s *Service) SaveRegister(device *domaindevice.Device) (*domaindevice.Devic
 		return device, nil
 	}
 	device.ID = existing.ID
-	if device.Password == "" {
-		device.Password = existing.Password
-	}
+	// REGISTER 只带信令地址，身份信息以库中已有为准，避免把 DeviceInfo 写入的厂商/型号冲掉
+	mergeDeviceIdentityFromDB(device, existing)
 	if device.Name == "" {
 		device.Name = existing.Name
+	}
+	if device.MediaServerID == "" {
+		device.MediaServerID = existing.MediaServerID
+	}
+	if device.HeartBeatInterval == 0 {
+		device.HeartBeatInterval = existing.HeartBeatInterval
+	}
+	if device.HeartBeatCount == 0 {
+		device.HeartBeatCount = existing.HeartBeatCount
 	}
 	if err := s.devices.Update(device); err != nil {
 		return nil, err
@@ -235,7 +272,52 @@ func (s *Service) HandleCatalog(deviceID string, items []sipinfra.CatalogItem) e
 	}
 	s.syncStatus.Store(deviceID, &SyncStatus{Total: len(channels), Current: len(channels), SyncIng: false})
 	log.Printf("GB28181 catalog synced: device=%s channels=%d", deviceID, len(channels))
-	return s.channels.ResetByDevice(deviceID, device.ID, channels)
+	if err := s.channels.ResetByDevice(deviceID, device.ID, channels); err != nil {
+		return err
+	}
+	s.backfillDeviceFromChannels(device, channels)
+	return nil
+}
+
+// backfillDeviceFromChannels 设备厂商/名称常在 Catalog Item 里，DeviceInfo 未回时从通道补齐。
+func (s *Service) backfillDeviceFromChannels(device *domaindevice.Device, channels []*domainchannel.Channel) {
+	if device == nil || len(channels) == 0 {
+		return
+	}
+	changed := false
+	for _, ch := range channels {
+		if ch == nil {
+			continue
+		}
+		if device.Manufacturer == "" && ch.Manufacturer != "" {
+			device.Manufacturer = ch.Manufacturer
+			changed = true
+		}
+		if device.Model == "" && ch.Model != "" {
+			device.Model = ch.Model
+			changed = true
+		}
+		if (device.Name == "" || device.Name == device.DeviceID) && ch.Name != "" && ch.Name != ch.GBDeviceID {
+			device.Name = ch.Name
+			changed = true
+		}
+		if changed && device.Manufacturer != "" {
+			break
+		}
+	}
+	if !changed {
+		return
+	}
+	device.UpdateTime = nowStr()
+	if err := s.devices.Update(device); err != nil {
+		log.Printf("GB28181 backfill device identity: device=%s err=%v", device.DeviceID, err)
+		return
+	}
+	if s.redis != nil {
+		_ = s.redis.UpdateDevice(context.Background(), device)
+	}
+	log.Printf("GB28181 device identity from catalog: device=%s name=%s manufacturer=%s",
+		device.DeviceID, device.Name, device.Manufacturer)
 }
 
 func (s *Service) ensureDefaultIPCChannel(device *domaindevice.Device) error {
@@ -277,8 +359,21 @@ func (s *Service) List(page, count int, query string, online *bool) ([]*domainde
 }
 
 func (s *Service) Delete(deviceID string) error {
+	serverID := ""
+	if d, err := s.devices.GetByDeviceID(deviceID); err == nil && d != nil {
+		serverID = d.ServerID
+	}
 	_ = s.channels.DeleteByDevice(deviceID)
-	return s.devices.DeleteByDeviceID(deviceID)
+	if err := s.devices.DeleteByDeviceID(deviceID); err != nil {
+		return err
+	}
+	if s.redis != nil {
+		_ = s.redis.RemoveDevice(context.Background(), deviceID)
+		if serverID != "" {
+			_ = s.redis.RemoveDeviceExpiry(context.Background(), serverID, deviceID)
+		}
+	}
+	return nil
 }
 
 func (s *Service) SyncCatalog(deviceID string) error {
@@ -287,11 +382,18 @@ func (s *Service) SyncCatalog(deviceID string) error {
 		return ErrDeviceNotFound
 	}
 	s.syncStatus.Store(deviceID, &SyncStatus{Total: 0, Current: 0, SyncIng: true, Started: time.Now()})
-	if isIPCDevice(deviceID) {
-		return s.syncIPCChannels(device)
-	}
 	if s.sip == nil {
 		return errors.New("SIP服务未启动")
+	}
+	// IPC 也发 DeviceInfo/Catalog：厂商、真实设备名都在协议响应里，不能只建默认通道
+	if device.Manufacturer == "" {
+		if err := s.sip.SendDeviceInfoQuery(device); err != nil {
+			log.Printf("GB28181 device info on sync: device=%s err=%v", deviceID, err)
+		}
+	}
+	if isIPCDevice(deviceID) {
+		_ = s.sip.SendCatalogQuery(device)
+		return s.syncIPCChannels(device)
 	}
 	return s.sip.SendCatalogQuery(device)
 }
@@ -412,6 +514,8 @@ func (s *Service) HandleDeviceInfo(deviceID, name, manufacturer, model, firmware
 	if s.redis != nil {
 		_ = s.redis.UpdateDevice(context.Background(), device)
 	}
+	log.Printf("GB28181 device info: device=%s name=%s manufacturer=%s model=%s",
+		deviceID, device.Name, device.Manufacturer, device.Model)
 	return nil
 }
 
@@ -424,12 +528,15 @@ func (s *Service) autoQueryDeviceInfo(deviceID string) {
 	if err != nil || device == nil || !device.OnLine {
 		return
 	}
-	if device.Manufacturer != "" && device.Model != "" {
+	// 厂商为空则补查；部分设备 Model 可空
+	if device.Manufacturer != "" {
 		return
 	}
 	if err := s.sip.SendDeviceInfoQuery(device); err != nil {
 		log.Printf("GB28181 device info query: device=%s err=%v", deviceID, err)
+		return
 	}
+	log.Printf("GB28181 device info query sent: device=%s", deviceID)
 }
 
 func (s *Service) GetKeepaliveStatistics(deviceID string, count int) []domaindevice.TimeStatistics {

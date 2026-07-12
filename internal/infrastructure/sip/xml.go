@@ -206,18 +206,37 @@ func extractTag(body []byte, tag string) string {
 func extractTagFold(s, tag string) string {
 	lower := strings.ToLower(s)
 	tagLower := strings.ToLower(tag)
-	startTag := "<" + tagLower + ">"
-	endTag := "</" + tagLower + ">"
-	i := strings.Index(lower, startTag)
-	if i < 0 {
-		return ""
+	// 兼容 <Manufacturer>、<Manufacturer >、<Manufacturer xxx="y">
+	needle := "<" + tagLower
+	i := 0
+	for {
+		idx := strings.Index(lower[i:], needle)
+		if idx < 0 {
+			return ""
+		}
+		abs := i + idx
+		after := abs + len(needle)
+		if after >= len(lower) {
+			return ""
+		}
+		ch := lower[after]
+		if ch != '>' && ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n' && ch != '/' {
+			// 避免匹配到 DeviceName 时命中 Name 等前缀
+			i = after
+			continue
+		}
+		gt := strings.IndexByte(lower[after:], '>')
+		if gt < 0 {
+			return ""
+		}
+		contentStart := after + gt + 1
+		endTag := "</" + tagLower + ">"
+		j := strings.Index(lower[contentStart:], endTag)
+		if j < 0 {
+			return ""
+		}
+		return strings.TrimSpace(s[contentStart : contentStart+j])
 	}
-	i += len(startTag)
-	j := strings.Index(lower[i:], endTag)
-	if j < 0 {
-		return ""
-	}
-	return strings.TrimSpace(s[i : i+j])
 }
 
 func parseCatalogItemsFallback(body []byte) []CatalogItem {

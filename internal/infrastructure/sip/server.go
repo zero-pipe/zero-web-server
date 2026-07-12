@@ -424,13 +424,16 @@ func (s *Server) handleMessage(req *sip.Request, tx sip.ServerTransaction) {
 			log.Printf("GB28181 catalog response: device=%s items=%d", deviceID, len(msg.Items))
 			_ = s.deviceSvc.HandleCatalog(deviceID, msg.Items)
 		case "DeviceInfo":
-			_ = s.deviceSvc.HandleDeviceInfo(
-				deviceID,
-				extractTag(body, "DeviceName"),
-				extractTag(body, "Manufacturer"),
-				extractTag(body, "Model"),
-				extractTag(body, "Firmware"),
-			)
+			devName := extractTag(body, "DeviceName")
+			if devName == "" {
+				devName = extractTag(body, "Name")
+			}
+			mfr := extractTag(body, "Manufacturer")
+			model := extractTag(body, "Model")
+			fw := extractTag(body, "Firmware")
+			log.Printf("GB28181 DeviceInfo response: device=%s name=%s manufacturer=%s model=%s",
+				deviceID, devName, mfr, model)
+			_ = s.deviceSvc.HandleDeviceInfo(deviceID, devName, mfr, model, fw)
 		case "RecordInfo":
 			s.recordMgr.HandleRecordInfo(deviceID, msg.DeviceID, msg.SN, msg.SumNum, msg.RecordItems)
 		case "PresetQuery":

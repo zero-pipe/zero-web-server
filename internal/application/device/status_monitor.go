@@ -80,11 +80,12 @@ func (s *Service) TouchExpiry(device *domaindevice.Device) {
 }
 
 func (s *Service) RemoveExpiry(deviceID string) {
-	if s.redis == nil {
+	if s.redis == nil || deviceID == "" {
 		return
 	}
-	device, err := s.GetByDeviceID(deviceID)
-	if err != nil {
+	// 直接查库，避免经 GetByDeviceID 与缓存清理形成递归
+	device, err := s.devices.GetByDeviceID(deviceID)
+	if err != nil || device == nil {
 		return
 	}
 	_ = s.redis.RemoveDeviceExpiry(context.Background(), device.ServerID, deviceID)
