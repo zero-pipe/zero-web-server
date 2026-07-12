@@ -472,7 +472,7 @@ func (s *Server) SendInvitePlay(device *domaindevice.Device, channel *domainchan
 		}
 	}
 	s.inviteMgr.Put(stream, &InviteSession{
-		Device: device, Channel: channel, Stream: stream, App: "rtp", Type: SessionPlay,
+		Device: device, Channel: channel, Stream: stream, App: "live", Type: SessionPlay,
 		Dialog: sess, StartedAt: time.Now(),
 	})
 	log.Printf("[GB28181 sip] invite session stored stream=%s (keep alive until stop/BYE)", stream)
@@ -488,7 +488,7 @@ func (s *Server) SendInviteSession(device *domaindevice.Device, channel *domainc
 		return err
 	}
 	s.inviteMgr.Put(stream, &InviteSession{
-		Device: device, Channel: channel, Stream: stream, App: "rtp", Type: sessionType,
+		Device: device, Channel: channel, Stream: stream, App: "live", Type: sessionType,
 		Dialog: sess, StartTime: startTime, EndTime: endTime, DownloadSpeed: downloadSpeed,
 		StartedAt: time.Now(),
 	})

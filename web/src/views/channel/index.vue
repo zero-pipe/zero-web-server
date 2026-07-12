@@ -344,7 +344,7 @@ export default {
       const deviceId = this.deviceId
       const channelId = itemData.deviceId
 
-      this.$router.push(`/cloudRecord/detail/rtp/${deviceId}_${channelId}`)
+      this.$router.push(`/cloudRecord/detail/live/${deviceId}_${channelId}`)
     },
     stopDevicePush: function(itemData) {
       this.$store.dispatch('commonChanel/stopPlayChannel', itemData.gbId).then(data => {

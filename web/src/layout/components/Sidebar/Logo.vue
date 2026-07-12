@@ -24,7 +24,7 @@ export default {
   },
   data() {
     return {
-      title: 'Zero Web Kit',
+      title: 'ZWS',
       logo: require('@/assets/brand/zero-logo-64.png')
     }
   }

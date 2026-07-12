@@ -1,13 +1,24 @@
 <template>
-  <div id="cloudRecordPlayer" style="height: 100%">
-    <div class="cloud-record-playBox" :style="playBoxStyle">
+  <div id="cloudRecordPlayer" class="cloud-record-player-root">
+    <div class="cloud-record-playBox">
+      <video
+        v-if="useNativeMp4"
+        ref="nativeVideo"
+        class="cloud-record-native-video"
+        playsinline
+        @timeupdate="onNativeTimeUpdate"
+        @play="playing = true"
+        @pause="playing = false"
+        @ended="playing = false"
+        @loadedmetadata="onNativeLoaded"
+      />
       <playerTabs
+        v-else
         ref="recordVideoPlayer"
         :show-button="false"
         :showTab="false"
         @playTimeChange="showPlayTimeChange"
         @playStatusChange="playingChange"
-        @player-changed="onPlayerChanged"
       />
     </div>
     <div class="cloud-record-player-option-box">
@@ -28,7 +39,7 @@
         {{showPlayTimeTotal}}
       </div>
     </div>
-    <div style="height: 40px; background-color: #383838; display: grid; grid-template-columns: 1fr auto 1fr">
+    <div class="cloud-record-control-bar">
       <div style="text-align: left;">
         <div class="cloud-record-record-play-control" style="background-color: transparent; box-shadow: 0 0 10px transparent">
           <a v-if="showListCallback" target="_blank" class="cloud-record-record-play-control-item iconfont icon-list" title="列表" @click="sidebarControl()" />
@@ -60,17 +71,8 @@
       </div>
       <div style="text-align: right;">
         <div class="cloud-record-record-play-control" style="background-color: transparent; box-shadow: 0 0 10px transparent">
-          <div class="cloud-record-record-play-control-item record-play-control-player">
-
-            <el-dropdown @command="changePlayerType" :popper-append-to-body='false' >
-              <a target="_blank" class="cloud-record-record-play-control-item record-play-control-speed" title="选择播放器">{{ playerLabel }}</a>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item v-for="p in playerList" :key="p.key" :command="p.key">{{ p.label }}</el-dropdown-item>
-              </el-dropdown-menu>
-            </el-dropdown>
-          </div>
-          <a v-if="!isFullScreen" target="_blank" class="cloud-record-record-play-control-item iconfont icon-fangdazhanshi" title="全屏" @click="fullScreen()" />
-          <a v-else target="_blank" class="cloud-record-record-play-control-item iconfont icon-suoxiao1" title="全屏" @click="fullScreen()" />
+          <a v-if="!hideFullscreen && !isFullScreen" target="_blank" class="cloud-record-record-play-control-item iconfont icon-fangdazhanshi" title="全屏" @click="fullScreen()" />
+          <a v-if="!hideFullscreen && isFullScreen" target="_blank" class="cloud-record-record-play-control-item iconfont icon-suoxiao1" title="全屏" @click="fullScreen()" />
         </div>
       </div>
     </div>
@@ -89,7 +91,15 @@ momentDurationFormatSetup(moment)
 export default {
   name: 'CloudRecordPlayer',
   components: { playerTabs },
-  props: ['showListCallback', 'showNextCallback', 'showLastCallback', 'lastDiable', 'nextDiable'],
+  props: {
+    showListCallback: { type: Function, default: null },
+    showNextCallback: { type: Function, default: null },
+    showLastCallback: { type: Function, default: null },
+    lastDiable: { type: Boolean, default: false },
+    nextDiable: { type: Boolean, default: false },
+    hidePlayerSwitch: { type: Boolean, default: false },
+    hideFullscreen: { type: Boolean, default: false }
+  },
   data() {
     return {
       showSidebar: false,
@@ -105,14 +115,16 @@ export default {
       isFullScreen: false,
       playing: false,
       initTime: null,
-      playerList: [],
-      playerLabel: 'Jessibuca',
       playSpeedRange: [1, 2, 4, 6, 8, 16, 20]
     }
   },
   computed: {
-    playBoxStyle() {
-      return this.isFullScreen ? { height: 'calc(100vh - 61px)' } : { height: '100%' }
+    useNativeMp4() {
+      return !!(this.streamInfo && (this.streamInfo.mp4 || (this.streamInfo.flv && /\.mp4(\?|$|#)/i.test(this.streamInfo.flv))))
+    },
+    nativeMp4Url() {
+      if (!this.streamInfo) return ''
+      return this.streamInfo.mp4 || this.streamInfo.flv || ''
     },
     showPlayTimeValue() {
       return this.streamInfo === null ? '--:--:--' : moment.duration(this.playerTime, 'milliseconds').format('hh:mm:ss', {
@@ -151,25 +163,10 @@ export default {
     document.addEventListener('mousemove', this.timeProcessMousemove)
     document.addEventListener('mouseup', this.timeProcessMouseup)
   },
-  mounted() {
-    this.updatePlayerList()
-  },
   destroyed() {
     this.$destroy('recordVideoPlayer')
   },
   methods: {
-    updatePlayerList() {
-      if (this.$refs.recordVideoPlayer) {
-        this.playerList = this.$refs.recordVideoPlayer.getPlayerList()
-        const active = this.$refs.recordVideoPlayer.getActivePlayer()
-        const p = this.playerList.find(p => p.key === active)
-        this.playerLabel = p ? p.label : 'Jessibuca'
-      }
-    },
-    onPlayerChanged(key) {
-      const p = this.playerList.find(p => p.key === key)
-      this.playerLabel = p ? p.label : 'Jessibuca'
-    },
     timeProcessMouseup(event) {
       this.isMousedown = false
     },
@@ -177,6 +174,9 @@ export default {
 
     },
     timeProcessClick(event) {
+      if (!this.streamInfo || !this.streamInfo.duration) {
+        return
+      }
       let x = event.offsetX
       let clientWidth = this.$refs.timeProcess.clientWidth
       this.seekRecord(x / clientWidth * this.streamInfo.duration)
@@ -198,6 +198,22 @@ export default {
       this.showListCallback(this.showSidebar)
     },
     snap() {
+      if (this.useNativeMp4 && this.$refs.nativeVideo) {
+        try {
+          const v = this.$refs.nativeVideo
+          const canvas = document.createElement('canvas')
+          canvas.width = v.videoWidth || 1280
+          canvas.height = v.videoHeight || 720
+          canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height)
+          const a = document.createElement('a')
+          a.href = canvas.toDataURL('image/jpeg')
+          a.download = 'snap.jpg'
+          a.click()
+        } catch (e) {
+          console.warn(e)
+        }
+        return
+      }
       if (this.$refs.recordVideoPlayer) {
         this.$refs.recordVideoPlayer.screenshot()
       }
@@ -215,6 +231,10 @@ export default {
     },
     changePlaySpeed(speed) {
       this.playSpeed = speed
+      if (this.useNativeMp4 && this.$refs.nativeVideo) {
+        this.$refs.nativeVideo.playbackRate = speed
+        return
+      }
       this.$store.dispatch('cloudRecord/speed', {
         mediaServerId: this.streamInfo.mediaServerId,
         app: this.streamInfo.app,
@@ -227,13 +247,6 @@ export default {
         this.$refs.recordVideoPlayer.setPlaybackRate(this.playSpeed)
       }
     },
-    changePlayerType(playerType) {
-      if (this.$refs.recordVideoPlayer) {
-        this.$refs.recordVideoPlayer.switchPlayer(playerType)
-        const p = this.playerList.find(p => p.key === playerType)
-        this.playerLabel = p ? p.label : 'Jessibuca'
-      }
-    },
     seekBackward() {
       this.seekRecord(this.playerTime - 5 * 1000)
     },
@@ -241,27 +254,93 @@ export default {
       this.seekRecord(this.playerTime + 5 * 1000)
     },
     stopPLay() {
+      if (this.$refs.nativeVideo) {
+        this.$refs.nativeVideo.pause()
+        this.$refs.nativeVideo.removeAttribute('src')
+        this.$refs.nativeVideo.load()
+      }
       if (this.$refs.recordVideoPlayer) {
         this.$refs.recordVideoPlayer.destroy()
+      }
+      const box = this.$el && this.$el.querySelector('.cloud-record-playBox')
+      if (box) {
+        box.style.aspectRatio = ''
       }
       this.streamInfo = null
       this.playerTime = null
       this.playSpeed = 1
+      this.playing = false
     },
     pausePlay() {
+      if (this.useNativeMp4 && this.$refs.nativeVideo) {
+        this.$refs.nativeVideo.pause()
+        return
+      }
       if (this.$refs.recordVideoPlayer) {
         this.$refs.recordVideoPlayer.pause()
       }
     },
     play() {
-      if (this.$refs.recordVideoPlayer) {
-        if (this.$refs.recordVideoPlayer.$refs[this.$refs.recordVideoPlayer.getActivePlayer()] &&
-            this.$refs.recordVideoPlayer.$refs[this.$refs.recordVideoPlayer.getActivePlayer()].loaded) {
-          this.$refs.recordVideoPlayer.$refs[this.$refs.recordVideoPlayer.getActivePlayer()].unPause()
+      if (!this.streamInfo) {
+        return
+      }
+      if (this.useNativeMp4) {
+        this.$nextTick(() => this.playNativeMp4())
+        return
+      }
+      if (!this.$refs.recordVideoPlayer) {
+        return
+      }
+      const active = this.$refs.recordVideoPlayer.getActivePlayer()
+      const inst = this.$refs.recordVideoPlayer.$refs[active]
+      if (inst && inst.loaded) {
+        if (typeof inst.unPause === 'function') {
+          inst.unPause()
+        } else if (typeof inst.playBtnClick === 'function') {
+          inst.playBtnClick()
         } else {
-          this.playRecord()
+          this.$refs.recordVideoPlayer.play()
+        }
+        return
+      }
+      this.$refs.recordVideoPlayer.setStreamInfo(this.streamInfo)
+    },
+    playNativeMp4() {
+      const v = this.$refs.nativeVideo
+      if (!v || !this.nativeMp4Url) {
+        return
+      }
+      if (v.src !== this.nativeMp4Url) {
+        v.src = this.nativeMp4Url
+      }
+      const p = v.play()
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => {})
+      }
+    },
+    onNativeLoaded() {
+      const v = this.$refs.nativeVideo
+      if (!v || !this.streamInfo) {
+        return
+      }
+      if ((!this.streamInfo.duration || this.streamInfo.duration <= 0) && v.duration && isFinite(v.duration)) {
+        this.streamInfo.duration = v.duration * 1000
+      }
+      v.playbackRate = this.playSpeed || 1
+      // 弹窗画幅按真实分辨率，避免左右黑边
+      if (v.videoWidth > 0 && v.videoHeight > 0) {
+        const box = this.$el && this.$el.querySelector('.cloud-record-playBox')
+        if (box && this.$el.classList.contains('cloud-record-play-stage')) {
+          box.style.aspectRatio = `${v.videoWidth} / ${v.videoHeight}`
         }
       }
+    },
+    onNativeTimeUpdate() {
+      const v = this.$refs.nativeVideo
+      if (!v) {
+        return
+      }
+      this.playerTime = Math.max(0, v.currentTime * 1000)
     },
     fullScreen() {
       if (this.isFullScreen) {
@@ -282,28 +361,50 @@ export default {
       this.isFullScreen = true
     },
     setStreamInfo(streamInfo, timeLen, startTime) {
+      if (streamInfo && (!streamInfo.duration || streamInfo.duration <= 0) && timeLen) {
+        streamInfo.duration = timeLen
+      }
       this.streamInfo = streamInfo
       this.timeLen = timeLen
       this.startTime = startTime
+      this.playerTime = 0
       this.$nextTick(() => {
+        if (this.useNativeMp4) {
+          this.playNativeMp4()
+          return
+        }
         if (this.$refs.recordVideoPlayer) {
-          console.log(streamInfo)
           this.$refs.recordVideoPlayer.setStreamInfo(streamInfo)
+          this.$nextTick(() => this.$refs.recordVideoPlayer.syncPlayerSize())
         }
       })
     },
     seekRecord(playSeekValue, callback) {
+      if (!this.streamInfo) {
+        return
+      }
+      let ms = playSeekValue
+      if (ms < 0) ms = 0
+      if (this.streamInfo.duration && ms > this.streamInfo.duration) {
+        ms = this.streamInfo.duration
+      }
+      if (this.useNativeMp4 && this.$refs.nativeVideo) {
+        this.$refs.nativeVideo.currentTime = ms / 1000
+        this.playerTime = ms
+        if (callback) callback(ms)
+        return
+      }
       this.$store.dispatch('cloudRecord/seek', {
         mediaServerId: this.streamInfo.mediaServerId,
         app: this.streamInfo.app,
         stream: this.streamInfo.stream,
-        seek: playSeekValue,
+        seek: ms,
         schema: 'fmp4'
       })
-        .then((data) => {
-          this.playerTime = playSeekValue
+        .then(() => {
+          this.playerTime = ms
           if (callback) {
-            callback(playSeekValue)
+            callback(ms)
           }
         })
         .catch((error) => {
@@ -311,28 +412,66 @@ export default {
         })
     },
     showPlayTimeChange(val) {
-      console.log(val)
       if (Number(val)) {
         this.playerTime = Number(val)
       }
     },
     playingChange(val) {
       this.playing = val
-      if (!val) {
-        this.stopPLay()
-      }
     }
   }
 }
 </script>
 
 <style>
-.cloud-record-playBox {
-  width: 100%;
-  background-color: #000000;
+.cloud-record-player-root {
+  height: 100%;
+  min-height: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  background-color: #111;
+}
+.cloud-record-playBox {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background-color: #000;
+  display: flex;
+  align-items: stretch;
   justify-content: center;
+  overflow: hidden;
+}
+.cloud-record-playBox > * {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.cloud-record-native-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  outline: none;
+}
+/* 弹窗：画幅与窗口同宽，默认 16:9，metadata 后按真实比例覆盖 */
+.cloud-record-play-stage .cloud-record-player-root {
+  height: auto;
+}
+.cloud-record-play-stage .cloud-record-playBox {
+  flex: none;
+  aspect-ratio: 16 / 9;
+  height: auto;
+}
+.cloud-record-play-stage .cloud-record-native-video {
+  object-fit: contain;
+}
+.cloud-record-control-bar {
+  height: 40px;
+  flex-shrink: 0;
+  background-color: #2a2a2a;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  border-top: 1px solid #333;
 }
 .cloud-record-record-play-control {
   height: 32px;
@@ -340,9 +479,8 @@ export default {
   display: inline-block;
   width: fit-content;
   padding: 0 10px;
-  -webkit-box-shadow: 0 0 10px #262626;
-  box-shadow: 0 0 10px #262626;
-  background-color: #262626;
+  box-shadow: none;
+  background-color: transparent;
   margin: 4px 0;
 }
 .cloud-record-record-play-control-item {
@@ -352,7 +490,7 @@ export default {
   margin-right: 2px;
 }
 .cloud-record-record-play-control-item:hover {
-  color: #1f83e6;
+  color: #4da3ff;
 }
 .cloud-record-record-play-control-speed {
   font-weight: bold;
@@ -362,9 +500,10 @@ export default {
 .cloud-record-player-option-box {
   height: 20px;
   width: 100%;
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: 70px auto 70px;
-  background-color: rgb(0, 0, 0);
+  background-color: #1f1f1f;
 }
 .cloud-record-time-process {
   width: 100%;
@@ -410,9 +549,5 @@ export default {
     1px -1px 0 black,
     -1px 1px 0 black,
     1px 1px 0 black;
-}
-.record-play-control-player {
-  width: fit-content;
-  height: 32px;
 }
 </style>

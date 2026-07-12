@@ -25,10 +25,31 @@ func NewCloudRecordHandler(svc *cloudrecordapp.Service, playTimeoutMs int) *Clou
 	return &CloudRecordHandler{svc: svc, playTimeoutSec: sec}
 }
 
+// parseTimeQueryMs 支持毫秒时间戳或 "yyyy-MM-dd HH:mm:ss" / "yyyy-MM-dd"。
+func parseTimeQueryMs(raw string) int64 {
+	if raw == "" {
+		return 0
+	}
+	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return n
+	}
+	layouts := []string{
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+		time.RFC3339,
+	}
+	for _, layout := range layouts {
+		if t, err := time.ParseInLocation(layout, raw, time.Local); err == nil {
+			return t.UnixMilli()
+		}
+	}
+	return 0
+}
+
 func (h *CloudRecordHandler) List(c *gin.Context) {
 	page, count := parsePageCount(c)
-	startTime, _ := strconv.ParseInt(c.Query("startTime"), 10, 64)
-	endTime, _ := strconv.ParseInt(c.Query("endTime"), 10, 64)
+	startTime := parseTimeQueryMs(c.Query("startTime"))
+	endTime := parseTimeQueryMs(c.Query("endTime"))
 	asc := c.Query("ascOrder") == "true"
 	list, total, err := h.svc.List(page, count, c.Query("app"), c.Query("stream"), c.Query("query"),
 		c.Query("callId"), c.Query("mediaServerId"), startTime, endTime, asc)

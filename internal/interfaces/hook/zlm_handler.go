@@ -1,8 +1,6 @@
 package hook
 
 import (
-	"strconv"
-
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
 	mediaapp "zero-web-kit/internal/application/media"
 	playapp "zero-web-kit/internal/application/play"
@@ -144,8 +142,8 @@ func (h *Handler) onStreamNoneReader(c *gin.Context) {
 		stream = c.Query("stream")
 	}
 	closeStream := h.streamOnDemand
-	if app == "rtp" {
-		// GB28181 RTP/PS 由 Go SIP 会话管理；切换播放器时会出现短暂无人观看，勿关流
+	if mediaapp.IsGBLiveApp(app) {
+		// GB28181 由 Go SIP 会话管理；切换播放器时会出现短暂无人观看，勿关流
 		closeStream = false
 	} else if app == "onvif" {
 		// ONVIF RTSP 拉流代理：切换 Jessibuca/H265web 时会有短暂无人观看，勿关流
@@ -169,14 +167,13 @@ func (h *Handler) onRecordMp4(c *gin.Context) {
 		h.onOK(c)
 		return
 	}
-	timeLen, _ := strconv.ParseFloat(c.PostForm("time_len"), 64)
-	fileSize, _ := strconv.ParseInt(c.PostForm("file_size"), 10, 64)
-	startTime, _ := strconv.ParseInt(c.PostForm("start_time"), 10, 64)
+	fields := readRecordMp4Fields(c)
 	param := cloudrecordapp.RecordHookParam{
-		App: c.PostForm("app"), Stream: c.PostForm("stream"),
-		FileName: c.PostForm("file_name"), FilePath: c.PostForm("file_path"),
-		FileSize: fileSize, Folder: c.PostForm("folder"),
-		StartTime: startTime, TimeLen: timeLen,
+		App: fields.App, Stream: fields.Stream,
+		FileName: fields.FileName, FilePath: fields.FilePath, URL: fields.URL,
+		FileSize: fields.FileSize, Folder: fields.Folder,
+		StartTime: fields.StartTime, TimeLen: fields.TimeLen,
+		CallID: fields.CallID, MediaServerID: fields.MediaServerID,
 	}
 	_ = h.cloudRecord.OnRecordMp4(param)
 	h.onOK(c)

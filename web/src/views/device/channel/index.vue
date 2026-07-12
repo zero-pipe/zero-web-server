@@ -420,7 +420,7 @@ export default {
       const deviceId = this.deviceId
       const channelId = itemData.deviceId
 
-      this.$router.push(`/cloudRecord/detail/rtp/${deviceId}_${channelId}`)
+      this.$router.push(`/cloudRecord/detail/live/${deviceId}_${channelId}`)
     },
     startRecord: function(itemData) {
       this.$store.dispatch('device/deviceRecord', {

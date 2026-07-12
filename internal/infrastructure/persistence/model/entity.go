@@ -124,42 +124,42 @@ type GBDevice struct {
 func (GBDevice) TableName() string { return "zws_device" }
 
 type GBDeviceChannel struct {
-	ID                int     `gorm:"column:id;primaryKey;autoIncrement"`
-	DeviceID          string  `gorm:"column:device_id;size:50"`
-	Name              string  `gorm:"column:name;size:255"`
-	Manufacturer      string  `gorm:"column:manufacturer;size:255"`
-	Model             string  `gorm:"column:model;size:255"`
-	Owner             string  `gorm:"column:owner;size:50"`
-	CivilCode         string  `gorm:"column:civil_code;size:50"`
-	Block             string  `gorm:"column:block;size:50"`
-	Address           string  `gorm:"column:address;size:50"`
-	Parental          int     `gorm:"column:parental"`
-	ParentID          string  `gorm:"column:parent_id;size:50"`
-	Status            string  `gorm:"column:status;size:50"`
-	Longitude         float64 `gorm:"column:longitude"`
-	Latitude          float64 `gorm:"column:latitude"`
-	PTZType           int     `gorm:"column:ptz_type"`
-	BusinessGroupID   string  `gorm:"column:business_group_id;size:255"`
-	CreateTime        string  `gorm:"column:create_time;size:50"`
-	UpdateTime        string  `gorm:"column:update_time;size:50"`
-	SubCount          int     `gorm:"column:sub_count"`
-	HasAudio          bool    `gorm:"column:has_audio"`
-	ChannelType       int     `gorm:"column:channel_type;default:0"`
-	MapLevel          int     `gorm:"column:map_level;default:0"`
-	GBDeviceID        string  `gorm:"column:gb_device_id;size:50"`
-	GBName            string  `gorm:"column:gb_name;size:255"`
-	GBManufacturer    string  `gorm:"column:gb_manufacturer;size:255"`
-	GBModel           string  `gorm:"column:gb_model;size:255"`
-	GBCivilCode       string  `gorm:"column:gb_civil_code;size:255"`
-	GBParentID        string  `gorm:"column:gb_parent_id;size:255"`
-	GBStatus          string  `gorm:"column:gb_status;size:50"`
-	GBLongitude       float64 `gorm:"column:gb_longitude"`
-	GBLatitude        float64 `gorm:"column:gb_latitude"`
-	GBBusinessGroupID string  `gorm:"column:gb_business_group_id;size:50"`
-	GBPTZType         int     `gorm:"column:gb_ptz_type"`
-	RecordPlanID      int     `gorm:"column:record_plan_id"`
-	DataType          int     `gorm:"column:data_type"`
-	DataDeviceID      int     `gorm:"column:data_device_id"`
+	ID                int     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	DeviceID          string  `gorm:"column:device_id;size:50" json:"deviceId"`
+	Name              string  `gorm:"column:name;size:255" json:"name"`
+	Manufacturer      string  `gorm:"column:manufacturer;size:255" json:"manufacturer"`
+	Model             string  `gorm:"column:model;size:255" json:"model"`
+	Owner             string  `gorm:"column:owner;size:50" json:"owner"`
+	CivilCode         string  `gorm:"column:civil_code;size:50" json:"civilCode"`
+	Block             string  `gorm:"column:block;size:50" json:"block"`
+	Address           string  `gorm:"column:address;size:50" json:"address"`
+	Parental          int     `gorm:"column:parental" json:"parental"`
+	ParentID          string  `gorm:"column:parent_id;size:50" json:"parentId"`
+	Status            string  `gorm:"column:status;size:50" json:"status"`
+	Longitude         float64 `gorm:"column:longitude" json:"longitude"`
+	Latitude          float64 `gorm:"column:latitude" json:"latitude"`
+	PTZType           int     `gorm:"column:ptz_type" json:"ptzType"`
+	BusinessGroupID   string  `gorm:"column:business_group_id;size:255" json:"businessGroupId"`
+	CreateTime        string  `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime        string  `gorm:"column:update_time;size:50" json:"updateTime"`
+	SubCount          int     `gorm:"column:sub_count" json:"subCount"`
+	HasAudio          bool    `gorm:"column:has_audio" json:"hasAudio"`
+	ChannelType       int     `gorm:"column:channel_type;default:0" json:"channelType"`
+	MapLevel          int     `gorm:"column:map_level;default:0" json:"mapLevel"`
+	GBDeviceID        string  `gorm:"column:gb_device_id;size:50" json:"gbDeviceId"`
+	GBName            string  `gorm:"column:gb_name;size:255" json:"gbName"`
+	GBManufacturer    string  `gorm:"column:gb_manufacturer;size:255" json:"gbManufacturer"`
+	GBModel           string  `gorm:"column:gb_model;size:255" json:"gbModel"`
+	GBCivilCode       string  `gorm:"column:gb_civil_code;size:255" json:"gbCivilCode"`
+	GBParentID        string  `gorm:"column:gb_parent_id;size:255" json:"gbParentId"`
+	GBStatus          string  `gorm:"column:gb_status;size:50" json:"gbStatus"`
+	GBLongitude       float64 `gorm:"column:gb_longitude" json:"gbLongitude"`
+	GBLatitude        float64 `gorm:"column:gb_latitude" json:"gbLatitude"`
+	GBBusinessGroupID string  `gorm:"column:gb_business_group_id;size:50" json:"gbBusinessGroupId"`
+	GBPTZType         int     `gorm:"column:gb_ptz_type" json:"gbPtzType"`
+	RecordPlanID      int     `gorm:"column:record_plan_id" json:"recordPlanId"`
+	DataType          int     `gorm:"column:data_type" json:"dataType"`
+	DataDeviceID      int     `gorm:"column:data_device_id" json:"dataDeviceId"`
 }
 
 func (GBDeviceChannel) TableName() string { return "zws_device_channel" }
@@ -269,42 +269,43 @@ type StreamProxy struct {
 func (StreamProxy) TableName() string { return "zws_stream_proxy" }
 
 type CloudRecord struct {
-	ID            int     `gorm:"column:id;primaryKey;autoIncrement"`
-	App           string  `gorm:"column:app;size:255"`
-	Stream        string  `gorm:"column:stream;size:255"`
-	CallID        string  `gorm:"column:call_id;size:255"`
-	StartTime     int64   `gorm:"column:start_time"`
-	EndTime       int64   `gorm:"column:end_time"`
-	MediaServerID string  `gorm:"column:media_server_id;size:50"`
-	ServerID      string  `gorm:"column:server_id;size:50"`
-	FileName      string  `gorm:"column:file_name;size:255"`
-	Folder        string  `gorm:"column:folder;size:255"`
-	FilePath      string  `gorm:"column:file_path;size:512"`
-	Collect       bool    `gorm:"column:collect"`
-	FileSize      int64   `gorm:"column:file_size"`
-	TimeLen       float64 `gorm:"column:time_len"`
+	ID            int     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	App           string  `gorm:"column:app;size:255" json:"app"`
+	Stream        string  `gorm:"column:stream;size:255" json:"stream"`
+	CallID        string  `gorm:"column:call_id;size:255" json:"callId"`
+	StartTime     int64   `gorm:"column:start_time" json:"startTime"`
+	EndTime       int64   `gorm:"column:end_time" json:"endTime"`
+	MediaServerID string  `gorm:"column:media_server_id;size:50" json:"mediaServerId"`
+	ServerID      string  `gorm:"column:server_id;size:50" json:"serverId"`
+	FileName      string  `gorm:"column:file_name;size:255" json:"fileName"`
+	Folder        string  `gorm:"column:folder;size:255" json:"folder"`
+	FilePath      string  `gorm:"column:file_path;size:512" json:"filePath"`
+	PlayURL       string  `gorm:"column:play_url;size:768" json:"playUrl"`
+	Collect       bool    `gorm:"column:collect" json:"collect"`
+	FileSize      int64   `gorm:"column:file_size" json:"fileSize"`
+	TimeLen       float64 `gorm:"column:time_len" json:"timeLen"`
 }
 
 func (CloudRecord) TableName() string { return "zws_cloud_record" }
 
 type RecordPlan struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement"`
-	Snap       bool   `gorm:"column:snap"`
-	Name       string `gorm:"column:name;size:255"`
-	CreateTime string `gorm:"column:create_time;size:50"`
-	UpdateTime string `gorm:"column:update_time;size:50"`
+	ID         int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Snap       bool   `gorm:"column:snap" json:"snap"`
+	Name       string `gorm:"column:name;size:255" json:"name"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
 func (RecordPlan) TableName() string { return "zws_record_plan" }
 
 type RecordPlanItem struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement"`
-	Start      int    `gorm:"column:start"`
-	Stop       int    `gorm:"column:stop"`
-	WeekDay    int    `gorm:"column:week_day"`
-	PlanID     int    `gorm:"column:plan_id"`
-	CreateTime string `gorm:"column:create_time;size:50"`
-	UpdateTime string `gorm:"column:update_time;size:50"`
+	ID         int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Start      int    `gorm:"column:start" json:"start"`
+	Stop       int    `gorm:"column:stop" json:"stop"`
+	WeekDay    int    `gorm:"column:week_day" json:"weekDay"`
+	PlanID     int    `gorm:"column:plan_id" json:"planId"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
 func (RecordPlanItem) TableName() string { return "zws_record_plan_item" }

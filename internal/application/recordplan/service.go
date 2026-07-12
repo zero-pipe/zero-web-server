@@ -11,6 +11,7 @@ import (
 	"zero-web-kit/internal/domain/shared"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/model"
+	applog "zero-web-kit/pkg/log"
 )
 
 type PlanView struct {
@@ -20,10 +21,10 @@ type PlanView struct {
 }
 
 type LinkParam struct {
-	PlanID      int     `json:"planId"`
-	ChannelIds  []int   `json:"channelIds"`
-	DeviceDbIds []int   `json:"deviceDbIds"`
-	AllLink     *bool   `json:"allLink"`
+	PlanID      int   `json:"planId"`
+	ChannelIds  []int `json:"channelIds"`
+	DeviceDbIds []int `json:"deviceDbIds"`
+	AllLink     *bool `json:"allLink"`
 }
 
 type Service struct {
@@ -31,8 +32,16 @@ type Service struct {
 	play     *playapp.Service
 	publish  *mediaapp.PublishRegistry
 	serverID string
-	active   sync.Map // channelID -> streamKey
+	active   sync.Map // channelID -> streamKey "app/stream"
+	meta     sync.Map // channelID -> activeMeta
 	stopCh   chan struct{}
+}
+
+type activeMeta struct {
+	DeviceID   string
+	ChannelID  string
+	App        string
+	Stream     string
 }
 
 func NewService(repo *persistence.RecordPlanRepository, play *playapp.Service, publish *mediaapp.PublishRegistry, serverID string) *Service {
@@ -71,24 +80,27 @@ func (s *Service) tick() {
 	index := now.Hour()*60 + now.Minute()
 	channels, err := s.repo.QueryRecordingChannels(weekDay, index)
 	if err != nil {
+		applog.Warnf("[record-plan] query recording channels: %v", err)
 		return
 	}
 	need := make(map[int]model.GBDeviceChannel, len(channels))
 	for _, ch := range channels {
 		need[ch.ID] = ch
 	}
+	// 窗口外：主动停流
 	s.active.Range(func(k, v any) bool {
 		chID := k.(int)
-		if _, ok := need[chID]; !ok {
-			s.active.Delete(chID)
+		if _, ok := need[chID]; ok {
+			return true
 		}
+		s.stopRecord(chID)
 		return true
 	})
 	for _, ch := range need {
 		if _, ok := s.active.Load(ch.ID); ok {
 			continue
 		}
-		if ch.DataType != shared.ChannelDataTypeGB28181 || ch.DeviceID == "" {
+		if ch.DataType != shared.ChannelDataTypeGB28181 || ch.DeviceID == "" || ch.GBDeviceID == "" {
 			continue
 		}
 		go s.startRecord(ch)
@@ -96,7 +108,7 @@ func (s *Service) tick() {
 }
 
 func (s *Service) startRecord(ch model.GBDeviceChannel) {
-	app := "rtp"
+	app := mediaapp.LiveApp
 	stream := fmt.Sprintf("%s_%s", ch.DeviceID, ch.GBDeviceID)
 	s.publish.EnableMP4(app, stream)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -104,9 +116,35 @@ func (s *Service) startRecord(ch model.GBDeviceChannel) {
 	content, err := s.play.StartPlay(ctx, ch.DeviceID, ch.GBDeviceID)
 	if err != nil {
 		s.publish.DisableMP4(app, stream)
+		applog.Warnf("[record-plan] start play failed channel=%d %s/%s: %v", ch.ID, ch.DeviceID, ch.GBDeviceID, err)
 		return
 	}
-	s.active.Store(ch.ID, content.App+"/"+content.Stream)
+	keyApp, keyStream := app, stream
+	if content != nil && content.App != "" && content.Stream != "" {
+		keyApp, keyStream = content.App, content.Stream
+	}
+	s.active.Store(ch.ID, keyApp+"/"+keyStream)
+	s.meta.Store(ch.ID, activeMeta{
+		DeviceID: ch.DeviceID, ChannelID: ch.GBDeviceID,
+		App: keyApp, Stream: keyStream,
+	})
+	applog.Infof("[record-plan] recording start channel=%d stream=%s/%s", ch.ID, keyApp, keyStream)
+}
+
+func (s *Service) stopRecord(channelID int) {
+	v, ok := s.meta.Load(channelID)
+	s.active.Delete(channelID)
+	s.meta.Delete(channelID)
+	if !ok {
+		return
+	}
+	m := v.(activeMeta)
+	s.publish.DisableMP4(m.App, m.Stream)
+	if err := s.play.StopPlay(m.DeviceID, m.ChannelID); err != nil {
+		applog.Warnf("[record-plan] stop play failed channel=%d %s/%s: %v", channelID, m.DeviceID, m.ChannelID, err)
+	} else {
+		applog.Infof("[record-plan] recording stop channel=%d stream=%s/%s", channelID, m.App, m.Stream)
+	}
 }
 
 func (s *Service) Add(name string, items []model.RecordPlanItem) error {
@@ -169,6 +207,12 @@ func (s *Service) Link(param LinkParam) error {
 		} else {
 			err = s.repo.UnlinkAll(param.PlanID)
 		}
+	} else if len(param.DeviceDbIds) > 0 {
+		if param.PlanID == 0 {
+			err = s.repo.UnlinkChannelsByDevice(param.DeviceDbIds)
+		} else {
+			err = s.repo.LinkChannelsByDevice(param.PlanID, param.DeviceDbIds)
+		}
 	} else {
 		ids := param.ChannelIds
 		if len(ids) == 0 {
@@ -187,8 +231,8 @@ func (s *Service) Link(param LinkParam) error {
 	return nil
 }
 
-func (s *Service) ChannelList(page, count, planID int, query string, hasLink *bool) ([]model.GBDeviceChannel, int64, error) {
-	return s.repo.ChannelList(page, count, planID, query, hasLink)
+func (s *Service) ChannelList(page, count, planID int, query string, hasLink *bool, online, channelType string) ([]model.GBDeviceChannel, int64, error) {
+	return s.repo.ChannelList(page, count, planID, query, hasLink, online, channelType)
 }
 
 func (s *Service) Recording(app, stream string) bool {
@@ -225,7 +269,7 @@ func (s *Service) OnStreamDeparture(app, stream string) {
 	index := now.Hour()*60 + now.Minute()
 	channels, err := s.repo.QueryRecordingChannels(weekDay, index)
 	if err != nil {
-		s.active.Delete(channelID)
+		s.stopRecord(channelID)
 		return
 	}
 	var ch *model.GBDeviceChannel
@@ -236,8 +280,9 @@ func (s *Service) OnStreamDeparture(app, stream string) {
 		}
 	}
 	s.active.Delete(channelID)
+	s.meta.Delete(channelID)
+	s.publish.DisableMP4(app, stream)
 	if ch == nil {
-		s.publish.DisableMP4(app, stream)
 		return
 	}
 	go s.startRecord(*ch)

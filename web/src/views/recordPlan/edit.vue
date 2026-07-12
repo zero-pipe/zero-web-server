@@ -109,9 +109,9 @@ export default {
       if (recordPlan) {
         console.log(recordPlan)
         this.edit = true
-        this.planName = recordPlan.name
-        this.id = recordPlan.id
-        this.$store.dispatch('recordPlan/getPlan', recordPlan.id)
+        this.planName = recordPlan.name || recordPlan.Name
+        this.id = recordPlan.id || recordPlan.ID
+        this.$store.dispatch('recordPlan/getPlan', this.id)
           .then(data => {
             if (data && data.planItemList) {
               this.handPlanData(data.planItemList)

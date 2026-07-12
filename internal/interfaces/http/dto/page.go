@@ -44,6 +44,8 @@ type StreamContent struct {
 	MediaServerID string  `json:"mediaServerId"`
 	ServerID      string  `json:"serverId"`
 	Progress      float64 `json:"progress"`
+	Duration      float64 `json:"duration"` // 云端录像点播总时长（毫秒），前端进度条用
+	Mp4           string  `json:"mp4,omitempty"` // HTTP-MP4 直出（云录像优先）
 }
 
 type AudioBroadcastResult struct {

@@ -137,8 +137,11 @@ export default {
         this.initData()
       })
     },
+    planId: function(plan) {
+      return plan.id || plan.ID
+    },
     link: function(plan) {
-      this.$refs.linkChannelRecord.openDialog(plan.id, () => {
+      this.$refs.linkChannelRecord.openDialog(this.planId(plan), () => {
         this.initData()
       })
     },
@@ -148,7 +151,7 @@ export default {
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        this.$store.dispatch('recordPlan/deletePlan', plan.id)
+        this.$store.dispatch('recordPlan/deletePlan', this.planId(plan))
           .then(() => {
             this.$message({
               showClose: true,

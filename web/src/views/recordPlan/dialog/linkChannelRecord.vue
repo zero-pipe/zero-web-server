@@ -75,7 +75,14 @@
             <el-table-column label="类型" min-width="100">
               <template v-slot:default="scope">
                 <div slot="reference" class="name-wrapper">
-                  <el-tag size="medium" effect="plain" type="success" :style="$channelTypeList[scope.row.dataType].style">{{ $channelTypeList[scope.row.dataType].name }}</el-tag>
+                  <el-tag
+                    v-if="$channelTypeList[scope.row.dataType]"
+                    size="medium"
+                    effect="plain"
+                    type="success"
+                    :style="$channelTypeList[scope.row.dataType].style"
+                  >{{ $channelTypeList[scope.row.dataType].name }}</el-tag>
+                  <span v-else>-</span>
                 </div>
               </template>
             </el-table-column>
@@ -207,7 +214,8 @@ export default {
     add: function(row) {
       const channels = []
       for (let i = 0; i < this.multipleSelection.length; i++) {
-        channels.push(this.multipleSelection[i].gbId)
+        const id = this.multipleSelection[i].id || this.multipleSelection[i].gbId
+        if (id != null) channels.push(id)
       }
       if (channels.length === 0) {
         this.$message.info({
@@ -263,7 +271,8 @@ export default {
     remove: function(row) {
       const channels = []
       for (let i = 0; i < this.multipleSelection.length; i++) {
-        channels.push(this.multipleSelection[i].gbId)
+        const id = this.multipleSelection[i].id || this.multipleSelection[i].gbId
+        if (id != null) channels.push(id)
       }
       if (channels.length === 0) {
         this.$message.info({

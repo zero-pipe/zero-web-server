@@ -1,45 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Zero Media">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="ZWS">
   <defs>
-    <linearGradient id="bg" x1="18%" y1="8%" x2="88%" y2="96%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e8f3fc"/>
+    <linearGradient id="tile" x1="12%" y1="0%" x2="88%" y2="100%">
+      <stop offset="0%" stop-color="#1976d2"/>
+      <stop offset="55%" stop-color="#1565c0"/>
+      <stop offset="100%" stop-color="#0d47a1"/>
     </linearGradient>
-    <linearGradient id="play" x1="0%" y1="20%" x2="100%" y2="80%">
-      <stop offset="0%" stop-color="#4dd0e1"/>
-      <stop offset="42%" stop-color="#29b6f6"/>
-      <stop offset="100%" stop-color="#1565c0"/>
-    </linearGradient>
-    <linearGradient id="wave" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4fc3f7"/>
-      <stop offset="100%" stop-color="#1565c0"/>
+    <linearGradient id="lens" x1="30%" y1="20%" x2="75%" y2="90%">
+      <stop offset="0%" stop-color="#e3f2fd"/>
+      <stop offset="100%" stop-color="#90caf9"/>
     </linearGradient>
   </defs>
 
-  <!-- tile with safe padding -->
-  <rect x="6" y="6" width="116" height="116" rx="24" fill="url(#bg)" stroke="#90caf9" stroke-width="2"/>
+  <!-- 平台主色圆角底，贴合侧栏蓝 -->
+  <rect x="6" y="6" width="116" height="116" rx="26" fill="url(#tile)"/>
 
-  <!-- CV corners inset so they don't collide with tile stroke -->
-  <g fill="none" stroke="#1e88e5" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
-    <path d="M26 44 V30 H40"/>
-    <path d="M102 44 V30 H88"/>
-    <path d="M26 84 V98 H40"/>
-    <path d="M102 84 V98 H88"/>
+  <!-- 机器视觉取景框 -->
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+    <path d="M28 46 V30 H44"/>
+    <path d="M100 46 V30 H84"/>
+    <path d="M28 82 V98 H44"/>
+    <path d="M100 82 V98 H84"/>
   </g>
 
-  <!-- play: keep tip left of waves so arcs stay inside tile -->
-  <path d="M36 36 L36 92 L82 64 Z" fill="url(#play)"/>
+  <!-- 扫描线 -->
+  <line x1="34" y1="64" x2="94" y2="64" stroke="#bbdefb" stroke-width="1.6" opacity="0.55"/>
 
-  <!-- circular iris -->
-  <circle cx="54" cy="64" r="11.5" fill="#0d47a1"/>
-  <circle cx="54" cy="64" r="11.5" fill="none" stroke="#81d4fa" stroke-width="1.4" opacity="0.55"/>
-  <circle cx="54" cy="64" r="6.4" fill="none" stroke="#e3f2fd" stroke-width="2"/>
-  <circle cx="54" cy="64" r="3" fill="#e3f2fd"/>
-  <circle cx="54" cy="64" r="1.35" fill="#1565c0"/>
+  <!-- 视觉镜头 / 虹膜 -->
+  <circle cx="64" cy="64" r="22" fill="none" stroke="#e3f2fd" stroke-width="3.2" opacity="0.9"/>
+  <circle cx="64" cy="64" r="15" fill="url(#lens)" opacity="0.35"/>
+  <circle cx="64" cy="64" r="15" fill="none" stroke="#ffffff" stroke-width="2.4"/>
+  <circle cx="64" cy="64" r="8.5" fill="#0d47a1"/>
+  <circle cx="64" cy="64" r="8.5" fill="none" stroke="#bbdefb" stroke-width="1.4"/>
+  <circle cx="64" cy="64" r="3.4" fill="#ffffff"/>
 
-  <!-- waves fully inside rounded tile (max ~108) -->
-  <g fill="none" stroke="url(#wave)" stroke-linecap="round">
-    <path d="M88 52 A16 16 0 0 1 88 76" stroke-width="3.6"/>
-    <path d="M96 44 A26 26 0 0 1 96 84" stroke-width="3.3" opacity="0.88"/>
-    <path d="M104 36 A36 36 0 0 1 104 92" stroke-width="3" opacity="0.72"/>
+  <!-- AI 检测框（目标识别角标） -->
+  <g fill="none" stroke="#b3e5fc" stroke-width="2.4" stroke-linecap="square" opacity="0.98">
+    <path d="M76 40 h12 M76 40 v12"/>
+    <path d="M100 40 h-12 M100 40 v12"/>
+    <path d="M76 64 h12 M76 64 v-12"/>
+    <path d="M100 64 h-12 M100 64 v-12"/>
   </g>
 </svg>

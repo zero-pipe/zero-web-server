@@ -1,6 +1,6 @@
 module.exports = {
 
-  title: 'Zero Web Kit',
+  title: 'ZWS',
 
   /**
    * @type {boolean} true | false

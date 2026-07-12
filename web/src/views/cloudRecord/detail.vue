@@ -69,7 +69,7 @@ export default {
   },
   data() {
     return {
-      showSidebar: false,
+      showSidebar: true,
       app: this.$route.params.app,
       stream: this.$route.params.stream,
       mediaServerId: null,
@@ -243,7 +243,9 @@ export default {
           this.total = data.total
           this.detailFiles = this.detailFiles.concat(data.list)
           const temp = new Set()
-          this.initTime = Number.parseInt(this.detailFiles[0].startTime)
+          if (this.detailFiles.length > 0) {
+            this.initTime = Number.parseInt(this.detailFiles[0].startTime)
+          }
           for (let i = 0; i < this.detailFiles.length; i++) {
             temp.add(this.detailFiles[i].mediaServerId)
             this.timeSegments.push({
@@ -259,6 +261,10 @@ export default {
           if (this.mediaServerList.length === 1) {
             this.mediaServerId = this.mediaServerList[0]
           }
+          // 首次进入详情：展开列表后自动点播第一条，避免只有控件没有画面
+          if (this.chooseFileIndex === null && this.detailFiles.length > 0) {
+            this.$nextTick(() => this.chooseFile(0))
+          }
         })
         .catch((error) => {
           console.log(error)
@@ -270,6 +276,8 @@ export default {
     },
     chooseFile(index) {
       this.chooseFileIndex = index
+      this.lastBtnDiable = index <= 0
+      this.nextBtnDiable = index >= this.detailFiles.length - 1
       this.playRecord()
     },
     playRecord() {

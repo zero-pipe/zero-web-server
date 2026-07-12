@@ -242,7 +242,10 @@ export default {
           this.$refs.playerDialog.openDialog(data, row.timeLen, row.startTime)
         })
         .catch((error) => {
-          console.log(error)
+          this.$message.error({
+            showClose: true,
+            message: typeof error === 'string' ? error : (error.message || '点播失败')
+          })
         })
         .finally(() => {
           this.playLoading = false
@@ -356,9 +359,3 @@ export default {
   }
 }
 </script>
-
-<style>
-.el-dialog__body {
-  padding: 20px 0 0 0 !important;
-}
-</style>

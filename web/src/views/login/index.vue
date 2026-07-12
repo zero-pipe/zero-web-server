@@ -210,8 +210,8 @@
             <img :src="brandLogo" alt="" class="zero-logo-img">
           </div>
           <div class="panel-brand-text">
-            <h3>Zero</h3>
-            <p>Zero Media AIoT Platform</p>
+            <h3>ZWS</h3>
+            <p>机器视觉媒体平台</p>
           </div>
         </div>
 

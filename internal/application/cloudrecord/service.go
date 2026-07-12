@@ -3,8 +3,7 @@ package cloudrecord
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"path/filepath"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -16,13 +15,11 @@ import (
 	"zero-web-kit/internal/interfaces/http/dto"
 )
 
-const loadMP4App = "mp4_record"
-
 type Service struct {
 	repo         *persistence.CloudRecordRepository
 	mediaServers *mediaserverapp.Service
 	serverID     string
-	sessions     sync.Map // streamKey -> chan *dto.StreamContent
+	sessions     sync.Map // 保留：兼容旧 FLV load 会话（现已不走）
 }
 
 func NewService(repo *persistence.CloudRecordRepository, mediaServers *mediaserverapp.Service, serverID string) *Service {
@@ -36,18 +33,27 @@ func (s *Service) OnRecordMp4(param RecordHookParam) error {
 			mediaID = node.ID()
 		}
 	}
+	// ZMS/ZLM hook: start_time 为秒，time_len 为秒；前端按毫秒展示/播放
+	startMs, timeLenMs := normalizeRecordTimes(param.StartTime, param.TimeLen)
+	playURL := strings.TrimSpace(param.URL)
+	if playURL == "" {
+		playURL = s.synthesizePlayURL(mediaID, param.FilePath)
+	} else {
+		playURL = s.rewritePlayURLHost(mediaID, playURL)
+	}
 	rec := &model.CloudRecord{
 		App:           param.App,
 		Stream:        param.Stream,
-		StartTime:     param.StartTime,
-		EndTime:       param.StartTime + int64(param.TimeLen),
+		StartTime:     startMs,
+		EndTime:       startMs + int64(timeLenMs),
 		MediaServerID: mediaID,
 		ServerID:      s.serverID,
 		FileName:      param.FileName,
 		Folder:        param.Folder,
 		FilePath:      param.FilePath,
+		PlayURL:       playURL,
 		FileSize:      param.FileSize,
-		TimeLen:       param.TimeLen,
+		TimeLen:       timeLenMs,
 	}
 	if param.CallID != "" {
 		rec.CallID = param.CallID
@@ -55,11 +61,40 @@ func (s *Service) OnRecordMp4(param RecordHookParam) error {
 	return s.repo.Create(rec)
 }
 
+// normalizeRecordTimes 统一为毫秒；兼容库内已按秒写入的旧数据（列表展示时也会再规范化）。
+func normalizeRecordTimes(startSecOrMs int64, timeLenSecOrMs float64) (startMs int64, timeLenMs float64) {
+	startMs = startSecOrMs
+	if startMs > 0 && startMs < 1_000_000_000_000 { // < 2001-09-09 in ms → 按秒
+		startMs *= 1000
+	}
+	timeLenMs = timeLenSecOrMs
+	if timeLenMs > 0 && timeLenMs < 100_000 { // 切片通常 < 1 天(秒)；已是毫秒则 >= 100000
+		timeLenMs *= 1000
+	}
+	return startMs, timeLenMs
+}
+
+func normalizeCloudRecord(rec *model.CloudRecord) {
+	if rec == nil {
+		return
+	}
+	startMs, timeLenMs := normalizeRecordTimes(rec.StartTime, rec.TimeLen)
+	rec.StartTime = startMs
+	rec.TimeLen = timeLenMs
+	if rec.EndTime > 0 && rec.EndTime < 1_000_000_000_000 {
+		rec.EndTime *= 1000
+	}
+	if rec.EndTime <= 0 && startMs > 0 {
+		rec.EndTime = startMs + int64(timeLenMs)
+	}
+}
+
 type RecordHookParam struct {
 	App           string
 	Stream        string
 	FileName      string
 	FilePath      string
+	URL           string // HTTP-MP4 点播地址（ZMS on_record_mp4.url）
 	FileSize      int64
 	Folder        string
 	StartTime     int64
@@ -69,7 +104,15 @@ type RecordHookParam struct {
 }
 
 func (s *Service) List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]model.CloudRecord, int64, error) {
-	return s.repo.List(page, count, app, stream, query, callID, mediaServerID, startTime, endTime, asc)
+	rows, total, err := s.repo.List(page, count, app, stream, query, callID, mediaServerID, startTime, endTime, asc)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range rows {
+		normalizeCloudRecord(&rows[i])
+		s.ensurePlayURL(&rows[i])
+	}
+	return rows, total, nil
 }
 
 func (s *Service) DateList(app, stream, mediaServerID string, year, month int) ([]string, error) {
@@ -77,6 +120,25 @@ func (s *Service) DateList(app, stream, mediaServerID string, year, month int) (
 }
 
 func (s *Service) Delete(ids []int) error {
+	rows, err := s.repo.ListByIDs(ids)
+	if err != nil {
+		return err
+	}
+	for _, rec := range rows {
+		if rec.FilePath == "" {
+			continue
+		}
+		node, resolveErr := s.mediaServers.Resolve(rec.MediaServerID)
+		if resolveErr != nil {
+			node, resolveErr = s.mediaServers.SelectMinimumLoad()
+		}
+		if resolveErr != nil || node == nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		_, _ = node.Client.DeleteRecordFile(ctx, rec.FilePath)
+		cancel()
+	}
 	return s.repo.Delete(ids)
 }
 
@@ -94,21 +156,39 @@ func (s *Service) GetPlayPath(recordID int) (map[string]string, error) {
 	}
 	cfg := node.MediaConfig()
 	base := cfg.BaseURL()
-	return map[string]string{
-		"httpPath": rec.FilePath,
-		"download": fmt.Sprintf("%s/index/api/downloadFile?secret=%s&file_path=%s", base, cfg.Secret, rec.FilePath),
-		"filePath": rec.FilePath,
-	}, nil
+	download := fmt.Sprintf("%s/index/api/downloadFile?secret=%s&file_path=%s",
+		base, url.QueryEscape(cfg.Secret), url.QueryEscape(rec.FilePath))
+	s.ensurePlayURL(rec)
+	out := map[string]string{
+		"httpPath":  download,
+		"httpsPath": download,
+		"download":  download,
+		"filePath":  rec.FilePath,
+	}
+	if rec.PlayURL != "" {
+		out["playUrl"] = rec.PlayURL
+		out["mp4"] = rec.PlayURL
+	}
+	return out, nil
 }
 
+// LoadRecord 云录像点播：直接返回已落库的 HTTP-MP4 URL，不再 loadMP4File/转 FLV。
 func (s *Service) LoadRecord(ctx context.Context, app, stream string, cloudRecordID int) (*dto.StreamContent, error) {
+	_ = ctx
 	rec, err := s.repo.GetByID(cloudRecordID)
 	if err != nil {
 		return nil, fmt.Errorf("录像不存在")
 	}
-	filePath := rec.FilePath
-	if filePath == "" {
-		return nil, fmt.Errorf("录像文件路径为空")
+	normalizeCloudRecord(rec)
+	s.ensurePlayURL(rec)
+	if rec.PlayURL == "" {
+		return nil, fmt.Errorf("录像播放地址为空")
+	}
+	if app == "" {
+		app = rec.App
+	}
+	if stream == "" {
+		stream = rec.Stream
 	}
 	node, err := s.mediaServers.Resolve(rec.MediaServerID)
 	if err != nil {
@@ -117,49 +197,37 @@ func (s *Service) LoadRecord(ctx context.Context, app, stream string, cloudRecor
 			return nil, err
 		}
 	}
-	name := strings.TrimSuffix(rec.FileName, filepath.Ext(rec.FileName))
-	buildStream := fmt.Sprintf("%s_%s_%s_%s", app, stream, name, randomSuffix())
-	done := make(chan *dto.StreamContent, 1)
-	key := streamKey(loadMP4App, buildStream)
-	s.sessions.Store(key, done)
-	defer s.sessions.Delete(key)
-
-	resp, err := node.Client.LoadMP4File(ctx, loadMP4App, buildStream, filePath)
-	if err != nil {
-		return nil, err
+	content := &dto.StreamContent{
+		App:           app,
+		Stream:        stream,
+		IP:            node.StreamIP(),
+		Mp4:           rec.PlayURL,
+		Flv:           rec.PlayURL, // 兼容旧播放器字段；前端优先 mp4 + 原生 video
+		MediaServerID: node.ID(),
+		ServerID:      s.serverID,
+		Progress:      rec.TimeLen,
+		Duration:      rec.TimeLen,
 	}
-	if resp.Code != 0 {
-		return nil, fmt.Errorf("loadMP4File: %s", resp.Msg)
-	}
-	s.mediaServers.BindStream(loadMP4App, buildStream, node.ID())
-
-	select {
-	case content := <-done:
-		content.Progress = rec.TimeLen
-		return content, nil
-	case <-time.After(15 * time.Second):
-		return s.buildStreamContent(loadMP4App, buildStream, node), nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return content, nil
 }
 
 func (s *Service) Seek(app, stream, mediaServerID string, seek float64, schema string) error {
-	node, err := s.mediaServers.ResolveForStream(app, stream, mediaServerID)
-	if err != nil {
-		return err
-	}
-	_, err = node.Client.SeekRecordStamp(context.Background(), app, stream, seek, schema)
-	return err
+	// HTTP-MP4 由浏览器 Range/currentTime 本地 seek，无需 ZMS demux seek
+	_ = app
+	_ = stream
+	_ = mediaServerID
+	_ = seek
+	_ = schema
+	return nil
 }
 
 func (s *Service) Speed(app, stream, mediaServerID string, speed int, schema string) error {
-	node, err := s.mediaServers.ResolveForStream(app, stream, mediaServerID)
-	if err != nil {
-		return err
-	}
-	_, err = node.Client.SetRecordSpeed(context.Background(), app, stream, speed, schema)
-	return err
+	_ = app
+	_ = stream
+	_ = mediaServerID
+	_ = speed
+	_ = schema
+	return nil
 }
 
 func (s *Service) AddTask(app, stream, mediaServerID, startTime, endTime string) (string, error) {
@@ -196,13 +264,61 @@ func (s *Service) buildStreamContent(app, stream string, node *mediaserverapp.No
 	}
 }
 
-func streamKey(app, stream string) string { return app + "/" + stream }
-
-func randomSuffix() string {
-	const letters = "abcdefghijklmnopqrstuvwxyz"
-	b := make([]byte, 6)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+func (s *Service) ensurePlayURL(rec *model.CloudRecord) {
+	if rec == nil || rec.PlayURL != "" {
+		return
 	}
-	return string(b)
+	rec.PlayURL = s.synthesizePlayURL(rec.MediaServerID, rec.FilePath)
 }
+
+func (s *Service) synthesizePlayURL(mediaServerID, filePath string) string {
+	rel := filePathToRecordHTTPRel(filePath)
+	if rel == "" {
+		return ""
+	}
+	node, err := s.mediaServers.Resolve(mediaServerID)
+	if err != nil {
+		node, err = s.mediaServers.SelectMinimumLoad()
+		if err != nil || node == nil {
+			return ""
+		}
+	}
+	return strings.TrimRight(node.MediaConfig().BaseURL(), "/") + "/" + rel
+}
+
+// rewritePlayURLHost 用平台媒体节点流 IP 替换 ZMS 回调里的 host（避免 127.0.0.1）。
+func (s *Service) rewritePlayURLHost(mediaServerID, playURL string) string {
+	u, err := url.Parse(playURL)
+	if err != nil || u.Path == "" {
+		return playURL
+	}
+	node, err := s.mediaServers.Resolve(mediaServerID)
+	if err != nil {
+		node, err = s.mediaServers.SelectMinimumLoad()
+		if err != nil || node == nil {
+			return playURL
+		}
+	}
+	base := strings.TrimRight(node.MediaConfig().BaseURL(), "/")
+	return base + u.Path
+}
+
+func filePathToRecordHTTPRel(filePath string) string {
+	if filePath == "" {
+		return ""
+	}
+	norm := strings.ReplaceAll(filePath, "\\", "/")
+	idx := strings.Index(norm, "/record/")
+	if idx >= 0 {
+		return strings.TrimPrefix(norm[idx:], "/")
+	}
+	if strings.HasPrefix(norm, "record/") {
+		return norm
+	}
+	if strings.HasPrefix(norm, "./record/") {
+		return norm[2:]
+	}
+	return ""
+}
+
+func streamKey(app, stream string) string { return app + "/" + stream }

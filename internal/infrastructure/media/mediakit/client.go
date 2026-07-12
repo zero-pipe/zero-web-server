@@ -96,7 +96,15 @@ func (c *Client) LoadMP4File(ctx context.Context, app, stream, filePath string) 
 		"file_path":   {filePath},
 		"file_repeat": {"0"},
 	}
-	return c.post(ctx, "loadMP4File", params)
+	// ZMS webapi 目前只解析 URL query；与 openRtpServer 一样走 GET
+	return c.get(ctx, "loadMP4File", params)
+}
+
+func (c *Client) DeleteRecordFile(ctx context.Context, filePath string) (*APIResponse, error) {
+	params := url.Values{
+		"file_path": {filePath},
+	}
+	return c.get(ctx, "deleteRecordFile", params)
 }
 
 func (c *Client) SeekRecordStamp(ctx context.Context, app, stream string, stamp float64, schema string) (*APIResponse, error) {
@@ -110,7 +118,7 @@ func (c *Client) SeekRecordStamp(ctx context.Context, app, stream string, stamp 
 		"stamp":  {strconv.FormatFloat(stamp, 'f', -1, 64)},
 		"schema": {schema},
 	}
-	return c.post(ctx, "seekRecordStamp", params)
+	return c.get(ctx, "seekRecordStamp", params)
 }
 
 func (c *Client) SetRecordSpeed(ctx context.Context, app, stream string, speed int, schema string) (*APIResponse, error) {
@@ -124,7 +132,7 @@ func (c *Client) SetRecordSpeed(ctx context.Context, app, stream string, speed i
 		"speed":  {strconv.Itoa(speed)},
 		"schema": {schema},
 	}
-	return c.post(ctx, "setRecordSpeed", params)
+	return c.get(ctx, "setRecordSpeed", params)
 }
 
 func (c *Client) CloseStreams(ctx context.Context, vhost, app, stream string) (*APIResponse, error) {

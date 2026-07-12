@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
+	mediaapp "zero-web-kit/internal/application/media"
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domaindevice "zero-web-kit/internal/domain/device"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
@@ -58,7 +59,7 @@ func (s *Service) StartPlay(ctx context.Context, deviceID, channelDeviceID strin
 }
 
 func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel) (*dto.StreamContent, error) {
-	app := "rtp"
+	app := mediaapp.LiveApp
 	stream := fmt.Sprintf("%s_%s", device.DeviceID, channel.GBDeviceID)
 
 	node, err := s.mediaServers.ResolveForStream(app, stream, device.MediaServerID)
@@ -147,7 +148,7 @@ func gbLiveStreamReady(info *mediakit.StreamMediaInfo) bool {
 }
 
 func (s *Service) StopPlay(deviceID, channelDeviceID string) error {
-	app := "rtp"
+	app := mediaapp.LiveApp
 	stream := fmt.Sprintf("%s_%s", deviceID, channelDeviceID)
 	_ = s.sip.CloseInviteSession(stream)
 	client := s.clientForStream(app, stream)

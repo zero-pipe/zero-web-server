@@ -5,7 +5,7 @@ function resolve(dir) {
   return path.join(__dirname, dir)
 }
 
-const name = defaultSettings.title || "Zero Web Kit" // page title
+const name = defaultSettings.title || "ZWS" // page title
 
 // If your port is set to 80,
 // use administrator privileges to execute the command line.

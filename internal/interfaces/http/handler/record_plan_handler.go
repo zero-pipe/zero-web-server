@@ -102,10 +102,36 @@ func (h *RecordPlanHandler) ChannelList(c *gin.Context) {
 		b := v == "true"
 		hasLink = &b
 	}
-	list, total, err := h.svc.ChannelList(page, count, planID, c.Query("query"), hasLink)
+	list, total, err := h.svc.ChannelList(page, count, planID, c.Query("query"), hasLink, c.Query("online"), c.Query("channelType"))
 	if err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
 	}
-	response.OK(c, dto.NewPageInfo(list, total, page, count))
+	// 前端表格用 gb* 字段；库里 gb_name 为空时回退 name，并补 gbId 兼容旧前端
+	views := make([]recordChannelView, 0, len(list))
+	for i := range list {
+		views = append(views, newRecordChannelView(list[i]))
+	}
+	response.OK(c, dto.NewPageInfo(views, total, page, count))
+}
+
+type recordChannelView struct {
+	model.GBDeviceChannel
+	GbID int `json:"gbId"`
+}
+
+func newRecordChannelView(ch model.GBDeviceChannel) recordChannelView {
+	if ch.GBName == "" {
+		ch.GBName = ch.Name
+	}
+	if ch.GBDeviceID == "" {
+		ch.GBDeviceID = ch.DeviceID
+	}
+	if ch.GBManufacturer == "" {
+		ch.GBManufacturer = ch.Manufacturer
+	}
+	if ch.GBStatus == "" {
+		ch.GBStatus = ch.Status
+	}
+	return recordChannelView{GBDeviceChannel: ch, GbID: ch.ID}
 }

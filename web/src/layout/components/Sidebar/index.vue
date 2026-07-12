@@ -7,7 +7,7 @@
     <div class="primary-rail">
       <div class="brand" @click="$router.push('/map')">
         <img v-if="logo" :src="logo" class="brand-logo" alt="logo">
-        <span v-if="!isCollapse" class="brand-text">Zero</span>
+        <span v-if="!isCollapse" class="brand-text">ZWS</span>
       </div>
       <el-scrollbar class="primary-scroll">
         <div

@@ -2,6 +2,8 @@ package persistence
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
 	"time"
 
 	"zero-web-kit/internal/domain/shared"
@@ -223,6 +225,15 @@ func (r *CloudRecordRepository) Delete(ids []int) error {
 	return r.db.Where("id IN ?", ids).Delete(&model.CloudRecord{}).Error
 }
 
+func (r *CloudRecordRepository) ListByIDs(ids []int) ([]model.CloudRecord, error) {
+	var rows []model.CloudRecord
+	if len(ids) == 0 {
+		return rows, nil
+	}
+	err := r.db.Where("id IN ?", ids).Find(&rows).Error
+	return rows, err
+}
+
 func (r *CloudRecordRepository) GetByID(id int) (*model.CloudRecord, error) {
 	var m model.CloudRecord
 	if err := r.db.First(&m, id).Error; err != nil {
@@ -252,10 +263,23 @@ func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID
 		q = q.Where("media_server_id = ?", mediaServerID)
 	}
 	if startTime > 0 {
-		q = q.Where("start_time >= ?", startTime/1000)
+		// 前端多为毫秒；库内可能是秒或毫秒
+		sec, ms := startTime, startTime
+		if startTime >= 1_000_000_000_000 {
+			sec = startTime / 1000
+		} else {
+			ms = startTime * 1000
+		}
+		q = q.Where("start_time >= ? OR start_time >= ?", sec, ms)
 	}
 	if endTime > 0 {
-		q = q.Where("start_time <= ?", endTime/1000)
+		sec, ms := endTime, endTime
+		if endTime >= 1_000_000_000_000 {
+			sec = endTime / 1000
+		} else {
+			ms = endTime * 1000
+		}
+		q = q.Where("start_time <= ? OR start_time <= ?", sec, ms)
 	}
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
@@ -277,8 +301,11 @@ func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID
 func (r *CloudRecordRepository) DateList(app, stream, mediaServerID string, year, month int) ([]string, error) {
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	end := start.AddDate(0, 1, 0)
+	startSec, endSec := start.Unix(), end.Unix()
+	startMs, endMs := start.UnixMilli(), end.UnixMilli()
 	q := r.db.Model(&model.CloudRecord{}).Where("app = ? AND stream = ?", app, stream).
-		Where("start_time >= ? AND start_time < ?", start.Unix(), end.Unix())
+		Where("(start_time >= ? AND start_time < ?) OR (start_time >= ? AND start_time < ?)",
+			startSec, endSec, startMs, endMs)
 	if mediaServerID != "" {
 		q = q.Where("media_server_id = ?", mediaServerID)
 	}
@@ -288,14 +315,19 @@ func (r *CloudRecordRepository) DateList(app, stream, mediaServerID string, year
 	}
 	set := make(map[string]struct{})
 	for _, row := range rows {
-		d := time.Unix(row.StartTime, 0).Format("2006-01-02")
+		ts := row.StartTime
+		if ts >= 1_000_000_000_000 { // 毫秒
+			ts = ts / 1000
+		}
+		d := time.Unix(ts, 0).In(time.Local).Format("2006-01-02")
 		set[d] = struct{}{}
 	}
-	dates := make([]string, 0, len(set))
+	out := make([]string, 0, len(set))
 	for d := range set {
-		dates = append(dates, d)
+		out = append(out, d)
 	}
-	return dates, nil
+	sort.Strings(out)
+	return out, nil
 }
 
 // --- Record Plan ---
@@ -383,6 +415,18 @@ func (r *RecordPlanRepository) UnlinkChannels(channelIDs []int) error {
 	return r.db.Model(&model.GBDeviceChannel{}).Where("id IN ?", channelIDs).Update("record_plan_id", 0).Error
 }
 
+func (r *RecordPlanRepository) LinkChannelsByDevice(planID int, deviceDbIDs []int) error {
+	return r.db.Model(&model.GBDeviceChannel{}).
+		Where("data_type = ? AND data_device_id IN ?", shared.ChannelDataTypeGB28181, deviceDbIDs).
+		Update("record_plan_id", planID).Error
+}
+
+func (r *RecordPlanRepository) UnlinkChannelsByDevice(deviceDbIDs []int) error {
+	return r.db.Model(&model.GBDeviceChannel{}).
+		Where("data_type = ? AND data_device_id IN ?", shared.ChannelDataTypeGB28181, deviceDbIDs).
+		Update("record_plan_id", 0).Error
+}
+
 func (r *RecordPlanRepository) LinkAll(planID int) error {
 	return r.db.Model(&model.GBDeviceChannel{}).Where("data_type = ?", shared.ChannelDataTypeGB28181).
 		Update("record_plan_id", planID).Error
@@ -392,23 +436,33 @@ func (r *RecordPlanRepository) UnlinkAll(planID int) error {
 	return r.db.Model(&model.GBDeviceChannel{}).Where("record_plan_id = ?", planID).Update("record_plan_id", 0).Error
 }
 
-func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query string, hasLink *bool) ([]model.GBDeviceChannel, int64, error) {
+func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query string, hasLink *bool, online, channelType string) ([]model.GBDeviceChannel, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
 	if count <= 0 {
 		count = 15
 	}
-	q := r.db.Model(&model.GBDeviceChannel{})
+	q := r.db.Model(&model.GBDeviceChannel{}).Where("data_type = ?", shared.ChannelDataTypeGB28181)
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("name LIKE ? OR gb_device_id LIKE ?", like, like)
+		q = q.Where("(name LIKE ? OR gb_name LIKE ? OR gb_device_id LIKE ? OR device_id LIKE ?)", like, like, like, like)
 	}
 	if hasLink != nil {
 		if *hasLink {
 			q = q.Where("record_plan_id = ?", planID)
 		} else {
-			q = q.Where("record_plan_id = 0 OR record_plan_id IS NULL OR record_plan_id <> ?", planID)
+			q = q.Where("(record_plan_id = 0 OR record_plan_id IS NULL OR record_plan_id <> ?)", planID)
+		}
+	}
+	if online == "true" {
+		q = q.Where("UPPER(COALESCE(NULLIF(gb_status,''), status)) = ?", "ON")
+	} else if online == "false" {
+		q = q.Where("UPPER(COALESCE(NULLIF(gb_status,''), status)) <> ? OR (gb_status IS NULL AND status IS NULL)", "ON")
+	}
+	if channelType != "" {
+		if n, err := strconv.Atoi(channelType); err == nil {
+			q = q.Where("data_type = ?", n)
 		}
 	}
 	var total int64
