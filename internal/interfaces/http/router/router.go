@@ -110,7 +110,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	commonChannelHandler := handler.NewCommonChannelHandler(deps.CommonChannelSvc)
 	groupHandler := handler.NewGroupHandler(deps.GroupService)
 	regionHandler := handler.NewRegionHandler(deps.RegionService)
-	roleHandler := handler.NewRoleHandler(deps.UserRepo)
+	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
@@ -141,17 +141,26 @@ func Setup(r *gin.Engine, deps Deps) {
 	mediaHook.Register(hookGroup)
 
 	auth := r.Group("/api")
-	auth.Use(middleware.Auth(deps.JWT))
+	auth.Use(middleware.Auth(deps.JWT, deps.UserRepo))
 	{
 		auth.POST("/user/userInfo", userHandler.UserInfo)
-		auth.GET("/user/users", userHandler.ListUsers)
-		auth.POST("/user/add", userHandler.AddUser)
-		auth.DELETE("/user/delete", userHandler.DeleteUser)
 		auth.POST("/user/changePassword", userHandler.ChangePassword)
-		auth.POST("/user/changePasswordForAdmin", userHandler.ChangePasswordForAdmin)
-		auth.POST("/user/changePushKey", userHandler.ChangePushKey)
 
-		auth.GET("/role/all", roleHandler.All)
+		userMgmt := auth.Group("")
+		userMgmt.Use(middleware.RequireMenu("user"))
+		{
+			userMgmt.GET("/user/users", userHandler.ListUsers)
+			userMgmt.POST("/user/add", userHandler.AddUser)
+			userMgmt.DELETE("/user/delete", userHandler.DeleteUser)
+			userMgmt.POST("/user/changePasswordForAdmin", userHandler.ChangePasswordForAdmin)
+			userMgmt.POST("/user/changePushKey", userHandler.ChangePushKey)
+
+			userMgmt.GET("/role/all", roleHandler.All)
+			userMgmt.GET("/role/menus", roleHandler.Menus)
+			userMgmt.POST("/role/add", roleHandler.Add)
+			userMgmt.POST("/role/update", roleHandler.Update)
+			userMgmt.DELETE("/role/delete", roleHandler.Delete)
+		}
 
 		serverAPI := auth.Group("/server")
 		{

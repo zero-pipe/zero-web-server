@@ -390,7 +390,7 @@ CREATE TABLE IF NOT EXISTS zws_user_role
 (
     id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     name        VARCHAR(50) COMMENT '角色名称',
-    authority   VARCHAR(50) COMMENT '权限标识',
+    authority   VARCHAR(512) COMMENT '菜单权限：* 全部，或 JSON 数组如 ["map","live"]',
     create_time VARCHAR(50) COMMENT '创建时间',
     update_time VARCHAR(50) COMMENT '更新时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -427,13 +427,17 @@ CREATE TABLE IF NOT EXISTS zws_gb_sip_config
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
 
 -- 初始数据
+-- 初始化角色：管理员 / 运维 / 视频值班
+INSERT INTO zws_user_role
+VALUES (1, '管理员', '*', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+INSERT INTO zws_user_role
+VALUES (2, '运维', '["ops","system"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+INSERT INTO zws_user_role
+VALUES (3, '视频值班', '["map","live","record","alarm"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 -- 初始化管理员账号，账号admin 密码admin（MD5加密后）
 INSERT INTO zws_user
 VALUES (1, 'admin', '21232f297a57a5a743894a0e4a801fc3', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57',
         '3e80d1762a324d5b0ff636e0bd16f1e3');
--- 初始化管理员角色
-INSERT INTO zws_user_role
-VALUES (1, 'admin', '0', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 
 -- 通用分组表，存储行业或组织结构
 DROP TABLE IF EXISTS zws_common_group;

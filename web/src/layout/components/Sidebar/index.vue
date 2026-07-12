@@ -5,7 +5,7 @@
     :style="sidebarStyle"
   >
     <div class="primary-rail">
-      <div class="brand" @click="$router.push('/map')">
+      <div class="brand" @click="goHome">
         <img v-if="logo" :src="logo" class="brand-logo" alt="logo">
         <span v-if="!isCollapse" class="brand-text">ZWS</span>
       </div>
@@ -58,12 +58,12 @@
 <script>
 import { mapGetters } from 'vuex'
 import { primaryMenus, findPrimaryByPath } from '@/layout/menu'
+import { filterMenusByPerm } from '@/utils/permission'
 
 export default {
   name: 'Sidebar',
   data() {
     return {
-      menus: primaryMenus,
       activePrimary: null,
       logo: require('@/assets/brand/zero-logo-64.png'),
       resizing: false
@@ -71,6 +71,9 @@ export default {
   },
   computed: {
     ...mapGetters(['sidebar']),
+    menus() {
+      return filterMenusByPerm(primaryMenus, this.$store.getters.menus)
+    },
     isCollapse() {
       return !this.sidebar.opened
     },
@@ -101,9 +104,17 @@ export default {
     $route: {
       immediate: true,
       handler(route) {
-        this.activePrimary = findPrimaryByPath(route.path)
+        const all = this.menus
+        const hit = findPrimaryByPath(route.path)
+        // findPrimaryByPath 基于全量菜单；再落到当前可见菜单
+        this.activePrimary = all.find(m => m.id === (hit && hit.id)) || all[0] || null
         this.$store.dispatch('app/setSidebarWidth', this.totalWidth)
       }
+    },
+    menus() {
+      const all = this.menus
+      const hit = findPrimaryByPath(this.$route.path)
+      this.activePrimary = all.find(m => m.id === (hit && hit.id)) || all[0] || null
     },
     totalWidth(val) {
       this.$store.dispatch('app/setSidebarWidth', val)
@@ -116,6 +127,12 @@ export default {
     this.stopResize()
   },
   methods: {
+    goHome() {
+      const first = this.menus && this.menus[0]
+      if (!first) return
+      const path = first.path || (first.children && first.children[0] && first.children[0].path)
+      if (path) this.$router.push(path)
+    },
     isElIcon(icon) {
       return icon && icon.indexOf('el-icon') === 0
     },

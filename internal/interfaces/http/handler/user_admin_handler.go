@@ -1,29 +1,11 @@
 package handler
 
 import (
-	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/interfaces/http/dto"
 	"zero-web-kit/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
-
-type RoleHandler struct {
-	userRepo *persistence.UserRepository
-}
-
-func NewRoleHandler(userRepo *persistence.UserRepository) *RoleHandler {
-	return &RoleHandler{userRepo: userRepo}
-}
-
-func (h *RoleHandler) All(c *gin.Context) {
-	roles, err := h.userRepo.ListRoles()
-	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
-		return
-	}
-	response.OK(c, roles)
-}
 
 func (h *UserHandler) ListUsers(c *gin.Context) {
 	page, count := parsePageCount(c)

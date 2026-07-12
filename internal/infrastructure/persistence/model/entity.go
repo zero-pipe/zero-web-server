@@ -1,11 +1,11 @@
 package model
 
 type UserRole struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement"`
-	Name       string `gorm:"column:name;size:50"`
-	Authority  string `gorm:"column:authority;size:50"`
-	CreateTime string `gorm:"column:create_time;size:50"`
-	UpdateTime string `gorm:"column:update_time;size:50"`
+	ID         int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name       string `gorm:"column:name;size:50" json:"name"`
+	Authority  string `gorm:"column:authority;size:512" json:"authority"` // 菜单权限：* 或 JSON 数组
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
 func (UserRole) TableName() string { return "zws_user_role" }

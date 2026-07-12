@@ -61,6 +61,9 @@ func NewDB(cfg config.MySQLConfig) (*gorm.DB, error) {
 	if err := seedAdminIfEmpty(db); err != nil {
 		return nil, fmt.Errorf("seed admin: %w", err)
 	}
+	if err := seedDefaultRoles(db); err != nil {
+		return nil, fmt.Errorf("seed roles: %w", err)
+	}
 
 	applog.Info("mysql ready", "database", cfg.Database)
 	return db, nil
@@ -171,7 +174,7 @@ func seedAdminIfEmpty(db *gorm.DB) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	if roleCount == 0 {
 		role := &model.UserRole{
-			ID: 1, Name: "admin", Authority: "0",
+			ID: 1, Name: "管理员", Authority: "*",
 			CreateTime: now, UpdateTime: now,
 		}
 		if err := db.Create(role).Error; err != nil {
@@ -195,6 +198,48 @@ func seedAdminIfEmpty(db *gorm.DB) error {
 			return err
 		}
 		applog.Info("seeded default admin user", "username", "admin", "password", "admin")
+	}
+	return nil
+}
+
+// seedDefaultRoles 升级已有库：管理员权限归一、补齐预置角色。
+func seedDefaultRoles(db *gorm.DB) error {
+	now := time.Now().Format("2006-01-02 15:04:05")
+	_ = db.Model(&model.UserRole{}).Where("id = ?", 1).Updates(map[string]any{
+		"authority": "*", "update_time": now,
+	}).Error
+	_ = db.Model(&model.UserRole{}).Where("id = ? AND name = ?", 1, "admin").
+		Update("name", "管理员").Error
+
+	presets := []struct {
+		PreferID  int
+		Name      string
+		Authority string
+	}{
+		{2, "运维", `["ops","system"]`},
+		{3, "视频值班", `["map","live","record","alarm"]`},
+	}
+	for _, p := range presets {
+		var n int64
+		if err := db.Model(&model.UserRole{}).Where("name = ?", p.Name).Count(&n).Error; err != nil {
+			return err
+		}
+		if n > 0 {
+			continue
+		}
+		role := &model.UserRole{
+			ID: p.PreferID, Name: p.Name, Authority: p.Authority,
+			CreateTime: now, UpdateTime: now,
+		}
+		var idTaken int64
+		_ = db.Model(&model.UserRole{}).Where("id = ?", p.PreferID).Count(&idTaken).Error
+		if idTaken > 0 {
+			role.ID = 0
+		}
+		if err := db.Create(role).Error; err != nil {
+			return err
+		}
+		applog.Info("seeded role", "name", p.Name, "id", role.ID)
 	}
 	return nil
 }

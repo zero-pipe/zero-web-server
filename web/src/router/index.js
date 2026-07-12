@@ -259,7 +259,20 @@ export const constantRoutes = [
         path: '',
         name: 'User',
         component: () => import('@/views/user/index'),
-        meta: { title: '用户管理', icon: 'user' }
+        meta: { title: '用户列表', icon: 'user' }
+      }
+    ]
+  },
+  {
+    path: '/role',
+    component: Layout,
+    redirect: '/role',
+    children: [
+      {
+        path: '',
+        name: 'Role',
+        component: () => import('@/views/role/index'),
+        meta: { title: '角色管理', icon: 'el-icon-s-check' }
       }
     ]
   },

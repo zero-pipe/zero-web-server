@@ -19,19 +19,24 @@ type User struct {
 }
 
 type LoginUser struct {
-	Username    string `json:"username"`
-	AccessToken string `json:"accessToken"`
-	ServerID    string `json:"serverId"`
-	PushKey     string `json:"pushKey,omitempty"`
-	Role        *Role  `json:"role,omitempty"`
+	Username    string   `json:"username"`
+	AccessToken string   `json:"accessToken"`
+	ServerID    string   `json:"serverId"`
+	PushKey     string   `json:"pushKey,omitempty"`
+	Role        *Role    `json:"role,omitempty"`
+	Menus       []string `json:"menus"`
 }
 
-func NewLoginUser(u *User, token, serverID string) *LoginUser {
+func NewLoginUser(u *User, token, serverID string, menus []string) *LoginUser {
 	lu := &LoginUser{
 		Username:    u.Username,
 		AccessToken: token,
 		ServerID:    serverID,
 		PushKey:     u.PushKey,
+		Menus:       menus,
+	}
+	if lu.Menus == nil {
+		lu.Menus = []string{}
 	}
 	if u.Role != nil {
 		lu.Role = u.Role
@@ -47,4 +52,9 @@ type Repository interface {
 	Delete(id int) error
 	UpdatePassword(id int, password string) error
 	ChangePushKey(id int, pushKey string) error
+	ListRoles() ([]*Role, error)
+	CreateRole(name, authority string) (*Role, error)
+	UpdateRole(id int, name, authority string) error
+	DeleteRole(id int) error
+	CountUsersByRole(roleID int) (int64, error)
 }

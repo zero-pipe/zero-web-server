@@ -1,6 +1,7 @@
 /**
  * 双列侧栏菜单：一级业务域 + 二级功能页
  * path 与 vue-router 保持一致；hidden 路由不在此列出
+ * id 同时作为菜单权限码
  */
 export const primaryMenus = [
   {
@@ -77,7 +78,10 @@ export const primaryMenus = [
     id: 'user',
     title: '用户管理',
     icon: 'menu-user',
-    path: '/user'
+    children: [
+      { title: '用户列表', path: '/user', icon: 'user' },
+      { title: '角色管理', path: '/role', icon: 'el-icon-s-check' }
+    ]
   }
 ]
 

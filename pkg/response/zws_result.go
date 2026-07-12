@@ -1,10 +1,11 @@
 package response
 
 const (
-	CodeSuccess = 0
-	CodeError   = 100
-	CodeBadReq  = 400
-	CodeUnauth  = 401
+	CodeSuccess   = 0
+	CodeError     = 100
+	CodeBadReq    = 400
+	CodeUnauth    = 401
+	CodeForbidden = 403
 )
 
 type ZWSResult[T any] struct {

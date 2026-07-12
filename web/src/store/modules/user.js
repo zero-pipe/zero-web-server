@@ -17,7 +17,13 @@ import {
   removeToken,
   removeName,
   setServerId,
-  removeServerId
+  removeServerId,
+  getMenus,
+  setMenus,
+  removeMenus,
+  getRoleId,
+  setRoleId,
+  removeRoleId
 } from '@/utils/auth'
 import { resetRouter } from '@/router'
 
@@ -26,6 +32,8 @@ const getDefaultState = () => {
     token: getToken(),
     name: '',
     serverId: '',
+    menus: getMenus(),
+    roleId: getRoleId(),
     showConfirmBoxForLoginLose: true
   }
 }
@@ -45,13 +53,35 @@ const mutations = {
   SET_SERVER_ID: (state, serverId) => {
     state.serverId = serverId
   },
+  SET_MENUS: (state, menus) => {
+    state.menus = menus || []
+  },
+  SET_ROLE_ID: (state, roleId) => {
+    state.roleId = roleId || 0
+  },
   SET_CONFIRM_BOX: (state, status) => {
     state.showConfirmBoxForLoginLose = status
   }
 }
 
+function applyProfile(commit, data) {
+  const menus = (data && data.menus) || []
+  const roleId = (data && data.role && data.role.id) || 0
+  commit('SET_MENUS', menus)
+  commit('SET_ROLE_ID', roleId)
+  setMenus(menus)
+  setRoleId(roleId)
+  if (data && data.username) {
+    commit('SET_NAME', data.username)
+    setName(data.username)
+  }
+  if (data && data.serverId) {
+    commit('SET_SERVER_ID', data.serverId)
+    setServerId(data.serverId)
+  }
+}
+
 const actions = {
-  // user login
   login({ commit }, userInfo) {
     const { username, password } = userInfo
     return new Promise((resolve, reject) => {
@@ -61,25 +91,23 @@ const actions = {
       }).then(response => {
         const { data } = response
         commit('SET_TOKEN', data.accessToken)
-        commit('SET_NAME', data.username)
-        commit('SET_SERVER_ID', data.serverId)
         commit('SET_CONFIRM_BOX', true)
         setToken(data.accessToken)
-        setName(data.username)
-        setServerId(data.serverId)
-        resolve()
+        applyProfile(commit, data)
+        resolve(data)
       }).catch(error => {
         reject(error)
       })
     })
   },
-  // user logout
   logout({ commit, state }) {
     return new Promise((resolve, reject) => {
       logout(state.token).then(() => {
         removeToken()
         removeServerId()
         removeName()
+        removeMenus()
+        removeRoleId()
         resetRouter()
         commit('RESET_STATE')
         resolve()
@@ -89,10 +117,11 @@ const actions = {
     })
   },
 
-  // remove token
   resetToken({ commit }) {
     return new Promise(resolve => {
-      removeToken() // must remove  token  first
+      removeToken()
+      removeMenus()
+      removeRoleId()
       commit('RESET_STATE')
       resolve()
     })
@@ -102,6 +131,7 @@ const actions = {
     return new Promise((resolve, reject) => {
       getUserInfo().then(response => {
         const { data } = response
+        applyProfile(commit, data)
         resolve(data)
       }).catch(error => {
         reject(error)
@@ -112,66 +142,48 @@ const actions = {
   changePushKey({ commit }, params) {
     return new Promise((resolve, reject) => {
       changePushKey(params).then(response => {
-        const { data } = response
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+        resolve(response.data)
+      }).catch(reject)
     })
   },
 
   queryList({ commit }, params) {
     return new Promise((resolve, reject) => {
       queryList(params).then(response => {
-        const { data } = response
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+        resolve(response.data)
+      }).catch(reject)
     })
   },
 
   removeById({ commit }, id) {
     return new Promise((resolve, reject) => {
       removeById(id).then(response => {
-        const { data } = response
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+        resolve(response.data)
+      }).catch(reject)
     })
   },
 
   add({ commit }, params) {
     return new Promise((resolve, reject) => {
       add(params).then(response => {
-        const { data } = response
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+        resolve(response.data)
+      }).catch(reject)
     })
   },
 
   changePassword({ commit }, params) {
     return new Promise((resolve, reject) => {
       changePassword(params).then(response => {
-        const { data } = response
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+        resolve(response.data)
+      }).catch(reject)
     })
   },
 
   changePasswordForAdmin({ commit }, params) {
     return new Promise((resolve, reject) => {
       changePasswordForAdmin(params).then(response => {
-        const { data } = response
-        resolve(data)
-      }).catch(error => {
-        reject(error)
-      })
+        resolve(response.data)
+      }).catch(reject)
     })
   },
   closeConfirmBoxForLoginLose({ commit }) {
@@ -185,4 +197,3 @@ export default {
   mutations,
   actions
 }
-

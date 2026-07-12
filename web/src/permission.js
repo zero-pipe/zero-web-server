@@ -2,44 +2,63 @@ import router from './router'
 import store from './store'
 import NProgress from 'nprogress' // progress bar
 import 'nprogress/nprogress.css' // progress bar style
-import { getToken, getName, getServerId } from '@/utils/auth' // get token from cookie
+import { getToken, getName, getServerId, getMenus } from '@/utils/auth'
 import getPageTitle from '@/utils/get-page-title'
+import { canAccessPath, firstAllowedPath } from '@/utils/permission'
 
-NProgress.configure({ showSpinner: false }) // NProgress Configuration
+NProgress.configure({ showSpinner: false })
 
-const whiteList = ['/login', '/play/share'] // no redirect whitelist
+const whiteList = ['/login', '/play/share']
 
 router.beforeEach(async(to, from, next) => {
-  // start progress bar
   NProgress.start()
-
-  // set page title
   document.title = getPageTitle(to.meta.title)
 
-  // determine whether the user has logged in
   const hasToken = getToken()
 
   if (hasToken) {
     if (to.path === '/login') {
-      // if is logged in, redirect to the home page
-      next({ path: '/' })
+      next({ path: firstAllowedPath(store.getters.menus || getMenus()) })
       NProgress.done()
-    } else {
-      const hasGetUserInfo = store.getters.name
-      if (!hasGetUserInfo) {
-        store.commit('user/SET_NAME', getName())
-        store.commit('user/SET_SERVER_ID', getServerId())
-      }
-      next()
+      return
     }
-  } else {
-    /* has no token*/
 
+    if (!store.getters.name) {
+      store.commit('user/SET_NAME', getName())
+      store.commit('user/SET_SERVER_ID', getServerId())
+    }
+
+    // 刷新后 menus 可能为空，拉一次用户信息
+    let menus = store.getters.menus
+    if (!menus || !menus.length) {
+      try {
+        const data = await store.dispatch('user/getUserInfo')
+        menus = (data && data.menus) || []
+      } catch (e) {
+        await store.dispatch('user/resetToken')
+        next(`/login?redirect=${to.path}`)
+        NProgress.done()
+        return
+      }
+    }
+
+    if (to.path === '/' || to.path === '') {
+      next({ path: firstAllowedPath(menus) })
+      NProgress.done()
+      return
+    }
+
+    if (!canAccessPath(menus, to.path)) {
+      next({ path: firstAllowedPath(menus), replace: true })
+      NProgress.done()
+      return
+    }
+
+    next()
+  } else {
     if (whiteList.indexOf(to.path) !== -1) {
-      // in the free login whitelist, go directly
       next()
     } else {
-      // other pages that do not have permission to access are redirected to the login page.
       next(`/login?redirect=${to.path}`)
       NProgress.done()
     }
@@ -47,6 +66,5 @@ router.beforeEach(async(to, from, next) => {
 })
 
 router.afterEach(() => {
-  // finish progress bar
   NProgress.done()
 })
