@@ -20,20 +20,117 @@ import (
 )
 
 type View struct {
-	GbID         int     `json:"gbId"`
-	GbDeviceId   string  `json:"gbDeviceId"`
-	GbName       string  `json:"gbName"`
-	DeviceId     string  `json:"deviceId"`
-	DataType     int     `json:"dataType"`
-	DataDeviceId int     `json:"dataDeviceId"`
-	Name         string  `json:"name"`
-	Status       string  `json:"gbStatus"`
-	PTZType      int     `json:"ptzType"`
-	Longitude    float64 `json:"longitude"`
-	GbLongitude  float64 `json:"gbLongitude"`
-	Latitude     float64 `json:"gbLatitude"`
-	HasAudio     bool    `json:"hasAudio"`
-	RecordPlanId int     `json:"recordPlanId"`
+	GbID               int       `json:"gbId"`
+	GbDeviceId         string    `json:"gbDeviceId"`
+	GbName             string    `json:"gbName"`
+	GbManufacturer     string    `json:"gbManufacturer"`
+	GbModel            string    `json:"gbModel"`
+	GbStatus           string    `json:"gbStatus"`
+	GbParentId         string    `json:"gbParentId"`
+	GbBusinessGroupId  string    `json:"gbBusinessGroupId"`
+	GbParental         int       `json:"gbParental"`
+	GbPtzType          int       `json:"gbPtzType"`
+	DeviceId           string    `json:"deviceId"`
+	DataType           int       `json:"dataType"`
+	DataDeviceId       int       `json:"dataDeviceId"`
+	Name               string    `json:"name"`
+	Status             string    `json:"status"`
+	PTZType            int       `json:"ptzType"`
+	Longitude          FlexFloat `json:"longitude"`
+	GbLongitude        FlexFloat `json:"gbLongitude"`
+	Latitude           FlexFloat `json:"latitude"`
+	GbLatitude         FlexFloat `json:"gbLatitude"`
+	HasAudio           bool      `json:"hasAudio"`
+	RecordPlanId       int       `json:"recordPlanId"`
+}
+
+func toView(ch *domainchannel.Channel) View {
+	return View{
+		GbID:              ch.ID,
+		GbDeviceId:        ch.GBDeviceID,
+		GbName:            ch.Name,
+		GbManufacturer:    ch.Manufacturer,
+		GbModel:           ch.Model,
+		GbStatus:          ch.Status,
+		GbParentId:        ch.ParentID,
+		GbBusinessGroupId: ch.BusinessGroupID,
+		GbParental:        ch.Parental,
+		GbPtzType:         ch.PTZType,
+		DeviceId:          ch.DeviceID,
+		DataType:          ch.DataType,
+		DataDeviceId:      ch.DataDeviceID,
+		Name:              ch.Name,
+		Status:            ch.Status,
+		PTZType:           ch.PTZType,
+		Longitude:         FlexFloat(ch.Longitude),
+		GbLongitude:       FlexFloat(ch.Longitude),
+		Latitude:          FlexFloat(ch.Latitude),
+		GbLatitude:        FlexFloat(ch.Latitude),
+		HasAudio:          ch.HasAudio,
+	}
+}
+
+func (s *Service) Update(v *View) error {
+	ch, err := s.channels.GetByID(v.GbID)
+	if err != nil {
+		return err
+	}
+	if v.GbName != "" {
+		ch.Name = v.GbName
+	} else if v.Name != "" {
+		ch.Name = v.Name
+	}
+	if v.GbDeviceId != "" {
+		ch.GBDeviceID = v.GbDeviceId
+	}
+	if v.GbStatus != "" {
+		ch.Status = v.GbStatus
+	}
+	if v.GbManufacturer != "" {
+		ch.Manufacturer = v.GbManufacturer
+	}
+	if v.GbModel != "" {
+		ch.Model = v.GbModel
+	}
+
+	// 保留业务分组挂载；仅当表单显式填写父节点/业务组时才改
+	parentID := ch.ParentID
+	bizGroup := ch.BusinessGroupID
+	if p := strings.TrimSpace(v.GbParentId); p != "" {
+		parentID = p
+	}
+	if b := strings.TrimSpace(v.GbBusinessGroupId); b != "" {
+		bizGroup = b
+	}
+
+	lon := v.GbLongitude.Float64()
+	if lon == 0 {
+		lon = v.Longitude.Float64()
+	}
+	lat := v.GbLatitude.Float64()
+	if lat == 0 {
+		lat = v.Latitude.Float64()
+	}
+	ch.Longitude = lon
+	ch.Latitude = lat
+
+	ptz := v.GbPtzType
+	if ptz == 0 {
+		ptz = v.PTZType
+	}
+	if ptz != 0 {
+		ch.PTZType = ptz
+	}
+
+	return s.channels.Update(&model.GBDeviceChannel{
+		ID: ch.ID, DeviceID: ch.DeviceID, GBDeviceID: ch.GBDeviceID, Name: ch.Name,
+		Manufacturer: ch.Manufacturer, Model: ch.Model,
+		Longitude: ch.Longitude, Latitude: ch.Latitude, PTZType: ch.PTZType,
+		Status: ch.Status, DataType: ch.DataType, DataDeviceID: ch.DataDeviceID,
+		ParentID: parentID, GBParentID: parentID,
+		BusinessGroupID: bizGroup, GBBusinessGroupID: bizGroup,
+		CreateTime: ch.CreateTime,
+	})
 }
 
 type Service struct {
@@ -54,16 +151,6 @@ func NewService(
 	onvif *onvifapp.Service,
 ) *Service {
 	return &Service{channels: ch, groups: groups, play: play, playback: playback, ptz: ptz, onvif: onvif}
-}
-
-func toView(ch *domainchannel.Channel) View {
-	return View{
-		GbID: ch.ID, GbDeviceId: ch.GBDeviceID, GbName: ch.Name, DeviceId: ch.DeviceID,
-		DataType: ch.DataType, DataDeviceId: ch.DataDeviceID, Name: ch.Name,
-		Status: ch.Status, PTZType: ch.PTZType,
-		Longitude: ch.Longitude, GbLongitude: ch.Longitude,
-		Latitude: ch.Latitude, HasAudio: ch.HasAudio,
-	}
 }
 
 func (s *Service) GetOne(id int) (*View, error) {
@@ -99,28 +186,6 @@ func (s *Service) ListFiltered(page, count int, query string, channelType *int, 
 		out[i] = toView(ch)
 	}
 	return out, total, nil
-}
-
-func (s *Service) Update(v *View) error {
-	ch, err := s.channels.GetByID(v.GbID)
-	if err != nil {
-		return err
-	}
-	if v.GbName != "" {
-		ch.Name = v.GbName
-	}
-	if v.GbDeviceId != "" {
-		ch.GBDeviceID = v.GbDeviceId
-	}
-	ch.Longitude = v.GbLongitude
-	ch.Latitude = v.Latitude
-	ch.PTZType = v.PTZType
-	return s.channels.Update(&model.GBDeviceChannel{
-		ID: ch.ID, DeviceID: ch.DeviceID, GBDeviceID: ch.GBDeviceID, Name: ch.Name,
-		Longitude: ch.Longitude, Latitude: ch.Latitude, PTZType: ch.PTZType,
-		DataType: ch.DataType, DataDeviceID: ch.DataDeviceID, Status: ch.Status,
-		CreateTime: ch.CreateTime,
-	})
 }
 
 func (s *Service) Play(channelID int) (*dto.StreamContent, error) {

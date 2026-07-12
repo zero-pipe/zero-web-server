@@ -252,7 +252,6 @@
 import channelCode from './../dialog/channelCode'
 import ChooseCivilCode from '../dialog/chooseCivilCode.vue'
 import ChooseGroup from '../dialog/chooseGroup.vue'
-import diff from '../../utils/diff'
 import ResetChannel from './../dialog/resetChannel.vue'
 
 export default {
@@ -317,16 +316,13 @@ export default {
             this.form.gbDownloadSpeed = this.form.gbDownloadSpeedArray.join('/')
           }
           this.form.enableBroadcast = this.form.enableBroadcastForBool ? 1 : 0
-          // 判断哪些字段变化
-          let diffData = diff(this.dataForm, this.form)
-          diffData['gbId'] = this.form.gbId
-
-          console.log(diffData)
-          console.log(this.dataForm)
-          console.log(this.form)
+          // 提交完整表单（经纬度等 el-input 为字符串，后端已兼容）
+          const payload = Object.assign({}, this.form, { gbId: this.form.gbId })
+          delete payload.enableBroadcastForBool
+          delete payload.gbDownloadSpeedArray
 
           if (this.form.gbId) {
-            this.$store.dispatch('commonChanel/update', diffData)
+            this.$store.dispatch('commonChanel/update', payload)
               .then(data => {
                 this.$message.success({
                   showClose: true,

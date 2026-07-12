@@ -211,17 +211,43 @@ func (r *ChannelRepository) Update(m *model.GBDeviceChannel) error {
 	m.UpdateTime = nowTimeStr()
 	// 勿用 Save 全字段覆盖：会把未赋值的 gb_name/gb_status 写成空串，
 	// 树查询 COALESCE(gb_name, name) 遇到 '' 不会回退到 name，导致分屏/地图无名。
-	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", m.ID).Updates(map[string]interface{}{
-		"name":         m.Name,
-		"gb_name":      m.Name,
-		"gb_device_id": m.GBDeviceID,
-		"longitude":    m.Longitude,
-		"gb_longitude": m.Longitude,
-		"latitude":     m.Latitude,
-		"gb_latitude":  m.Latitude,
-		"ptz_type":     m.PTZType,
-		"update_time":  m.UpdateTime,
-	}).Error
+	m.UpdateTime = nowTimeStr()
+	// 勿用 Save 全字段覆盖：会把未赋值的 gb_name/gb_status 写成空串。
+	// 业务分组挂载字段仅在有值时更新，避免编辑经纬度等把 gb_parent_id 清掉。
+	updates := map[string]interface{}{
+		"name":            m.Name,
+		"gb_name":         m.Name,
+		"gb_device_id":    m.GBDeviceID,
+		"manufacturer":    m.Manufacturer,
+		"gb_manufacturer": firstNonEmpty(m.GBManufacturer, m.Manufacturer),
+		"model":           m.Model,
+		"gb_model":        firstNonEmpty(m.GBModel, m.Model),
+		"status":          m.Status,
+		"gb_status":       firstNonEmpty(m.GBStatus, m.Status),
+		"longitude":       m.Longitude,
+		"gb_longitude":    m.Longitude,
+		"latitude":        m.Latitude,
+		"gb_latitude":     m.Latitude,
+		"ptz_type":        m.PTZType,
+		"gb_ptz_type":     m.PTZType,
+		"update_time":     m.UpdateTime,
+	}
+	if pid := firstNonEmpty(m.GBParentID, m.ParentID); pid != "" {
+		updates["gb_parent_id"] = pid
+	}
+	if biz := firstNonEmpty(m.GBBusinessGroupID, m.BusinessGroupID); biz != "" {
+		updates["gb_business_group_id"] = biz
+	}
+	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", m.ID).Updates(updates).Error
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func (r *ChannelRepository) ListCommon(page, count int, query string, channelType *int, online *bool, hasRecordPlan *bool) ([]*domainchannel.Channel, int64, error) {
@@ -566,24 +592,34 @@ func toDomainChannel(m *model.GBDeviceChannel) *domainchannel.Channel {
 	if m.GBPTZType > 0 {
 		ptz = m.GBPTZType
 	}
+	// 业务分组挂载看 gb_parent_id；parent_id 多为设备目录同步字段
+	parentID := strings.TrimSpace(m.GBParentID)
+	if parentID == "" {
+		parentID = strings.TrimSpace(m.ParentID)
+	}
+	bizGroup := strings.TrimSpace(m.GBBusinessGroupID)
+	if bizGroup == "" {
+		bizGroup = strings.TrimSpace(m.BusinessGroupID)
+	}
 	return &domainchannel.Channel{
-		ID:           m.ID,
-		DeviceID:     m.DeviceID,
-		DataType:     m.DataType,
-		DataDeviceID: m.DataDeviceID,
-		GBDeviceID:   strings.TrimSpace(m.GBDeviceID),
-		Name:         name,
-		Manufacturer: m.Manufacturer,
-		Model:        m.Model,
-		Status:       status,
-		PTZType:      ptz,
-		Parental:     m.Parental,
-		ParentID:     m.ParentID,
-		Longitude:    lon,
-		Latitude:     lat,
-		HasAudio:     m.HasAudio,
-		SubCount:     m.SubCount,
-		CreateTime:   m.CreateTime,
-		UpdateTime:   m.UpdateTime,
+		ID:              m.ID,
+		DeviceID:        m.DeviceID,
+		DataType:        m.DataType,
+		DataDeviceID:    m.DataDeviceID,
+		GBDeviceID:      strings.TrimSpace(m.GBDeviceID),
+		Name:            name,
+		Manufacturer:    m.Manufacturer,
+		Model:           m.Model,
+		Status:          status,
+		PTZType:         ptz,
+		Parental:        m.Parental,
+		ParentID:        parentID,
+		BusinessGroupID: bizGroup,
+		Longitude:       lon,
+		Latitude:        lat,
+		HasAudio:        m.HasAudio,
+		SubCount:        m.SubCount,
+		CreateTime:      m.CreateTime,
+		UpdateTime:      m.UpdateTime,
 	}
 }

@@ -55,7 +55,7 @@ func (h *CommonChannelHandler) List(c *gin.Context) {
 func (h *CommonChannelHandler) Update(c *gin.Context) {
 	var body commonchannelapp.View
 	if err := c.ShouldBindJSON(&body); err != nil {
-		response.Error(c, response.CodeBadReq, "参数错误")
+		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
 		return
 	}
 	if err := h.svc.Update(&body); err != nil {
