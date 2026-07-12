@@ -21,6 +21,7 @@ export const primaryMenus = [
     title: '设备管理',
     icon: 'menu-device',
     children: [
+      { title: '设备列表', path: '/devices', icon: 'devices' },
       { title: '国标设备', path: '/device', icon: 'device' },
       { title: 'ONVIF设备', path: '/onvifDevice', icon: 'onvifDevice' },
       { title: '部标设备', path: '/jtDevice', icon: 'jtDevice' },

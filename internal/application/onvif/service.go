@@ -158,6 +158,43 @@ func (s *Service) DeleteDevice(ctx context.Context, id int64) error {
 	return s.devices.Delete(ctx, id)
 }
 
+type UpdateDeviceRequest struct {
+	Name     string `json:"name"`
+	Vendor   string `json:"vendor"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Port     int    `json:"port"`
+}
+
+func (s *Service) UpdateDevice(ctx context.Context, id int64, req UpdateDeviceRequest) (*domainonvif.Device, error) {
+	device, err := s.devices.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return nil, fmt.Errorf("设备名称不能为空")
+	}
+	device.Name = name
+	if req.Vendor != "" {
+		device.Manufacturer = req.Vendor
+	}
+	if req.Username != "" {
+		device.Username = req.Username
+	}
+	if req.Password != "" {
+		device.Password = req.Password
+	}
+	if req.Port > 0 {
+		device.Port = req.Port
+	}
+	device.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
+	if err := s.devices.Update(ctx, device); err != nil {
+		return nil, err
+	}
+	return device, nil
+}
+
 func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainonvif.Channel, error) {
 	device, err := s.devices.GetByID(ctx, deviceID)
 	if err != nil {
@@ -176,37 +213,44 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainon
 		return nil, err
 	}
 
-	now := time.Now().Format("2006-01-02 15:04:05")
-	channels := make([]*domainonvif.Channel, 0, len(profiles))
-	for _, p := range profiles {
-		ch := &domainonvif.Channel{
-			DeviceID:     deviceID,
-			ProfileToken: p.Token,
-			Name:         p.Name,
-			HasAudio:     p.AudioSourceConfiguration != nil,
-			HasPTZ:       p.PTZConfiguration != nil,
-			Status:       "ON",
-			CreateTime:   now,
-			UpdateTime:   now,
-		}
-		if p.VideoEncoderConfiguration != nil {
-			ch.EncoderToken = p.VideoEncoderConfiguration.Token
-			if res := p.VideoEncoderConfiguration.Resolution; res != nil && res.Width > 0 && res.Height > 0 {
-				ch.Resolution = fmt.Sprintf("%dx%d", res.Width, res.Height)
-			}
-			if p.VideoEncoderConfiguration.Encoding != "" {
-				ch.Codec = p.VideoEncoderConfiguration.Encoding
-			}
-		}
-		if p.VideoSourceConfiguration != nil {
-			ch.VideoSource = p.VideoSourceConfiguration.SourceToken
-		}
+	// ONVIF Media Profile ≠ 国标通道：同一 VideoSource 常有主/子码流多个 Profile。
+	// 一源一通道；同组全部 Profile 写入 StreamProfiles，供列表选择主/子码流后播放。
+	order, groups := groupProfilesByVideoSource(profiles)
 
-		streamURI, err := client.GetStreamURI(ctx, p.Token)
-		if err == nil && streamURI != nil {
-			ch.StreamURI = streamURI.URI
+	now := time.Now().Format("2006-01-02 15:04:05")
+	deviceName := strings.TrimSpace(device.Name)
+	if device.CustomName != "" {
+		deviceName = strings.TrimSpace(device.CustomName)
+	}
+	channels := make([]*domainonvif.Channel, 0, len(order))
+	for i, key := range order {
+		group := groups[key]
+		if len(group) == 0 {
+			continue
 		}
-		enrichChannelMeta(ch, p.Name)
+		streamProfiles := make([]domainonvif.StreamProfile, 0, len(group))
+		var preferred *onviflib.Profile
+		var preferredSP domainonvif.StreamProfile
+		bestScore := -1 << 30
+		for _, p := range group {
+			if p == nil {
+				continue
+			}
+			sp := buildStreamProfile(ctx, client, p)
+			streamProfiles = append(streamProfiles, sp)
+			score := profilePreferenceScore(p)
+			if preferred == nil || score > bestScore {
+				preferred = p
+				preferredSP = sp
+				bestScore = score
+			}
+		}
+		if preferred == nil {
+			continue
+		}
+		ch := channelFromProfile(deviceID, preferred, preferredSP, now)
+		ch.StreamProfiles = streamProfiles
+		ch.Name = channelName(deviceName, i+1)
 		channels = append(channels, ch)
 	}
 
@@ -221,7 +265,27 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainon
 	device.UpdateTime = now
 	_ = s.devices.Update(ctx, device)
 
+	streamOptions := 0
+	for _, ch := range channels {
+		n := len(ch.StreamProfiles)
+		if n == 0 {
+			n = 1
+		}
+		streamOptions += n
+	}
+	fmt.Printf("[onvif] sync device=%d rawProfiles=%d channels=%d streamOptions=%d\n",
+		deviceID, len(profiles), len(channels), streamOptions)
+
 	return channels, nil
+}
+
+// ChannelCount 设备下逻辑通道数（已按 VideoSource 去重后的条数）
+func (s *Service) ChannelCount(ctx context.Context, deviceID int64) (int, error) {
+	list, err := s.channels.ListByDeviceID(ctx, deviceID)
+	if err != nil {
+		return 0, err
+	}
+	return len(list), nil
 }
 
 func (s *Service) ListChannels(ctx context.Context, page, count int, deviceID int64) ([]*domainonvif.Channel, int64, error) {
@@ -230,6 +294,38 @@ func (s *Service) ListChannels(ctx context.Context, page, count int, deviceID in
 		enrichChannelDisplay(ch)
 	}
 	return list, total, err
+}
+
+type UpdateChannelRequest struct {
+	ChannelID    int64  `json:"channelId"`
+	HasAudio     *bool  `json:"hasAudio"`
+	ProfileToken string `json:"profileToken"`
+}
+
+// UpdateChannel 更新通道偏好：开启音频、默认码流（Profile）
+func (s *Service) UpdateChannel(ctx context.Context, req UpdateChannelRequest) error {
+	ch, err := s.channels.GetByID(ctx, req.ChannelID)
+	if err != nil {
+		return err
+	}
+	if req.HasAudio != nil {
+		ch.HasAudio = *req.HasAudio
+	}
+	token := strings.TrimSpace(req.ProfileToken)
+	if token != "" {
+		preferAudio := ch.HasAudio
+		if err := applyStreamProfile(ch, token); err != nil {
+			return err
+		}
+		// 码流切换不覆盖用户「开启音频」偏好
+		ch.HasAudio = preferAudio
+	}
+	if ch.ProfilesJSON == "" && len(ch.StreamProfiles) > 0 {
+		if b, err := json.Marshal(ch.StreamProfiles); err == nil {
+			ch.ProfilesJSON = string(b)
+		}
+	}
+	return s.channels.Update(ctx, ch)
 }
 
 func (s *Service) ProbeAll(ctx context.Context) error {
@@ -271,13 +367,16 @@ type PlayResult struct {
 	URLs             map[string]string `json:"urls"`
 }
 
-func (s *Service) StartPlay(ctx context.Context, channelID int64) (*PlayResult, error) {
+func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken string) (*PlayResult, error) {
 	ch, err := s.channels.GetByID(ctx, channelID)
 	if err != nil {
 		return nil, err
 	}
 	device, err := s.devices.GetByID(ctx, ch.DeviceID)
 	if err != nil {
+		return nil, err
+	}
+	if err := applyStreamProfile(ch, profileToken); err != nil {
 		return nil, err
 	}
 	enrichChannelDisplay(ch)
@@ -433,11 +532,12 @@ func normalizeVideoCodec(raw string) string {
 	}
 }
 
-func (s *Service) StopPlay(ctx context.Context, channelID int64) error {
+func (s *Service) StopPlay(ctx context.Context, channelID int64, profileToken string) error {
 	ch, err := s.channels.GetByID(ctx, channelID)
 	if err != nil {
 		return err
 	}
+	_ = applyStreamProfile(ch, profileToken)
 	app := "onvif"
 	vhost := "__defaultVhost__"
 	stream := fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken))
@@ -581,6 +681,168 @@ func injectRTSPAuth(rawURL, username, password string) string {
 	}
 	u.User = url.UserPassword(username, password)
 	return u.String()
+}
+
+// channelName 统一通道展示名：设备名_channel_N
+func channelName(deviceName string, index int) string {
+	base := strings.TrimSpace(deviceName)
+	if base == "" {
+		base = "device"
+	}
+	return fmt.Sprintf("%s_channel_%d", base, index)
+}
+
+// groupProfilesByVideoSource 按视频源归组，组内保留全部主/子码流 Profile。
+func groupProfilesByVideoSource(profiles []*onviflib.Profile) ([]string, map[string][]*onviflib.Profile) {
+	groups := make(map[string][]*onviflib.Profile, len(profiles))
+	order := make([]string, 0, len(profiles))
+	for _, p := range profiles {
+		if p == nil {
+			continue
+		}
+		key := videoSourceKey(p)
+		if _, ok := groups[key]; !ok {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], p)
+	}
+	return order, groups
+}
+
+func buildStreamProfile(ctx context.Context, client *onviflib.Client, p *onviflib.Profile) domainonvif.StreamProfile {
+	sp := domainonvif.StreamProfile{
+		ProfileToken: p.Token,
+		HasAudio:     p.AudioSourceConfiguration != nil,
+		HasPTZ:       p.PTZConfiguration != nil,
+	}
+	if p.VideoEncoderConfiguration != nil {
+		if res := p.VideoEncoderConfiguration.Resolution; res != nil && res.Width > 0 && res.Height > 0 {
+			sp.Resolution = fmt.Sprintf("%dx%d", res.Width, res.Height)
+		}
+		if p.VideoEncoderConfiguration.Encoding != "" {
+			sp.Codec = p.VideoEncoderConfiguration.Encoding
+		}
+	}
+	if streamURI, err := client.GetStreamURI(ctx, p.Token); err == nil && streamURI != nil {
+		sp.StreamURI = streamURI.URI
+	}
+	sp.StreamChannel = parseRTSPStreamChannel(sp.StreamURI)
+	sp.StreamType = streamTypeLabel(sp.StreamChannel)
+	sp.Label = streamProfileLabel(p, sp)
+	return sp
+}
+
+func streamProfileLabel(p *onviflib.Profile, sp domainonvif.StreamProfile) string {
+	if sp.StreamType != "" {
+		return sp.StreamType
+	}
+	name := strings.ToLower(strings.TrimSpace(p.Name))
+	switch {
+	case strings.Contains(name, "main") || strings.Contains(name, "主"):
+		return "主码流"
+	case strings.Contains(name, "sub") || strings.Contains(name, "子"):
+		return "子码流"
+	}
+	if label := strings.TrimSpace(p.Name); label != "" {
+		return label
+	}
+	return p.Token
+}
+
+func channelFromProfile(deviceID int64, p *onviflib.Profile, sp domainonvif.StreamProfile, now string) *domainonvif.Channel {
+	ch := &domainonvif.Channel{
+		DeviceID:      deviceID,
+		ProfileToken:  sp.ProfileToken,
+		Resolution:    sp.Resolution,
+		Codec:         sp.Codec,
+		StreamURI:     sp.StreamURI,
+		StreamChannel: sp.StreamChannel,
+		StreamType:    sp.StreamType,
+		HasAudio:      sp.HasAudio,
+		HasPTZ:        sp.HasPTZ,
+		Status:        "ON",
+		CreateTime:    now,
+		UpdateTime:    now,
+	}
+	if p.VideoEncoderConfiguration != nil {
+		ch.EncoderToken = p.VideoEncoderConfiguration.Token
+	}
+	if p.VideoSourceConfiguration != nil {
+		ch.VideoSource = p.VideoSourceConfiguration.SourceToken
+	}
+	enrichChannelMeta(ch, p.Name)
+	return ch
+}
+
+// applyStreamProfile 按所选 Profile 覆盖通道当前码流字段（不写库，仅用于本次播放）。
+func applyStreamProfile(ch *domainonvif.Channel, profileToken string) error {
+	token := strings.TrimSpace(profileToken)
+	if token == "" || token == ch.ProfileToken {
+		return nil
+	}
+	for _, sp := range ch.StreamProfiles {
+		if sp.ProfileToken != token {
+			continue
+		}
+		ch.ProfileToken = sp.ProfileToken
+		ch.Resolution = sp.Resolution
+		ch.Codec = sp.Codec
+		ch.StreamURI = sp.StreamURI
+		ch.StreamChannel = sp.StreamChannel
+		ch.StreamType = sp.StreamType
+		if sp.Label != "" {
+			ch.StreamType = firstNonEmpty(sp.StreamType, sp.Label)
+		}
+		ch.ConfigCodec = normalizeVideoCodec(sp.Codec)
+		return nil
+	}
+	return fmt.Errorf("通道不存在码流 Profile: %s", token)
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func videoSourceKey(p *onviflib.Profile) string {
+	if p.VideoSourceConfiguration != nil {
+		tok := strings.TrimSpace(p.VideoSourceConfiguration.SourceToken)
+		if tok != "" {
+			return "vs:" + tok
+		}
+		cfg := strings.TrimSpace(p.VideoSourceConfiguration.Token)
+		if cfg != "" {
+			return "vsc:" + cfg
+		}
+	}
+	// 无 VideoSource 时无法归并，按 Profile 各自成通道
+	return "profile:" + p.Token
+}
+
+func profilePreferenceScore(p *onviflib.Profile) int {
+	score := 0
+	name := strings.ToLower(strings.TrimSpace(p.Name))
+	switch {
+	case strings.Contains(name, "main") || strings.Contains(name, "主"):
+		score += 1000
+	case strings.Contains(name, "sub") || strings.Contains(name, "子"):
+		score -= 500
+	}
+	// Profile_1 / MediaProfile_000 等常见主码流命名略优先
+	if strings.HasSuffix(name, "_1") || strings.HasSuffix(name, "001") || strings.Contains(name, "profile_1") {
+		score += 100
+	}
+	if p.VideoEncoderConfiguration != nil && p.VideoEncoderConfiguration.Resolution != nil {
+		r := p.VideoEncoderConfiguration.Resolution
+		if r.Width > 0 && r.Height > 0 {
+			score += r.Width * r.Height / 10000
+		}
+	}
+	return score
 }
 
 func sanitizeStream(token string) string {

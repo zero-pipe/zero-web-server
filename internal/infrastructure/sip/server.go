@@ -42,23 +42,29 @@ type PositionHandler interface {
 }
 
 type Server struct {
-	cfg            config.SIPConfig
-	localIP        string
-	serverID       string
-	password       string
-	ua             *sipgo.UserAgent
-	srv            *sipgo.Server
-	client         *sipgo.Client
-	deviceSvc      DeviceService
-	alarmHandler   AlarmHandler
-	positionHandler PositionHandler
-	redis          *redisinfra.Client
-	challenges     sync.Map
-	sn             atomic.Int64
-	recordMgr      *RecordManager
-	presetMgr      *PresetManager
-	inviteMgr      *InviteManager
-	infoCSeq       atomic.Int64
+	cfg                 config.SIPConfig
+	localIP             string
+	serverID            string
+	password            string
+	requirePreRegister  bool
+	ua                  *sipgo.UserAgent
+	srv                 *sipgo.Server
+	client              *sipgo.Client
+	deviceSvc           DeviceService
+	alarmHandler        AlarmHandler
+	positionHandler     PositionHandler
+	redis               *redisinfra.Client
+	challenges          sync.Map
+	sn                  atomic.Int64
+	recordMgr           *RecordManager
+	presetMgr           *PresetManager
+	inviteMgr           *InviteManager
+	infoCSeq            atomic.Int64
+}
+
+// SetRequirePreRegister 未预添加设备是否拒绝 REGISTER
+func (s *Server) SetRequirePreRegister(v bool) {
+	s.requirePreRegister = v
 }
 
 func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc DeviceService, redis *redisinfra.Client) (*Server, error) {
@@ -287,6 +293,11 @@ func (s *Server) handleRegister(req *sip.Request, tx sip.ServerTransaction) {
 	}
 
 	device, _ := s.deviceSvc.GetByDeviceID(deviceID)
+	if device == nil && s.requirePreRegister {
+		log.Printf("GB28181 register rejected (not pre-registered): id=%s ip=%s:%d", deviceID, ip, port)
+		s.respond(tx, req, 403, "Forbidden", nil)
+		return
+	}
 	password := s.password
 	if device != nil && device.Password != "" {
 		password = device.Password

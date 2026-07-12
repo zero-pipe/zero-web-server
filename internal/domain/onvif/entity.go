@@ -42,8 +42,24 @@ type Channel struct {
 	HasPTZ        bool   `json:"hasPtz"`
 	StreamURI     string `json:"streamUri"`
 	Status        string `json:"status"`
+	// StreamProfiles 同一视频源下的主/子码流等可选 Profile（播放时按所选 token 取流）
+	StreamProfiles []StreamProfile `json:"streamProfiles,omitempty"`
+	ProfilesJSON   string          `json:"-"`
 	CreateTime    string `json:"createTime"`
 	UpdateTime    string `json:"updateTime"`
+}
+
+// StreamProfile 可选码流（对应一个 ONVIF Media Profile）
+type StreamProfile struct {
+	ProfileToken  string `json:"profileToken"`
+	Label         string `json:"label"` // 主码流 / 子码流 / Profile 名
+	Resolution    string `json:"resolution"`
+	Codec         string `json:"codec"`
+	StreamURI     string `json:"streamUri"`
+	StreamChannel string `json:"streamChannel,omitempty"`
+	StreamType    string `json:"streamType,omitempty"`
+	HasAudio      bool   `json:"hasAudio"`
+	HasPTZ        bool   `json:"hasPtz"`
 }
 
 type DiscoveredDevice struct {
@@ -67,6 +83,7 @@ type DeviceRepository interface {
 type ChannelRepository interface {
 	DeleteByDeviceID(ctx context.Context, deviceID int64) error
 	BatchCreate(ctx context.Context, channels []*Channel) error
+	Update(ctx context.Context, channel *Channel) error
 	ListByDeviceID(ctx context.Context, deviceID int64) ([]*Channel, error)
 	GetByID(ctx context.Context, id int64) (*Channel, error)
 	List(ctx context.Context, page, count int, deviceID int64) ([]*Channel, int64, error)

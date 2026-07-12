@@ -3,7 +3,9 @@ package deviceapp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,15 +16,22 @@ import (
 )
 
 var (
-	ErrDeviceNotFound = errors.New("设备不存在")
+	ErrDeviceNotFound     = errors.New("设备不存在")
+	ErrDeviceNotPreRegistered = errors.New("设备未预添加，拒绝注册")
 )
 
 type Service struct {
-	devices    domaindevice.Repository
-	channels   domainchannel.Repository
-	redis      *redisinfra.Client
-	sip        *sipinfra.Server
-	syncStatus sync.Map // deviceID -> *SyncStatus
+	devices            domaindevice.Repository
+	channels           domainchannel.Repository
+	redis              *redisinfra.Client
+	sip                *sipinfra.Server
+	requirePreRegister bool
+	syncStatus         sync.Map // deviceID -> *SyncStatus
+}
+
+// SetRequirePreRegister 未预添加是否禁止 SaveRegister 自动建档
+func (s *Service) SetRequirePreRegister(v bool) {
+	s.requirePreRegister = v
 }
 
 type SyncStatus struct {
@@ -110,6 +119,9 @@ func (s *Service) ensureDeviceDBID(device *domaindevice.Device) {
 func (s *Service) SaveRegister(device *domaindevice.Device) (*domaindevice.Device, error) {
 	existing, err := s.devices.GetByDeviceID(device.DeviceID)
 	if err != nil {
+		if s.requirePreRegister {
+			return nil, ErrDeviceNotPreRegistered
+		}
 		if err := s.devices.Create(device); err != nil {
 			return nil, err
 		}
@@ -230,15 +242,21 @@ func (s *Service) HandleCatalog(deviceID string, items []sipinfra.CatalogItem) e
 	}
 	s.ensureDeviceDBID(device)
 	now := nowStr()
+	deviceName := device.Name
+	if device.CustomName != "" {
+		deviceName = device.CustomName
+	}
 	channels := make([]*domainchannel.Channel, 0, len(items))
+	idx := 0
 	for _, item := range items {
 		if item.DeviceID == "" {
 			continue
 		}
+		idx++
 		ch := &domainchannel.Channel{
 			DeviceID:     deviceID,
 			GBDeviceID:   item.DeviceID,
-			Name:         item.Name,
+			Name:         channelDisplayName(deviceName, idx),
 			Manufacturer: item.Manufacturer,
 			Model:        item.Model,
 			Parental:     item.Parental,
@@ -249,9 +267,6 @@ func (s *Service) HandleCatalog(deviceID string, items []sipinfra.CatalogItem) e
 			PTZType:      item.PTZType,
 			CreateTime:   now,
 			UpdateTime:   now,
-		}
-		if ch.Name == "" {
-			ch.Name = item.DeviceID
 		}
 		if ch.Status == "" {
 			ch.Status = "ON"
@@ -279,7 +294,8 @@ func (s *Service) HandleCatalog(deviceID string, items []sipinfra.CatalogItem) e
 	return nil
 }
 
-// backfillDeviceFromChannels 设备厂商/名称常在 Catalog Item 里，DeviceInfo 未回时从通道补齐。
+// backfillDeviceFromChannels 设备厂商/型号常在 Catalog Item 里，DeviceInfo 未回时从通道补齐。
+// 不再用通道名回填设备名（通道已统一为 设备名_channel_N）。
 func (s *Service) backfillDeviceFromChannels(device *domaindevice.Device, channels []*domainchannel.Channel) {
 	if device == nil || len(channels) == 0 {
 		return
@@ -297,11 +313,7 @@ func (s *Service) backfillDeviceFromChannels(device *domaindevice.Device, channe
 			device.Model = ch.Model
 			changed = true
 		}
-		if (device.Name == "" || device.Name == device.DeviceID) && ch.Name != "" && ch.Name != ch.GBDeviceID {
-			device.Name = ch.Name
-			changed = true
-		}
-		if changed && device.Manufacturer != "" {
+		if changed && device.Manufacturer != "" && device.Model != "" {
 			break
 		}
 	}
@@ -336,14 +348,14 @@ func (s *Service) ensureDefaultIPCChannel(device *domaindevice.Device) error {
 		return nil
 	}
 	now := nowStr()
-	name := device.Name
-	if name == "" || name == device.DeviceID {
-		name = "Camera-" + device.DeviceID
+	deviceName := device.Name
+	if device.CustomName != "" {
+		deviceName = device.CustomName
 	}
 	ch := &domainchannel.Channel{
 		DeviceID:     device.DeviceID,
 		GBDeviceID:   device.DeviceID,
-		Name:         name,
+		Name:         channelDisplayName(deviceName, 1),
 		Manufacturer: device.Manufacturer,
 		Model:        device.Model,
 		Status:       "ON",
@@ -588,6 +600,15 @@ func formatTimeStatistics(timeStampList []int64, count int) []domaindevice.TimeS
 
 func nowStr() string {
 	return time.Now().Format("2006-01-02 15:04:05")
+}
+
+// channelDisplayName 统一通道展示名：设备名_channel_N
+func channelDisplayName(deviceName string, index int) string {
+	base := strings.TrimSpace(deviceName)
+	if base == "" {
+		base = "device"
+	}
+	return fmt.Sprintf("%s_channel_%d", base, index)
 }
 
 // Ensure Service implements sipinfra.DeviceService

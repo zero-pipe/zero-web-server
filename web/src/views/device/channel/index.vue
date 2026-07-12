@@ -73,35 +73,6 @@
       >
         <el-table-column prop="name" label="名称" min-width="180" />
         <el-table-column prop="deviceId" label="编号" min-width="180" />
-        <el-table-column label="快照" min-width="100">
-          <template v-slot:default="scope">
-            <el-image
-              :src="getSnap(scope.row)"
-              :preview-src-list="getBigSnap(scope.row)"
-              :fit="'contain'"
-              style="width: 60px"
-              @error="getSnapErrorEvent(scope.row.deviceId, scope.row.channelId)"
-            >
-              <div slot="error" class="image-slot">
-                <i class="el-icon-picture-outline" />
-              </div>
-            </el-image>
-          </template>
-        </el-table-column>
-        <!--          <el-table-column prop="subCount" label="子节点数" min-width="100">-->
-        <!--          </el-table-column>-->
-        <el-table-column prop="manufacturer" label="厂家" min-width="100" />
-        <el-table-column label="位置信息" min-width="150">
-          <template v-slot:default="scope">
-            <span v-if="scope.row.longitude && scope.row.latitude">{{ scope.row.longitude }}<br>{{ scope.row.latitude }}</span>
-            <span v-if="!scope.row.longitude || !scope.row.latitude">无</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="ptzType" label="摄像头类型" min-width="100">
-          <template v-slot:default="scope">
-            <div>{{ scope.row.ptzTypeText }}</div>
-          </template>
-        </el-table-column>
         <el-table-column label="开启音频" min-width="100">
           <template v-slot:default="scope">
             <el-switch v-model="scope.row.hasAudio" active-color="#409EFF" @change="updateChannel(scope.row)" />

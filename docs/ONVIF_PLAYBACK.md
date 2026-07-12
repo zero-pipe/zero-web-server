@@ -6,7 +6,7 @@
 |------|---------|-----------------|
 | 信令 | SIP INVITE | ONVIF GetStreamURI |
 | 媒体 | 摄像机 **推** RTP/PS 到 ZMS | ZMS **拉** 摄像机 RTSP |
-| ZMS 流名 | `rtp/{deviceId}_{channelId}` | `onvif/{deviceId}_{profileToken}` |
+| ZMS 流名 | `live/{deviceId}_{channelId}` | `onvif/{deviceId}_{profileToken}` |
 | 前端播放器 | Jessibuca / WebRTC / H265web | 同上（按编码自动选择） |
 
 ## 2. 端到端流程

@@ -1,38 +1,75 @@
 <template>
-  <div style="height: calc(100vh - 124px);">
-    <el-page-header content="ONVIF 通道" @back="$emit('show-device')" />
-
-    <el-form :inline="true" size="mini" style="margin-top: 12px;">
-      <el-form-item>
-        <el-button type="primary" icon="el-icon-refresh" @click="loadChannels">刷新</el-button>
-        <el-button icon="el-icon-refresh-right" @click="handleSync">同步通道</el-button>
+  <div id="channelList" style="height: calc(100vh - 124px);">
+    <el-form :inline="true" size="mini">
+      <el-form-item style="margin-right: 2rem">
+        <el-page-header content="通道列表" @back="$emit('show-device')" />
+      </el-form-item>
+      <el-form-item label="搜索">
+        <el-input
+          v-model="searchStr"
+          style="margin-right: 1rem; width: auto;"
+          placeholder="关键字"
+          prefix-icon="el-icon-search"
+          clearable
+          @input="filterChannels"
+        />
       </el-form-item>
       <el-form-item>
-        <span class="hint-text">播放策略：H264→Jessibuca，H265→H265web；以 ZMS 实测编码为准</span>
+        <el-button icon="el-icon-refresh-right" @click="handleSync">同步通道</el-button>
+      </el-form-item>
+      <el-form-item style="float: right;">
+        <el-button icon="el-icon-refresh-right" circle :loading="loading" @click="loadChannels" />
       </el-form-item>
     </el-form>
 
-    <el-table v-loading="loading" :data="channelList" size="small" height="calc(100% - 100px)">
-      <el-table-column prop="name" label="码流" min-width="140" />
-      <el-table-column label="RTSP" width="72">
-        <template v-slot:default="scope">
-          {{ scope.row.streamChannel || '-' }}
+    <el-table
+      v-loading="loading"
+      :data="filteredList"
+      size="small"
+      height="calc(100% - 64px)"
+      style="width: 100%; font-size: 12px;"
+      header-row-class-name="table-header"
+    >
+      <el-table-column prop="name" label="名称" min-width="180" />
+      <el-table-column label="编号" min-width="160">
+        <template v-slot:default>
+          <span class="text-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column prop="profileToken" label="Profile" min-width="120" />
-      <el-table-column prop="resolution" label="配置分辨率" width="110" />
-      <el-table-column label="配置编码" width="100">
+      <el-table-column label="开启音频" min-width="100">
         <template v-slot:default="scope">
-          {{ scope.row.configCodec || scope.row.codec || '-' }}
+          <el-switch
+            v-model="scope.row.hasAudio"
+            active-color="#409EFF"
+            @change="() => onAudioChange(scope.row)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="PTZ" width="72">
+      <el-table-column label="码流类型" min-width="200">
         <template v-slot:default="scope">
-          <el-tag v-if="scope.row.hasPtz" size="mini" type="success">支持</el-tag>
-          <el-tag v-else size="mini" type="info">否</el-tag>
+          <el-select
+            v-model="scope.row.selectedProfileToken"
+            size="mini"
+            style="width: 100%;"
+            placeholder="请选择码流类型"
+            @change="(val) => onStreamTypeChange(scope.row, val)"
+          >
+            <el-option
+              v-for="sp in scope.row.streamProfiles"
+              :key="sp.profileToken"
+              :label="profileOptionLabel(sp)"
+              :value="sp.profileToken"
+            />
+          </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="300" fixed="right">
+      <el-table-column label="状态" min-width="90">
+        <template v-slot:default="scope">
+          <el-tag v-if="scope.row.status === 'ON'" size="medium">在线</el-tag>
+          <el-tag v-else size="medium" type="info">离线</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="200" fixed="right">
         <template v-slot:default="scope">
           <el-button
             size="medium"
@@ -41,14 +78,6 @@
             :loading="scope.row.playLoading"
             @click="handlePlay(scope.row)"
           >播放
-          </el-button>
-          <el-button
-            size="medium"
-            type="text"
-            icon="el-icon-switch-button"
-            style="color: #f56c6c"
-            @click="handleStop(scope.row)"
-          >停止
           </el-button>
           <template v-if="scope.row.hasPtz">
             <el-divider direction="vertical" />
@@ -192,7 +221,7 @@ import playerTabs from '@/views/common/playerTabs.vue'
 import streamMediaPanel from '@/views/common/streamMediaPanel.vue'
 import mediaInfo from '@/views/common/mediaInfo.vue'
 import ptzControls from '@/views/common/ptzControls.vue'
-import { ptzControl, queryChannels, startPlay, stopPlay, syncDevice } from '@/api/onvif'
+import { ptzControl, queryChannels, startPlay, stopPlay, syncDevice, updateChannel } from '@/api/onvif'
 import { getMediaServerList } from '@/api/server'
 import { isH265Codec, resolvePlayerStrategy } from '@/utils/playerStrategy'
 
@@ -218,6 +247,7 @@ export default {
       loading: false,
       isPlaying: false,
       channelList: [],
+      searchStr: '',
       playerVisible: false,
       streamInfo: null,
       playMeta: null,
@@ -226,6 +256,7 @@ export default {
       playerUrlPriority: ['flv', 'ws_flv', 'https_flv', 'wss_flv'],
       preferredPlayer: 'jessibuca',
       currentChannelId: null,
+      currentProfileToken: null,
       currentHasPtz: false,
       app: '',
       streamId: '',
@@ -240,6 +271,14 @@ export default {
   computed: {
     isStreaming() {
       return !!(this.streamInfo && this.playerVisible)
+    },
+    filteredList() {
+      const q = (this.searchStr || '').trim().toLowerCase()
+      if (!q) return this.channelList
+      return this.channelList.filter(ch => {
+        const blob = `${ch.name || ''} ${ch.profileToken || ''} ${ch.resolution || ''}`.toLowerCase()
+        return blob.indexOf(q) >= 0
+      })
     }
   },
   watch: {
@@ -254,14 +293,93 @@ export default {
     loadChannels() {
       this.loading = true
       queryChannels({ page: 1, count: 100, deviceId: this.deviceId }).then(res => {
-        this.channelList = (res.data && res.data.list) || []
+        const list = (res.data && res.data.list) || []
+        this.channelList = list.map(ch => this.normalizeChannel(ch))
       }).finally(() => {
         this.loading = false
       })
     },
+    normalizeChannel(ch) {
+      const profiles = (ch.streamProfiles && ch.streamProfiles.length)
+        ? ch.streamProfiles
+        : [{
+          profileToken: ch.profileToken,
+          label: ch.streamType || ch.profileToken,
+          resolution: ch.resolution,
+          codec: ch.codec,
+          streamType: ch.streamType,
+          streamChannel: ch.streamChannel,
+          hasAudio: ch.hasAudio,
+          hasPtz: ch.hasPtz
+        }]
+      const selected = ch.profileToken || (profiles[0] && profiles[0].profileToken)
+      const row = {
+        ...ch,
+        streamProfiles: profiles,
+        selectedProfileToken: selected,
+        playLoading: false
+      }
+      this.applyProfileFields(row, selected)
+      return row
+    },
+    profileOptionLabel(sp) {
+      if (!sp) return ''
+      const label = sp.label || sp.streamType || '码流'
+      // 与国标「主/子码流」语义对齐；分辨率作辅助信息
+      return sp.resolution ? `${label}(${sp.resolution})` : label
+    },
+    applyProfileFields(row, profileToken) {
+      const sp = (row.streamProfiles || []).find(p => p.profileToken === profileToken)
+      if (!sp) return
+      row.selectedProfileToken = sp.profileToken
+      row.profileToken = sp.profileToken
+      row.resolution = sp.resolution || row.resolution
+      row.codec = sp.codec || row.codec
+      row.configCodec = sp.codec || row.configCodec
+      row.streamType = sp.streamType || sp.label || row.streamType
+      row.streamChannel = sp.streamChannel || row.streamChannel
+    },
+    onAudioChange(row) {
+      updateChannel({
+        channelId: row.id,
+        hasAudio: !!row.hasAudio
+      }).catch(() => {
+        row.hasAudio = !row.hasAudio
+        this.$message.error('更新音频设置失败')
+      })
+    },
+    onStreamTypeChange(row, profileToken) {
+      this.applyProfileFields(row, profileToken)
+      updateChannel({
+        channelId: row.id,
+        profileToken
+      }).then(() => {
+        this.$message.success('码流类型已更新')
+      }).catch(err => {
+        this.$message.error((err && err.message) || '更新码流类型失败')
+        this.loadChannels()
+      })
+    },
+    filterChannels() {
+      // filteredList 计算属性已处理
+    },
     handleSync() {
-      syncDevice(this.deviceId).then(() => {
-        this.$message.success('同步成功')
+      syncDevice(this.deviceId).then(res => {
+        const channels = Array.isArray(res.data) ? res.data : []
+        let streamOptions = 0
+        channels.forEach(ch => {
+          const n = (ch.streamProfiles && ch.streamProfiles.length) || 1
+          streamOptions += n
+        })
+        if (channels.length === 0) {
+          this.$message.success('同步成功（无通道）')
+        } else if (streamOptions <= channels.length) {
+          this.$message.warning(
+            `同步完成：${channels.length} 个通道，但仅发现 ${streamOptions} 路码流（通常主+子应 ≥2）。请确认摄像机 ONVIF 已开启子码流，或查看服务端日志 rawProfiles`
+          )
+        } else {
+          this.$message.success(`同步成功：${channels.length} 个通道，${streamOptions} 路码流可选`)
+        }
         this.loadChannels()
       })
     },
@@ -300,7 +418,9 @@ export default {
         this.destroyPlayer()
       }
       this.isPlaying = true
-      startPlay(row.id).then(res => {
+      this.$set(row, 'playLoading', true)
+      const profileToken = row.selectedProfileToken || row.profileToken
+      startPlay(row.id, profileToken).then(res => {
         const data = res.data || {}
         if (!data.urls || (!data.urls.flv && !data.urls.ws)) {
           this.$message.error('未获取到播放地址')
@@ -310,7 +430,10 @@ export default {
           this.$message.error('未获取到实测编码，请稍后重试')
           return
         }
-        this.applyPlayerStrategy(data)
+        this.applyPlayerStrategy({
+          ...data,
+          hasAudio: !!(row.hasAudio && data.hasAudio)
+        })
         const streamInfo = this.buildStreamInfo(data)
         this.playMeta = {
           streamType: data.streamType,
@@ -333,6 +456,7 @@ export default {
         this.streamId = data.stream || ''
         this.mediaServerId = data.mediaServerId || ''
         this.currentChannelId = row.id
+        this.currentProfileToken = profileToken
         this.currentHasPtz = !!row.hasPtz
         this.extraTab = 'media'
         this.playerVisible = true
@@ -364,14 +488,7 @@ export default {
         this.$message.error(msg)
       }).finally(() => {
         this.isPlaying = false
-      })
-    },
-    handleStop(row) {
-      stopPlay(row.id).then(() => {
-        if (this.currentChannelId === row.id) {
-          this.closePlayer(false)
-        }
-        this.$message.success('已停止')
+        this.$set(row, 'playLoading', false)
       })
     },
     destroyPlayer() {
@@ -392,9 +509,10 @@ export default {
       this.mediaServerId = ''
       this.playerUrlInfo = { playerUrl: null, playUrl: null }
       if (callBackendStop !== false && this.currentChannelId) {
-        stopPlay(this.currentChannelId)
+        stopPlay(this.currentChannelId, this.currentProfileToken)
       }
       this.currentChannelId = null
+      this.currentProfileToken = null
       this.currentHasPtz = false
     },
     handleStopCurrent() {
@@ -430,6 +548,10 @@ export default {
 </script>
 
 <style scoped>
+.text-muted {
+  color: #c0c4cc;
+}
+
 .hint-text {
   font-size: 12px;
   color: #909399;

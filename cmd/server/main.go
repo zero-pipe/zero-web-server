@@ -15,6 +15,7 @@ import (
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
 	commonchannelapp "zero-web-kit/internal/application/commonchannel"
 	deviceapp "zero-web-kit/internal/application/device"
+	deviceaccess "zero-web-kit/internal/application/deviceaccess"
 	groupapp "zero-web-kit/internal/application/group"
 	mediaapp "zero-web-kit/internal/application/media"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
@@ -107,6 +108,7 @@ func main() {
 
 	authService := appauth.NewService(userRepo, jwtManager, cfg.UserSettings.ServerID)
 	deviceService := deviceapp.NewService(deviceRepo, channelRepo, redisClient)
+	deviceService.SetRequirePreRegister(cfg.GB.RequirePreRegister)
 	publishRegistry := mediaapp.NewPublishRegistry()
 	publishAuth := mediaapp.NewPublishAuth(
 		userRepo, streamPushRepo, streamProxyRepo,
@@ -129,6 +131,7 @@ func main() {
 		}
 	}
 	deviceService.SetSIP(sipServer)
+	sipServer.SetRequirePreRegister(cfg.GB.RequirePreRegister)
 
 	alarmService := alarmapp.NewService(alarmRepo, channelRepo)
 	positionService := positionapp.NewService(positionRepo, channelRepo)
@@ -160,6 +163,7 @@ func main() {
 	onvifService := onvifapp.NewService(
 		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaServerService, cfg.UserSettings.ServerID,
 	)
+	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
 
 	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaServerService, cfg.UserSettings.ServerID)
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaServerService, cfg.UserSettings.ServerID)
@@ -197,6 +201,7 @@ func main() {
 		AuthService:         authService,
 		ONVIFService:        onvifService,
 		DeviceService:       deviceService,
+		DeviceAccessService: deviceAccessService,
 		PlayService:         playService,
 		PlaybackService:     playbackService,
 		PTZService:          ptzService,

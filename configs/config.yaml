@@ -6,7 +6,7 @@ mysql:
   host: 127.0.0.1
   port: 3306
   user: root
-  password: "12345678"
+  password: "cqw881013"
   database: zws
   charset: utf8mb4
   max_idle_conns: 10
@@ -15,19 +15,23 @@ mysql:
 redis:
   host: 127.0.0.1
   port: 6379
-  password: ""
+  password: "cqw881013"
   database: 7
   pool_size: 10
 
 # 国标 SIP 默认值：库空时启动写入 zws_gb_sip_config；之后以库为准。
 # 页面「系统管理 → 国标配置」可改编码/域/密码/IP，热更新无需重启；改监听端口需重启。
 sip:
-  ip: ""                           # 空则自动探测本机网卡；也可填摄像机可达的平台 IP
+  ip: "192.168.1.5"                           # 空则自动探测本机网卡；也可填摄像机可达的平台 IP
   port: 5060
   domain: "3402000000"             # 宜为国标编号前 10 位
   id: "34020000002000000001"       # 本平台 20 位国标编号
   password: "12345678"
   alarm: false
+
+# 国标接入行为：true=必须先在「设备列表」预添加，未预置设备 REGISTER 返回 403
+gb:
+  require_pre_register: true
 
 # 媒体节点改为页面「媒体节点」动态添加并落库，启动时可为空。
 # 如需兼容临时指定，可取消注释（IP+http_port 非空才生效）。

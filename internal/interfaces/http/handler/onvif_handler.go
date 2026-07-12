@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 
 	onvifapp "zero-web-kit/internal/application/onvif"
 	"zero-web-kit/pkg/response"
@@ -114,13 +115,27 @@ func (h *ONVIFHandler) QueryChannels(c *gin.Context) {
 	})
 }
 
+func (h *ONVIFHandler) UpdateChannel(c *gin.Context) {
+	var req onvifapp.UpdateChannelRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.ChannelID == 0 {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.svc.UpdateChannel(c.Request.Context(), req); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
 func (h *ONVIFHandler) StartPlay(c *gin.Context) {
 	channelID, err := strconv.ParseInt(c.Query("channelId"), 10, 64)
 	if err != nil {
 		response.Error(c, response.CodeBadReq, "无效的通道ID")
 		return
 	}
-	result, err := h.svc.StartPlay(c.Request.Context(), channelID)
+	profileToken := strings.TrimSpace(c.Query("profileToken"))
+	result, err := h.svc.StartPlay(c.Request.Context(), channelID, profileToken)
 	if err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
@@ -134,7 +149,8 @@ func (h *ONVIFHandler) StopPlay(c *gin.Context) {
 		response.Error(c, response.CodeBadReq, "无效的通道ID")
 		return
 	}
-	if err := h.svc.StopPlay(c.Request.Context(), channelID); err != nil {
+	profileToken := strings.TrimSpace(c.Query("profileToken"))
+	if err := h.svc.StopPlay(c.Request.Context(), channelID, profileToken); err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
 	commonchannelapp "zero-web-kit/internal/application/commonchannel"
 	deviceapp "zero-web-kit/internal/application/device"
+	deviceaccess "zero-web-kit/internal/application/deviceaccess"
 	groupapp "zero-web-kit/internal/application/group"
 	mediaapp "zero-web-kit/internal/application/media"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
@@ -35,6 +36,7 @@ type Deps struct {
 	AuthService         *appauth.Service
 	ONVIFService        *onvifapp.Service
 	DeviceService       *deviceapp.Service
+	DeviceAccessService *deviceaccess.Service
 	PlayService         *playapp.Service
 	PlaybackService     *playbackapp.Service
 	PTZService          *ptzapp.Service
@@ -84,6 +86,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	serverHandler := handler.NewServerHandler(deps.ServerID, deps.Metrics)
 	onvifHandler := handler.NewONVIFHandler(deps.ONVIFService)
 	deviceHandler := handler.NewDeviceHandler(deps.DeviceService)
+	deviceAccessHandler := handler.NewDeviceAccessHandler(deps.DeviceAccessService)
 	playHandler := handler.NewPlayHandler(deps.PlayService, deps.PlayTimeoutMs)
 	playbackHandler := handler.NewPlaybackHandler(deps.PlaybackService, deps.PlayTimeoutMs)
 	gbRecordHandler := handler.NewGBRecordHandler(deps.PlaybackService, deps.RecordInfoTimeoutMs)
@@ -192,6 +195,7 @@ func Setup(r *gin.Engine, deps Deps) {
 			onvif.POST("/device/sync/:id", onvifHandler.SyncDevice)
 			onvif.POST("/device/probe", onvifHandler.Probe)
 			onvif.GET("/channel/query", onvifHandler.QueryChannels)
+			onvif.POST("/channel/update", onvifHandler.UpdateChannel)
 			onvif.GET("/play/start", onvifHandler.StartPlay)
 			onvif.GET("/play/stop", onvifHandler.StopPlay)
 			onvif.POST("/ptz/control", onvifHandler.PTZControl)
@@ -199,6 +203,19 @@ func Setup(r *gin.Engine, deps Deps) {
 			onvif.GET("/ptz/preset/call", onvifHandler.GotoPreset)
 			onvif.GET("/ptz/preset/add", onvifHandler.SetPreset)
 			onvif.GET("/ptz/preset/delete", onvifHandler.RemovePreset)
+		}
+
+		// 统一设备接入门面（国标 + ONVIF）
+		if deps.DeviceAccessService != nil {
+			devices := auth.Group("/devices")
+			{
+				devices.GET("", deviceAccessHandler.List)
+				devices.POST("", deviceAccessHandler.Create)
+				devices.PUT("", deviceAccessHandler.Update)
+				devices.DELETE("", deviceAccessHandler.Delete)
+				devices.POST("/delete", deviceAccessHandler.Delete)
+				devices.POST("/sync", deviceAccessHandler.Sync)
+			}
 		}
 
 		jt1078 := auth.Group("/jt1078")

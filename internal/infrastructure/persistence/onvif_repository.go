@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -122,6 +123,27 @@ func (r *OnvifChannelRepository) BatchCreate(ctx context.Context, channels []*do
 	return nil
 }
 
+func (r *OnvifChannelRepository) Update(ctx context.Context, channel *domainonvif.Channel) error {
+	if channel == nil || channel.ID == 0 {
+		return fmt.Errorf("invalid channel")
+	}
+	channel.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
+	return r.db.WithContext(ctx).Model(&model.OnvifChannel{}).Where("id = ?", channel.ID).Updates(map[string]interface{}{
+		"profile_token": channel.ProfileToken,
+		"name":          channel.Name,
+		"video_source":  channel.VideoSource,
+		"encoder_token": channel.EncoderToken,
+		"resolution":    channel.Resolution,
+		"codec":         channel.Codec,
+		"has_audio":     channel.HasAudio,
+		"has_ptz":       channel.HasPTZ,
+		"stream_uri":    channel.StreamURI,
+		"status":        channel.Status,
+		"profiles_json": channel.ProfilesJSON,
+		"update_time":   channel.UpdateTime,
+	}).Error
+}
+
 func (r *OnvifChannelRepository) ListByDeviceID(ctx context.Context, deviceID int64) ([]*domainonvif.Channel, error) {
 	var rows []model.OnvifChannel
 	if err := r.db.WithContext(ctx).Where("device_id = ?", deviceID).Find(&rows).Error; err != nil {
@@ -230,6 +252,12 @@ func toOnvifDeviceDomain(m *model.OnvifDevice) *domainonvif.Device {
 }
 
 func toOnvifChannelModel(c *domainonvif.Channel) *model.OnvifChannel {
+	profilesJSON := c.ProfilesJSON
+	if profilesJSON == "" && len(c.StreamProfiles) > 0 {
+		if b, err := json.Marshal(c.StreamProfiles); err == nil {
+			profilesJSON = string(b)
+		}
+	}
 	return &model.OnvifChannel{
 		ID:           c.ID,
 		DeviceID:     c.DeviceID,
@@ -243,13 +271,14 @@ func toOnvifChannelModel(c *domainonvif.Channel) *model.OnvifChannel {
 		HasPTZ:       c.HasPTZ,
 		StreamURI:    c.StreamURI,
 		Status:       c.Status,
+		ProfilesJSON: profilesJSON,
 		CreateTime:   c.CreateTime,
 		UpdateTime:   c.UpdateTime,
 	}
 }
 
 func toOnvifChannelDomain(m *model.OnvifChannel) *domainonvif.Channel {
-	return &domainonvif.Channel{
+	ch := &domainonvif.Channel{
 		ID:           m.ID,
 		DeviceID:     m.DeviceID,
 		ProfileToken: m.ProfileToken,
@@ -262,7 +291,12 @@ func toOnvifChannelDomain(m *model.OnvifChannel) *domainonvif.Channel {
 		HasPTZ:       m.HasPTZ,
 		StreamURI:    m.StreamURI,
 		Status:       m.Status,
+		ProfilesJSON: m.ProfilesJSON,
 		CreateTime:   m.CreateTime,
 		UpdateTime:   m.UpdateTime,
 	}
+	if m.ProfilesJSON != "" {
+		_ = json.Unmarshal([]byte(m.ProfilesJSON), &ch.StreamProfiles)
+	}
+	return ch
 }

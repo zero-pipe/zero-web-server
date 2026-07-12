@@ -82,7 +82,6 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="gbName" label="名称" min-width="180" />
         <el-table-column prop="gbDeviceId" label="编号" min-width="180" />
-        <el-table-column prop="gbManufacturer" label="厂家" min-width="100" />
         <el-table-column label="类型" min-width="100">
           <template v-slot:default="scope">
             <div slot="reference" class="name-wrapper">

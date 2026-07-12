@@ -14,10 +14,17 @@ type Config struct {
 	MySQL        MySQLConfig        `mapstructure:"mysql"`
 	Redis        RedisConfig        `mapstructure:"redis"`
 	SIP          SIPConfig          `mapstructure:"sip"`
+	GB           GBConfig           `mapstructure:"gb"`
 	Media        MediaConfig        `mapstructure:"media"`
 	Log          LogConfig          `mapstructure:"log"`
 	UserSettings UserSettingsConfig `mapstructure:"user_settings"`
 	ONVIF        ONVIFConfig        `mapstructure:"onvif"`
+}
+
+// GBConfig 国标接入行为（与 sip 信令配置分离）
+type GBConfig struct {
+	// RequirePreRegister 为 true 时，未在平台预添加的设备 REGISTER 将被拒绝
+	RequirePreRegister bool `mapstructure:"require_pre_register"`
 }
 
 // SIPConfig 国标 SIP：yaml 提供默认值；启动时写入库（若库空），之后以库为准，页面可热更新编码等。

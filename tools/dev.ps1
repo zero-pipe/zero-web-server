@@ -337,13 +337,27 @@ function Do-Start {
     Write-Host "Backend ready (pid $($backend.Id))" -ForegroundColor Green
 
     Write-Title "Starting frontend :$FrontendPort"
-    # BROWSER=none: vue.config.js has open:true; we open once from this script
-    $frontend = Start-BackgroundLogged -Tag "frontend" -FileName "cmd.exe" `
-        -ArgumentList @("/c", "set BROWSER=none&& npm run dev") `
-        -WorkingDirectory (Join-Path $Root "web")
-
+    # 直接启动 npm，存活判断改看 :9528，避免 cmd 包装进程先退出误杀后端
+    $frontendOut = Join-Path $LogDir "frontend.out.log"
+    $frontendErr = Join-Path $LogDir "frontend.err.log"
+    foreach ($f in @($frontendOut, $frontendErr)) {
+        if (Test-Path $f) { Remove-Item $f -Force }
+    }
+    $npmCmd = Get-Command npm.cmd -ErrorAction SilentlyContinue
+    if (-not $npmCmd) { $npmCmd = Get-Command npm -ErrorAction Stop }
+    $prevBrowser = $env:BROWSER
+    $env:BROWSER = "none"
+    try {
+        $frontend = Start-Process -FilePath $npmCmd.Source -ArgumentList @("run", "dev") `
+            -WorkingDirectory (Join-Path $Root "web") `
+            -RedirectStandardOutput $frontendOut -RedirectStandardError $frontendErr `
+            -PassThru -WindowStyle Hidden
+    } finally {
+        if ($null -eq $prevBrowser) { Remove-Item Env:BROWSER -ErrorAction SilentlyContinue }
+        else { $env:BROWSER = $prevBrowser }
+    }
     if (-not (Wait-TcpPort $FrontendPort 120)) {
-        Get-Content (Join-Path $LogDir "frontend.err.log") -ErrorAction SilentlyContinue
+        Get-Content $frontendErr -ErrorAction SilentlyContinue
         Stop-ProcessTree $frontend.Id "frontend"
         Stop-ProcessTree $backend.Id "backend"
         Write-Error "Frontend failed on :$FrontendPort — see .dev/logs/frontend.err.log"
@@ -366,9 +380,11 @@ function Do-Start {
         }
     }
 
+    $backendListenPid = if (($bk = (Get-ListenerPids $BackendPort | Select-Object -First 1))) { [int]$bk } else { [int]$backend.Id }
+    $frontendListenPid = if (($fe = (Get-ListenerPids $FrontendPort | Select-Object -First 1))) { [int]$fe } else { [int]$frontend.Id }
     Save-DevState @{
-        backend  = if (($bk = (Get-ListenerPids $BackendPort | Select-Object -First 1))) { $bk } else { $backend.Id }
-        frontend = if (($fe = (Get-ListenerPids $FrontendPort | Select-Object -First 1))) { $fe } else { $frontend.Id }
+        backend  = $backendListenPid
+        frontend = $frontendListenPid
         media    = $mediaPid
         started  = (Get-Date).ToString("o")
     }
@@ -392,15 +408,28 @@ function Do-Start {
         Write-Host "Streaming new log lines only (Ctrl+C stops all). Use -Quiet for a silent watch." -ForegroundColor Gray
         Init-LogOffsetsToEnd
     }
+    $frontendDownStreak = 0
+    $backendDownStreak = 0
     try {
         while ($true) {
-            if (-not (Test-ProcessAlive $backend.Id)) {
-                Write-Warning "Backend exited"
-                break
+            # 以端口为准：webpack/node 仍在监听则不算退出（避免包装进程 PID 误杀整栈）
+            if (-not (Test-TcpPortOpen $BackendPort)) {
+                $backendDownStreak++
+                if ($backendDownStreak -ge 3) {
+                    Write-Warning "Backend exited (:$BackendPort closed)"
+                    break
+                }
+            } else {
+                $backendDownStreak = 0
             }
-            if (-not (Test-ProcessAlive $frontend.Id)) {
-                Write-Warning "Frontend exited"
-                break
+            if (-not (Test-TcpPortOpen $FrontendPort)) {
+                $frontendDownStreak++
+                if ($frontendDownStreak -ge 3) {
+                    Write-Warning "Frontend exited (:$FrontendPort closed)"
+                    break
+                }
+            } else {
+                $frontendDownStreak = 0
             }
             if (-not $Quiet) { Show-NewLogLines }
             Start-Sleep -Seconds 1

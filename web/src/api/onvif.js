@@ -53,19 +53,33 @@ export function queryChannels(params) {
   })
 }
 
-export function startPlay(channelId) {
+export function updateChannel(data) {
   return request({
-    url: '/api/onvif/play/start',
-    method: 'get',
-    params: { channelId }
+    url: '/api/onvif/channel/update',
+    method: 'post',
+    data
   })
 }
 
-export function stopPlay(channelId) {
+export function startPlay(channelId, profileToken) {
+  return request({
+    url: '/api/onvif/play/start',
+    method: 'get',
+    params: {
+      channelId,
+      ...(profileToken ? { profileToken } : {})
+    }
+  })
+}
+
+export function stopPlay(channelId, profileToken) {
   return request({
     url: '/api/onvif/play/stop',
     method: 'get',
-    params: { channelId }
+    params: {
+      channelId,
+      ...(profileToken ? { profileToken } : {})
+    }
   })
 }
 

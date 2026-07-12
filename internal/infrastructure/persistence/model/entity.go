@@ -62,6 +62,7 @@ type OnvifChannel struct {
 	HasPTZ       bool   `gorm:"column:has_ptz"`
 	StreamURI    string `gorm:"column:stream_uri;size:1024"`
 	Status       string `gorm:"column:status;size:50"`
+	ProfilesJSON string `gorm:"column:profiles_json;type:text"` // 同视频源下可选码流 JSON
 	CreateTime   string `gorm:"column:create_time;size:50"`
 	UpdateTime   string `gorm:"column:update_time;size:50"`
 }

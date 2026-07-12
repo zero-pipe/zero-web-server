@@ -97,6 +97,18 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/devices',
+    component: Layout,
+    children: [
+      {
+        path: '/devices',
+        name: 'Devices',
+        component: () => import('@/views/devices/index'),
+        meta: { title: '设备列表', icon: 'device' }
+      }
+    ]
+  },
+  {
     path: '/device',
     component: Layout,
     children: [

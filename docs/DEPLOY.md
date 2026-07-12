@@ -68,13 +68,14 @@ docker compose version
 
 ## 三、数据库初始化（四种场景通用）
 
-**全新安装**（推荐 SQL）：
+**基本原则：新安装只跑全量 SQL；AutoMigrate 仅用于已有库升级补列。**
+
+**全新安装**：
 
 ```bash
 # Linux / macOS / Git Bash
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mysql -u root -p zws < sql/init_zws_mysql.sql
-mysql -u root -p zws < sql/add_onvif_tables.sql
 ```
 
 **Windows PowerShell**（把 `$mysql` 换成你的 mysql.exe 路径）：
@@ -84,7 +85,6 @@ cd E:\16_project\zero-web-kit
 $mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 & $mysql -u root -p你的密码 -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 Get-Content sql\init_zws_mysql.sql -Raw | & $mysql -u root -p你的密码 zws
-Get-Content sql\add_onvif_tables.sql -Raw | & $mysql -u root -p你的密码 zws
 ```
 
 默认管理员：**admin / admin**
@@ -93,7 +93,9 @@ Get-Content sql\add_onvif_tables.sql -Raw | & $mysql -u root -p你的密码 zws
 
 ```sql
 USE zws;
+SHOW TABLES LIKE 'zws_%';
 SELECT username FROM zws_user WHERE username = 'admin';
+-- 应有 play_url、zws_gb_sip_config、zws_onvif_*
 ```
 
 ---
@@ -167,7 +169,7 @@ docker compose -f docker/docker-compose.yml ps
 docker compose -f docker/docker-compose.yml logs mysql --tail 20
 ```
 
-MySQL 首次启动会自动执行 `sql/init_zws_mysql.sql` 与 `sql/add_onvif_tables.sql`。
+MySQL 首次启动会自动执行 `sql/init_zws_mysql.sql`（全量建表，含 ONVIF）。
 
 ---
 
@@ -205,9 +207,8 @@ sudo apt install -y mysql-server redis-server
 
 sudo systemctl enable --now mysql redis-server
 
-# 导入数据库（第三节）
+# 导入数据库（第三节，全量 init 即可）
 mysql -u root -p zws < sql/init_zws_mysql.sql
-mysql -u root -p zws < sql/add_onvif_tables.sql
 
 # 防火墙（若启用 ufw）
 sudo ufw allow 18080/tcp
