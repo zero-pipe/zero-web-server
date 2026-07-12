@@ -20,7 +20,7 @@ var logWSUpgrader = websocket.Upgrader{
 	},
 }
 
-// LogChannel WebSocket 实时日志，对齐 WVP /channel/log。
+// LogChannel WebSocket 实时日志（/channel/log）。
 // 鉴权：query access-token，或兼容 Sec-WebSocket-Protocol。
 func LogChannel(c *gin.Context) {
 	proto := c.GetHeader("Sec-WebSocket-Protocol")

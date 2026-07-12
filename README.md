@@ -34,7 +34,7 @@ zero-web-kit/
 ├── pkg/
 │   ├── jwt/                 # JWT 签发
 │   ├── log/                 # 结构化日志 + 文件轮转
-│   └── response/            # 统一 JSON 响应（兼容原前端）
+│   └── response/            # 统一 JSON 响应 {code,msg,data}
 ├── resources/               # 静态资源（如 civilCode.csv）
 ├── tools/                   # 开发脚本（dev.ps1 / dev.sh 一键启停）
 ├── web/                     # Vue 前端
@@ -68,11 +68,11 @@ make frontend-install && make frontend-dev
 
 - 源码目录：与 zero-web-kit 同级的 **`zms/`**，编译产物为 `demo_media_server`
 - 联调配置：`zms/conf/config.zero-web-kit.ini`（Hook → `:18080`，HTTP → `:8080`）
-- 平台配置：`configs/config.yaml` 中 `media.type: zms`（兼容 `zeromediakit` / `zlm` 等旧值）
+- 平台配置：`configs/config.yaml` 中 `media.type: zms`
 - 编译与启动详见 [docs/DEPLOY.md](docs/DEPLOY.md) 第九节；ZMS 日志级别见 [zms/README.md](../zms/README.md)
 - WebRTC 信令可由平台反向代理：`/index/api/webrtc`
 
-媒体节点管理页使用 zero-media-server 品牌图标，已移除 ZLMediaKit 选项。
+媒体节点管理页使用 zero-media-server 品牌图标。
 
 ## GB28181
 

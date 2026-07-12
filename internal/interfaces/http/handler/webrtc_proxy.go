@@ -24,7 +24,7 @@ import (
 
 
 
-// WebRTCProxyHandler 将 WebRTC 信令转发到 ZMS/ZLM，供前端 rtc 字段走平台同源地址。
+// WebRTCProxyHandler 将 WebRTC 信令转发到 ZMS，供前端 rtc 字段走平台同源地址。
 
 type WebRTCProxyHandler struct {
 

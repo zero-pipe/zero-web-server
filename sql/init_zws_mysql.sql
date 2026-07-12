@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS zws_device_channel
     UNIQUE KEY uk_device_channel_source (data_device_id, device_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 媒体服务器（如 ZLM）节点信息
+-- 媒体服务器（zero-media-server / ZMS）节点信息
 DROP TABLE IF EXISTS zws_media_server;
 CREATE TABLE IF NOT EXISTS zws_media_server
 (
@@ -180,12 +180,12 @@ CREATE TABLE IF NOT EXISTS zws_media_server
     ws_flv_ssl_port     INT COMMENT 'WS-FLV HTTPS端口',
     jtt_proxy_port      INT COMMENT 'JT/T代理端口',
     auto_config         TINYINT(1) DEFAULT 0 COMMENT '是否自动配置',
-    secret              VARCHAR(50) COMMENT 'ZLM校验密钥',
-    type                VARCHAR(50) default 'zlm' COMMENT '节点类型',
+    secret              VARCHAR(50) COMMENT 'API校验密钥',
+    type                VARCHAR(50) default 'zms' COMMENT '节点类型（zms）',
     rtp_enable          TINYINT(1) DEFAULT 0 COMMENT '是否开启RTP',
     rtp_port_range      VARCHAR(50) COMMENT 'RTP端口范围',
     send_rtp_port_range VARCHAR(50) COMMENT '发送RTP端口范围',
-    record_assist_port  INT COMMENT '录像辅助端口',
+    record_assist_port  INT COMMENT '录像辅助端口（预留）',
     default_server      TINYINT(1) DEFAULT 0 COMMENT '是否默认节点',
     create_time         VARCHAR(50) COMMENT '创建时间',
     update_time         VARCHAR(50) COMMENT '更新时间',

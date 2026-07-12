@@ -199,26 +199,6 @@ export default {
     loadEnd() {
       this.playerTitle = this.file.fileName
     },
-    deleteRecord() {
-      // TODO
-      const that = this
-      this.$axios({
-        method: 'delete',
-        url: `/record_proxy/api/record/delete`,
-        params: {
-          page: that.currentPage,
-          count: that.count
-        }
-      }).then(function(res) {
-        console.log(res)
-        if (res.data.code === 0) {
-          that.total = res.data.data.total
-          that.fileList = res.data.data.list
-        }
-      }).catch(function(error) {
-        console.log(error)
-      })
-    },
     formatTime(time) {
       const h = parseInt(time / 3600 / 1000)
       const minute = parseInt((time - h * 3600 * 1000) / 60 / 1000)

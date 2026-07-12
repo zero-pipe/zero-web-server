@@ -119,7 +119,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	)
 
 	r.GET("/health", healthHandler.Health)
-	// 实时日志 WebSocket（对齐 WVP /channel/log；token 走子协议）
+	// 实时日志 WebSocket（/channel/log；token 走子协议）
 	r.GET("/channel/log", handler.LogChannel)
 	api := r.Group("/api")
 	{

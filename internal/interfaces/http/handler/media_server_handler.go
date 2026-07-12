@@ -126,7 +126,7 @@ func (h *MediaServerHandler) Load(c *gin.Context) {
 }
 
 func (h *MediaServerHandler) RecordCheck(c *gin.Context) {
-	response.Error(c, response.CodeError, "未配置 RecordAssist 服务")
+	response.Error(c, response.CodeError, "未配置录像辅助服务")
 }
 
 func (h *MediaServerHandler) ResourceInfo(c *gin.Context) {

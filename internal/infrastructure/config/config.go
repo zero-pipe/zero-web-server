@@ -66,7 +66,7 @@ func (c RedisConfig) Addr() string {
 
 type MediaConfig struct {
 	ID       string         `mapstructure:"id"`
-	Type     string         `mapstructure:"type"` // zms | zero-media-server (legacy: zeromediakit, zlm)
+	Type     string         `mapstructure:"type"` // zms | zero-media-server（兼容旧别名）
 	IP       string         `mapstructure:"ip"`
 	HTTPPort int            `mapstructure:"http_port"`
 	Secret   string         `mapstructure:"secret"`

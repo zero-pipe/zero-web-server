@@ -33,7 +33,7 @@ func (s *Service) OnRecordMp4(param RecordHookParam) error {
 			mediaID = node.ID()
 		}
 	}
-	// ZMS/ZLM hook: start_time 为秒，time_len 为秒；前端按毫秒展示/播放
+	// ZMS hook: start_time 为秒，time_len 为秒；前端按毫秒展示/播放
 	startMs, timeLenMs := normalizeRecordTimes(param.StartTime, param.TimeLen)
 	playURL := strings.TrimSpace(param.URL)
 	if playURL == "" {
@@ -231,7 +231,7 @@ func (s *Service) Speed(app, stream, mediaServerID string, speed int, schema str
 }
 
 func (s *Service) AddTask(app, stream, mediaServerID, startTime, endTime string) (string, error) {
-	return "", fmt.Errorf("未配置 RecordAssist 服务，暂不支持云端录像合并任务")
+	return "", fmt.Errorf("暂不支持云端录像合并任务")
 }
 
 func (s *Service) QueryTaskList(mediaServerID string, isEnd *bool) ([]any, error) {

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// LogFileInfo 历史日志文件条目（对齐 WVP LogFileInfo）。
+// LogFileInfo 历史日志文件条目。
 type LogFileInfo struct {
 	FileName  string `json:"fileName"`
 	FileSize  int64  `json:"fileSize"`

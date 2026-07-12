@@ -15,7 +15,7 @@ import (
 
 var processStart = time.Now()
 
-// PlatformInfo 对齐 WVP /api/server/info：map[分组]map[字段]string。
+// PlatformInfo 平台信息：map[分组]map[字段]string，供 GET /api/server/info。
 func PlatformInfo(version, serverID string, serverPort int, scheme, requestHost string) map[string]map[string]string {
 	out := map[string]map[string]string{
 		"硬件信息": {},
