@@ -3,6 +3,7 @@ package handler
 import (
 	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
+	"zero-web-kit/internal/application/ops"
 	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/persistence/model"
 	"zero-web-kit/pkg/response"
@@ -12,6 +13,7 @@ import (
 
 type MediaServerHandler struct {
 	svc        *mediaserverapp.Service
+	dashboard  *ops.Dashboard
 	gbSipSvc   *gbsipconfig.Service
 	sipCfg     config.SIPConfig
 	mediaIP    string
@@ -22,6 +24,7 @@ type MediaServerHandler struct {
 
 func NewMediaServerHandler(
 	svc *mediaserverapp.Service,
+	dashboard *ops.Dashboard,
 	gbSipSvc *gbsipconfig.Service,
 	sipCfg config.SIPConfig,
 	mediaIP string,
@@ -30,6 +33,7 @@ func NewMediaServerHandler(
 ) *MediaServerHandler {
 	return &MediaServerHandler{
 		svc:        svc,
+		dashboard:  dashboard,
 		gbSipSvc:   gbSipSvc,
 		sipCfg:     sipCfg,
 		mediaIP:    mediaIP,
@@ -109,7 +113,11 @@ func (h *MediaServerHandler) MediaInfo(c *gin.Context) {
 }
 
 func (h *MediaServerHandler) Load(c *gin.Context) {
-	list, err := h.svc.Load()
+	if h.dashboard == nil {
+		response.OK(c, []any{})
+		return
+	}
+	list, err := h.dashboard.MediaLoads()
 	if err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
@@ -122,11 +130,23 @@ func (h *MediaServerHandler) RecordCheck(c *gin.Context) {
 }
 
 func (h *MediaServerHandler) ResourceInfo(c *gin.Context) {
-	response.OK(c, gin.H{})
+	if h.dashboard == nil {
+		response.OK(c, ops.ResourceInfo{})
+		return
+	}
+	response.OK(c, h.dashboard.ResourceInfo())
 }
 
 func (h *MediaServerHandler) Info(c *gin.Context) {
-	response.OK(c, gin.H{})
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	if proto := c.GetHeader("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	host := c.Request.Host
+	response.OK(c, ops.PlatformInfo(h.version, h.serverID, h.serverPort, scheme, host))
 }
 
 func (h *MediaServerHandler) MapConfig(c *gin.Context) {

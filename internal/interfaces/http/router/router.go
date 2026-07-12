@@ -10,6 +10,7 @@ import (
 	mediaapp "zero-web-kit/internal/application/media"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	onvifapp "zero-web-kit/internal/application/onvif"
+	"zero-web-kit/internal/application/ops"
 	platformapp "zero-web-kit/internal/application/platform"
 	positionapp "zero-web-kit/internal/application/position"
 	playapp "zero-web-kit/internal/application/play"
@@ -62,9 +63,13 @@ type Deps struct {
 	GbSipConfigService  *gbsipconfig.Service
 	ServerPort          int
 	MediaIP             string
+	LogDir              string
+	Metrics             *ops.Metrics
+	Dashboard           *ops.Dashboard
 }
 
 func Setup(r *gin.Engine, deps Deps) {
+	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())
 
 	if deps.MediaBaseURL != "" {
@@ -76,7 +81,7 @@ func Setup(r *gin.Engine, deps Deps) {
 
 	userHandler := handler.NewUserHandler(deps.AuthService)
 	healthHandler := handler.NewHealthHandler(deps.Version)
-	serverHandler := handler.NewServerHandler(deps.ServerID)
+	serverHandler := handler.NewServerHandler(deps.ServerID, deps.Metrics)
 	onvifHandler := handler.NewONVIFHandler(deps.ONVIFService)
 	deviceHandler := handler.NewDeviceHandler(deps.DeviceService)
 	playHandler := handler.NewPlayHandler(deps.PlayService, deps.PlayTimeoutMs)
@@ -92,6 +97,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	recordPlanHandler := handler.NewRecordPlanHandler(deps.RecordPlanService)
 	mediaServerHandler := handler.NewMediaServerHandler(
 		deps.MediaServerService,
+		deps.Dashboard,
 		deps.GbSipConfigService,
 		deps.SIPConfig,
 		deps.MediaIP,
@@ -105,6 +111,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	groupHandler := handler.NewGroupHandler(deps.GroupService)
 	regionHandler := handler.NewRegionHandler(deps.RegionService)
 	roleHandler := handler.NewRoleHandler(deps.UserRepo)
+	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
@@ -112,6 +119,8 @@ func Setup(r *gin.Engine, deps Deps) {
 	)
 
 	r.GET("/health", healthHandler.Health)
+	// 实时日志 WebSocket（对齐 WVP /channel/log；token 走子协议）
+	r.GET("/channel/log", handler.LogChannel)
 	api := r.Group("/api")
 	{
 		user := api.Group("/user")
@@ -280,6 +289,12 @@ func Setup(r *gin.Engine, deps Deps) {
 			cloudRecord.GET("/speed", cloudRecordHandler.Speed)
 			cloudRecord.GET("/task/add", cloudRecordHandler.AddTask)
 			cloudRecord.GET("/task/list", cloudRecordHandler.TaskList)
+		}
+
+		logAPI := auth.Group("/log")
+		{
+			logAPI.GET("/list", logHandler.List)
+			logAPI.GET("/file/:fileName", logHandler.File)
 		}
 
 		push := auth.Group("/push")

@@ -16,13 +16,12 @@ const service = axios.create({
 service.interceptors.request.use(
   config => {
     // do something before request is sent
-    if (store.getters.token && config.url.indexOf('api/user/login') < 0) {
+    if (store.getters.token && config.url && config.url.indexOf('api/user/login') < 0) {
       config.headers['access-token'] = getToken()
     }
     return config
   },
   error => {
-    // do something with request error
     console.log(error) // for debug
     return Promise.reject(error)
   }
@@ -30,29 +29,40 @@ service.interceptors.request.use(
 
 // response interceptor
 service.interceptors.response.use(
-  /**
-   * If you want to get http information such as headers or status
-   * Please return  response => response
-  */
-
-  /**
-   * Determine the request status by custom code
-   * Here is just an example
-   * You can also judge the status by HTTP Status Code
-   */
   response => {
-    if (response.config.url.indexOf('/api/user/logout') >= 0) {
+    if (response.config.url && response.config.url.indexOf('/api/user/logout') >= 0) {
       return
     }
     const res = response.data
-    if (res.code && res.code !== 0) {
-      throw res.msg
-    } else {
+    // 历史日志文件等接口直接返回纯文本
+    if (typeof res === 'string') {
       return res
     }
+    if (!res || typeof res !== 'object') {
+      const err = new Error('响应无效')
+      Message.error({ message: err.message, showClose: true })
+      return Promise.reject(err)
+    }
+    if (res.code && res.code !== 0) {
+      const msg = res.msg || '请求失败'
+      Message.error({ message: msg, showClose: true })
+      return Promise.reject(new Error(msg))
+    }
+    return res
   },
   error => {
     console.log(error) // for debug
+    if (axios.isCancel(error)) {
+      return Promise.reject(error)
+    }
+    // 业务层可能 reject 了普通 Error / 字符串，没有 response
+    if (!error || !error.response) {
+      const msg = (error && error.message) || (typeof error === 'string' ? error : '网络异常')
+      if (msg && store.getters.showConfirmBoxForLoginLose) {
+        Message.error({ message: msg, showClose: true })
+      }
+      return Promise.reject(error || new Error(msg))
+    }
     if (error.response.status === 401) {
       if (!showLoginConfirm && store.getters.showConfirmBoxForLoginLose) {
         // to re-login
@@ -71,28 +81,16 @@ service.interceptors.response.use(
             type: 'warning',
             message: '登录过期提示已经关闭，请注销后重新登录'
           })
-          // 清除token， 后续请求不再继续
-
         })
       }
-    }else {
-      if (!store.getters.showConfirmBoxForLoginLose) {
-        return
-      }
-      let data = error.response.data
-      if (data && data.msg) {
-        Message.error({
-          message: data.msg,
-          showClose: true
-        })
-      }else {
-        Message.error({
-          message: error.message,
-          showClose: true
-        })
-      }
+    } else if (store.getters.showConfirmBoxForLoginLose) {
+      const data = error.response.data
+      Message.error({
+        message: (data && data.msg) || error.message || '请求失败',
+        showClose: true
+      })
     }
-    // return Promise.reject(error)
+    return Promise.reject(error)
   }
 )
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
+	"zero-web-kit/internal/infrastructure/persistence/model"
 	"zero-web-kit/internal/interfaces/http/dto"
 	"zero-web-kit/pkg/response"
 
@@ -56,6 +57,9 @@ func (h *CloudRecordHandler) List(c *gin.Context) {
 	if err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
+	}
+	if list == nil {
+		list = []model.CloudRecord{}
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
 }

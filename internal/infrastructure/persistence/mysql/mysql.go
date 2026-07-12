@@ -16,7 +16,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-# NewDB 连接 MySQL：库不存在则创建。
+// NewDB 连接 MySQL：库不存在则创建。
 // 表结构原则：新安装必须先执行 sql/init_zws_mysql.sql 全量脚本；
 // AutoMigrate 仅用于已有库升级时补缺表/缺列，不是新装建表手段。
 func NewDB(cfg config.MySQLConfig) (*gorm.DB, error) {

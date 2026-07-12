@@ -43,6 +43,7 @@ module.exports = {
       "/dev-api": {
         target: "http://127.0.0.1:18080",
         changeOrigin: true,
+        ws: true,
         pathRewrite: {
           "^/dev-api": "/",
         },
@@ -50,6 +51,12 @@ module.exports = {
       "/api": {
         target: "http://127.0.0.1:18080",
         changeOrigin: true,
+        ws: true,
+      },
+      "/channel": {
+        target: "http://127.0.0.1:18080",
+        changeOrigin: true,
+        ws: true,
       },
       "/index/api/webrtc": {
         target: "http://127.0.0.1:18080",

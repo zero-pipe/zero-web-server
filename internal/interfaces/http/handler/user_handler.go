@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	appauth "zero-web-kit/internal/application/auth"
+	"zero-web-kit/internal/application/ops"
 	"zero-web-kit/pkg/jwt"
 	"zero-web-kit/pkg/response"
 
@@ -73,10 +74,14 @@ func (h *HealthHandler) Health(c *gin.Context) {
 
 type ServerHandler struct {
 	serverID string
+	metrics  *ops.Metrics
 }
 
-func NewServerHandler(serverID string) *ServerHandler {
-	return &ServerHandler{serverID: serverID}
+func NewServerHandler(serverID string, metrics *ops.Metrics) *ServerHandler {
+	if metrics == nil {
+		metrics = ops.DefaultMetrics
+	}
+	return &ServerHandler{serverID: serverID, metrics: metrics}
 }
 
 func (h *ServerHandler) Config(c *gin.Context) {
@@ -86,9 +91,7 @@ func (h *ServerHandler) Config(c *gin.Context) {
 }
 
 func (h *ServerHandler) SystemInfo(c *gin.Context) {
-	response.OK(c, gin.H{
-		"serverId": h.serverID,
-	})
+	response.OK(c, h.metrics.Snapshot())
 }
 
 func parsePageCount(c *gin.Context) (int, int) {

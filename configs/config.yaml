@@ -36,10 +36,10 @@ log:
   output: both         # stdout | file | both
   file:
     path: logs/zero-web-kit.log
-    max_size_mb: 100   # 单文件上限（MB），超出自动切分
-    max_backups: 10    # 保留历史文件个数
-    max_age_days: 30   # 历史文件最长保留天数
-    compress: true     # 归档 gzip 压缩
+    max_size_mb: 100   # 单文件上限（MB），超出自动切分为 zero-web-kit-*.log[.gz]
+    max_backups: 20    # 最多保留多少个历史文件（与天数同时生效，先到先删）
+    max_age_days: 7    # 历史文件最长保留天数，超时自动删除，避免撑满磁盘
+    compress: true     # 切分后的历史文件 gzip 压缩
 
 user_settings:
   play_timeout: 180000

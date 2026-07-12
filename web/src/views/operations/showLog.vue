@@ -4,6 +4,9 @@
       <el-form-item label="过滤">
         <el-input v-model="filter" size="mini" placeholder="请输入过滤关键字" style="width: 20vw" />
       </el-form-item>
+      <el-form-item v-if="statusText">
+        <span :style="{ color: statusOk ? '#67c23a' : '#f56c6c', fontSize: '12px' }">{{ statusText }}</span>
+      </el-form-item>
       <el-form-item style="float: right;">
         <el-button size="mini" icon="el-icon-download" @click="downloadFile()">下载</el-button>
       </el-form-item>
@@ -26,31 +29,24 @@ export default {
   data() {
     return {
       loading: true,
-      winHeight: window.innerHeight - 100,
+      winHeight: window.innerHeight - 200,
       data: [],
       filter: '',
       logData: '',
       websocket: null,
-      destroyedCallback: null
+      statusText: '',
+      statusOk: false
     }
   },
   watch: {
-    remoteUrl(newValue) {
-      console.log(newValue)
-      this.remoteUrl = newValue
+    remoteUrl() {
       this.initData()
     },
-    fileUrl(newValue) {
-      this.fileUrl = newValue
+    fileUrl() {
       this.initData()
     },
-    filter(newValue) {
-      this.filter = newValue
-      this.logData = this.getLogData()
-    },
-    data(newValue) {
-      this.data = newValue
-      this.logData = this.getLogData()
+    filter() {
+      this.refreshLogData()
     }
   },
   created() {
@@ -59,102 +55,142 @@ export default {
       this.initData()
     }
   },
-  destroyed() {
-    console.log('destroyed')
-    if (this.destroyedCallback) {
-      this.destroyedCallback()
-    }
+  beforeDestroy() {
+    this.closeSocket()
   },
   methods: {
-    initData: function() {
+    closeSocket() {
+      if (this.websocket) {
+        try {
+          this.websocket.onopen = null
+          this.websocket.onmessage = null
+          this.websocket.onerror = null
+          this.websocket.onclose = null
+          this.websocket.close()
+        } catch (e) { /* ignore */ }
+        this.websocket = null
+      }
+    },
+    refreshLogData() {
+      this.logData = this.getLogData()
+    },
+    appendLine(line) {
+      if (line == null || line === '') {
+        return
+      }
+      this.data.push(String(line))
+      this.refreshLogData()
+    },
+    initData() {
       this.loading = true
       this.data = []
-      console.log(this.loading)
+      this.logData = ''
+      this.statusText = ''
+      this.closeSocket()
+
       if (this.fileUrl) {
         request({
           method: 'get',
           url: this.fileUrl
         }).then((res) => {
-          const dataArray = res.split('\n')
-          dataArray.forEach(item => {
-            this.data.push(item)
+          const text = typeof res === 'string' ? res : ''
+          text.split('\n').forEach(item => {
+            if (item !== '') {
+              this.data.push(item)
+            }
           })
+          this.refreshLogData()
           this.loading = false
           if (this.loadEnd && typeof this.loadEnd === 'function') {
             this.loadEnd()
           }
         }).catch((error) => {
           console.log(error)
+          this.statusText = '日志文件加载失败'
+          this.statusOk = false
         })
-      } else if (this.remoteUrl) {
-        console.log('remoteUrl' + this.remoteUrl)
-        console.log(window.location.host)
-        window.websocket = new WebSocket(this.remoteUrl, this.$store.getters.token)
-        window.websocket.onclose = e => {
-          console.log(`conn closed: code=${e.code}, reason=${e.reason}, wasClean=${e.wasClean}`)
-        }
-        window.websocket.onmessage = e => {
-          this.loading = false
-          this.data.push(e.data)
-        }
-        window.websocket.onerror = e => {
-          console.log(`conn err`)
-          console.error(e)
-        }
-        window.websocket.onopen = e => {
-          console.log(`conn open: ${e}`)
-          this.destroyedCallback = () => {
-            window.websocket.close()
-          }
+        return
+      }
+
+      if (!this.remoteUrl) {
+        return
+      }
+
+      // 不用 JWT 当 Sec-WebSocket-Protocol（易握手失败）；改 query 传 token
+      const token = this.$store.getters.token
+      let url = this.remoteUrl
+      if (token) {
+        url += (url.indexOf('?') >= 0 ? '&' : '?') + 'access-token=' + encodeURIComponent(token)
+      }
+      console.log('realtime log ws:', url)
+
+      let ws
+      try {
+        ws = new WebSocket(url)
+      } catch (e) {
+        this.statusText = 'WebSocket 创建失败: ' + (e && e.message)
+        this.statusOk = false
+        return
+      }
+      this.websocket = ws
+      this.statusText = '连接中…'
+      this.statusOk = false
+
+      ws.onopen = () => {
+        this.statusText = '已连接'
+        this.statusOk = true
+        this.loading = false
+      }
+      ws.onmessage = (e) => {
+        this.loading = false
+        this.appendLine(e.data)
+      }
+      ws.onerror = () => {
+        this.statusText = '连接异常（请确认后端已启动，开发环境需直连 :18080）'
+        this.statusOk = false
+      }
+      ws.onclose = (e) => {
+        if (!this.statusOk) {
+          this.statusText = `连接关闭 code=${e.code}`
+        } else {
+          this.statusText = '连接已断开'
+          this.statusOk = false
         }
       }
     },
-    getLogData: function() {
-      this.loading = true
+    getLogData() {
       if (this.data.length === 0) {
-        this.loading = false
         return ''
-      } else {
-        let result = ''
-        for (let i = 0; i < this.data.length; i++) {
-          if (this.filter.length === 0) {
-            result += this.data[i] + '\r\n'
-          } else {
-            if (this.data[i].indexOf(this.filter) > -1) {
-              result += this.data[i] + '\r\n'
-            }
-          }
-        }
-        this.loading = false
-        return result
       }
+      let result = ''
+      for (let i = 0; i < this.data.length; i++) {
+        if (!this.filter || this.data[i].indexOf(this.filter) > -1) {
+          result += this.data[i] + '\r\n'
+        }
+      }
+      return result
     },
-    getLogDataWithOutAnsi: function() {
+    getLogDataWithOutAnsi() {
       if (this.data.length === 0) {
         return ''
-      } else {
-        let result = ''
-        for (let i = 0; i < this.data.length; i++) {
-          if (this.filter.length === 0) {
-            result += stripAnsi(this.data[i]) + '\r\n'
-          } else {
-            if (this.data[i].indexOf(this.filter) > -1) {
-              result += stripAnsi(this.data[i]) + '\r\n'
-            }
-          }
-        }
-        return result
       }
+      let result = ''
+      for (let i = 0; i < this.data.length; i++) {
+        if (!this.filter || this.data[i].indexOf(this.filter) > -1) {
+          result += stripAnsi(this.data[i]) + '\r\n'
+        }
+      }
+      return result
     },
     downloadFile() {
       const blob = new Blob([this.getLogDataWithOutAnsi()], {
-        type: 'text/plain;charset=utf-8'
+        type: 'text/plain; charset=utf-8'
       })
       const reader = new FileReader()
       reader.readAsDataURL(blob)
       reader.onload = (e) => {
         const a = document.createElement('a')
-        a.download = `zero-web-kit-${this.filter}-${moment().format('yyyy-MM-DD')}.log`
+        a.download = `zero-web-kit-${this.filter || 'all'}-${moment().format('YYYY-MM-DD')}.log`
         a.href = e.target.result
         document.body.appendChild(a)
         a.click()
@@ -164,17 +200,3 @@ export default {
   }
 }
 </script>
-
-<style>
-.log-loading{
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  display: inline-block;
-  text-align: center;
-  background-color: transparent;
-  font-size: 20px;
-  color: rgb(255, 255, 255);
-  z-index: 1000;
-}
-</style>

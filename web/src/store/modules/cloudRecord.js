@@ -83,8 +83,11 @@ const actions = {
   queryList({ commit }, params) {
     return new Promise((resolve, reject) => {
       queryList(params).then(response => {
-        const { data } = response
-        resolve(data)
+        if (!response || response.data == null) {
+          reject(new Error('列表数据无效'))
+          return
+        }
+        resolve(response.data)
       }).catch(error => {
         reject(error)
       })

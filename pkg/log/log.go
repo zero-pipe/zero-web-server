@@ -52,9 +52,19 @@ func Init(cfg config.LogConfig) error {
 	} else {
 		handler = slog.NewTextHandler(io.MultiWriter(writers...), opts)
 	}
+	handler = NewBroadcastHandler(handler, DefaultHub)
 	logger = slog.New(handler)
 	slog.SetDefault(logger)
 	return nil
+}
+
+// LogDir returns the directory containing the rotating log file.
+func LogDir(cfg config.LogFileConfig) string {
+	path := cfg.Path
+	if path == "" {
+		path = "logs/zero-web-kit.log"
+	}
+	return filepath.Dir(path)
 }
 
 func openLogFile(cfg config.LogFileConfig) (io.Writer, error) {
@@ -71,11 +81,11 @@ func openLogFile(cfg config.LogFileConfig) (io.Writer, error) {
 	}
 	maxBackups := cfg.MaxBackups
 	if maxBackups <= 0 {
-		maxBackups = 10
+		maxBackups = 20
 	}
 	maxAge := cfg.MaxAgeDays
 	if maxAge <= 0 {
-		maxAge = 30
+		maxAge = 7
 	}
 	return &lumberjack.Logger{
 		Filename:   path,

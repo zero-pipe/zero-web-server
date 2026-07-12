@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	appauth "zero-web-kit/internal/application/auth"
 	alarmapp "zero-web-kit/internal/application/alarm"
@@ -28,6 +29,7 @@ import (
 	recordplanapp "zero-web-kit/internal/application/recordplan"
 	streampushapp "zero-web-kit/internal/application/streampush"
 	streamproxyapp "zero-web-kit/internal/application/streamproxy"
+	"zero-web-kit/internal/application/ops"
 	"zero-web-kit/internal/infrastructure/config"
 	onvifinfra "zero-web-kit/internal/infrastructure/onvif"
 	"zero-web-kit/internal/infrastructure/persistence"
@@ -176,6 +178,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ops.DefaultMetrics.Start(ctx, 2*time.Second)
 	if err := sipServer.Start(ctx); err != nil {
 		applog.Fatalf("start sip: %v", err)
 	}
@@ -185,6 +188,8 @@ func main() {
 	if mediaBaseURL == "" && cfg.Media.Configured() {
 		mediaBaseURL = cfg.Media.BaseURL()
 	}
+
+	dashboard := ops.NewDashboard(db, mediaServerService)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -220,6 +225,9 @@ func main() {
 		GbSipConfigService:  gbSipConfigService,
 		ServerPort:          cfg.Server.Port,
 		MediaIP:             firstMediaIP(cfg, mediaServerService),
+		LogDir:              applog.LogDir(cfg.Log.File),
+		Metrics:             ops.DefaultMetrics,
+		Dashboard:           dashboard,
 	})
 
 	go func() {

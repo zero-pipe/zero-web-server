@@ -10,11 +10,16 @@ export const primaryMenus = [
     path: '/map'
   },
   {
+    id: 'live',
+    title: '分屏监控',
+    icon: 'live',
+    path: '/live'
+  },
+  {
     id: 'device',
     title: '设备管理',
     icon: 'menu-device',
     children: [
-      { title: '分屏监控', path: '/live', icon: 'live' },
       { title: '国标设备', path: '/device', icon: 'device' },
       { title: 'ONVIF设备', path: '/onvifDevice', icon: 'onvifDevice' },
       { title: '部标设备', path: '/jtDevice', icon: 'jtDevice' },
@@ -42,11 +47,17 @@ export const primaryMenus = [
     ]
   },
   {
+    id: 'alarm',
+    title: '报警管理',
+    icon: 'el-icon-bell',
+    path: '/alarm'
+  },
+  {
     id: 'ops',
     title: '运维管理',
     icon: 'menu-ops',
     children: [
-      { title: '报警管理', path: '/alarm', icon: 'el-icon-bell' },
+      { title: '控制台', path: '/dashboard', icon: 'dashboard' },
       { title: '平台信息', path: '/operations/systemInfo', icon: 'systemInfo' },
       { title: '历史日志', path: '/operations/historyLog', icon: 'historyLog' },
       { title: '实时日志', path: '/operations/realLog', icon: 'realLog' }
@@ -57,7 +68,6 @@ export const primaryMenus = [
     title: '系统管理',
     icon: 'menu-system',
     children: [
-      { title: '控制台', path: '/dashboard', icon: 'dashboard' },
       { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' },
       { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
       { title: '国标级联', path: '/platform', icon: 'gbCascade' }

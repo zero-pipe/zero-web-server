@@ -198,6 +198,7 @@ export default {
         })
     },
     getRecordList: function() {
+      this.loading = true
       this.$store.dispatch('cloudRecord/queryList', {
         query: this.search,
         startTime: this.startTime,
@@ -207,11 +208,12 @@ export default {
         count: this.count
       })
         .then((data) => {
-          this.total = data.total
-          this.recordList = data.list
+          this.total = (data && data.total) || 0
+          this.recordList = (data && data.list) || []
         })
         .catch((error) => {
           console.log(error)
+          this.recordList = []
         })
         .finally(() => {
           this.loading = false
