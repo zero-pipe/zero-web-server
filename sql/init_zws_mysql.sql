@@ -1,6 +1,7 @@
--- zero-web-kit MySQL 8 native schema (canonical)
--- Pure MySQL syntax; use this for new installations instead of 001
--- See schema_manifest.yaml for required/optional/deprecated tables
+# zero-web-kit MySQL 8 native schema (canonical)
+-- 新安装全量脚本：一次建齐全部业务表（含 ONVIF / 国标 SIP / 云录像 play_url）
+-- 升级已有库：依赖 AutoMigrate 补列；勿把 AutoMigrate 当新装手段
+-- See schema_manifest.yaml for required/optional tables
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -67,8 +68,8 @@ CREATE TABLE IF NOT EXISTS zws_device_channel
     id                           INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     device_id                    VARCHAR(50) COMMENT '所属设备ID',
     name                         VARCHAR(255) COMMENT '通道名称',
-    manufacturer                 VARCHAR(50) COMMENT '厂商',
-    model                        VARCHAR(50) COMMENT '型号',
+    manufacturer                 VARCHAR(255) COMMENT '厂商',
+    model                        VARCHAR(255) COMMENT '型号',
     owner                        VARCHAR(50) COMMENT '归属单位',
     civil_code                   VARCHAR(50) COMMENT '行政区划代码',
     block                        VARCHAR(50) COMMENT '区域/小区编号',
@@ -310,7 +311,7 @@ CREATE TABLE IF NOT EXISTS zws_stream_proxy
     type                       VARCHAR(50) COMMENT '代理类型（拉流/推流）',
     app                        VARCHAR(255) COMMENT '应用名',
     stream                     VARCHAR(255) COMMENT '流ID',
-    src_url                    VARCHAR(255) COMMENT '源地址',
+    src_url                    VARCHAR(1024) COMMENT '源地址',
     timeout                    INT COMMENT '拉流超时时间',
     ffmpeg_cmd_key             VARCHAR(255) COMMENT 'FFmpeg命令模板键',
     rtsp_type                  VARCHAR(50) COMMENT 'RTSP拉流方式',
@@ -355,14 +356,15 @@ CREATE TABLE IF NOT EXISTS zws_cloud_record
     id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     app             VARCHAR(255) COMMENT '应用名',
     stream          VARCHAR(255) COMMENT '流ID',
-    call_id         VARCHAR(255) COMMENT '会话ID',
+    call_id         VARCHAR(255) COMMENT '会话ID（推流鉴权事务号，可空）',
     start_time      bigint COMMENT '录像开始时间',
     end_time        bigint COMMENT '录像结束时间',
     media_server_id VARCHAR(50) COMMENT '媒体服务器ID',
     server_id       VARCHAR(50) COMMENT '信令服务器ID',
     file_name       VARCHAR(255) COMMENT '文件名',
-    folder          VARCHAR(500) COMMENT '目录',
-    file_path       VARCHAR(500) COMMENT '完整路径',
+    folder          VARCHAR(255) COMMENT '目录',
+    file_path       VARCHAR(512) COMMENT '完整路径',
+    play_url        VARCHAR(768) COMMENT 'HTTP-MP4 直出播放地址',
     collect         TINYINT(1) DEFAULT 0 COMMENT '是否收藏',
     file_size       bigint COMMENT '文件大小',
     time_len        DOUBLE COMMENT '时长'
@@ -408,6 +410,21 @@ CREATE TABLE IF NOT EXISTS zws_user_api_key
     update_time VARCHAR(50) COMMENT '更新时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
+-- 本平台唯一国标 SIP 配置（设备接入 / 上下级级联共用，固定 id=1）
+DROP TABLE IF EXISTS zws_gb_sip_config;
+CREATE TABLE IF NOT EXISTS zws_gb_sip_config
+(
+    id          INT NOT NULL PRIMARY KEY COMMENT '固定为1',
+    ip          VARCHAR(64)  NOT NULL COMMENT 'SIP 监听/对外 IP',
+    port        INT NOT NULL COMMENT 'SIP 端口',
+    domain      VARCHAR(32)  NOT NULL COMMENT 'SIP 域',
+    device_id   VARCHAR(32)  NOT NULL COMMENT '本平台国标编号',
+    password    VARCHAR(64)  NOT NULL COMMENT '接入密码',
+    alarm       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否处理报警',
+    create_time VARCHAR(50) COMMENT '创建时间',
+    update_time VARCHAR(50) COMMENT '更新时间'
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
 
 -- 初始数据
 -- 初始化管理员账号，账号admin 密码admin（MD5加密后）
@@ -525,5 +542,52 @@ CREATE TABLE IF NOT EXISTS zws_alarm (
                           alarm_type INT COMMENT '报警类别',
                           alarm_time bigint COMMENT '报警时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ONVIF 设备（新安装全量包含；旧库升级可用 add_onvif_tables.sql）
+DROP TABLE IF EXISTS zws_onvif_channel;
+DROP TABLE IF EXISTS zws_onvif_device;
+CREATE TABLE IF NOT EXISTS zws_onvif_device (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    name            VARCHAR(255) COMMENT '设备名称',
+    ip              VARCHAR(64) NOT NULL COMMENT '设备IP',
+    port            INT DEFAULT 80 COMMENT 'ONVIF端口',
+    username        VARCHAR(128) COMMENT '认证用户名',
+    password        VARCHAR(128) COMMENT '认证密码',
+    manufacturer    VARCHAR(255) COMMENT '厂商',
+    model           VARCHAR(255) COMMENT '型号',
+    firmware        VARCHAR(255) COMMENT '固件版本',
+    serial_number   VARCHAR(255) COMMENT '序列号',
+    hardware_id     VARCHAR(255) COMMENT '硬件ID',
+    device_uri      VARCHAR(512) COMMENT 'Device Service URI',
+    media_uri       VARCHAR(512) COMMENT 'Media Service URI',
+    ptz_uri         VARCHAR(512) COMMENT 'PTZ Service URI',
+    on_line         TINYINT(1) DEFAULT 0 COMMENT '在线状态',
+    discovery_mode  INT DEFAULT 0 COMMENT '0=手动 1=自动发现',
+    media_server_id VARCHAR(255) DEFAULT 'auto',
+    custom_name     VARCHAR(255),
+    server_id       VARCHAR(50),
+    create_time     VARCHAR(50),
+    update_time     VARCHAR(50),
+    UNIQUE KEY uk_onvif_ip_port (ip, port)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF设备';
+
+CREATE TABLE IF NOT EXISTS zws_onvif_channel (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    device_id       BIGINT NOT NULL COMMENT '关联 zws_onvif_device.id',
+    profile_token   VARCHAR(255) NOT NULL COMMENT 'ONVIF Profile Token',
+    name            VARCHAR(255) COMMENT '通道名称',
+    video_source    VARCHAR(255) COMMENT 'VideoSource Token',
+    encoder_token   VARCHAR(255) COMMENT 'VideoEncoder Token',
+    resolution      VARCHAR(64) COMMENT '分辨率',
+    codec           VARCHAR(64) COMMENT '编码格式',
+    has_audio       TINYINT(1) DEFAULT 0,
+    has_ptz         TINYINT(1) DEFAULT 0,
+    stream_uri      VARCHAR(1024) COMMENT 'RTSP地址',
+    status          VARCHAR(50) DEFAULT 'OFF',
+    create_time     VARCHAR(50),
+    update_time     VARCHAR(50),
+    UNIQUE KEY uk_device_profile (device_id, profile_token),
+    KEY idx_device_id (device_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF通道';
 
 SET FOREIGN_KEY_CHECKS = 1;

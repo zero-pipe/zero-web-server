@@ -1,16 +1,18 @@
 # zero-web-kit 数据库表清单
-# 新环境请用 sql/init_zws_mysql.sql + sql/add_onvif_tables.sql
+# 新安装：只执行 sql/init_zws_mysql.sql（全量，含 ONVIF）
+# 升级：AutoMigrate 补列；旧库缺 ONVIF 时再执行 add_onvif_tables.sql
 
-version: "0.7.0"
+version: "0.7.1"
 mysql_min: "8.0"
 
 scripts:
   new_install:
     - init_zws_mysql.sql
+  upgrade_optional:
     - add_onvif_tables.sql
 
 required:
-  description: 后端已实现功能依赖，缺失会导致运行错误
+  description: 后端已实现功能依赖，新装由 init_zws_mysql.sql 一次建齐
   tables:
     - name: zws_user
       module: auth
@@ -24,6 +26,7 @@ required:
       module: media
     - name: zws_gb_sip_config
       module: gb28181
+      notes: 国标 SIP 单例配置，定义于 init_zws_mysql.sql
     - name: zws_platform
       module: cascade
     - name: zws_platform_channel
@@ -34,6 +37,7 @@ required:
       module: stream
     - name: zws_cloud_record
       module: record
+      notes: 含 play_url（HTTP-MP4 直出）
     - name: zws_record_plan
       module: record
     - name: zws_record_plan_item
@@ -45,20 +49,20 @@ required:
       notes: channel_id 为 INT，对应 zws_device_channel.id
     - name: zws_onvif_device
       module: onvif
-      script: add_onvif_tables.sql
+      notes: 已并入 init_zws_mysql.sql
     - name: zws_onvif_channel
       module: onvif
-      script: add_onvif_tables.sql
+      notes: 已并入 init_zws_mysql.sql
+    - name: zws_common_group
+      module: channel
+    - name: zws_common_region
+      module: channel
 
 optional:
   description: 表已建但 API 未实现或仅占位
   tables:
     - name: zws_user_api_key
       module: auth
-    - name: zws_common_group
-      module: channel
-    - name: zws_common_region
-      module: channel
     - name: zws_platform_group
       module: cascade
     - name: zws_platform_region

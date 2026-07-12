@@ -12,16 +12,6 @@
             @input="initData"
           />
         </el-form-item>
-        <el-form-item label="Call Id">
-          <el-input
-            v-model="callId"
-            style="margin-right: 1rem; width: auto;"
-            placeholder="事务标识"
-            prefix-icon="el-icon-search"
-            clearable
-            @input="initData"
-          />
-        </el-form-item>
         <el-form-item label="开始时间">
           <el-date-picker
             v-model="startTime"
@@ -89,7 +79,6 @@
         />
         <el-table-column prop="app" label="应用名" />
         <el-table-column prop="stream" label="流ID" />
-        <el-table-column prop="callId" label="Call Id"/>
         <el-table-column label="开始时间">
           <template v-slot:default="scope">
             {{ formatTimeStamp(scope.row.startTime) }}
@@ -153,7 +142,6 @@ export default {
   data() {
     return {
       search: '',
-      callId: '',
       startTime: '',
       endTime: '',
       playerTitle: '',
@@ -212,7 +200,6 @@ export default {
     getRecordList: function() {
       this.$store.dispatch('cloudRecord/queryList', {
         query: this.search,
-        callId: this.callId,
         startTime: this.startTime,
         endTime: this.endTime,
         mediaServerId: this.mediaServerId,

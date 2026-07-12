@@ -16,7 +16,9 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// NewDB 连接 MySQL：库不存在则创建；表不存在则 AutoMigrate 创建；已有则复用（不删数据）。
+# NewDB 连接 MySQL：库不存在则创建。
+// 表结构原则：新安装必须先执行 sql/init_zws_mysql.sql 全量脚本；
+// AutoMigrate 仅用于已有库升级时补缺表/缺列，不是新装建表手段。
 func NewDB(cfg config.MySQLConfig) (*gorm.DB, error) {
 	if cfg.Charset == "" {
 		cfg.Charset = "utf8mb4"
@@ -89,7 +91,7 @@ func ensureDatabase(cfg config.MySQLConfig) error {
 }
 
 func autoMigrateAll(db *gorm.DB) error {
-	// 已有表：只补缺列；新建表：整表创建。字段均带 size，避免把带索引的 varchar 改成 longtext。
+	// 升级路径：已有表只补缺列；若运维未跑全量 SQL 而缺整表，此处会创建（不应作为新装依赖）。
 	models := []any{
 		&model.UserRole{},
 		&model.User{},
