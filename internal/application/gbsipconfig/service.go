@@ -3,10 +3,13 @@ package gbsipconfig
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/model"
+	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	applog "zero-web-kit/pkg/log"
 
 	"gorm.io/gorm"
 )
@@ -24,18 +27,73 @@ type OnChangeFunc func(cfg config.SIPConfig, portChanged bool)
 
 type Service struct {
 	repo     *persistence.GbSipConfigRepository
+	defaults config.SIPConfig
 	onChange OnChangeFunc
 }
 
-func NewService(repo *persistence.GbSipConfigRepository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *persistence.GbSipConfigRepository, defaults config.SIPConfig) *Service {
+	return &Service{repo: repo, defaults: defaults}
 }
 
 func (s *Service) SetOnChange(fn OnChangeFunc) {
 	s.onChange = fn
 }
 
-// Load 从库读取；无记录返回空配置（不自动建行，由页面手动保存）。
+// Bootstrap 启动入口：库有配置则用库；库空则用 yaml 默认值写入库并返回。
+func (s *Service) Bootstrap() (config.SIPConfig, error) {
+	row, err := s.repo.Get()
+	if err == nil {
+		return s.repo.ToSIPConfig(row), nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return config.SIPConfig{}, err
+	}
+	seed := s.buildDefaultRow()
+	if err := s.repo.Save(seed); err != nil {
+		return config.SIPConfig{}, err
+	}
+	cfg := s.repo.ToSIPConfig(seed)
+	applog.Info("seeded gb sip config from yaml defaults",
+		"id", cfg.ID, "domain", cfg.Domain, "ip", cfg.IP, "port", cfg.Port)
+	return cfg, nil
+}
+
+func (s *Service) buildDefaultRow() *model.GbSipConfig {
+	d := s.defaults
+	if d.Port <= 0 {
+		d.Port = 5060
+	}
+	if strings.TrimSpace(d.Domain) == "" {
+		d.Domain = "3402000000"
+	}
+	if strings.TrimSpace(d.ID) == "" {
+		d.ID = "34020000002000000001"
+	}
+	if strings.TrimSpace(d.Password) == "" {
+		d.Password = "12345678"
+	}
+	ip := strings.TrimSpace(d.IP)
+	if ip == "" || ip == "0.0.0.0" {
+		ip = sipinfra.GuessLocalIP()
+	}
+	if ip == "" {
+		ip = "127.0.0.1"
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	return &model.GbSipConfig{
+		ID:         1,
+		IP:         ip,
+		Port:       d.Port,
+		Domain:     strings.TrimSpace(d.Domain),
+		DeviceID:   strings.TrimSpace(d.ID),
+		Password:   strings.TrimSpace(d.Password),
+		Alarm:      d.Alarm,
+		CreateTime: now,
+		UpdateTime: now,
+	}
+}
+
+// Load 从库读取；无记录返回空配置。
 func (s *Service) Load() (config.SIPConfig, error) {
 	row, err := s.repo.Get()
 	if err != nil {
@@ -47,14 +105,14 @@ func (s *Service) Load() (config.SIPConfig, error) {
 	return s.repo.ToSIPConfig(row), nil
 }
 
-// GetOrEmpty 供页面展示；无记录时返回可编辑的空表单对象。
+// GetOrEmpty 供页面展示；无记录时返回 yaml 默认表单（一般启动已 Bootstrap）。
 func (s *Service) GetOrEmpty() (*model.GbSipConfig, error) {
 	row, err := s.repo.Get()
 	if err == nil {
 		return row, nil
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return &model.GbSipConfig{ID: 1, Port: 5060}, nil
+		return s.buildDefaultRow(), nil
 	}
 	return nil, err
 }

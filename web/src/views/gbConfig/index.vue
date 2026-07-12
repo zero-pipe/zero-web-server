@@ -3,7 +3,7 @@
     <el-card shadow="never" class="gb-config-card">
       <div slot="header" class="gb-config-header">
         <span>国标配置</span>
-        <span class="gb-config-sub">本平台唯一 SIP 配置，设备接入与国标级联共用</span>
+        <span class="gb-config-sub">改编码/域/密码/IP 保存即生效无需重启；改监听端口后需重启服务</span>
       </div>
       <el-form
         ref="form"

@@ -149,6 +149,11 @@ func (s *Server) Config() config.SIPConfig { return s.cfg }
 func (s *Server) LocalIP() string          { return s.localIP }
 func (s *Server) Domain() string           { return s.cfg.Domain }
 
+// GuessLocalIP 取第一块非回环 IPv4，作为 sip.ip 未配置时的兜底。
+func GuessLocalIP() string {
+	return guessLocalIP()
+}
+
 // guessLocalIP 取第一块非回环 IPv4，作为 sip.ip 未配置时的兜底。
 func guessLocalIP() string {
 	ifaces, err := net.Interfaces()

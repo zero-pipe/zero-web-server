@@ -97,10 +97,10 @@ func main() {
 	mediaServerRepo := persistence.NewMediaServerRepository(db)
 	groupRegionRepo := persistence.NewGroupRegionRepository(db)
 	gbSipConfigRepo := persistence.NewGbSipConfigRepository(db)
-	gbSipConfigService := gbsipconfig.NewService(gbSipConfigRepo)
+	gbSipConfigService := gbsipconfig.NewService(gbSipConfigRepo, cfg.SIP)
 
-	// 国标 SIP 以数据库为准；库空则跳过监听，由「国标配置」页面填写
-	sipCfg, err := gbSipConfigService.Load()
+	// 库空则用 yaml 默认 SIP 写入库；之后以库为准，页面改编码可热更新
+	sipCfg, err := gbSipConfigService.Bootstrap()
 	if err != nil {
 		applog.Fatalf("load gb sip config: %v", err)
 	}

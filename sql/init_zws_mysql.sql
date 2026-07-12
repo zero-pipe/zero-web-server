@@ -426,6 +426,11 @@ CREATE TABLE IF NOT EXISTS zws_gb_sip_config
     update_time VARCHAR(50) COMMENT '更新时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
 
+-- 默认国标 SIP（与 configs/config.yaml 对齐；新装可随后在页面改编码，无需重启）
+INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, create_time, update_time)
+VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0,
+        '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+
 -- 初始数据
 -- 初始化角色：管理员 / 运维 / 视频值班
 INSERT INTO zws_user_role

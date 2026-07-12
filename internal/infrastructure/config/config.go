@@ -13,21 +13,22 @@ type Config struct {
 	Server       ServerConfig       `mapstructure:"server"`
 	MySQL        MySQLConfig        `mapstructure:"mysql"`
 	Redis        RedisConfig        `mapstructure:"redis"`
+	SIP          SIPConfig          `mapstructure:"sip"`
 	Media        MediaConfig        `mapstructure:"media"`
 	Log          LogConfig          `mapstructure:"log"`
 	UserSettings UserSettingsConfig `mapstructure:"user_settings"`
 	ONVIF        ONVIFConfig        `mapstructure:"onvif"`
 }
 
-// SIPConfig 国标 SIP 运行时配置（存库，不在 yaml 中配置）。
+// SIPConfig 国标 SIP：yaml 提供默认值；启动时写入库（若库空），之后以库为准，页面可热更新编码等。
 type SIPConfig struct {
-	// IP 摄像机可达的平台网卡地址，写入 INVITE Contact/Via。
-	IP       string
-	Port     int
-	Domain   string
-	ID       string
-	Password string
-	Alarm    bool
+	// IP 摄像机可达的平台网卡地址，写入 INVITE Contact/Via；空则启动时自动探测。
+	IP       string `mapstructure:"ip"`
+	Port     int    `mapstructure:"port"`
+	Domain   string `mapstructure:"domain"`
+	ID       string `mapstructure:"id"`
+	Password string `mapstructure:"password"`
+	Alarm    bool   `mapstructure:"alarm"`
 }
 
 type ServerConfig struct {
