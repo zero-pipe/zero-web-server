@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	mediaapp "zero-web-kit/internal/application/media"
+	publishauth "zero-web-kit/internal/application/publishauth"
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domaindevice "zero-web-kit/internal/domain/device"
 	domainrecord "zero-web-kit/internal/domain/record"
@@ -78,7 +78,7 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 	if err != nil {
 		return nil, err
 	}
-	app := mediaapp.LiveApp
+	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s_playback", device.DeviceID, channel.GBDeviceID)
 	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionPlayback, startTime, endTime, 0,
 		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
@@ -103,7 +103,7 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 	if downloadSpeed <= 0 {
 		downloadSpeed = 4
 	}
-	app := mediaapp.LiveApp
+	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s_download", device.DeviceID, channel.GBDeviceID)
 	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionDownload, startTime, endTime, downloadSpeed,
 		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
@@ -125,10 +125,10 @@ func (s *Service) StopPlayback(deviceID, channelDeviceID, stream string) error {
 		stream = fmt.Sprintf("%s_%s_playback", deviceID, channelDeviceID)
 	}
 	_ = s.sip.CloseInviteSession(stream)
-	if node, err := s.media.ResolveForStream(context.Background(), mediaapp.LiveApp, stream, "auto"); err == nil {
-		_ = node.CloseStreams(context.Background(), "__defaultVhost__", mediaapp.LiveApp, stream)
+	if node, err := s.media.ResolveForStream(context.Background(), publishauth.LiveApp, stream, "auto"); err == nil {
+		_ = node.CloseStreams(context.Background(), "__defaultVhost__", publishauth.LiveApp, stream)
 	}
-	s.media.UnbindStream(mediaapp.LiveApp, stream)
+	s.media.UnbindStream(publishauth.LiveApp, stream)
 	return nil
 }
 
@@ -137,10 +137,10 @@ func (s *Service) StopDownload(deviceID, channelDeviceID, stream string) error {
 		stream = fmt.Sprintf("%s_%s_download", deviceID, channelDeviceID)
 	}
 	_ = s.sip.CloseInviteSession(stream)
-	if node, err := s.media.ResolveForStream(context.Background(), mediaapp.LiveApp, stream, "auto"); err == nil {
-		_ = node.CloseStreams(context.Background(), "__defaultVhost__", mediaapp.LiveApp, stream)
+	if node, err := s.media.ResolveForStream(context.Background(), publishauth.LiveApp, stream, "auto"); err == nil {
+		_ = node.CloseStreams(context.Background(), "__defaultVhost__", publishauth.LiveApp, stream)
 	}
-	s.media.UnbindStream(mediaapp.LiveApp, stream)
+	s.media.UnbindStream(publishauth.LiveApp, stream)
 	return nil
 }
 

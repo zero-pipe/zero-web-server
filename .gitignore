@@ -10,8 +10,7 @@ server.exe
 *.so
 *.dylib
 
-# Runtime / secrets
-config/jwk.json
+# Runtime / local overrides
 configs/config.local.yaml
 configs/config.*.local.yaml
 configs/config.zms.yaml

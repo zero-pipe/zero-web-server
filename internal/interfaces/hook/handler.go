@@ -2,7 +2,7 @@ package hook
 
 import (
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
-	mediaapp "zero-web-kit/internal/application/media"
+	publishauth "zero-web-kit/internal/application/publishauth"
 	playapp "zero-web-kit/internal/application/play"
 	playbackapp "zero-web-kit/internal/application/playback"
 	recordplanapp "zero-web-kit/internal/application/recordplan"
@@ -25,7 +25,7 @@ type Handler struct {
 	streamPush     *streampushapp.Service
 	streamProxy    *streamproxyapp.Service
 	recordPlan     *recordplanapp.Service
-	publishAuth    *mediaapp.PublishAuth
+	publishAuth    *publishauth.PublishAuth
 	streamOnDemand bool
 }
 
@@ -36,7 +36,7 @@ func NewHandler(
 	push *streampushapp.Service,
 	proxy *streamproxyapp.Service,
 	plan *recordplanapp.Service,
-	publishAuth *mediaapp.PublishAuth,
+	publishAuth *publishauth.PublishAuth,
 	streamOnDemand bool,
 ) *Handler {
 	notifiers := make([]StreamNotifier, 0, 4)
@@ -142,7 +142,7 @@ func (h *Handler) onStreamNoneReader(c *gin.Context) {
 		stream = c.Query("stream")
 	}
 	closeStream := h.streamOnDemand
-	if mediaapp.IsGBLiveApp(app) {
+	if publishauth.IsGBLiveApp(app) {
 		// GB28181 由 Go SIP 会话管理；切换播放器时会出现短暂无人观看，勿关流
 		closeStream = false
 	} else if app == "onvif" {
@@ -150,7 +150,7 @@ func (h *Handler) onStreamNoneReader(c *gin.Context) {
 		closeStream = false
 	} else if h.recordPlan != nil && h.recordPlan.Recording(app, stream) {
 		closeStream = false
-	} else if app == mediaapp.LoadMP4App {
+	} else if app == publishauth.LoadMP4App {
 		closeStream = false
 	} else if h.streamProxy != nil {
 		if v := h.streamProxy.CloseOnNoneReader(app, stream); v != nil {

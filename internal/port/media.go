@@ -67,7 +67,10 @@ type MediaEndpoint interface {
 // 平台不实现流媒体本身，只做节点配置、健康与选路。
 type MediaCluster interface {
 	List(ctx context.Context) ([]MediaNode, error)
-	// Resolve 按 preferID 选节点；空或 auto 走负载策略。
+	// Lookup 按 ID 取节点配置（不探测在线）；空 ID 取默认/首个已配置节点。
+	// 用于录像点播 URL 合成等「只需地址、不要求此刻 Ping 通」的场景。
+	Lookup(ctx context.Context, id string) (MediaEndpoint, error)
+	// Resolve 按 preferID 选节点；空或 auto 走负载策略。须在线。
 	Resolve(ctx context.Context, preferID string) (MediaEndpoint, error)
 	// ResolveForStream 同一 app/stream 尽量粘滞到同一节点。
 	ResolveForStream(ctx context.Context, app, stream, preferID string) (MediaEndpoint, error)

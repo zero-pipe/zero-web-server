@@ -77,9 +77,14 @@ type Service struct {
 	serverID string
 
 	mu         sync.RWMutex
-	load       map[string]int64 // nodeID -> 活跃流计数（负载）
+	load       map[string]int64  // nodeID -> 活跃流计数（负载）
 	streamNode map[string]string // app/stream -> nodeID
+	onlineAt   map[string]time.Time
+	onlineOK   map[string]bool
 }
+
+const onlineProbeTTL = 3 * time.Second
+const onlineProbeTimeout = 1500 * time.Millisecond
 
 func NewService(repo *persistence.MediaServerRepository, serverID string) *Service {
 	s := &Service{
@@ -87,6 +92,8 @@ func NewService(repo *persistence.MediaServerRepository, serverID string) *Servi
 		serverID:   serverID,
 		load:       make(map[string]int64),
 		streamNode: make(map[string]string),
+		onlineAt:   make(map[string]time.Time),
+		onlineOK:   make(map[string]bool),
 	}
 	// 历史「配置默认节点」标记清掉，全部改为可增删改的库管节点
 	_ = repo.ClearAllDefault()
@@ -99,10 +106,17 @@ func (s *Service) List() ([]View, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]View, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, s.toView(row, s.isOnline(row)))
+	out := make([]View, len(rows))
+	var wg sync.WaitGroup
+	for i := range rows {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			row := rows[i]
+			out[i] = s.toView(row, s.isOnline(row))
+		}(i)
 	}
+	wg.Wait()
 	return out, nil
 }
 
@@ -270,6 +284,37 @@ func (s *Service) Load() ([]View, error) {
 	return s.ListOnline()
 }
 
+// Lookup 按 ID 取节点配置，不探测在线。空 ID 优先默认节点，否则取列表首个。
+func (s *Service) Lookup(id string) (*Node, error) {
+	id = strings.TrimSpace(id)
+	if id != "" && !strings.EqualFold(id, "auto") {
+		m, err := s.repo.GetByID(id)
+		if err != nil {
+			return nil, fmt.Errorf("流媒体节点不存在: %s", id)
+		}
+		return s.wrap(*m), nil
+	}
+	rows, err := s.repo.ListAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("未配置媒体节点，请先在「媒体管理 → 媒体节点」添加")
+	}
+	var fallback *model.MediaServer
+	for i := range rows {
+		row := rows[i]
+		if row.DefaultServer {
+			return s.wrap(row), nil
+		}
+		if fallback == nil {
+			cp := row
+			fallback = &cp
+		}
+	}
+	return s.wrap(*fallback), nil
+}
+
 // Resolve 按 preferID 选节点：空/"auto" → 在线最小负载；指定 ID → 该节点（须在线）。
 func (s *Service) Resolve(preferID string) (*Node, error) {
 	preferID = strings.TrimSpace(preferID)
@@ -307,7 +352,7 @@ func (s *Service) SelectMinimumLoad() (*Node, error) {
 		}
 	}
 	if best == nil {
-		return nil, fmt.Errorf("无可用媒体节点，请先在「系统管理 → 媒体节点」添加并确保在线")
+		return nil, fmt.Errorf("无可用媒体节点，请先在「媒体管理 → 媒体节点」添加并确保在线")
 	}
 	return s.wrap(*best), nil
 }
@@ -405,8 +450,24 @@ func (s *Service) decLocked(id string) {
 }
 
 func (s *Service) isOnline(m model.MediaServer) bool {
+	s.mu.RLock()
+	if t, ok := s.onlineAt[m.ID]; ok && time.Since(t) < onlineProbeTTL {
+		v := s.onlineOK[m.ID]
+		s.mu.RUnlock()
+		return v
+	}
+	s.mu.RUnlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), onlineProbeTimeout)
+	defer cancel()
 	client := mediakit.NewClientAddr(m.IP, m.HTTPPort, m.Secret)
-	return client.Ping(context.Background()) == nil
+	ok := client.Ping(ctx) == nil
+
+	s.mu.Lock()
+	s.onlineAt[m.ID] = time.Now()
+	s.onlineOK[m.ID] = ok
+	s.mu.Unlock()
+	return ok
 }
 
 func (s *Service) toView(m model.MediaServer, online bool) View {

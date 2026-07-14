@@ -3,7 +3,7 @@ package handler
 import (
 	"strconv"
 
-	platformapp "zero-web-kit/internal/application/platform"
+	upstreamapp "zero-web-kit/internal/application/upstream"
 	domainplatform "zero-web-kit/internal/domain/platform"
 	"zero-web-kit/internal/interfaces/http/dto"
 	"zero-web-kit/pkg/response"
@@ -12,11 +12,11 @@ import (
 )
 
 type PlatformHandler struct {
-	svc     *platformapp.Service
-	channel *platformapp.ChannelService
+	svc     *upstreamapp.Service
+	channel *upstreamapp.ChannelService
 }
 
-func NewPlatformHandler(svc *platformapp.Service, channel *platformapp.ChannelService) *PlatformHandler {
+func NewPlatformHandler(svc *upstreamapp.Service, channel *upstreamapp.ChannelService) *PlatformHandler {
 	return &PlatformHandler{svc: svc, channel: channel}
 }
 

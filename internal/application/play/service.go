@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	mediaapp "zero-web-kit/internal/application/media"
+	publishauth "zero-web-kit/internal/application/publishauth"
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domaindevice "zero-web-kit/internal/domain/device"
 	"zero-web-kit/internal/infrastructure/media/mediakit"
@@ -68,7 +68,7 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 	if err != nil {
 		return "", "", fmt.Errorf("channel not found")
 	}
-	app := mediaapp.LiveApp
+	app := publishauth.LiveApp
 	stream = fmt.Sprintf("%s_%s", device.DeviceID, channel.GBDeviceID)
 
 	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
@@ -116,7 +116,7 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 }
 
 func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel) (*dto.StreamContent, error) {
-	app := mediaapp.LiveApp
+	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s", device.DeviceID, channel.GBDeviceID)
 
 	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
@@ -200,7 +200,7 @@ func gbLiveStreamReady(info *port.StreamProbe) bool {
 }
 
 func (s *Service) StopPlay(deviceID, channelDeviceID string) error {
-	app := mediaapp.LiveApp
+	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s", deviceID, channelDeviceID)
 	_ = s.sip.CloseInviteSession(stream)
 	err := s.closeStream(app, stream)

@@ -1,4 +1,4 @@
-package subordinateapp
+package downstreamapp
 
 import (
 	"errors"

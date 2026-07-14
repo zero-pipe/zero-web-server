@@ -1,4 +1,4 @@
-package commonchannel
+package channelapp
 
 import (
 	"bytes"

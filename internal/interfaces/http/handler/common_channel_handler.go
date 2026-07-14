@@ -3,7 +3,7 @@ package handler
 import (
 	"strconv"
 
-	commonchannelapp "zero-web-kit/internal/application/commonchannel"
+	channelapp "zero-web-kit/internal/application/channel"
 	"zero-web-kit/internal/interfaces/http/dto"
 	"zero-web-kit/pkg/response"
 
@@ -11,10 +11,10 @@ import (
 )
 
 type CommonChannelHandler struct {
-	svc *commonchannelapp.Service
+	svc *channelapp.Service
 }
 
-func NewCommonChannelHandler(svc *commonchannelapp.Service) *CommonChannelHandler {
+func NewCommonChannelHandler(svc *channelapp.Service) *CommonChannelHandler {
 	return &CommonChannelHandler{svc: svc}
 }
 
@@ -53,7 +53,7 @@ func (h *CommonChannelHandler) List(c *gin.Context) {
 }
 
 func (h *CommonChannelHandler) Update(c *gin.Context) {
-	var body commonchannelapp.View
+	var body channelapp.View
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
 		return
@@ -400,7 +400,7 @@ func (h *CommonChannelHandler) listByAssociation(c *gin.Context, byCivilCode boo
 		online = &b
 	}
 	query := c.Query("query")
-	var list []commonchannelapp.View
+	var list []channelapp.View
 	var total int64
 	var err error
 	if byCivilCode {

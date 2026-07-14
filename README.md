@@ -21,8 +21,7 @@ zero-web-kit/
 ├── 3rdpart/                 # 第三方源码（vendored）
 │   └── onvif-go/            # ONVIF 客户端/发现库
 ├── cmd/server/              # 程序入口
-├── configs/                 # config.yaml 主配置；config.local.yaml 可选本地覆盖（不入库）
-├── config/                  # 运行时密钥（jwk.json，不入库）
+├── configs/                 # config.yaml 主配置；jwk.json（JWT 密钥）；config.local.yaml 可选本地覆盖（不入库）
 ├── docker/                  # MySQL + Redis Compose
 ├── docs/                    # 补充文档（含 DEPLOY.md 部署指南）
 ├── internal/

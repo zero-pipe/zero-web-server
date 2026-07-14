@@ -10,7 +10,7 @@
         type="info"
         :closable="false"
         style="margin-bottom: 12px;"
-        title="双进程联调：本进程作上级时，在此预登记「下级进程」向上注册用的国标编号+密码；下级进程在「上级平台」填本级国标配置。"
+        title="预登记允许接入的下级平台国标编号与密码；下级平台注册成功后可在此查看在线状态。"
       />
       <el-form :inline="true" size="mini">
         <el-form-item label="搜索">

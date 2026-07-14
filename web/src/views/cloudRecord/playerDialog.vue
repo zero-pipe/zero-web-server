@@ -5,13 +5,14 @@
       custom-class="cloud-record-play-dialog"
       top="2rem"
       width="880px"
-      :append-to-body="false"
-      :modal-append-to-body="false"
-      :modal="false"
+      :append-to-body="true"
+      :modal-append-to-body="true"
+      :modal="true"
       :show-close="false"
       :close-on-click-modal="false"
       :visible.sync="showDialog"
       :destroy-on-close="true"
+      @opened="onDialogOpened"
       @close="close()"
     >
       <div slot="title" class="cloud-record-play-chrome">
@@ -60,20 +61,37 @@ export default {
     return {
       showDialog: false,
       streamInfo: null,
+      pendingPlay: null,
       maximized: false
     }
   },
   methods: {
     openDialog(streamInfo, timeLen, startTime) {
       this.maximized = false
-      this.showDialog = true
+      this.pendingPlay = { streamInfo, timeLen, startTime }
       this.streamInfo = streamInfo
+      this.showDialog = true
       this.$nextTick(() => {
         this.resetDialogStyle()
-        if (this.$refs.cloudRecordPlayer) {
-          this.$refs.cloudRecordPlayer.setStreamInfo(streamInfo, timeLen, startTime)
-        }
+        this.applyPendingPlay()
       })
+    },
+    onDialogOpened() {
+      this.resetDialogStyle()
+      this.applyPendingPlay()
+    },
+    applyPendingPlay(retries) {
+      const pending = this.pendingPlay
+      if (!pending) return
+      const left = retries == null ? 20 : retries
+      const player = this.$refs.cloudRecordPlayer
+      if (!player) {
+        if (left <= 0) return
+        this.$nextTick(() => this.applyPendingPlay(left - 1))
+        return
+      }
+      this.pendingPlay = null
+      player.setStreamInfo(pending.streamInfo, pending.timeLen, pending.startTime)
     },
     stopPlay() {
       if (this.$refs.cloudRecordPlayer) {
@@ -84,11 +102,13 @@ export default {
       if (this.$refs.cloudRecordPlayer) {
         this.$refs.cloudRecordPlayer.stopPLay()
       }
+      this.pendingPlay = null
       this.maximized = false
       this.showDialog = false
     },
     resetDialogStyle() {
-      const dialog = this.$el && this.$el.querySelector('.cloud-record-play-dialog')
+      // append-to-body 后弹窗不在 this.$el 内
+      const dialog = document.querySelector('.cloud-record-play-dialog')
       if (!dialog) return
       dialog.style.width = ''
       dialog.style.marginTop = ''
@@ -101,7 +121,7 @@ export default {
     toggleMaximize() {
       this.maximized = !this.maximized
       this.$nextTick(() => {
-        const dialog = this.$el && this.$el.querySelector('.cloud-record-play-dialog')
+        const dialog = document.querySelector('.cloud-record-play-dialog')
         if (!dialog) return
         if (this.maximized) {
           dialog.style.width = '100vw'

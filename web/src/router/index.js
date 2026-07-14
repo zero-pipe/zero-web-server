@@ -227,7 +227,7 @@ export const constantRoutes = [
         path: '',
         name: 'MediaServer',
         component: () => import('@/views/mediaServer/index'),
-        meta: { title: '媒体节点', icon: 'mediaServerList' }
+        meta: { title: '媒体节点', icon: 'media-node' }
       }
     ]
   },
@@ -253,7 +253,7 @@ export const constantRoutes = [
         path: '',
         name: 'ObjectStore',
         component: () => import('@/views/objectStore/index'),
-        meta: { title: '对象存储', icon: 'cloudRecord' }
+        meta: { title: '对象存储', icon: 'objectStore' }
       }
     ]
   },

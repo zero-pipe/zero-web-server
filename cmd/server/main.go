@@ -14,16 +14,16 @@ import (
 	alarmapp "zero-web-kit/internal/application/alarm"
 	cascadeapp "zero-web-kit/internal/application/cascade"
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
-	commonchannelapp "zero-web-kit/internal/application/commonchannel"
+	channelapp "zero-web-kit/internal/application/channel"
 	deviceapp "zero-web-kit/internal/application/device"
 	deviceaccess "zero-web-kit/internal/application/deviceaccess"
 	groupapp "zero-web-kit/internal/application/group"
-	mediaapp "zero-web-kit/internal/application/media"
+	publishauth "zero-web-kit/internal/application/publishauth"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	onvifapp "zero-web-kit/internal/application/onvif"
-	platformapp "zero-web-kit/internal/application/platform"
-	subordinateapp "zero-web-kit/internal/application/subordinate"
+	upstreamapp "zero-web-kit/internal/application/upstream"
+	downstreamapp "zero-web-kit/internal/application/downstream"
 	objectstoreapp "zero-web-kit/internal/application/objectstore"
 	snapapp "zero-web-kit/internal/application/snap"
 	mediacluster "zero-web-kit/internal/adapter/mediacluster"
@@ -120,8 +120,8 @@ func main() {
 		requirePreRegister = row.RequirePreRegister
 	}
 	deviceService.SetRequirePreRegister(requirePreRegister)
-	publishRegistry := mediaapp.NewPublishRegistry()
-	publishAuth := mediaapp.NewPublishAuth(
+	publishRegistry := publishauth.NewPublishRegistry()
+	publishAuth := publishauth.NewPublishAuth(
 		userRepo, streamPushRepo, streamProxyRepo,
 		cfg.UserSettings.PushAuthority, cfg.UserSettings.RecordPushLive,
 		publishRegistry,
@@ -150,7 +150,7 @@ func main() {
 	sipServer.SetRequirePreRegister(requirePreRegister)
 
 	subordinateRepo := persistence.NewSubordinateRepository(db)
-	subordinateService := subordinateapp.NewService(subordinateRepo, cfg.UserSettings.ServerID)
+	subordinateService := downstreamapp.NewService(subordinateRepo, cfg.UserSettings.ServerID)
 	sipServer.SetSubordinateHandler(subordinateService)
 
 	alarmService := alarmapp.NewService(alarmRepo, channelRepo)
@@ -165,9 +165,9 @@ func main() {
 	playbackService := playbackapp.NewService(
 		deviceRepo, channelRepo, sipServer, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
-	platformService := platformapp.NewService(platformRepo, sipCfg, cfg.UserSettings.ServerID)
+	platformService := upstreamapp.NewService(platformRepo, sipCfg, cfg.UserSettings.ServerID)
 	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
-	platformChannelSvc := platformapp.NewChannelService(
+	platformChannelSvc := upstreamapp.NewChannelService(
 		platformRepo, channelRepo, platformRepo, platformSIPClient,
 	)
 
@@ -197,7 +197,7 @@ func main() {
 	recordPlanService.Start()
 	defer recordPlanService.Stop()
 
-	commonChannelService := commonchannelapp.NewService(channelRepo, groupRegionRepo, playService, playbackService, ptzService, onvifService)
+	commonChannelService := channelapp.NewService(channelRepo, groupRegionRepo, playService, playbackService, ptzService, onvifService)
 	groupService := groupapp.NewService(groupRegionRepo)
 	regionService := regionapp.NewService(groupRegionRepo)
 

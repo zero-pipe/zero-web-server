@@ -4,15 +4,15 @@ import (
 	appauth "zero-web-kit/internal/application/auth"
 	alarmapp "zero-web-kit/internal/application/alarm"
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
-	commonchannelapp "zero-web-kit/internal/application/commonchannel"
+	channelapp "zero-web-kit/internal/application/channel"
 	deviceapp "zero-web-kit/internal/application/device"
 	deviceaccess "zero-web-kit/internal/application/deviceaccess"
 	groupapp "zero-web-kit/internal/application/group"
-	mediaapp "zero-web-kit/internal/application/media"
+	publishauth "zero-web-kit/internal/application/publishauth"
 	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	onvifapp "zero-web-kit/internal/application/onvif"
 	"zero-web-kit/internal/application/ops"
-	platformapp "zero-web-kit/internal/application/platform"
+	upstreamapp "zero-web-kit/internal/application/upstream"
 	positionapp "zero-web-kit/internal/application/position"
 	playapp "zero-web-kit/internal/application/play"
 	playbackapp "zero-web-kit/internal/application/playback"
@@ -24,7 +24,7 @@ import (
 	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	objectstoreapp "zero-web-kit/internal/application/objectstore"
 	snapapp "zero-web-kit/internal/application/snap"
-	subordinateapp "zero-web-kit/internal/application/subordinate"
+	downstreamapp "zero-web-kit/internal/application/downstream"
 	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/interfaces/hook"
@@ -44,20 +44,20 @@ type Deps struct {
 	PlaybackService     *playbackapp.Service
 	PTZService          *ptzapp.Service
 	AlarmService        *alarmapp.Service
-	PlatformService     *platformapp.Service
-	PlatformChannelSvc  *platformapp.ChannelService
-	SubordinateService  *subordinateapp.Service
+	PlatformService     *upstreamapp.Service
+	PlatformChannelSvc  *upstreamapp.ChannelService
+	SubordinateService  *downstreamapp.Service
 	PositionService     *positionapp.Service
 	CloudRecordService  *cloudrecordapp.Service
 	StreamPushService   *streampushapp.Service
 	StreamProxyService  *streamproxyapp.Service
 	RecordPlanService   *recordplanapp.Service
 	MediaServerService  *mediaserverapp.Service
-	CommonChannelSvc    *commonchannelapp.Service
+	CommonChannelSvc    *channelapp.Service
 	GroupService        *groupapp.Service
 	RegionService       *regionapp.Service
 	UserRepo            *persistence.UserRepository
-	PublishAuth         *mediaapp.PublishAuth
+	PublishAuth         *publishauth.PublishAuth
 	StreamOnDemand      bool
 	MediaBaseURL        string
 	JWT                 *jwtmgr.Manager

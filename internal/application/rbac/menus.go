@@ -11,32 +11,34 @@ const (
 	MenuMedia   = "media"   // 媒体
 	MenuStorage = "storage" // 存储
 	MenuOrg     = "org"     // 组织
-	MenuObserve = "observe" // 观察（地图/报警）
+	MenuApp     = "app"     // 应用（地图/分屏/报警）
 	MenuOps     = "ops"     // 运维
 	MenuUser    = "user"    // 用户
 
 	// 兼容旧码（角色 authority 历史数据）
-	MenuMap    = "map"
-	MenuLive   = "live"
-	MenuDevice = "device"
-	MenuRecord = "record"
-	MenuAlarm  = "alarm"
-	MenuSystem = "system"
+	MenuMap     = "map"
+	MenuLive    = "live"
+	MenuDevice  = "device"
+	MenuRecord  = "record"
+	MenuAlarm   = "alarm"
+	MenuSystem  = "system"
+	MenuObserve = "observe" // 曾用名「观察/监控」
 )
 
 // AllMenus 全部一级菜单权限（新能力域）。
 var AllMenus = []string{
-	MenuAccess, MenuMedia, MenuStorage, MenuOrg, MenuObserve, MenuOps, MenuUser,
+	MenuApp, MenuAccess, MenuMedia, MenuStorage, MenuOrg, MenuOps, MenuUser,
 }
 
 // legacyAlias 旧一级码映射到新能力码。
 var legacyAlias = map[string]string{
-	MenuDevice: MenuAccess,
-	MenuSystem: MenuAccess,
-	MenuRecord: MenuStorage,
-	MenuLive:   MenuMedia,
-	MenuMap:    MenuObserve,
-	MenuAlarm:  MenuObserve,
+	MenuDevice:  MenuAccess,
+	MenuSystem:  MenuAccess,
+	MenuRecord:  MenuStorage,
+	MenuLive:    MenuApp,
+	MenuMap:     MenuApp,
+	MenuAlarm:   MenuApp,
+	MenuObserve: MenuApp,
 }
 
 // MenuDefs 供前端角色配置勾选。
@@ -44,13 +46,13 @@ var MenuDefs = []struct {
 	Code  string `json:"code"`
 	Title string `json:"title"`
 }{
-	{MenuAccess, "接入"},
-	{MenuMedia, "媒体"},
-	{MenuStorage, "存储"},
-	{MenuOrg, "组织"},
-	{MenuObserve, "观察"},
-	{MenuOps, "运维"},
-	{MenuUser, "用户"},
+	{MenuApp, "应用管理"},
+	{MenuAccess, "接入管理"},
+	{MenuMedia, "媒体管理"},
+	{MenuStorage, "存储管理"},
+	{MenuOrg, "组织管理"},
+	{MenuOps, "运维管理"},
+	{MenuUser, "用户管理"},
 }
 
 const (

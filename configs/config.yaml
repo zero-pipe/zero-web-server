@@ -61,7 +61,7 @@ user_settings:
   record_push_live: false
   server_id: "000000"
   login_timeout: 60 # minutes
-  jwk_file: "config/jwk.json"
+  jwk_file: "configs/jwk.json"
 
 onvif:
   discovery_timeout: 5 # seconds

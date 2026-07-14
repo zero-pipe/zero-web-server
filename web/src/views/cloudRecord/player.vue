@@ -132,7 +132,9 @@ export default {
       })
     },
     playTimeValue() {
-      return { width: this.playerTime/this.streamInfo.duration * 100 + '%' }
+      const duration = this.streamInfo && this.streamInfo.duration
+      if (!duration) return { width: '0%' }
+      return { width: (this.playerTime || 0) / duration * 100 + '%' }
     },
     showPlayTimeTotal() {
       if (this.streamInfo === null) {
@@ -144,7 +146,9 @@ export default {
       }
     },
     playTimeTotal() {
-      return { left: `calc(${this.playerTime/this.streamInfo.duration}*100% - 6px)` }
+      const duration = this.streamInfo && this.streamInfo.duration
+      if (!duration) return { left: 'calc(0% - 6px)' }
+      return { left: `calc(${(this.playerTime || 0) / duration}*100% - 6px)` }
     },
     playTimeTitleStyle() {
       return { left: (this.showTimeLeft - 16) + 'px' }

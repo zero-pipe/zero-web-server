@@ -9,7 +9,7 @@ make test
 make build
 ```
 
-确认未 `git add`：`logs/`、`config/jwk.json`、`configs/config.local.yaml`。
+确认未 `git add`：`logs/`、`configs/config.local.yaml`。
 
 ## ZMS（`../zms`）
 

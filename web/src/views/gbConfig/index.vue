@@ -63,7 +63,7 @@
         <el-descriptions-item label="传输">{{ form.transport || 'UDP' }}</el-descriptions-item>
       </el-descriptions>
       <p class="hint" style="margin-top: 12px;">
-        场景说明：① 设备列表预登记设备编号 → 摄像机填本页信息并注册；② 双进程级联时，下级进程「国标级联→上级平台」填本页；本级进程「国标级联→下级平台」预登记下级的注册编号。
+        说明：摄像机或下级平台向上注册时，请填写本页「上级平台 IP / 端口 / 编号 / 域 / 密码」。下级平台需先在「国标级联 → 下级平台」中预登记其注册编号。
       </p>
     </el-card>
   </div>

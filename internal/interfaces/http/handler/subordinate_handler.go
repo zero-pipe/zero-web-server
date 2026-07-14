@@ -3,7 +3,7 @@ package handler
 import (
 	"strconv"
 
-	subordinateapp "zero-web-kit/internal/application/subordinate"
+	downstreamapp "zero-web-kit/internal/application/downstream"
 	domainsub "zero-web-kit/internal/domain/subordinate"
 	"zero-web-kit/pkg/response"
 
@@ -11,10 +11,10 @@ import (
 )
 
 type SubordinateHandler struct {
-	svc *subordinateapp.Service
+	svc *downstreamapp.Service
 }
 
-func NewSubordinateHandler(svc *subordinateapp.Service) *SubordinateHandler {
+func NewSubordinateHandler(svc *downstreamapp.Service) *SubordinateHandler {
 	return &SubordinateHandler{svc: svc}
 }
 

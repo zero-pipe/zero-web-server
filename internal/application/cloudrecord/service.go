@@ -125,10 +125,7 @@ func (s *Service) Delete(ids []int) error {
 		if rec.FilePath == "" {
 			continue
 		}
-		node, resolveErr := s.media.Resolve(context.Background(), rec.MediaServerID)
-		if resolveErr != nil {
-			node, resolveErr = s.media.SelectMinimumLoad(context.Background())
-		}
+		node, resolveErr := s.resolveForRecord(rec.MediaServerID)
 		if resolveErr != nil || node == nil {
 			continue
 		}
@@ -139,32 +136,50 @@ func (s *Service) Delete(ids []int) error {
 	return s.repo.Delete(ids)
 }
 
+// resolveForRecord 点播/拼 URL：优先在线节点，Ping 不通时仍用已登记配置（不阻断回放）。
+func (s *Service) resolveForRecord(preferID string) (port.MediaEndpoint, error) {
+	ctx := context.Background()
+	if node, err := s.media.Resolve(ctx, preferID); err == nil {
+		return node, nil
+	}
+	if node, err := s.media.SelectMinimumLoad(ctx); err == nil {
+		return node, nil
+	}
+	if node, err := s.media.Lookup(ctx, preferID); err == nil {
+		return node, nil
+	}
+	return s.media.Lookup(ctx, "")
+}
+
 func (s *Service) GetPlayPath(recordID int) (map[string]string, error) {
 	rec, err := s.repo.GetByID(recordID)
 	if err != nil {
 		return nil, fmt.Errorf("录像不存在")
 	}
-	node, err := s.media.Resolve(context.Background(), rec.MediaServerID)
-	if err != nil {
-		node, err = s.media.SelectMinimumLoad(context.Background())
-		if err != nil {
-			return nil, err
-		}
-	}
-	base := node.BaseURL()
-	download := fmt.Sprintf("%s/index/api/downloadFile?secret=%s&file_path=%s",
-		base, url.QueryEscape(node.Secret()), url.QueryEscape(rec.FilePath))
 	s.ensurePlayURL(rec)
 	out := map[string]string{
-		"httpPath":  download,
-		"httpsPath": download,
-		"download":  download,
-		"filePath":  rec.FilePath,
+		"filePath": rec.FilePath,
 	}
 	if rec.PlayURL != "" {
 		out["playUrl"] = rec.PlayURL
 		out["mp4"] = rec.PlayURL
 	}
+	node, err := s.resolveForRecord(rec.MediaServerID)
+	if err != nil {
+		if rec.PlayURL != "" {
+			out["httpPath"] = rec.PlayURL
+			out["httpsPath"] = rec.PlayURL
+			out["download"] = rec.PlayURL
+			return out, nil
+		}
+		return nil, err
+	}
+	base := node.BaseURL()
+	download := fmt.Sprintf("%s/index/api/downloadFile?secret=%s&file_path=%s",
+		base, url.QueryEscape(node.Secret()), url.QueryEscape(rec.FilePath))
+	out["httpPath"] = download
+	out["httpsPath"] = download
+	out["download"] = download
 	return out, nil
 }
 
@@ -185,24 +200,23 @@ func (s *Service) LoadRecord(ctx context.Context, app, stream string, cloudRecor
 	if stream == "" {
 		stream = rec.Stream
 	}
-	node, err := s.media.Resolve(context.Background(), rec.MediaServerID)
-	if err != nil {
-		node, err = s.media.SelectMinimumLoad(context.Background())
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &dto.StreamContent{
+	out := &dto.StreamContent{
 		App:           app,
 		Stream:        stream,
-		IP:            node.StreamIP(),
 		Mp4:           rec.PlayURL,
 		Flv:           rec.PlayURL,
-		MediaServerID: node.ID(),
+		MediaServerID: rec.MediaServerID,
 		ServerID:      s.serverID,
 		Progress:      rec.TimeLen,
 		Duration:      rec.TimeLen,
-	}, nil
+	}
+	if node, err := s.resolveForRecord(rec.MediaServerID); err == nil && node != nil {
+		out.IP = node.StreamIP()
+		out.MediaServerID = node.ID()
+	} else if u, parseErr := url.Parse(rec.PlayURL); parseErr == nil {
+		out.IP = u.Hostname()
+	}
+	return out, nil
 }
 
 func (s *Service) Seek(app, stream, mediaServerID string, seek float64, schema string) error {
@@ -261,12 +275,9 @@ func (s *Service) synthesizePlayURL(mediaServerID, filePath string) string {
 	if rel == "" {
 		return ""
 	}
-	node, err := s.media.Resolve(context.Background(), mediaServerID)
-	if err != nil {
-		node, err = s.media.SelectMinimumLoad(context.Background())
-		if err != nil || node == nil {
-			return ""
-		}
+	node, err := s.resolveForRecord(mediaServerID)
+	if err != nil || node == nil {
+		return ""
 	}
 	return strings.TrimRight(node.BaseURL(), "/") + "/" + rel
 }
@@ -276,12 +287,9 @@ func (s *Service) rewritePlayURLHost(mediaServerID, playURL string) string {
 	if err != nil || u.Path == "" {
 		return playURL
 	}
-	node, err := s.media.Resolve(context.Background(), mediaServerID)
-	if err != nil {
-		node, err = s.media.SelectMinimumLoad(context.Background())
-		if err != nil || node == nil {
-			return playURL
-		}
+	node, err := s.resolveForRecord(mediaServerID)
+	if err != nil || node == nil {
+		return playURL
 	}
 	base := strings.TrimRight(node.BaseURL(), "/")
 	return base + u.Path

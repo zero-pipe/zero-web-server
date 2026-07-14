@@ -25,7 +25,6 @@
       <el-col :xl="{ span: 8 }" :lg="{ span: 8 }" :md="{ span: 12 }" :sm="{ span: 12 }" :xs="{ span: 24 }">
         <div id="WorkThreadsLoad" class="control-cell">
           <div style="width:100%; height:100%; ">
-
             <consoleMem ref="consoleMem" />
           </div>
         </div>
@@ -68,54 +67,83 @@ export default {
   },
   data() {
     return {
-      timer: null
+      timer: null,
+      polling: false
     }
   },
   created() {
-    this.getSystemInfo()
-    this.getLoad()
-    this.getResourceInfo()
-    this.loopForSystemInfo()
+    this.refreshAll()
+    this.scheduleLoop()
+  },
+  activated() {
+    this.refreshAll()
+    this.scheduleLoop()
+  },
+  deactivated() {
+    this.stopLoop()
   },
   destroyed() {
-    window.clearImmediate(this.timer)
+    this.stopLoop()
   },
   methods: {
-    loopForSystemInfo: function() {
+    isConsoleRoute() {
+      return this.$route.name === '控制台' || this.$route.path === '/dashboard'
+    },
+    stopLoop() {
       if (this.timer != null) {
         window.clearTimeout(this.timer)
+        this.timer = null
       }
+    },
+    scheduleLoop() {
+      this.stopLoop()
       this.timer = setTimeout(() => {
-        console.log(this.$route.name)
-        if (this.$route.name === '控制台') {
-          this.getSystemInfo()
-          this.getLoad()
-          this.timer = null
-          this.loopForSystemInfo()
-          this.getResourceInfo()
+        if (!this.isConsoleRoute()) {
+          return
         }
+        this.refreshAll().finally(() => {
+          if (this.isConsoleRoute()) {
+            this.scheduleLoop()
+          }
+        })
       }, 2000)
     },
-    getSystemInfo: function() {
-      this.$store.dispatch('server/getSystemInfo')
-        .then(data => {
-          this.$refs.consoleCPU.setData(data.cpu)
-          this.$refs.consoleMem.setData(data.mem)
-          this.$refs.consoleNet.setData(data.net, data.netTotal)
-          this.$refs.consoleDisk.setData(data.disk)
-        })
+    refreshAll() {
+      if (this.polling) {
+        return Promise.resolve()
+      }
+      this.polling = true
+      return Promise.all([
+        this.getSystemInfo(),
+        this.getLoad(),
+        this.getResourceInfo()
+      ]).finally(() => {
+        this.polling = false
+      })
     },
-    getLoad: function() {
-      this.$store.dispatch('server/getMediaServerLoad')
+    getSystemInfo() {
+      return this.$store.dispatch('server/getSystemInfo')
         .then(data => {
-          this.$refs.consoleNodeLoad.setData(data)
+          if (this.$refs.consoleCPU) this.$refs.consoleCPU.setData(data.cpu)
+          if (this.$refs.consoleMem) this.$refs.consoleMem.setData(data.mem)
+          if (this.$refs.consoleNet) this.$refs.consoleNet.setData(data.net, data.netTotal)
+          if (this.$refs.consoleDisk) this.$refs.consoleDisk.setData(data.disk)
         })
+        .catch(() => {})
     },
-    getResourceInfo: function() {
-      this.$store.dispatch('server/getResourceInfo')
+    getLoad() {
+      return this.$store.dispatch('server/getMediaServerLoad')
         .then(data => {
-          this.$refs.consoleResource.setData(data)
+          if (this.$refs.consoleNodeLoad) this.$refs.consoleNodeLoad.setData(data)
         })
+        .catch(() => {})
+    },
+    getResourceInfo() {
+      return this.$store.dispatch('server/getResourceInfo')
+        .then(data => {
+          if (this.$refs.consoleResource) this.$refs.consoleResource.setData(data)
+        })
+        .catch(() => {})
     }
   }
 }

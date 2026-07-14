@@ -1,4 +1,4 @@
-package platformapp
+package upstreamapp
 
 import (
 	"fmt"

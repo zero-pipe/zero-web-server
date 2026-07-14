@@ -57,7 +57,10 @@ service.interceptors.response.use(
     }
     // 业务层可能 reject 了普通 Error / 字符串，没有 response
     if (!error || !error.response) {
-      const msg = (error && error.message) || (typeof error === 'string' ? error : '网络异常')
+      let msg = (error && error.message) || (typeof error === 'string' ? error : '网络异常')
+      if (/timeout of \d+ms exceeded/i.test(msg)) {
+        msg = '请求超时，请检查后端服务或媒体节点是否可达'
+      }
       if (msg && store.getters.showConfirmBoxForLoginLose) {
         Message.error({ message: msg, showClose: true })
       }

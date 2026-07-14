@@ -35,6 +35,15 @@ func (a *Adapter) List(ctx context.Context) ([]port.MediaNode, error) {
 	return out, nil
 }
 
+func (a *Adapter) Lookup(ctx context.Context, id string) (port.MediaEndpoint, error) {
+	_ = ctx
+	n, err := a.svc.Lookup(id)
+	if err != nil {
+		return nil, err
+	}
+	return wrap(n), nil
+}
+
 func (a *Adapter) Resolve(ctx context.Context, preferID string) (port.MediaEndpoint, error) {
 	_ = ctx
 	n, err := a.svc.Resolve(preferID)

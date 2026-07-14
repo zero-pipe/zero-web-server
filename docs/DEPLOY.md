@@ -132,7 +132,7 @@ media:
 
 > **注意**：若用本文 Docker Compose 起 MySQL，root 密码为 `root`，请把 `config.yaml` 里 `mysql.password` 改为 `"root"`，而不是 example 里的 `12345678`。
 
-首次启动会自动生成 `config/jwk.json`（JWT 密钥，勿提交 git）。
+JWT 密钥文件为 `configs/jwk.json`（可随仓库提交；生产环境建议替换为自己的密钥）。
 
 ---
 

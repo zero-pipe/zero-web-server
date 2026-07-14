@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	mediaapp "zero-web-kit/internal/application/media"
+	publishauth "zero-web-kit/internal/application/publishauth"
 	playapp "zero-web-kit/internal/application/play"
 	"zero-web-kit/internal/domain/shared"
 	"zero-web-kit/internal/infrastructure/persistence"
@@ -30,7 +30,7 @@ type LinkParam struct {
 type Service struct {
 	repo     *persistence.RecordPlanRepository
 	play     *playapp.Service
-	publish  *mediaapp.PublishRegistry
+	publish  *publishauth.PublishRegistry
 	serverID string
 	active   sync.Map // channelID -> streamKey "app/stream"
 	meta     sync.Map // channelID -> activeMeta
@@ -44,7 +44,7 @@ type activeMeta struct {
 	Stream     string
 }
 
-func NewService(repo *persistence.RecordPlanRepository, play *playapp.Service, publish *mediaapp.PublishRegistry, serverID string) *Service {
+func NewService(repo *persistence.RecordPlanRepository, play *playapp.Service, publish *publishauth.PublishRegistry, serverID string) *Service {
 	return &Service{
 		repo: repo, play: play, publish: publish, serverID: serverID,
 		stopCh: make(chan struct{}),
@@ -108,7 +108,7 @@ func (s *Service) tick() {
 }
 
 func (s *Service) startRecord(ch model.GBDeviceChannel) {
-	app := mediaapp.LiveApp
+	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s", ch.DeviceID, ch.GBDeviceID)
 	s.publish.EnableMP4(app, stream)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

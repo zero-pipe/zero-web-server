@@ -228,7 +228,17 @@ export default {
         cloudRecordId: row.id
       })
         .then(data => {
-          this.$refs.playerDialog.openDialog(data, row.timeLen, row.startTime)
+          const streamInfo = data || {}
+          // 列表里已有 playUrl 时兜底，避免接口字段缺失导致弹窗空播
+          if (!streamInfo.mp4 && !streamInfo.flv && row.playUrl) {
+            streamInfo.mp4 = row.playUrl
+            streamInfo.flv = row.playUrl
+          }
+          if (!streamInfo.mp4 && !streamInfo.flv) {
+            this.$message.error({ showClose: true, message: '录像播放地址为空' })
+            return
+          }
+          this.$refs.playerDialog.openDialog(streamInfo, row.timeLen, row.startTime)
         })
         .catch((error) => {
           this.$message.error({
