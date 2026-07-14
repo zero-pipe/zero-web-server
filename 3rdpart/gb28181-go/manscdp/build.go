@@ -25,15 +25,28 @@ func BuildDeviceInfoQuery(deviceID, sn string) string {
 </Query>`, sn, deviceID)
 }
 
+// BuildDeviceStatusQuery builds a DeviceStatus query MESSAGE body.
+func BuildDeviceStatusQuery(deviceID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>DeviceStatus</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+</Query>`, sn, deviceID)
+}
+
 // BuildDeviceControlPTZ builds a DeviceControl body with PTZCmd.
-func BuildDeviceControlPTZ(channelID, ptzCmd string) string {
+func BuildDeviceControlPTZ(channelID, sn, ptzCmd string) string {
+	if sn == "" {
+		sn = "1"
+	}
 	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
 <Control>
 <CmdType>DeviceControl</CmdType>
-<SN>%d</SN>
+<SN>%s</SN>
 <DeviceID>%s</DeviceID>
 <PTZCmd>%s</PTZCmd>
-</Control>`, 1, channelID, ptzCmd)
+</Control>`, sn, channelID, ptzCmd)
 }
 
 // BuildPresetQuery builds a PresetQuery MESSAGE body.
@@ -57,18 +70,150 @@ func BuildDeviceControlFrontEnd(channelID, sn, ptzCmd string) string {
 </Control>`, sn, channelID, ptzCmd)
 }
 
-// BuildRecordInfoQuery builds a RecordInfo query MESSAGE body.
-func BuildRecordInfoQuery(channelID, sn, startTime, endTime string) string {
+// BuildRecordCmd builds DeviceControl with RecordCmd (Record / StopRecord).
+func BuildRecordCmd(channelID, sn, recordCmd string) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>RecordInfo</CmdType>
+<Control>
+<CmdType>DeviceControl</CmdType>
 <SN>%s</SN>
 <DeviceID>%s</DeviceID>
-<StartTime>%s</StartTime>
-<EndTime>%s</EndTime>
-<Secrecy>0</Secrecy>
-<Type>all</Type>
-</Query>`, sn, channelID, startTime, endTime)
+<RecordCmd>%s</RecordCmd>
+</Control>`, sn, channelID, recordCmd)
+}
+
+// BuildGuardCmd builds DeviceControl with GuardCmd (SetGuard / ResetGuard).
+func BuildGuardCmd(channelID, sn, guardCmd string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Control>
+<CmdType>DeviceControl</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<GuardCmd>%s</GuardCmd>
+</Control>`, sn, channelID, guardCmd)
+}
+
+// BuildTeleBoot builds DeviceControl TeleBoot.
+func BuildTeleBoot(channelID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Control>
+<CmdType>DeviceControl</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<TeleBoot>Boot</TeleBoot>
+</Control>`, sn, channelID)
+}
+
+// BuildIFrameCmd builds DeviceControl IFrameCmd (强制关键帧).
+func BuildIFrameCmd(channelID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Control>
+<CmdType>DeviceControl</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<IFrameCmd>Send</IFrameCmd>
+</Control>`, sn, channelID)
+}
+
+// BuildAlarmCmd builds DeviceControl AlarmCmd (e.g. ResetAlarm).
+func BuildAlarmCmd(channelID, sn, alarmCmd string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Control>
+<CmdType>DeviceControl</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<AlarmCmd>%s</AlarmCmd>
+</Control>`, sn, channelID, alarmCmd)
+}
+
+// BuildRecordInfoQuery builds a RecordInfo query (Type=all, Secrecy=0).
+func BuildRecordInfoQuery(channelID, sn, startTime, endTime string) string {
+	return BuildRecordInfoQueryOpts(channelID, sn, RecordInfoOpts{
+		StartTime: startTime,
+		EndTime:   endTime,
+		Secrecy:   0,
+		Type:      "all",
+	})
+}
+
+// BuildRecordInfoQueryOpts builds a RecordInfo query with optional RecLocation/RecordPos.
+func BuildRecordInfoQueryOpts(channelID, sn string, opts RecordInfoOpts) string {
+	typ := opts.Type
+	if typ == "" {
+		typ = "all"
+	}
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="GB2312"?>` + "\n")
+	b.WriteString("<Query>\n")
+	b.WriteString("<CmdType>RecordInfo</CmdType>\n")
+	b.WriteString(fmt.Sprintf("<SN>%s</SN>\n", sn))
+	b.WriteString(fmt.Sprintf("<DeviceID>%s</DeviceID>\n", channelID))
+	b.WriteString(fmt.Sprintf("<StartTime>%s</StartTime>\n", opts.StartTime))
+	b.WriteString(fmt.Sprintf("<EndTime>%s</EndTime>\n", opts.EndTime))
+	b.WriteString(fmt.Sprintf("<Secrecy>%d</Secrecy>\n", opts.Secrecy))
+	b.WriteString(fmt.Sprintf("<Type>%s</Type>\n", typ))
+	if opts.RecLocation != "" {
+		b.WriteString(fmt.Sprintf("<RecLocation>%s</RecLocation>\n", opts.RecLocation))
+	}
+	if opts.RecordPos != "" {
+		b.WriteString(fmt.Sprintf("<RecordPos>%s</RecordPos>\n", opts.RecordPos))
+	}
+	b.WriteString("</Query>")
+	return b.String()
+}
+
+// BuildConfigDownloadQuery builds a ConfigDownload query.
+func BuildConfigDownloadQuery(deviceID, sn, configType string) string {
+	if configType == "" {
+		configType = "BasicParam"
+	}
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>ConfigDownload</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<ConfigType>%s</ConfigType>
+</Query>`, sn, deviceID, configType)
+}
+
+// BuildHomePositionQuery builds a HomePositionQuery request.
+func BuildHomePositionQuery(channelID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>HomePositionQuery</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+</Query>`, sn, channelID)
+}
+
+// BuildCruiseTrackListQuery builds a CruiseTrackListQuery request.
+func BuildCruiseTrackListQuery(channelID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>CruiseTrackListQuery</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+</Query>`, sn, channelID)
+}
+
+// BuildCruiseTrackQuery builds a CruiseTrackQuery request for a track number.
+func BuildCruiseTrackQuery(channelID, sn string, number int) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>CruiseTrackQuery</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+<Number>%d</Number>
+</Query>`, sn, channelID, number)
+}
+
+// BuildPTZPositionQuery builds a PTZPosition query/subscribe body.
+func BuildPTZPositionQuery(channelID, sn string) string {
+	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
+<Query>
+<CmdType>PTZPosition</CmdType>
+<SN>%s</SN>
+<DeviceID>%s</DeviceID>
+</Query>`, sn, channelID)
 }
 
 // BuildPlatformKeepalive builds an upstream platform keepalive notify.
@@ -96,7 +241,16 @@ func BuildCatalogNotify(platformDeviceID, sn string, items []CatalogItem) string
 		buf.WriteString("<Item>\r\n")
 		buf.WriteString(fmt.Sprintf("<DeviceID>%s</DeviceID>\r\n", it.DeviceID))
 		buf.WriteString(fmt.Sprintf("<Name>%s</Name>\r\n", it.Name))
-		buf.WriteString(fmt.Sprintf("<Status>%s</Status>\r\n", it.Status))
+		if it.Status != "" {
+			buf.WriteString(fmt.Sprintf("<Status>%s</Status>\r\n", it.Status))
+		}
+		ev := it.Event
+		if ev == "" {
+			ev = it.OperateType
+		}
+		if ev != "" {
+			buf.WriteString(fmt.Sprintf("<Event>%s</Event>\r\n", ev))
+		}
 		buf.WriteString("</Item>\r\n")
 	}
 	buf.WriteString("</DeviceList>\r\n</Notify>\r\n")

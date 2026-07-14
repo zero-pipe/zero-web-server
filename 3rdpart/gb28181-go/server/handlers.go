@@ -27,6 +27,9 @@ type MessageHandler interface {
 	OnKeepalive(ctx context.Context, deviceID, ip string, port int) error
 	OnCatalog(ctx context.Context, deviceID string, items []manscdp.CatalogItem) error
 	OnDeviceInfo(ctx context.Context, deviceID, name, manufacturer, model, firmware string) error
+	OnDeviceStatus(ctx context.Context, deviceID string, status *manscdp.DeviceStatus) error
+	OnMediaStatus(ctx context.Context, deviceID string, status *manscdp.MediaStatusNotify) error
+	OnDeviceControlResult(ctx context.Context, deviceID, sn, result string) error
 	OnAlarm(ctx context.Context, deviceID, channelID string, alarm *manscdp.AlarmNotify) error
 	OnMobilePosition(ctx context.Context, deviceID, channelID string, pos *manscdp.MobilePositionNotify) error
 }

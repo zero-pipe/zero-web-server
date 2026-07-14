@@ -55,3 +55,101 @@ func TestParsePresetEmptyList(t *testing.T) {
 		t.Fatalf("expected empty, got %+v", msg.PresetItems)
 	}
 }
+
+func TestParseCatalogOperateTypeAsEvent(t *testing.T) {
+	body := []byte(`<?xml version="1.0"?>
+<Notify>
+<CmdType>Catalog</CmdType>
+<SN>1</SN>
+<DeviceID>130909113319427420</DeviceID>
+<SumNum>1</SumNum>
+<DeviceList Num="1">
+<Item>
+<DeviceID>130909113319427421</DeviceID>
+<Name>cam</Name>
+<Status>OFF</Status>
+<OperateType>ADD</OperateType>
+</Item>
+</DeviceList>
+</Notify>`)
+	msg, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(msg.Items) != 1 {
+		t.Fatalf("items=%d", len(msg.Items))
+	}
+	if msg.Items[0].Event != "ADD" {
+		t.Fatalf("Event=%q OperateType=%q", msg.Items[0].Event, msg.Items[0].OperateType)
+	}
+}
+
+func TestParseDeviceStatus(t *testing.T) {
+	body := []byte(`<?xml version="1.0"?>
+<Response>
+<CmdType>DeviceStatus</CmdType>
+<SN>9</SN>
+<DeviceID>130909113319427420</DeviceID>
+<Result>OK</Result>
+<Online>OFFLINE</Online>
+<Status>OK</Status>
+<Encode>ON</Encode>
+<Record>ON</Record>
+<DeviceTime>2013-09-10T12:00:00</DeviceTime>
+</Response>`)
+	msg, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.DeviceStatus == nil || msg.DeviceStatus.Online != "OFFLINE" || msg.DeviceStatus.Record != "ON" {
+		t.Fatalf("status=%+v", msg.DeviceStatus)
+	}
+}
+
+func TestParseMediaStatus(t *testing.T) {
+	body := []byte(`<?xml version="1.0"?>
+<Notify>
+<CmdType>MediaStatus</CmdType>
+<SN>1</SN>
+<DeviceID>130909113319427420</DeviceID>
+<NotifyType>121</NotifyType>
+</Notify>`)
+	msg, err := Parse(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.MediaStatus == nil || msg.MediaStatus.NotifyType != "121" {
+		t.Fatalf("media=%+v", msg.MediaStatus)
+	}
+}
+
+func TestBuildRecordInfoOpts(t *testing.T) {
+	body := BuildRecordInfoQueryOpts("ch1", "2", RecordInfoOpts{
+		StartTime: "2013-01-01 00:00:00", EndTime: "2013-01-02 00:00:00",
+		Type: "all", RecLocation: "2", RecordPos: "2",
+	})
+	if !containsAll(body, "<RecLocation>2</RecLocation>", "<RecordPos>2</RecordPos>") {
+		t.Fatalf("body=%s", body)
+	}
+}
+
+func containsAll(s string, parts ...string) bool {
+	for _, p := range parts {
+		if !containsStr(s, p) {
+			return false
+		}
+	}
+	return true
+}
+
+func containsStr(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
+		(func() bool {
+			for i := 0; i+len(sub) <= len(s); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+			return false
+		})())
+}

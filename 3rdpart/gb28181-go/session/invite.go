@@ -59,6 +59,30 @@ func (m *InviteManager) Remove(stream string) {
 	m.sessions.Delete(stream)
 }
 
+// RemoveByCallID removes sessions whose INVITE Call-ID matches and returns stream keys.
+func (m *InviteManager) RemoveByCallID(callID string) []string {
+	if callID == "" {
+		return nil
+	}
+	var removed []string
+	m.sessions.Range(func(k, v any) bool {
+		sess := v.(*InviteSession)
+		if sess == nil || sess.Dialog == nil || sess.Dialog.InviteRequest == nil {
+			return true
+		}
+		cid := sess.Dialog.InviteRequest.CallID()
+		if cid == nil {
+			return true
+		}
+		if cid.Value() == callID {
+			m.sessions.Delete(k)
+			removed = append(removed, k.(string))
+		}
+		return true
+	})
+	return removed
+}
+
 func (s *InviteSession) Progress() float64 {
 	if s.Type != SessionDownload || s.StartTime == "" || s.EndTime == "" {
 		return 0

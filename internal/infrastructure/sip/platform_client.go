@@ -31,6 +31,8 @@ func toUpstream(p *domainplatform.Platform) cascade.Upstream {
 		ServerIP:   p.ServerIP,
 		ServerPort: p.ServerPort,
 		DeviceGBID: p.DeviceGBID,
+		Username:   p.Username,
+		Password:   p.Password,
 		Expires:    p.Expires,
 	}
 }

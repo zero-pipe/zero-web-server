@@ -69,6 +69,8 @@ func Parse(body []byte) (*Message, error) {
 	msg.CmdType = extractTag(body, "CmdType")
 	msg.SN = extractTag(body, "SN")
 	msg.DeviceID = extractTag(body, "DeviceID")
+	msg.Result = extractTag(body, "Result")
+	msg.NotifyType = extractTag(body, "NotifyType")
 	fmt.Sscanf(extractTag(body, "SumNum"), "%d", &msg.SumNum)
 
 	if len(msg.Items) == 0 {
@@ -87,6 +89,7 @@ func Parse(body []byte) (*Message, error) {
 	if msg.CmdType == "Catalog" && len(msg.Items) == 0 {
 		msg.Items = parseCatalogItemsFallback(body)
 	}
+	normalizeCatalogEvents(msg.Items)
 	if msg.CmdType == "RecordInfo" {
 		msg.RecordItems = parseRecordItemsFallback(body)
 	}
@@ -105,6 +108,15 @@ func Parse(body []byte) (*Message, error) {
 	}
 	if msg.CmdType == "MobilePosition" {
 		msg.Position = parseMobilePositionNotify(body)
+	}
+	if msg.CmdType == "DeviceStatus" {
+		msg.DeviceStatus = parseDeviceStatus(body)
+	}
+	if msg.CmdType == "MediaStatus" {
+		msg.MediaStatus = &MediaStatusNotify{
+			NotifyType: msg.NotifyType,
+			DeviceID:   msg.DeviceID,
+		}
 	}
 	if msg.Root == "" {
 		for _, tag := range []string{"Notify", "Response", "Query", "Control"} {
@@ -198,11 +210,16 @@ func parseCatalogItemsFallback(body []byte) []CatalogItem {
 			Model:        extractTagFold(chunk, "Model"),
 			Owner:        extractTagFold(chunk, "Owner"),
 			CivilCode:    extractTagFold(chunk, "CivilCode"),
+			Block:        extractTagFold(chunk, "Block"),
 			Address:      extractTagFold(chunk, "Address"),
 			ParentID:     extractTagFold(chunk, "ParentID"),
 			Status:       extractTagFold(chunk, "Status"),
+			Event:        extractTagFold(chunk, "Event"),
+			OperateType:  extractTagFold(chunk, "OperateType"),
 		}
 		fmt.Sscanf(extractTagFold(chunk, "Parental"), "%d", &item.Parental)
+		fmt.Sscanf(extractTagFold(chunk, "RegisterWay"), "%d", &item.RegisterWay)
+		fmt.Sscanf(extractTagFold(chunk, "Secrecy"), "%d", &item.Secrecy)
 		fmt.Sscanf(extractTagFold(chunk, "Longitude"), "%f", &item.Longitude)
 		fmt.Sscanf(extractTagFold(chunk, "Latitude"), "%f", &item.Latitude)
 		if info := extractInfoPTZType(chunk); info >= 0 {
@@ -328,4 +345,25 @@ func parseMobilePositionNotify(body []byte) *MobilePositionNotify {
 	fmt.Sscanf(extractTag(body, "Direction"), "%f", &p.Direction)
 	fmt.Sscanf(extractTag(body, "Altitude"), "%f", &p.Altitude)
 	return p
+}
+
+func parseDeviceStatus(body []byte) *DeviceStatus {
+	return &DeviceStatus{
+		Result:      extractTag(body, "Result"),
+		Online:      extractTag(body, "Online"),
+		Status:      extractTag(body, "Status"),
+		Encode:      extractTag(body, "Encode"),
+		Record:      extractTag(body, "Record"),
+		DeviceTime:  extractTag(body, "DeviceTime"),
+		AlarmStatus: extractTag(body, "Alarmstatus"),
+	}
+}
+
+// normalizeCatalogEvents fills Event from OperateType when Event is empty (Hik-style).
+func normalizeCatalogEvents(items []CatalogItem) {
+	for i := range items {
+		if items[i].Event == "" && items[i].OperateType != "" {
+			items[i].Event = items[i].OperateType
+		}
+	}
 }

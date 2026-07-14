@@ -56,7 +56,9 @@ _ = srv.Start(ctx)
 
 1. ~~Phase 0 — 纯协议工具包~~  
 2. ~~Phase 2 — `server` + `session` + `cascade`~~  
-3. Phase 3 — 示例程序、更多厂商 XML 金样、级联 Digest 完善  
+3. ~~Wave A — 抓包对齐：NOTIFY / DeviceStatus / MediaStatus / RecordCmd / RecordInfo 扩展 / Catalog Event / BYE 清理~~  
+4. ~~Wave B — Guard/TeleBoot/IFrame/AlarmCmd、ConfigDownload、2022 巡航/看守位/PTZPosition、级联 Digest~~  
+5. Phase 3 — 示例程序、更多厂商 XML 金样、语音对讲/抓拍完整会话  
 
 ## License
 

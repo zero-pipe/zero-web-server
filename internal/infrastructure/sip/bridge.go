@@ -98,6 +98,25 @@ func (b *bridge) OnDeviceInfo(_ context.Context, deviceID, name, manufacturer, m
 	return b.deviceSvc.HandleDeviceInfo(deviceID, name, manufacturer, model, firmware)
 }
 
+func (b *bridge) OnDeviceStatus(_ context.Context, deviceID string, status *manscdp.DeviceStatus) error {
+	_ = deviceID
+	_ = status
+	return nil
+}
+
+func (b *bridge) OnMediaStatus(_ context.Context, deviceID string, status *manscdp.MediaStatusNotify) error {
+	_ = deviceID
+	_ = status
+	return nil
+}
+
+func (b *bridge) OnDeviceControlResult(_ context.Context, deviceID, sn, result string) error {
+	_ = deviceID
+	_ = sn
+	_ = result
+	return nil
+}
+
 func (b *bridge) OnAlarm(_ context.Context, deviceID, channelID string, alarm *manscdp.AlarmNotify) error {
 	if b.alarm == nil {
 		return nil

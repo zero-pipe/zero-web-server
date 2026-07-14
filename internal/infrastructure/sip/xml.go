@@ -67,7 +67,7 @@ func BuildDeviceInfoQuery(deviceID, sn string) string {
 
 func BuildDeviceControlPTZ(deviceID, channelID, ptzCmd string) string {
 	_ = deviceID
-	return manscdp.BuildDeviceControlPTZ(channelID, ptzCmd)
+	return manscdp.BuildDeviceControlPTZ(channelID, "1", ptzCmd)
 }
 
 func BuildPresetQuery(channelID, sn string) string {
@@ -112,6 +112,10 @@ func BuildPlaybackSpeed(cseq int, speed float64) string {
 
 func BuildPlaybackSeek(cseq int, seekTime int64) string {
 	return mansrtsp.Seek(cseq, seekTime)
+}
+
+func BuildPlaybackSeekSpeed(cseq int, seekTime int64, speed float64) string {
+	return mansrtsp.SeekSpeed(cseq, seekTime, speed)
 }
 
 func BuildCatalogNotify(platformDeviceID, sn string, items []CatalogItem) string {

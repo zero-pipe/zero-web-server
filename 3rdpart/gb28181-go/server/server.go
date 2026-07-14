@@ -29,6 +29,8 @@ type Server struct {
 	records *session.RecordWaiter
 	presets *session.PresetWaiter
 	invites *session.InviteManager
+	controls *session.ControlWaiter
+	status   *session.StatusWaiter
 }
 
 // New creates a SIP server. handlers.Auth and handlers.Register/Message should be set
@@ -79,6 +81,8 @@ func New(cfg Config, handlers Handlers) (*Server, error) {
 		records:  session.NewRecordWaiter(),
 		presets:  session.NewPresetWaiter(),
 		invites:  session.NewInviteManager(),
+		controls: session.NewControlWaiter(),
+		status:   session.NewStatusWaiter(),
 	}
 	s.registerHandlers()
 	if cfg.Port <= 0 || strings.TrimSpace(cfg.ID) == "" {
@@ -119,9 +123,11 @@ func (s *Server) ApplyConfig(cfg Config) {
 func (s *Server) Config() Config   { return s.cfg }
 func (s *Server) LocalIP() string  { return s.localIP }
 func (s *Server) Domain() string   { return s.cfg.Domain }
-func (s *Server) Records() *session.RecordWaiter { return s.records }
-func (s *Server) Presets() *session.PresetWaiter { return s.presets }
-func (s *Server) Invites() *session.InviteManager { return s.invites }
+func (s *Server) Records() *session.RecordWaiter   { return s.records }
+func (s *Server) Presets() *session.PresetWaiter   { return s.presets }
+func (s *Server) Invites() *session.InviteManager  { return s.invites }
+func (s *Server) Controls() *session.ControlWaiter { return s.controls }
+func (s *Server) Status() *session.StatusWaiter    { return s.status }
 
 func (s *Server) NextSN() string {
 	return fmt.Sprintf("%d", s.sn.Add(1))
@@ -134,6 +140,7 @@ func (s *Server) NextInfoCSeq() int {
 func (s *Server) registerHandlers() {
 	s.srv.OnRegister(s.handleRegister)
 	s.srv.OnMessage(s.handleMessage)
+	s.srv.OnNotify(s.handleMessage) // catalog push / subscription notify (抓包 11)
 	s.srv.OnBye(s.handleBye)
 }
 
@@ -159,7 +166,13 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) handleBye(req *sip.Request, tx sip.ServerTransaction) {
-	log.Printf("[gb28181-go] BYE from=%s source=%s", extractSIPUser(req), req.Source())
+	callID := ""
+	if h := req.CallID(); h != nil {
+		callID = h.Value()
+	}
+	removed := s.invites.RemoveByCallID(callID)
+	log.Printf("[gb28181-go] BYE from=%s source=%s callID=%s removedSessions=%v",
+		extractSIPUser(req), req.Source(), callID, removed)
 	s.respond(tx, req, 200, "OK")
 }
 

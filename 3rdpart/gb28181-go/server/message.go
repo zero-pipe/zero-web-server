@@ -44,6 +44,13 @@ func (s *Server) handleMessage(req *sip.Request, tx sip.ServerTransaction) {
 			_ = s.handlers.Message.OnAlarm(ctx, deviceID, msg.DeviceID, msg.Alarm)
 		case "MobilePosition":
 			_ = s.handlers.Message.OnMobilePosition(ctx, deviceID, msg.DeviceID, msg.Position)
+		case "MediaStatus":
+			st := msg.MediaStatus
+			if st == nil {
+				st = &manscdp.MediaStatusNotify{NotifyType: msg.NotifyType, DeviceID: msg.DeviceID}
+			}
+			log.Printf("[gb28181-go] MediaStatus: device=%s notifyType=%s", deviceID, st.NotifyType)
+			_ = s.handlers.Message.OnMediaStatus(ctx, deviceID, st)
 		}
 	case "Response":
 		switch msg.CmdType {
@@ -61,10 +68,24 @@ func (s *Server) handleMessage(req *sip.Request, tx sip.ServerTransaction) {
 			log.Printf("[gb28181-go] DeviceInfo: device=%s name=%s manufacturer=%s model=%s",
 				deviceID, devName, mfr, model)
 			_ = s.handlers.Message.OnDeviceInfo(ctx, deviceID, devName, mfr, model, fw)
+		case "DeviceStatus":
+			st := msg.DeviceStatus
+			if st == nil {
+				st = &manscdp.DeviceStatus{Result: msg.Result}
+			}
+			s.status.Handle(msg.SN, st)
+			_ = s.handlers.Message.OnDeviceStatus(ctx, deviceID, st)
 		case "RecordInfo":
 			s.records.Handle(deviceID, msg.DeviceID, msg.SN, msg.SumNum, msg.RecordItems)
 		case "PresetQuery":
 			s.presets.Handle(msg.SN, msg.SumNum, msg.PresetItems)
+		case "DeviceControl":
+			result := msg.Result
+			if result == "" {
+				result = manscdp.ExtractTag(body, "Result")
+			}
+			s.controls.Handle(msg.SN, msg.DeviceID, result)
+			_ = s.handlers.Message.OnDeviceControlResult(ctx, deviceID, msg.SN, result)
 		}
 	}
 
