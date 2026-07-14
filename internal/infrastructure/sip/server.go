@@ -610,39 +610,6 @@ func (s *Server) inviteDialog(device *domaindevice.Device, channel *domainchanne
 	return sess, nil
 }
 
-// ParseInviteAnswerMedia 从 INVITE 200 OK 的 SDP 解析摄像机媒体地址（TCP-ACTIVE 用）。
-func ParseInviteAnswerMedia(sdp string) (host string, port int, err error) {
-	sdp = strings.ReplaceAll(sdp, "\r\n", "\n")
-	for _, line := range strings.Split(sdp, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "c=IN IP4 ") {
-			host = strings.TrimSpace(strings.TrimPrefix(line, "c=IN IP4 "))
-		}
-		if strings.HasPrefix(line, "m=video ") {
-			var mediaPort int
-			if _, scanErr := fmt.Sscanf(line, "m=video %d", &mediaPort); scanErr == nil && mediaPort > 0 {
-				port = mediaPort
-			}
-		}
-	}
-	if host == "" || port <= 0 {
-		return "", 0, fmt.Errorf("answer SDP missing c= or m=video port")
-	}
-	return host, port, nil
-}
-
-func extractSDPPort(sdp string) int {
-	for _, line := range strings.Split(sdp, "\n") {
-		if strings.HasPrefix(line, "m=video ") {
-			var port int
-			if _, err := fmt.Sscanf(line, "m=video %d", &port); err == nil {
-				return port
-			}
-		}
-	}
-	return 0
-}
-
 func (s *Server) SendPTZ(device *domaindevice.Device, channelID, direction string, h, v, z int) error {
 	cmd := BuildDeviceControlPTZ(device.DeviceID, channelID, PTZCommand(direction, h, v, z))
 	return s.sendMessage(device, cmd)

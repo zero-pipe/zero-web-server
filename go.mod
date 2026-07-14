@@ -1,6 +1,6 @@
 module zero-web-kit
 
-go 1.24
+go 1.25.4
 
 require (
 	github.com/0x524a/onvif-go v0.0.0
@@ -12,6 +12,7 @@ require (
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/shirou/gopsutil/v4 v4.24.12
 	github.com/spf13/viper v1.19.0
+	github.com/zero-pipe/gb28181-go v0.0.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
@@ -79,3 +80,5 @@ require (
 )
 
 replace github.com/0x524a/onvif-go => ./3rdpart/onvif-go
+
+replace github.com/zero-pipe/gb28181-go => ../gb28181-go

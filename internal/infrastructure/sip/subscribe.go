@@ -1,8 +1,9 @@
 package sipinfra
 
 import (
-	"fmt"
 	"strconv"
+
+	"github.com/zero-pipe/gb28181-go/manscdp"
 
 	domaindevice "zero-web-kit/internal/domain/device"
 
@@ -10,34 +11,15 @@ import (
 )
 
 func BuildSubscribeCatalog(deviceID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>Catalog</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-</Query>`, sn, deviceID)
+	return manscdp.BuildSubscribeCatalog(deviceID, sn)
 }
 
 func BuildSubscribeAlarm(deviceID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>Alarm</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-</Query>`, sn, deviceID)
+	return manscdp.BuildSubscribeAlarm(deviceID, sn)
 }
 
 func BuildSubscribeMobilePosition(deviceID, sn string, interval int) string {
-	if interval <= 0 {
-		interval = 5
-	}
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>MobilePosition</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-<Interval>%d</Interval>
-</Query>`, sn, deviceID, interval)
+	return manscdp.BuildSubscribeMobilePosition(deviceID, sn, interval)
 }
 
 func (s *Server) SendSubscribe(device *domaindevice.Device, eventType, body string, expiresSec int) error {

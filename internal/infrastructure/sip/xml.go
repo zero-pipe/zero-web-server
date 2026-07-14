@@ -1,17 +1,21 @@
 package sipinfra
 
 import (
-	"bytes"
-	"encoding/xml"
-	"fmt"
-	"io"
-	"regexp"
-	"strings"
-	"time"
+	"github.com/zero-pipe/gb28181-go/manscdp"
+	"github.com/zero-pipe/gb28181-go/mansrtsp"
+	"github.com/zero-pipe/gb28181-go/ptz"
+	"github.com/zero-pipe/gb28181-go/sdp"
 
 	domainptz "zero-web-kit/internal/domain/ptz"
 )
 
+type CatalogItem = manscdp.CatalogItem
+type RecordItem = manscdp.RecordItem
+type AlarmNotify = manscdp.AlarmNotify
+type MobilePositionNotify = manscdp.MobilePositionNotify
+
+// GBMessage mirrors manscdp.Message but maps presets to domainptz.Preset
+// so existing preset managers keep working unchanged.
 type GBMessage struct {
 	Root        string
 	CmdType     string
@@ -26,608 +30,115 @@ type GBMessage struct {
 	Position    *MobilePositionNotify
 }
 
-type RecordItem struct {
-	DeviceID   string
-	Name       string
-	FilePath   string
-	FileSize   string
-	StartTime  string
-	EndTime    string
-	Secrecy    int
-	Type       string
-	RecorderID string
-}
-
-type AlarmNotify struct {
-	AlarmPriority    string
-	AlarmMethod      string
-	AlarmTime        string
-	AlarmDescription string
-	Longitude        float64
-	Latitude         float64
-	AlarmType        int
-}
-
-type MobilePositionNotify struct {
-	Longitude float64
-	Latitude  float64
-	Speed     float64
-	Direction float64
-	Altitude  float64
-	Time      string
-}
-
-type CatalogItem struct {
-	DeviceID     string
-	Name         string
-	Manufacturer string
-	Model        string
-	Owner        string
-	CivilCode    string
-	Address      string
-	Parental     int
-	ParentID     string
-	Status       string
-	Longitude    float64
-	Latitude     float64
-	PTZType      int
-}
-
 func ParseGBXML(body []byte) (*GBMessage, error) {
-	dec := xml.NewDecoder(bytes.NewReader(body))
-	dec.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
-		return input, nil
+	msg, err := manscdp.Parse(body)
+	if err != nil {
+		return nil, err
 	}
-
-	msg := &GBMessage{Raw: body}
-	var current *CatalogItem
-	inDeviceList := false
-
-	for {
-		tok, err := dec.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		switch el := tok.(type) {
-		case xml.StartElement:
-			name := localName(el.Name.Local)
-			if msg.Root == "" && isRootTag(name) {
-				msg.Root = name
-			}
-			if name == "DeviceList" {
-				inDeviceList = true
-			}
-			if inDeviceList && name == "Item" {
-				current = &CatalogItem{}
-			}
-		case xml.EndElement:
-			name := localName(el.Name.Local)
-			if name == "Item" && current != nil {
-				msg.Items = append(msg.Items, *current)
-				current = nil
-			}
-			if name == "DeviceList" {
-				inDeviceList = false
-			}
-		case xml.CharData:
-			text := strings.TrimSpace(string(el))
-			if text == "" {
-				continue
-			}
-			if current != nil {
-				assignCatalogField(current, dec, text)
-				continue
-			}
-			// read last start element name from stack - simplified approach
-			switch {
-			case strings.Contains(string(body), "<CmdType>"+text+"</CmdType>"):
-				if msg.CmdType == "" {
-					msg.CmdType = text
-				}
-			}
+	out := &GBMessage{
+		Root:        msg.Root,
+		CmdType:     msg.CmdType,
+		SN:          msg.SN,
+		DeviceID:    msg.DeviceID,
+		SumNum:      msg.SumNum,
+		Raw:         msg.Raw,
+		Items:       msg.Items,
+		RecordItems: msg.RecordItems,
+		Alarm:       msg.Alarm,
+		Position:    msg.Position,
+	}
+	if len(msg.PresetItems) > 0 {
+		out.PresetItems = make([]domainptz.Preset, len(msg.PresetItems))
+		for i, p := range msg.PresetItems {
+			out.PresetItems[i] = domainptz.Preset{PresetID: p.PresetID, PresetName: p.PresetName}
 		}
 	}
-
-	// fallback field extraction
-	msg.CmdType = extractTag(body, "CmdType")
-	msg.SN = extractTag(body, "SN")
-	msg.DeviceID = extractTag(body, "DeviceID")
-	fmt.Sscanf(extractTag(body, "SumNum"), "%d", &msg.SumNum)
-
-	if len(msg.Items) == 0 {
-		msg.Items = parseCatalogItemsFallback(body)
-	} else {
-		nonEmpty := 0
-		for _, it := range msg.Items {
-			if it.DeviceID != "" {
-				nonEmpty++
-			}
-		}
-		if nonEmpty == 0 {
-			msg.Items = parseCatalogItemsFallback(body)
-		}
-	}
-	if msg.CmdType == "Catalog" && len(msg.Items) == 0 {
-		msg.Items = parseCatalogItemsFallback(body)
-	}
-	if msg.CmdType == "RecordInfo" {
-		msg.RecordItems = parseRecordItemsFallback(body)
-	}
-	if msg.CmdType == "PresetQuery" {
-		msg.PresetItems = parsePresetItemsFallback(body)
-		if msg.SumNum == 0 {
-			if n := extractPresetListNum(body); n > 0 {
-				msg.SumNum = n
-			} else {
-				msg.SumNum = len(msg.PresetItems)
-			}
-		}
-	}
-	if msg.CmdType == "Alarm" {
-		msg.Alarm = parseAlarmNotify(body)
-	}
-	if msg.CmdType == "MobilePosition" {
-		msg.Position = parseMobilePositionNotify(body)
-	}
-	if msg.Root == "" {
-		for _, tag := range []string{"Notify", "Response", "Query", "Control"} {
-			if strings.Contains(string(body), "<"+tag+">") {
-				msg.Root = tag
-				break
-			}
-		}
-	}
-	return msg, nil
-}
-
-func isRootTag(name string) bool {
-	switch name {
-	case "Notify", "Response", "Query", "Control":
-		return true
-	default:
-		return false
-	}
-}
-
-func localName(name string) string {
-	if idx := strings.Index(name, ":"); idx >= 0 {
-		return name[idx+1:]
-	}
-	return name
-}
-
-func extractTag(body []byte, tag string) string {
-	return extractTagFold(string(body), tag)
-}
-
-func extractTagFold(s, tag string) string {
-	lower := strings.ToLower(s)
-	tagLower := strings.ToLower(tag)
-	// 兼容 <Manufacturer>、<Manufacturer >、<Manufacturer xxx="y">
-	needle := "<" + tagLower
-	i := 0
-	for {
-		idx := strings.Index(lower[i:], needle)
-		if idx < 0 {
-			return ""
-		}
-		abs := i + idx
-		after := abs + len(needle)
-		if after >= len(lower) {
-			return ""
-		}
-		ch := lower[after]
-		if ch != '>' && ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n' && ch != '/' {
-			// 避免匹配到 DeviceName 时命中 Name 等前缀
-			i = after
-			continue
-		}
-		gt := strings.IndexByte(lower[after:], '>')
-		if gt < 0 {
-			return ""
-		}
-		contentStart := after + gt + 1
-		endTag := "</" + tagLower + ">"
-		j := strings.Index(lower[contentStart:], endTag)
-		if j < 0 {
-			return ""
-		}
-		return strings.TrimSpace(s[contentStart : contentStart+j])
-	}
-}
-
-func parseCatalogItemsFallback(body []byte) []CatalogItem {
-	s := string(body)
-	lower := strings.ToLower(s)
-	items := make([]CatalogItem, 0)
-	for {
-		i := strings.Index(lower, "<item")
-		if i < 0 {
-			break
-		}
-		closeIdx := strings.Index(lower[i:], "</item>")
-		if closeIdx < 0 {
-			break
-		}
-		end := i + closeIdx + len("</item>")
-		chunk := s[i:end]
-		item := CatalogItem{
-			DeviceID:     extractTagFold(chunk, "DeviceID"),
-			Name:         extractTagFold(chunk, "Name"),
-			Manufacturer: extractTagFold(chunk, "Manufacturer"),
-			Model:        extractTagFold(chunk, "Model"),
-			Owner:        extractTagFold(chunk, "Owner"),
-			CivilCode:    extractTagFold(chunk, "CivilCode"),
-			Address:      extractTagFold(chunk, "Address"),
-			ParentID:     extractTagFold(chunk, "ParentID"),
-			Status:       extractTagFold(chunk, "Status"),
-		}
-		fmt.Sscanf(extractTagFold(chunk, "Parental"), "%d", &item.Parental)
-		fmt.Sscanf(extractTagFold(chunk, "Longitude"), "%f", &item.Longitude)
-		fmt.Sscanf(extractTagFold(chunk, "Latitude"), "%f", &item.Latitude)
-		if info := extractInfoPTZType(chunk); info >= 0 {
-			item.PTZType = info
-		}
-		items = append(items, item)
-		s = s[end:]
-		lower = strings.ToLower(s)
-	}
-	return items
-}
-
-func extractInfoPTZType(chunk string) int {
-	i := strings.Index(strings.ToLower(chunk), "<info>")
-	if i < 0 {
-		return -1
-	}
-	sub := chunk[i:]
-	val := extractTagFold(sub, "PTZType")
-	var ptz int
-	fmt.Sscanf(val, "%d", &ptz)
-	return ptz
-}
-
-func assignCatalogField(item *CatalogItem, dec *xml.Decoder, text string) {
-	// unused in fallback mode
+	return out, nil
 }
 
 func BuildCatalogQuery(deviceID, platformID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>Catalog</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-</Query>`, sn, deviceID)
+	_ = platformID
+	return manscdp.BuildCatalogQuery(deviceID, sn)
 }
 
 func BuildDeviceInfoQuery(deviceID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>DeviceInfo</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-</Query>`, sn, deviceID)
+	return manscdp.BuildDeviceInfoQuery(deviceID, sn)
 }
 
 func BuildDeviceControlPTZ(deviceID, channelID, ptzCmd string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Control>
-<CmdType>DeviceControl</CmdType>
-<SN>%d</SN>
-<DeviceID>%s</DeviceID>
-<PTZCmd>%s</PTZCmd>
-</Control>`, 1, channelID, ptzCmd)
+	_ = deviceID
+	return manscdp.BuildDeviceControlPTZ(channelID, ptzCmd)
 }
 
-// BuildPresetQuery builds GB28181 PresetQuery MESSAGE body.
 func BuildPresetQuery(channelID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>PresetQuery</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-</Query>`, sn, channelID)
+	return manscdp.BuildPresetQuery(channelID, sn)
 }
 
-// FrontEndCmdString builds 8-byte PTZCmd hex string.
 func FrontEndCmdString(cmdCode, parameter1, parameter2, combineCode2 int) string {
-	b7 := (combineCode2 << 4) & 0xFF
-	check := (0xA5 + 0x0F + 0x01 + cmdCode + parameter1 + parameter2 + b7) % 0x100
-	return fmt.Sprintf("A50F01%02X%02X%02X%02X%02X",
-		byte(cmdCode), byte(parameter1), byte(parameter2), byte(b7), byte(check))
+	return ptz.FrontEndCmd(cmdCode, parameter1, parameter2, combineCode2)
 }
 
 func BuildDeviceControlFrontEnd(channelID, sn, ptzCmd string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Control>
-<CmdType>DeviceControl</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-<PTZCmd>%s</PTZCmd>
-</Control>`, sn, channelID, ptzCmd)
-}
-
-var presetListNumRe = regexp.MustCompile(`(?i)<PresetList[^>]*\bNum\s*=\s*["']?(\d+)`)
-
-func extractPresetListNum(body []byte) int {
-	m := presetListNumRe.FindSubmatch(body)
-	if len(m) < 2 {
-		return 0
-	}
-	var n int
-	fmt.Sscanf(string(m[1]), "%d", &n)
-	return n
-}
-
-func parsePresetItemsFallback(body []byte) []domainptz.Preset {
-	s := string(body)
-	lower := strings.ToLower(s)
-	items := make([]domainptz.Preset, 0)
-
-	// Prefer items inside PresetList; fall back to any Item with PresetID.
-	search := s
-	searchLower := lower
-	if i := strings.Index(lower, "<presetlist"); i >= 0 {
-		if j := strings.Index(lower[i:], "</presetlist>"); j >= 0 {
-			search = s[i : i+j]
-			searchLower = strings.ToLower(search)
-		}
-	}
-
-	rest := search
-	restLower := searchLower
-	for {
-		i := strings.Index(restLower, "<item")
-		if i < 0 {
-			break
-		}
-		closeIdx := strings.Index(restLower[i:], "</item>")
-		if closeIdx < 0 {
-			break
-		}
-		end := i + closeIdx + len("</item>")
-		chunk := rest[i:end]
-		id := extractTagFold(chunk, "PresetID")
-		name := extractTagFold(chunk, "PresetName")
-		if id != "" {
-			items = append(items, domainptz.Preset{PresetID: id, PresetName: name})
-		}
-		rest = rest[end:]
-		restLower = restLower[end:]
-	}
-	return items
+	return manscdp.BuildDeviceControlFrontEnd(channelID, sn, ptzCmd)
 }
 
 func BuildRecordInfoQuery(channelID, sn, startTime, endTime string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Query>
-<CmdType>RecordInfo</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-<StartTime>%s</StartTime>
-<EndTime>%s</EndTime>
-<Secrecy>0</Secrecy>
-<Type>all</Type>
-</Query>`, sn, channelID, startTime, endTime)
+	return manscdp.BuildRecordInfoQuery(channelID, sn, startTime, endTime)
 }
 
 func BuildPlaybackSDP(deviceID, channelID, sdpIP string, port int, ssrc, streamMode, startTime, endTime string) string {
-	mediaProto := "RTP/AVP"
-	setup := ""
-	switch streamMode {
-	case "TCP-ACTIVE":
-		mediaProto = "TCP/RTP/AVP"
-		setup = "a=setup:active\r\na=connection:new\r\n"
-	case "TCP-PASSIVE":
-		mediaProto = "TCP/RTP/AVP"
-		setup = "a=setup:passive\r\na=connection:new\r\n"
-	}
-	tStart, tEnd := parseTimeRange(startTime, endTime)
-	return fmt.Sprintf(
-		"v=0\r\no=%s 0 0 IN IP4 %s\r\ns=Playback\r\nu=%s:0\r\nc=IN IP4 %s\r\nt=%d %d\r\nm=video %d %s 96 98 97 99\r\na=recvonly\r\na=rtpmap:96 PS/90000\r\na=rtpmap:98 H264/90000\r\na=rtpmap:97 MPEG4/90000\r\na=rtpmap:99 H265/90000\r\n%sy=%s\r\n",
-		deviceID, sdpIP, channelID, sdpIP, tStart, tEnd, port, mediaProto, setup, ssrc,
-	)
-}
-
-func parseTimeRange(start, end string) (int64, int64) {
-	const layout = "2006-01-02 15:04:05"
-	ts, _ := time.ParseInLocation(layout, start, time.Local)
-	te, _ := time.ParseInLocation(layout, end, time.Local)
-	return ts.Unix(), te.Unix()
-}
-
-func parseRecordItemsFallback(body []byte) []RecordItem {
-	s := string(body)
-	items := make([]RecordItem, 0)
-	for {
-		i := strings.Index(s, "<Item")
-		if i < 0 {
-			break
-		}
-		j := strings.Index(s[i:], "</Item>")
-		if j < 0 {
-			break
-		}
-		chunk := s[i : i+j+7]
-		item := RecordItem{
-			DeviceID: extractTag([]byte(chunk), "DeviceID"),
-			Name:     extractTag([]byte(chunk), "Name"),
-			FilePath: extractTag([]byte(chunk), "FilePath"),
-			FileSize: extractTag([]byte(chunk), "FileSize"),
-			StartTime: extractTag([]byte(chunk), "StartTime"),
-			EndTime:   extractTag([]byte(chunk), "EndTime"),
-			Type:      extractTag([]byte(chunk), "Type"),
-			RecorderID: extractTag([]byte(chunk), "RecorderID"),
-		}
-		fmt.Sscanf(extractTag([]byte(chunk), "Secrecy"), "%d", &item.Secrecy)
-		items = append(items, item)
-		s = s[i+j+7:]
-	}
-	return items
-}
-
-func parseAlarmNotify(body []byte) *AlarmNotify {
-	a := &AlarmNotify{
-		AlarmPriority:    extractTag(body, "AlarmPriority"),
-		AlarmMethod:      extractTag(body, "AlarmMethod"),
-		AlarmTime:        extractTag(body, "AlarmTime"),
-		AlarmDescription: extractTag(body, "AlarmDescription"),
-	}
-	fmt.Sscanf(extractTag(body, "Longitude"), "%f", &a.Longitude)
-	fmt.Sscanf(extractTag(body, "Latitude"), "%f", &a.Latitude)
-	fmt.Sscanf(extractTag(body, "AlarmType"), "%d", &a.AlarmType)
-	return a
-}
-
-func parseMobilePositionNotify(body []byte) *MobilePositionNotify {
-	p := &MobilePositionNotify{Time: extractTag(body, "Time")}
-	fmt.Sscanf(extractTag(body, "Longitude"), "%f", &p.Longitude)
-	fmt.Sscanf(extractTag(body, "Latitude"), "%f", &p.Latitude)
-	fmt.Sscanf(extractTag(body, "Speed"), "%f", &p.Speed)
-	fmt.Sscanf(extractTag(body, "Direction"), "%f", &p.Direction)
-	fmt.Sscanf(extractTag(body, "Altitude"), "%f", &p.Altitude)
-	return p
+	return sdp.BuildPlayback(deviceID, channelID, sdpIP, port, ssrc, streamMode, startTime, endTime)
 }
 
 func BuildPlatformKeepalive(platformID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>
-<Notify>
-<CmdType>Keepalive</CmdType>
-<SN>%s</SN>
-<DeviceID>%s</DeviceID>
-<Status>OK</Status>
-</Notify>`, sn, platformID)
+	return manscdp.BuildPlatformKeepalive(platformID, sn)
 }
 
 func BuildDownloadSDP(deviceID, channelID, sdpIP string, port int, ssrc, streamMode, startTime, endTime string, downloadSpeed int) string {
-	mediaProto := "RTP/AVP"
-	setup := ""
-	switch streamMode {
-	case "TCP-ACTIVE":
-		mediaProto = "TCP/RTP/AVP"
-		setup = "a=setup:active\r\na=connection:new\r\n"
-	case "TCP-PASSIVE":
-		mediaProto = "TCP/RTP/AVP"
-		setup = "a=setup:passive\r\na=connection:new\r\n"
-	}
-	if downloadSpeed <= 0 {
-		downloadSpeed = 4
-	}
-	tStart, tEnd := parseTimeRange(startTime, endTime)
-	return fmt.Sprintf(
-		"v=0\r\no=%s 0 0 IN IP4 %s\r\ns=Download\r\nu=%s:0\r\nc=IN IP4 %s\r\nt=%d %d\r\nm=video %d %s 96 98 97 99\r\na=recvonly\r\na=rtpmap:96 PS/90000\r\na=rtpmap:98 H264/90000\r\na=rtpmap:97 MPEG4/90000\r\na=rtpmap:99 H265/90000\r\n%sa=downloadspeed:%d\r\ny=%s\r\n",
-		deviceID, sdpIP, channelID, sdpIP, tStart, tEnd, port, mediaProto, setup, downloadSpeed, ssrc,
-	)
+	return sdp.BuildDownload(deviceID, channelID, sdpIP, port, ssrc, streamMode, startTime, endTime, downloadSpeed)
 }
 
 func BuildPlaybackPause(cseq int) string {
-	return fmt.Sprintf("PAUSE RTSP/1.0\r\nCSeq: %d\r\nPauseTime: now\r\n", cseq)
+	return mansrtsp.Pause(cseq)
 }
 
 func BuildPlaybackResume(cseq int) string {
-	return fmt.Sprintf("PLAY RTSP/1.0\r\nCSeq: %d\r\nRange: npt=now-\r\n", cseq)
+	return mansrtsp.Resume(cseq)
 }
 
 func BuildPlaybackSpeed(cseq int, speed float64) string {
-	return fmt.Sprintf("PLAY RTSP/1.0\r\nCSeq: %d\r\nScale: %.6f\r\n", cseq, speed)
+	return mansrtsp.Speed(cseq, speed)
 }
 
 func BuildPlaybackSeek(cseq int, seekTime int64) string {
-	return fmt.Sprintf("PLAY RTSP/1.0\r\nCSeq: %d\r\nRange: npt=%d-\r\n", cseq, seekTime)
+	return mansrtsp.Seek(cseq, seekTime)
 }
 
 func BuildCatalogNotify(platformDeviceID, sn string, items []CatalogItem) string {
-	var buf strings.Builder
-	buf.WriteString(`<?xml version="1.0" encoding="GB2312"?>` + "\r\n")
-	buf.WriteString("<Notify>\r\n")
-	buf.WriteString("<CmdType>Catalog</CmdType>\r\n")
-	buf.WriteString(fmt.Sprintf("<SN>%s</SN>\r\n", sn))
-	buf.WriteString(fmt.Sprintf("<DeviceID>%s</DeviceID>\r\n", platformDeviceID))
-	buf.WriteString(fmt.Sprintf("<SumNum>%d</SumNum>\r\n", len(items)))
-	buf.WriteString(fmt.Sprintf("<DeviceList Num=\"%d\">\r\n", len(items)))
-	for _, it := range items {
-		buf.WriteString("<Item>\r\n")
-		buf.WriteString(fmt.Sprintf("<DeviceID>%s</DeviceID>\r\n", it.DeviceID))
-		buf.WriteString(fmt.Sprintf("<Name>%s</Name>\r\n", it.Name))
-		buf.WriteString(fmt.Sprintf("<Status>%s</Status>\r\n", it.Status))
-		buf.WriteString("</Item>\r\n")
-	}
-	buf.WriteString("</DeviceList>\r\n</Notify>\r\n")
-	return buf.String()
+	return manscdp.BuildCatalogNotify(platformDeviceID, sn, items)
 }
 
 func BuildBroadcastNotify(sourceID, targetChannelID, sn string) string {
-	return fmt.Sprintf(`<?xml version="1.0" encoding="GB2312"?>`+"\r\n"+
-		"<Notify>\r\n"+
-		"<CmdType>Broadcast</CmdType>\r\n"+
-		"<SN>%s</SN>\r\n"+
-		"<SourceID>%s</SourceID>\r\n"+
-		"<TargetID>%s</TargetID>\r\n"+
-		"</Notify>\r\n", sn, sourceID, targetChannelID)
+	return manscdp.BuildBroadcastNotify(sourceID, targetChannelID, sn)
 }
 
 func BuildPlaySDP(deviceID, sdpIP string, port int, ssrc, streamMode, streamIdentification string) string {
-	mediaProto := "RTP/AVP"
-	setup := ""
-	switch streamMode {
-	case "TCP-ACTIVE":
-		mediaProto = "TCP/RTP/AVP"
-		setup = "a=setup:active\r\na=connection:new\r\n"
-	case "TCP-PASSIVE":
-		mediaProto = "TCP/RTP/AVP"
-		setup = "a=setup:passive\r\na=connection:new\r\n"
-	}
-	streamAttr := ""
-	if streamIdentification != "" {
-		streamAttr = fmt.Sprintf("a=%s\r\n", streamIdentification)
-	}
-	return fmt.Sprintf(
-		"v=0\r\no=%s 0 0 IN IP4 %s\r\ns=Play\r\nc=IN IP4 %s\r\nt=0 0\r\nm=video %d %s 96 98 97 99\r\na=recvonly\r\na=rtpmap:96 PS/90000\r\na=rtpmap:98 H264/90000\r\na=rtpmap:97 MPEG4/90000\r\na=rtpmap:99 H265/90000\r\n%s%sy=%s\r\n",
-		deviceID, sdpIP, sdpIP, port, mediaProto, streamAttr, setup, ssrc,
-	)
+	return sdp.BuildPlay(deviceID, sdpIP, port, ssrc, streamMode, streamIdentification)
 }
 
 func PTZCommand(direction string, horizonSpeed, verticalSpeed, zoomSpeed int) string {
-	if horizonSpeed <= 0 {
-		horizonSpeed = 100
-	}
-	if verticalSpeed <= 0 {
-		verticalSpeed = 100
-	}
-	if zoomSpeed <= 0 {
-		zoomSpeed = 16
-	}
-	var cmd byte = 0x00
-	switch strings.ToLower(direction) {
-	case "left":
-		cmd = 0x01
-	case "right":
-		cmd = 0x02
-	case "up":
-		cmd = 0x03
-	case "down":
-		cmd = 0x04
-	case "upleft":
-		cmd = 0x05
-	case "upright":
-		cmd = 0x06
-	case "downleft":
-		cmd = 0x07
-	case "downright":
-		cmd = 0x08
-	case "zoomin":
-		cmd = 0x09
-	case "zoomout":
-		cmd = 0x0a
-	case "stop":
-		cmd = 0x00
-	default:
-		cmd = 0x00
-	}
-	check := (0xA5 + 0x0F + 0x01 + int(cmd) + horizonSpeed + verticalSpeed + zoomSpeed) % 256
-	return fmt.Sprintf("%02X%02X%02X%02X%02X%02X%02X%02X",
-		0xA5, 0x0F, 0x01, cmd, byte(horizonSpeed), byte(verticalSpeed), byte(zoomSpeed), byte(check))
+	return ptz.Command(direction, horizonSpeed, verticalSpeed, zoomSpeed)
+}
+
+// ParseInviteAnswerMedia 从 INVITE 200 OK 的 SDP 解析摄像机媒体地址（TCP-ACTIVE 用）。
+func ParseInviteAnswerMedia(sdpBody string) (host string, port int, err error) {
+	return sdp.ParseAnswerMedia(sdpBody)
+}
+
+func extractSDPPort(sdpBody string) int {
+	return sdp.ExtractVideoPort(sdpBody)
+}
+
+func extractTag(body []byte, tag string) string {
+	return manscdp.ExtractTag(body, tag)
 }
