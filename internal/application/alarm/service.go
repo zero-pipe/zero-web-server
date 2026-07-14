@@ -43,6 +43,10 @@ func (s *Service) HandleNotify(deviceID, channelGBID string, n *sipinfra.AlarmNo
 	})
 }
 
+func (s *Service) Get(id int) (*domainalarm.Alarm, error) {
+	return s.alarms.GetByID(id)
+}
+
 func (s *Service) List(page, count int, alarmType *int, beginTime, endTime string) ([]*domainalarm.Alarm, int64, error) {
 	return s.alarms.List(page, count, alarmType, parseTimeMs(beginTime), parseTimeMs(endTime))
 }

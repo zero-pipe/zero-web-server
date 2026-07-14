@@ -22,6 +22,9 @@ import (
 	streampushapp "zero-web-kit/internal/application/streampush"
 	streamproxyapp "zero-web-kit/internal/application/streamproxy"
 	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
+	objectstoreapp "zero-web-kit/internal/application/objectstore"
+	snapapp "zero-web-kit/internal/application/snap"
+	subordinateapp "zero-web-kit/internal/application/subordinate"
 	"zero-web-kit/internal/infrastructure/config"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/interfaces/hook"
@@ -43,6 +46,7 @@ type Deps struct {
 	AlarmService        *alarmapp.Service
 	PlatformService     *platformapp.Service
 	PlatformChannelSvc  *platformapp.ChannelService
+	SubordinateService  *subordinateapp.Service
 	PositionService     *positionapp.Service
 	CloudRecordService  *cloudrecordapp.Service
 	StreamPushService   *streampushapp.Service
@@ -63,6 +67,8 @@ type Deps struct {
 	RecordInfoTimeoutMs int
 	SIPConfig           config.SIPConfig
 	GbSipConfigService  *gbsipconfig.Service
+	ObjectStoreService  *objectstoreapp.Service
+	SnapService         *snapapp.Service
 	ServerPort          int
 	MediaIP             string
 	LogDir              string
@@ -91,8 +97,9 @@ func Setup(r *gin.Engine, deps Deps) {
 	playbackHandler := handler.NewPlaybackHandler(deps.PlaybackService, deps.PlayTimeoutMs)
 	gbRecordHandler := handler.NewGBRecordHandler(deps.PlaybackService, deps.RecordInfoTimeoutMs)
 	ptzHandler := handler.NewPTZHandler(deps.PTZService)
-	alarmHandler := handler.NewAlarmHandler(deps.AlarmService)
+	alarmHandler := handler.NewAlarmHandler(deps.AlarmService, deps.ObjectStoreService)
 	platformHandler := handler.NewPlatformHandler(deps.PlatformService, deps.PlatformChannelSvc)
+	subordinateHandler := handler.NewSubordinateHandler(deps.SubordinateService)
 	positionHandler := handler.NewPositionHandler(deps.PositionService)
 	cloudRecordHandler := handler.NewCloudRecordHandler(deps.CloudRecordService, deps.PlayTimeoutMs)
 	streamPushHandler := handler.NewStreamPushHandler(deps.StreamPushService, deps.PlayTimeoutMs)
@@ -109,6 +116,8 @@ func Setup(r *gin.Engine, deps Deps) {
 		deps.Version,
 	)
 	gbSipConfigHandler := handler.NewGbSipConfigHandler(deps.GbSipConfigService)
+	objectStoreHandler := handler.NewObjectStoreHandler(deps.ObjectStoreService)
+	snapHandler := handler.NewSnapHandler(deps.SnapService)
 	jt1078Handler := handler.NewJT1078Handler()
 	commonChannelHandler := handler.NewCommonChannelHandler(deps.CommonChannelSvc)
 	groupHandler := handler.NewGroupHandler(deps.GroupService)
@@ -179,6 +188,9 @@ func Setup(r *gin.Engine, deps Deps) {
 			serverAPI.GET("/system/configInfo", mediaServerHandler.SystemConfigInfo)
 			serverAPI.GET("/gb_sip_config", gbSipConfigHandler.Get)
 			serverAPI.POST("/gb_sip_config/save", gbSipConfigHandler.Save)
+			serverAPI.GET("/object_store_config", objectStoreHandler.Get)
+			serverAPI.POST("/object_store_config/save", objectStoreHandler.Save)
+			serverAPI.GET("/object_store_config/health", objectStoreHandler.Health)
 			serverAPI.GET("/resource/info", mediaServerHandler.ResourceInfo)
 			serverAPI.GET("/info", mediaServerHandler.Info)
 			serverAPI.GET("/map/config", mediaServerHandler.MapConfig)
@@ -282,6 +294,8 @@ func Setup(r *gin.Engine, deps Deps) {
 			deviceQuery.GET("/statistics/keepalive", deviceHandler.KeepaliveStatistics)
 			deviceQuery.GET("/statistics/register", deviceHandler.RegisterStatistics)
 			deviceQuery.POST("/channel/audio", deviceHandler.ChangeChannelAudio)
+			deviceQuery.GET("/snap/:deviceId/:channelId", snapHandler.GetChannelSnap)
+			deviceQuery.POST("/snap/:deviceId/:channelId", snapHandler.UploadChannelSnap)
 		}
 
 		auth.GET("/play/start/:deviceId/:channelId", playHandler.Start)
@@ -381,6 +395,15 @@ func Setup(r *gin.Engine, deps Deps) {
 			platform.POST("/channel/device/remove", platformHandler.ChannelDeviceRemove)
 			platform.DELETE("/channel/remove", platformHandler.ChannelRemove)
 			platform.POST("/channel/custom/update", platformHandler.ChannelCustomUpdate)
+		}
+
+		subordinate := auth.Group("/subordinate")
+		{
+			subordinate.GET("/query", subordinateHandler.List)
+			subordinate.GET("/one/:id", subordinateHandler.Get)
+			subordinate.POST("/add", subordinateHandler.Add)
+			subordinate.POST("/update/:id", subordinateHandler.Update)
+			subordinate.DELETE("/delete/:id", subordinateHandler.Delete)
 		}
 
 		position := auth.Group("/position")

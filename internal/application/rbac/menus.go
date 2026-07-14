@@ -5,23 +5,38 @@ import (
 	"strings"
 )
 
-// 菜单权限码，与 web/src/layout/menu.js 的 primary id 对齐。
+// 菜单权限码，与 web/src/layout/menu.js 的 primary id 对齐（中台能力域）。
 const (
+	MenuAccess  = "access"  // 接入
+	MenuMedia   = "media"   // 媒体
+	MenuStorage = "storage" // 存储
+	MenuOrg     = "org"     // 组织
+	MenuObserve = "observe" // 观察（地图/报警）
+	MenuOps     = "ops"     // 运维
+	MenuUser    = "user"    // 用户
+
+	// 兼容旧码（角色 authority 历史数据）
 	MenuMap    = "map"
 	MenuLive   = "live"
 	MenuDevice = "device"
-	MenuOrg    = "org"
 	MenuRecord = "record"
 	MenuAlarm  = "alarm"
-	MenuOps    = "ops"
 	MenuSystem = "system"
-	MenuUser   = "user"
 )
 
-// AllMenus 全部一级菜单权限。
+// AllMenus 全部一级菜单权限（新能力域）。
 var AllMenus = []string{
-	MenuMap, MenuLive, MenuDevice, MenuOrg, MenuRecord,
-	MenuAlarm, MenuOps, MenuSystem, MenuUser,
+	MenuAccess, MenuMedia, MenuStorage, MenuOrg, MenuObserve, MenuOps, MenuUser,
+}
+
+// legacyAlias 旧一级码映射到新能力码。
+var legacyAlias = map[string]string{
+	MenuDevice: MenuAccess,
+	MenuSystem: MenuAccess,
+	MenuRecord: MenuStorage,
+	MenuLive:   MenuMedia,
+	MenuMap:    MenuObserve,
+	MenuAlarm:  MenuObserve,
 }
 
 // MenuDefs 供前端角色配置勾选。
@@ -29,19 +44,17 @@ var MenuDefs = []struct {
 	Code  string `json:"code"`
 	Title string `json:"title"`
 }{
-	{MenuMap, "电子地图"},
-	{MenuLive, "分屏监控"},
-	{MenuDevice, "设备管理"},
-	{MenuOrg, "组织管理"},
-	{MenuRecord, "录像管理"},
-	{MenuAlarm, "报警管理"},
-	{MenuOps, "运维管理"},
-	{MenuSystem, "系统管理"},
-	{MenuUser, "用户管理"},
+	{MenuAccess, "接入"},
+	{MenuMedia, "媒体"},
+	{MenuStorage, "存储"},
+	{MenuOrg, "组织"},
+	{MenuObserve, "观察"},
+	{MenuOps, "运维"},
+	{MenuUser, "用户"},
 }
 
 const (
-	AuthorityAll   = "*"
+	AuthorityAll    = "*"
 	AuthorityLegacy = "0" // 兼容旧 admin
 )
 
@@ -52,7 +65,6 @@ func IsFullAccess(authority string) bool {
 }
 
 // ParseMenus 解析角色 authority → 菜单码列表。
-// roleID==1 或 * / 0：返回全部；否则解析 JSON 数组。
 func ParseMenus(roleID int, authority string) []string {
 	if roleID == 1 || IsFullAccess(authority) {
 		out := make([]string, len(AllMenus))
@@ -65,7 +77,6 @@ func ParseMenus(roleID int, authority string) []string {
 	}
 	var codes []string
 	if err := json.Unmarshal([]byte(a), &codes); err != nil {
-		// 兼容逗号分隔
 		parts := strings.Split(a, ",")
 		codes = codes[:0]
 		for _, p := range parts {
@@ -107,7 +118,7 @@ func EncodeMenus(codes []string) string {
 	return string(b)
 }
 
-// Normalize 去重并只保留合法菜单码。
+// Normalize 去重、旧码映射，只保留合法菜单码。
 func Normalize(codes []string) []string {
 	valid := map[string]bool{}
 	for _, m := range AllMenus {
@@ -117,6 +128,9 @@ func Normalize(codes []string) []string {
 	out := make([]string, 0, len(codes))
 	for _, c := range codes {
 		c = strings.TrimSpace(c)
+		if alias, ok := legacyAlias[c]; ok {
+			c = alias
+		}
 		if !valid[c] || seen[c] {
 			continue
 		}
@@ -128,6 +142,9 @@ func Normalize(codes []string) []string {
 
 // HasMenu 是否拥有指定菜单。
 func HasMenu(menus []string, code string) bool {
+	if alias, ok := legacyAlias[code]; ok {
+		code = alias
+	}
 	for _, m := range menus {
 		if m == AuthorityAll || m == code {
 			return true

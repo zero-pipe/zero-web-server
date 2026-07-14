@@ -2,6 +2,7 @@ package sipinfra
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -13,17 +14,36 @@ import (
 	gbserver "github.com/zero-pipe/gb28181-go/server"
 )
 
+// SubordinateHandler routes REGISTER/MESSAGE for downstream platforms.
+type SubordinateHandler interface {
+	ResolvePassword(gbID string) (password string, known bool, err error)
+	Known(gbID string) bool
+	Exists(gbID string) bool
+	OnRegister(ev gbserver.RegisterEvent) error
+	OnUnregister(gbID string) error
+	OnKeepalive(gbID, ip string, port int) error
+}
+
 // bridge adapts ZWS device/alarm/position/redis into gb28181-go handlers.
 type bridge struct {
-	deviceSvc DeviceService
-	alarm     AlarmHandler
-	position  PositionHandler
-	redis     *redisinfra.Client
-	password  string
-	serverID  string
+	deviceSvc   DeviceService
+	subordinate SubordinateHandler
+	cascade     gbserver.CascadeInboundHandler
+	alarm       AlarmHandler
+	position    PositionHandler
+	redis       *redisinfra.Client
+	password    string
+	serverID    string
 }
 
 func (b *bridge) ResolvePassword(deviceID string) (string, bool, error) {
+	if b.subordinate != nil {
+		if p, known, err := b.subordinate.ResolvePassword(deviceID); err != nil {
+			return "", false, err
+		} else if known {
+			return p, true, nil
+		}
+	}
 	d, err := b.deviceSvc.GetByDeviceID(deviceID)
 	if err != nil || d == nil {
 		return b.password, false, nil
@@ -35,6 +55,9 @@ func (b *bridge) ResolvePassword(deviceID string) (string, bool, error) {
 }
 
 func (b *bridge) OnRegister(ctx context.Context, ev gbserver.RegisterEvent) error {
+	if b.subordinate != nil && b.subordinate.Known(ev.DeviceID) {
+		return b.subordinate.OnRegister(ev)
+	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	var device *domaindevice.Device
 	if existing, err := b.deviceSvc.GetByDeviceID(ev.DeviceID); err == nil && existing != nil {
@@ -75,6 +98,9 @@ func (b *bridge) OnRegister(ctx context.Context, ev gbserver.RegisterEvent) erro
 }
 
 func (b *bridge) OnUnregister(_ context.Context, deviceID string) error {
+	if b.subordinate != nil && b.subordinate.Exists(deviceID) {
+		return b.subordinate.OnUnregister(deviceID)
+	}
 	if device, err := b.deviceSvc.GetByDeviceID(deviceID); err == nil && device != nil {
 		_ = b.deviceSvc.Offline(device)
 	}
@@ -82,19 +108,61 @@ func (b *bridge) OnUnregister(_ context.Context, deviceID string) error {
 }
 
 func (b *bridge) DeviceKnown(deviceID string) bool {
+	if b.subordinate != nil && b.subordinate.Known(deviceID) {
+		return true
+	}
 	d, err := b.deviceSvc.GetByDeviceID(deviceID)
 	return err == nil && d != nil
 }
 
+func (b *bridge) UpstreamKnown(upstreamGBID string) bool {
+	if b.cascade == nil {
+		return false
+	}
+	return b.cascade.UpstreamKnown(upstreamGBID)
+}
+
+func (b *bridge) OnDeviceControl(ctx context.Context, ev gbserver.InboundControlEvent) error {
+	if b.cascade == nil {
+		return nil
+	}
+	return b.cascade.OnDeviceControl(ctx, ev)
+}
+
+func (b *bridge) OnInvite(ctx context.Context, ev gbserver.InboundInviteEvent) ([]byte, error) {
+	if b.cascade == nil {
+		return nil, fmt.Errorf("cascade inbound not configured")
+	}
+	return b.cascade.OnInvite(ctx, ev)
+}
+
+func (b *bridge) OnInviteEnd(ctx context.Context, callID string) error {
+	if b.cascade == nil {
+		return nil
+	}
+	return b.cascade.OnInviteEnd(ctx, callID)
+}
+
 func (b *bridge) OnKeepalive(_ context.Context, deviceID, ip string, port int) error {
+	if b.subordinate != nil && b.subordinate.Known(deviceID) {
+		return b.subordinate.OnKeepalive(deviceID, ip, port)
+	}
 	return b.deviceSvc.HandleKeepalive(deviceID, ip, port)
 }
 
 func (b *bridge) OnCatalog(_ context.Context, deviceID string, items []manscdp.CatalogItem) error {
+	if b.subordinate != nil && b.subordinate.Known(deviceID) {
+		// 下级目录入库留给后续通道映射波次；此处先保活在线即可
+		_ = b.subordinate.OnKeepalive(deviceID, "", 0)
+		return nil
+	}
 	return b.deviceSvc.HandleCatalog(deviceID, items)
 }
 
 func (b *bridge) OnDeviceInfo(_ context.Context, deviceID, name, manufacturer, model, firmware string) error {
+	if b.subordinate != nil && b.subordinate.Known(deviceID) {
+		return nil
+	}
 	return b.deviceSvc.HandleDeviceInfo(deviceID, name, manufacturer, model, firmware)
 }
 

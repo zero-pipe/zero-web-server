@@ -1,38 +1,49 @@
 /**
- * 双列侧栏菜单：一级业务域 + 二级功能页
- * path 与 vue-router 保持一致；hidden 路由不在此列出
- * id 同时作为菜单权限码
+ * 双列侧栏：按「物联中台底座」能力域划分一级菜单。
+ * id = 权限码（与 rbac.AllMenus 对齐）；path 与 vue-router 一致。
+ *
+ * 能力映射：
+ * - access  接入：设备 / 通道 / 国标配置 / 级联
+ * - media   媒体：节点集群调度 / 推拉流 / 分屏观察
+ * - storage 存储：对象存储对接 / 录像元数据
+ * - observe 观察入口：地图 / 报警（非底座核心，可裁剪）
  */
 export const primaryMenus = [
   {
-    id: 'map',
-    title: '电子地图',
-    icon: 'menu-map',
-    path: '/map'
-  },
-  {
-    id: 'live',
-    title: '分屏监控',
-    icon: 'live',
-    path: '/live'
-  },
-  {
-    id: 'device',
-    title: '设备管理',
+    id: 'access',
+    title: '接入',
     icon: 'menu-device',
     children: [
       { title: '设备列表', path: '/devices', icon: 'devices' },
-      { title: '国标设备', path: '/device', icon: 'device' },
-      { title: 'ONVIF设备', path: '/onvifDevice', icon: 'onvifDevice' },
-      { title: '部标设备', path: '/jtDevice', icon: 'jtDevice' },
       { title: '通道列表', path: '/channel', icon: 'channelManger' },
+      { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
+      { title: '国标级联', path: '/platform', icon: 'gbCascade' }
+    ]
+  },
+  {
+    id: 'media',
+    title: '媒体',
+    icon: 'mediaServerList',
+    children: [
+      { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' },
       { title: '推流列表', path: '/push', icon: 'streamPush' },
-      { title: '拉流代理', path: '/proxy', icon: 'streamProxy' }
+      { title: '拉流代理', path: '/proxy', icon: 'streamProxy' },
+      { title: '分屏监控', path: '/live', icon: 'live' }
+    ]
+  },
+  {
+    id: 'storage',
+    title: '存储',
+    icon: 'cloudRecord',
+    children: [
+      { title: '对象存储', path: '/objectStore', icon: 'cloudRecord' },
+      { title: '录制计划', path: '/recordPlan', icon: 'recordPlan' },
+      { title: '云端录像', path: '/cloudRecord', icon: 'cloudRecord' }
     ]
   },
   {
     id: 'org',
-    title: '组织管理',
+    title: '组织',
     icon: 'menu-org',
     children: [
       { title: '行政区划', path: '/commonChannel/region', icon: 'region' },
@@ -40,23 +51,17 @@ export const primaryMenus = [
     ]
   },
   {
-    id: 'record',
-    title: '录像管理',
-    icon: 'menu-record',
+    id: 'observe',
+    title: '观察',
+    icon: 'menu-map',
     children: [
-      { title: '录制计划', path: '/recordPlan', icon: 'recordPlan' },
-      { title: '云端录像', path: '/cloudRecord', icon: 'cloudRecord' }
+      { title: '电子地图', path: '/map', icon: 'menu-map' },
+      { title: '报警管理', path: '/alarm', icon: 'el-icon-bell' }
     ]
   },
   {
-    id: 'alarm',
-    title: '报警管理',
-    icon: 'el-icon-bell',
-    path: '/alarm'
-  },
-  {
     id: 'ops',
-    title: '运维管理',
+    title: '运维',
     icon: 'menu-ops',
     children: [
       { title: '控制台', path: '/dashboard', icon: 'dashboard' },
@@ -66,18 +71,8 @@ export const primaryMenus = [
     ]
   },
   {
-    id: 'system',
-    title: '系统管理',
-    icon: 'menu-system',
-    children: [
-      { title: '媒体节点', path: '/mediaServer', icon: 'mediaServerList' },
-      { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
-      { title: '国标级联', path: '/platform', icon: 'gbCascade' }
-    ]
-  },
-  {
     id: 'user',
-    title: '用户管理',
+    title: '用户',
     icon: 'menu-user',
     children: [
       { title: '用户列表', path: '/user', icon: 'user' },
@@ -85,6 +80,16 @@ export const primaryMenus = [
     ]
   }
 ]
+
+/** 旧权限码 → 新能力码（角色库兼容） */
+export const legacyMenuAlias = {
+  device: 'access',
+  system: 'access',
+  record: 'storage',
+  live: 'media',
+  map: 'observe',
+  alarm: 'observe'
+}
 
 export function findPrimaryByPath(routePath) {
   const path = (routePath || '').split('?')[0]

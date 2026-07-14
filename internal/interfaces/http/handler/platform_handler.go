@@ -170,5 +170,19 @@ func (h *PlatformHandler) ChannelRemove(c *gin.Context) {
 }
 
 func (h *PlatformHandler) ChannelCustomUpdate(c *gin.Context) {
+	var body struct {
+		PlatformID     int    `json:"platformId"`
+		ID             int    `json:"id"`
+		CustomDeviceID string `json:"customDeviceId"`
+		CustomName     string `json:"customName"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.PlatformID <= 0 || body.ID <= 0 {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.channel.UpdateCustom(body.PlatformID, body.ID, body.CustomDeviceID, body.CustomName); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
 	response.OK(c, nil)
 }

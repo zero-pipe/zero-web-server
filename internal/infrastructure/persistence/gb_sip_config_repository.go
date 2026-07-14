@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"zero-web-kit/internal/infrastructure/config"
@@ -43,14 +44,20 @@ func (r *GbSipConfigRepository) Save(row *model.GbSipConfig) error {
 	if err != nil {
 		return err
 	}
+	transport := strings.TrimSpace(row.Transport)
+	if transport == "" {
+		transport = "UDP"
+	}
 	return r.db.Model(&model.GbSipConfig{}).Where("id = ?", gbSipConfigSingletonID).Updates(map[string]any{
-		"ip":          row.IP,
-		"port":        row.Port,
-		"domain":      row.Domain,
-		"device_id":   row.DeviceID,
-		"password":    row.Password,
-		"alarm":       row.Alarm,
-		"update_time": row.UpdateTime,
+		"ip":                   row.IP,
+		"port":                 row.Port,
+		"domain":               row.Domain,
+		"device_id":            row.DeviceID,
+		"password":             row.Password,
+		"alarm":                row.Alarm,
+		"require_pre_register": row.RequirePreRegister,
+		"transport":            transport,
+		"update_time":          row.UpdateTime,
 	}).Error
 }
 
@@ -66,4 +73,12 @@ func (r *GbSipConfigRepository) ToSIPConfig(row *model.GbSipConfig) config.SIPCo
 		Password: row.Password,
 		Alarm:    row.Alarm,
 	}
+}
+
+// RequirePreRegister returns the DB flag (default true when row missing fields historically).
+func (r *GbSipConfigRepository) RequirePreRegister(row *model.GbSipConfig) bool {
+	if row == nil {
+		return true
+	}
+	return row.RequirePreRegister
 }

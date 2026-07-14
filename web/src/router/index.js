@@ -113,10 +113,9 @@ export const constantRoutes = [
     component: Layout,
     children: [
       {
+        // 遗留入口：统一设备列表
         path: '/device',
-        name: 'Device',
-        component: () => import('@/views/device/index'),
-        meta: { title: '国标设备', icon: 'device' }
+        redirect: '/devices'
       },
       {
         hidden: true,
@@ -127,15 +126,11 @@ export const constantRoutes = [
       },
       {
         path: '/jtDevice',
-        name: 'JTDevice',
-        component: () => import('@/views/jtDevice/index'),
-        meta: { title: '部标设备', icon: 'jtDevice' }
+        redirect: '/devices'
       },
       {
         path: '/onvifDevice',
-        name: 'OnvifDevice',
-        component: () => import('@/views/onvifDevice/index'),
-        meta: { title: 'ONVIF设备', icon: 'onvifDevice' }
+        redirect: '/devices'
       },
       {
         hidden: true,
@@ -246,6 +241,19 @@ export const constantRoutes = [
         name: 'GbConfig',
         component: () => import('@/views/gbConfig/index'),
         meta: { title: '国标配置', icon: 'gbConfig' }
+      }
+    ]
+  },
+  {
+    path: '/objectStore',
+    component: Layout,
+    redirect: '/objectStore',
+    children: [
+      {
+        path: '',
+        name: 'ObjectStore',
+        component: () => import('@/views/objectStore/index'),
+        meta: { title: '对象存储', icon: 'cloudRecord' }
       }
     ]
   },

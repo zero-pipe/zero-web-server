@@ -1,7 +1,7 @@
 package onvifapp
 
 import (
-	"zero-web-kit/internal/infrastructure/media/mediakit"
+	"zero-web-kit/internal/port"
 )
 
 const minPlayBytesSpeed int64 = 2048
@@ -15,7 +15,7 @@ func isSuspiciousVideoSize(width, height int) bool {
 }
 
 // isStreamReadyForPlay 判断 ZMS 流是否已有可播数据（避免复用半就绪/僵尸流）。
-func isStreamReadyForPlay(info *mediakit.StreamMediaInfo, streamChannel string) bool {
+func isStreamReadyForPlay(info *port.StreamProbe, streamChannel string) bool {
 	_ = streamChannel
 	if info == nil || !info.Video {
 		return false

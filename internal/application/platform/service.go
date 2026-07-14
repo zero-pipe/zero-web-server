@@ -68,9 +68,11 @@ func (s *Service) Delete(id int) error {
 
 func (s *Service) ServerConfig() map[string]any {
 	return map[string]any{
-		"deviceIp":   s.cfg.Domain,
+		"deviceIp":   s.cfg.IP,
 		"deviceId":   s.cfg.ID,
+		"deviceDomain": s.cfg.Domain,
 		"devicePort": s.cfg.Port,
+		"password":  s.cfg.Password,
 	}
 }
 

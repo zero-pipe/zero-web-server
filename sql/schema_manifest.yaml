@@ -27,6 +27,12 @@ required:
     - name: zws_gb_sip_config
       module: gb28181
       notes: 国标 SIP 单例配置，定义于 init_zws_mysql.sql
+    - name: zws_subordinate_platform
+      module: cascade
+      notes: 下级平台预登记（向本级 REGISTER）
+    - name: zws_object_store_config
+      module: storage
+      notes: 对象存储对接（MinIO/S3），平台不自建存储
     - name: zws_platform
       module: cascade
     - name: zws_platform_channel

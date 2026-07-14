@@ -2,20 +2,20 @@
   <div id="gbConfig" class="app-container gb-config-page">
     <el-card shadow="never" class="gb-config-card">
       <div slot="header" class="gb-config-header">
-        <span>国标配置</span>
-        <span class="gb-config-sub">改编码/域/密码/IP 保存即生效无需重启；改监听端口后需重启服务</span>
+        <span>本级国标身份</span>
+        <span class="gb-config-sub">摄像机 / 下级平台把本页信息填为「上级」；改编码/域/密码/IP/预登记保存即生效；改端口需重启</span>
       </div>
       <el-form
         ref="form"
         v-loading="loading"
         :model="form"
         :rules="rules"
-        label-width="120px"
-        style="max-width: 640px"
+        label-width="140px"
+        style="max-width: 720px"
         @submit.native.prevent
       >
         <el-form-item label="SIP IP" prop="ip">
-          <el-input v-model="form.ip" placeholder="摄像机可达的本机网卡地址" clearable />
+          <el-input v-model="form.ip" placeholder="对端可达的本机网卡地址" clearable />
         </el-form-item>
         <el-form-item label="SIP 端口" prop="port">
           <el-input-number v-model="form.port" :min="1" :max="65535" controls-position="right" style="width: 100%" />
@@ -23,11 +23,21 @@
         <el-form-item label="SIP 域" prop="domain">
           <el-input v-model="form.domain" placeholder="例如 3402000000" clearable />
         </el-form-item>
-        <el-form-item label="国标编号" prop="deviceId">
+        <el-form-item label="本级国标编号" prop="deviceId">
           <el-input v-model="form.deviceId" maxlength="20" show-word-limit placeholder="20位平台国标编号" clearable />
         </el-form-item>
-        <el-form-item label="SIP 密码" prop="password">
-          <el-input v-model="form.password" show-password placeholder="设备注册鉴权密码" clearable />
+        <el-form-item label="默认注册密码" prop="password">
+          <el-input v-model="form.password" show-password placeholder="设备未单独设密时使用" clearable />
+        </el-form-item>
+        <el-form-item label="信令传输">
+          <el-radio-group v-model="form.transport">
+            <el-radio label="UDP">UDP</el-radio>
+            <el-radio label="TCP">TCP</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="强制预登记">
+          <el-switch v-model="form.requirePreRegister" />
+          <span class="hint">开启后：未在「设备列表」或「下级平台」预登记的编号，REGISTER 返回 403</span>
         </el-form-item>
         <el-form-item label="报警订阅">
           <el-switch v-model="form.alarm" />
@@ -37,6 +47,24 @@
           <el-button @click="load">重置</el-button>
         </el-form-item>
       </el-form>
+    </el-card>
+
+    <el-card shadow="never" class="gb-config-card" style="margin-top: 16px;">
+      <div slot="header" class="gb-config-header">
+        <span>接入信息（填到摄像机 / 下级）</span>
+        <el-button type="text" icon="el-icon-document-copy" @click="copyAccess">一键复制</el-button>
+      </div>
+      <el-descriptions :column="1" border size="small" style="max-width: 720px;">
+        <el-descriptions-item label="上级平台 IP">{{ form.ip }}</el-descriptions-item>
+        <el-descriptions-item label="上级平台端口">{{ form.port }}</el-descriptions-item>
+        <el-descriptions-item label="上级平台编号">{{ form.deviceId }}</el-descriptions-item>
+        <el-descriptions-item label="上级平台域">{{ form.domain }}</el-descriptions-item>
+        <el-descriptions-item label="注册密码">{{ form.password }}</el-descriptions-item>
+        <el-descriptions-item label="传输">{{ form.transport || 'UDP' }}</el-descriptions-item>
+      </el-descriptions>
+      <p class="hint" style="margin-top: 12px;">
+        场景说明：① 设备列表预登记设备编号 → 摄像机填本页信息并注册；② 双进程级联时，下级进程「国标级联→上级平台」填本页；本级进程「国标级联→下级平台」预登记下级的注册编号。
+      </p>
     </el-card>
   </div>
 </template>
@@ -57,7 +85,9 @@ export default {
         domain: '',
         deviceId: '',
         password: '',
-        alarm: false
+        alarm: false,
+        requirePreRegister: true,
+        transport: 'UDP'
       },
       rules: {
         ip: [{ required: true, message: '请填写 SIP IP', trigger: 'blur' }],
@@ -87,7 +117,9 @@ export default {
             domain: data.domain || '',
             deviceId: data.deviceId || '',
             password: data.password || '',
-            alarm: !!data.alarm
+            alarm: !!data.alarm,
+            requirePreRegister: data.requirePreRegister !== false,
+            transport: data.transport || 'UDP'
           }
         })
         .catch(err => {
@@ -96,6 +128,39 @@ export default {
         .finally(() => {
           this.loading = false
         })
+    },
+    accessText() {
+      return [
+        `上级平台IP: ${this.form.ip}`,
+        `上级平台端口: ${this.form.port}`,
+        `上级平台编号: ${this.form.deviceId}`,
+        `上级平台域: ${this.form.domain}`,
+        `注册密码: ${this.form.password}`,
+        `传输: ${this.form.transport || 'UDP'}`
+      ].join('\n')
+    },
+    copyAccess() {
+      const text = this.accessText()
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          this.$message.success('已复制接入信息')
+        }).catch(() => this.fallbackCopy(text))
+      } else {
+        this.fallbackCopy(text)
+      }
+    },
+    fallbackCopy(text) {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      try {
+        document.execCommand('copy')
+        this.$message.success('已复制接入信息')
+      } catch (e) {
+        this.$message.error('复制失败，请手动选择')
+      }
+      document.body.removeChild(ta)
     },
     onSubmit() {
       this.$refs.form.validate(valid => {
@@ -120,21 +185,20 @@ export default {
 </script>
 
 <style scoped>
-.gb-config-page {
-  max-width: 960px;
-}
-.gb-config-card {
-  border-radius: 10px;
-  border: 1px solid #e8eef6;
-}
 .gb-config-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 .gb-config-sub {
   font-size: 12px;
   color: #909399;
-  font-weight: 400;
+  font-weight: normal;
+}
+.hint {
+  margin-left: 12px;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

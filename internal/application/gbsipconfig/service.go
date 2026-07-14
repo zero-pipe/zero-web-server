@@ -23,7 +23,7 @@ var (
 	ErrPasswordRequired = errors.New("SIP 密码不能为空")
 )
 
-type OnChangeFunc func(cfg config.SIPConfig, portChanged bool)
+type OnChangeFunc func(cfg config.SIPConfig, requirePreRegister bool, portChanged bool)
 
 type Service struct {
 	repo     *persistence.GbSipConfigRepository
@@ -81,15 +81,17 @@ func (s *Service) buildDefaultRow() *model.GbSipConfig {
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
 	return &model.GbSipConfig{
-		ID:         1,
-		IP:         ip,
-		Port:       d.Port,
-		Domain:     strings.TrimSpace(d.Domain),
-		DeviceID:   strings.TrimSpace(d.ID),
-		Password:   strings.TrimSpace(d.Password),
-		Alarm:      d.Alarm,
-		CreateTime: now,
-		UpdateTime: now,
+		ID:                 1,
+		IP:                 ip,
+		Port:               d.Port,
+		Domain:             strings.TrimSpace(d.Domain),
+		DeviceID:           strings.TrimSpace(d.ID),
+		Password:           strings.TrimSpace(d.Password),
+		Alarm:              d.Alarm,
+		RequirePreRegister: true, // yaml 默认通常为 true；库种子与之一致
+		Transport:          "UDP",
+		CreateTime:         now,
+		UpdateTime:         now,
 	}
 }
 
@@ -142,7 +144,7 @@ func (s *Service) Save(row *model.GbSipConfig) (portChanged bool, err error) {
 	}
 	cfg := s.repo.ToSIPConfig(saved)
 	if s.onChange != nil {
-		s.onChange(cfg, portChanged)
+		s.onChange(cfg, saved.RequirePreRegister, portChanged)
 	}
 	return portChanged, nil
 }
@@ -155,6 +157,13 @@ func validate(row *model.GbSipConfig) error {
 	row.Domain = strings.TrimSpace(row.Domain)
 	row.DeviceID = strings.TrimSpace(row.DeviceID)
 	row.Password = strings.TrimSpace(row.Password)
+	row.Transport = strings.ToUpper(strings.TrimSpace(row.Transport))
+	if row.Transport == "" {
+		row.Transport = "UDP"
+	}
+	if row.Transport != "UDP" && row.Transport != "TCP" {
+		return errors.New("传输模式须为 UDP 或 TCP")
+	}
 	if row.IP == "" {
 		return ErrIPRequired
 	}

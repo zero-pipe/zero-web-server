@@ -5,6 +5,7 @@ import (
 
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domainplatform "zero-web-kit/internal/domain/platform"
+	"zero-web-kit/internal/infrastructure/persistence/model"
 	sipinfra "zero-web-kit/internal/infrastructure/sip"
 )
 
@@ -18,11 +19,16 @@ type PlatformChannelRepository interface {
 	AddPlatformChannel(platformID, channelID int) error
 	RemovePlatformChannel(platformID, channelID int) error
 	ListChannelIDsByDevice(deviceID string) ([]int, error)
+	GetPlatformChannel(platformID, channelID int) (*model.PlatformChannel, error)
+	GetByCustomDeviceID(platformID int, customID string) (*model.PlatformChannel, error)
+	UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error
 }
 
 type ChannelView struct {
 	domainchannel.Channel
-	HasShare bool `json:"hasShare"`
+	HasShare       bool   `json:"hasShare"`
+	CustomDeviceID string `json:"customDeviceId"`
+	CustomName     string `json:"customName"`
 }
 
 type ChannelService struct {
@@ -56,6 +62,12 @@ func (s *ChannelService) List(platformID, page, count int, query string, hasShar
 	for _, ch := range all {
 		_, ok := sharedSet[ch.ID]
 		view := ChannelView{Channel: *ch, HasShare: ok}
+		if ok {
+			if row, err := s.platformCh.GetPlatformChannel(platformID, ch.ID); err == nil && row != nil {
+				view.CustomDeviceID = row.CustomDeviceID
+				view.CustomName = row.CustomName
+			}
+		}
 		if hasShare != nil && view.HasShare != *hasShare {
 			continue
 		}
@@ -86,6 +98,7 @@ func (s *ChannelService) AddChannels(platformID int, channelIDs []int, all bool)
 				return err
 			}
 		}
+		s.maybeAutoPush(platformID)
 		return nil
 	}
 	for _, id := range channelIDs {
@@ -93,6 +106,7 @@ func (s *ChannelService) AddChannels(platformID int, channelIDs []int, all bool)
 			return err
 		}
 	}
+	s.maybeAutoPush(platformID)
 	return nil
 }
 
@@ -120,6 +134,7 @@ func (s *ChannelService) AddChannelsByDevice(platformID int, deviceIDs []string)
 			_ = s.platformCh.AddPlatformChannel(platformID, id)
 		}
 	}
+	s.maybeAutoPush(platformID)
 	return nil
 }
 
@@ -155,9 +170,37 @@ func (s *ChannelService) PushCatalog(platformID int) error {
 		if status == "" {
 			status = "ON"
 		}
+		catalogID := ch.GBDeviceID
+		catalogName := ch.Name
+		if row, err := s.platformCh.GetPlatformChannel(platformID, id); err == nil && row != nil {
+			if row.CustomDeviceID != "" {
+				catalogID = row.CustomDeviceID
+			}
+			if row.CustomName != "" {
+				catalogName = row.CustomName
+			}
+		}
 		items = append(items, sipinfra.CatalogItem{
-			DeviceID: ch.GBDeviceID, Name: ch.Name, Status: status,
+			DeviceID: catalogID, Name: catalogName, Status: status,
 		})
 	}
 	return s.sip.SendCatalogNotify(platform, items)
+}
+
+func (s *ChannelService) UpdateCustom(platformID, channelID int, customID, customName string) error {
+	if _, err := s.platforms.GetByID(platformID); err != nil {
+		return fmt.Errorf("平台不存在")
+	}
+	if _, err := s.platformCh.GetPlatformChannel(platformID, channelID); err != nil {
+		return fmt.Errorf("通道未共享到该平台")
+	}
+	return s.platformCh.UpdatePlatformChannelCustom(platformID, channelID, customID, customName)
+}
+
+func (s *ChannelService) maybeAutoPush(platformID int) {
+	p, err := s.platforms.GetByID(platformID)
+	if err != nil || p == nil || !p.AutoPushChannel || !p.Enable {
+		return
+	}
+	_ = s.PushCatalog(platformID)
 }

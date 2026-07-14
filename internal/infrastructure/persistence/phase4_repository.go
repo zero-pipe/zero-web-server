@@ -29,6 +29,14 @@ func (r *AlarmRepository) Create(alarm *domainalarm.Alarm) error {
 	return nil
 }
 
+func (r *AlarmRepository) GetByID(id int) (*domainalarm.Alarm, error) {
+	var m model.Alarm
+	if err := r.db.First(&m, id).Error; err != nil {
+		return nil, err
+	}
+	return toDomainAlarm(&m), nil
+}
+
 func (r *AlarmRepository) List(page, count int, alarmType *int, beginTime, endTime int64) ([]*domainalarm.Alarm, int64, error) {
 	if page <= 0 {
 		page = 1
@@ -231,6 +239,33 @@ func (r *PlatformRepository) AddPlatformChannel(platformID, channelID int) error
 func (r *PlatformRepository) RemovePlatformChannel(platformID, channelID int) error {
 	return r.db.Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).
 		Delete(&model.PlatformChannel{}).Error
+}
+
+func (r *PlatformRepository) GetPlatformChannel(platformID, channelID int) (*model.PlatformChannel, error) {
+	var row model.PlatformChannel
+	err := r.db.Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).First(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *PlatformRepository) GetByCustomDeviceID(platformID int, customID string) (*model.PlatformChannel, error) {
+	var row model.PlatformChannel
+	err := r.db.Where("platform_id = ? AND custom_device_id = ?", platformID, customID).First(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+func (r *PlatformRepository) UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error {
+	return r.db.Model(&model.PlatformChannel{}).
+		Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).
+		Updates(map[string]any{
+			"custom_device_id": customID,
+			"custom_name":      customName,
+		}).Error
 }
 
 func toDomainAlarm(m *model.Alarm) *domainalarm.Alarm {

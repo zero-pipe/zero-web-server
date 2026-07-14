@@ -105,6 +105,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.MobilePosition{},
 		&model.Platform{},
 		&model.PlatformChannel{},
+		&model.SubordinatePlatform{},
 		&model.StreamPush{},
 		&model.StreamProxy{},
 		&model.CloudRecord{},
@@ -115,6 +116,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.CommonGroup{},
 		&model.CommonRegion{},
 		&model.GbSipConfig{},
+		&model.ObjectStoreConfig{},
 	}
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)

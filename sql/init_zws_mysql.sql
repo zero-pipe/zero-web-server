@@ -415,30 +415,76 @@ CREATE TABLE IF NOT EXISTS zws_user_api_key
 DROP TABLE IF EXISTS zws_gb_sip_config;
 CREATE TABLE IF NOT EXISTS zws_gb_sip_config
 (
-    id          INT NOT NULL PRIMARY KEY COMMENT '固定为1',
-    ip          VARCHAR(64)  NOT NULL COMMENT 'SIP 监听/对外 IP',
-    port        INT NOT NULL COMMENT 'SIP 端口',
-    domain      VARCHAR(32)  NOT NULL COMMENT 'SIP 域',
-    device_id   VARCHAR(32)  NOT NULL COMMENT '本平台国标编号',
-    password    VARCHAR(64)  NOT NULL COMMENT '接入密码',
-    alarm       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否处理报警',
-    create_time VARCHAR(50) COMMENT '创建时间',
-    update_time VARCHAR(50) COMMENT '更新时间'
+    id                   INT NOT NULL PRIMARY KEY COMMENT '固定为1',
+    ip                   VARCHAR(64)  NOT NULL COMMENT 'SIP 监听/对外 IP',
+    port                 INT NOT NULL COMMENT 'SIP 端口',
+    domain               VARCHAR(32)  NOT NULL COMMENT 'SIP 域',
+    device_id            VARCHAR(32)  NOT NULL COMMENT '本平台国标编号',
+    password             VARCHAR(64)  NOT NULL COMMENT '接入密码',
+    alarm                TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否处理报警',
+    require_pre_register TINYINT(1) NOT NULL DEFAULT 1 COMMENT '强制预登记',
+    transport            VARCHAR(16) NOT NULL DEFAULT 'UDP' COMMENT '信令传输偏好',
+    create_time          VARCHAR(50) COMMENT '创建时间',
+    update_time          VARCHAR(50) COMMENT '更新时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
 
 -- 默认国标 SIP（与 configs/config.yaml 对齐；新装可随后在页面改编码，无需重启）
-INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, create_time, update_time)
-VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0,
+INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, require_pre_register, transport, create_time, update_time)
+VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0, 1, 'UDP',
         '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+
+-- 下级国标平台（向本级 REGISTER，与 zws_device 分离）
+DROP TABLE IF EXISTS zws_subordinate_platform;
+CREATE TABLE IF NOT EXISTS zws_subordinate_platform
+(
+    id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    enable           TINYINT(1) NOT NULL DEFAULT 1,
+    name             VARCHAR(255),
+    device_gb_id     VARCHAR(50) NOT NULL COMMENT '下级向上注册的国标编号',
+    password         VARCHAR(64) NOT NULL,
+    transport        VARCHAR(16) DEFAULT 'UDP',
+    status           TINYINT(1) NOT NULL DEFAULT 0,
+    ip               VARCHAR(64),
+    port             INT,
+    host_address     VARCHAR(128),
+    expires          INT,
+    register_call_id VARCHAR(128),
+    server_id        VARCHAR(50),
+    create_time      VARCHAR(50),
+    update_time      VARCHAR(50),
+    UNIQUE KEY uk_sub_gb_id (device_gb_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下级国标平台';
+
+-- 对象存储对接配置（MinIO / S3），平台不自建存储
+DROP TABLE IF EXISTS zws_object_store_config;
+CREATE TABLE IF NOT EXISTS zws_object_store_config
+(
+    id          INT NOT NULL PRIMARY KEY COMMENT '固定为1',
+    enabled     TINYINT(1) NOT NULL DEFAULT 0,
+    provider    VARCHAR(32) NOT NULL DEFAULT 'noop',
+    endpoint    VARCHAR(255),
+    region      VARCHAR(64),
+    bucket      VARCHAR(128),
+    access_key  VARCHAR(128),
+    secret_key  VARCHAR(256),
+    use_ssl     TINYINT(1) NOT NULL DEFAULT 0,
+    path_style  TINYINT(1) NOT NULL DEFAULT 1,
+    public_base VARCHAR(255),
+    create_time VARCHAR(50),
+    update_time VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对象存储对接';
+
+INSERT INTO zws_object_store_config (id, enabled, provider, path_style, create_time, update_time)
+VALUES (1, 0, 'noop', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 
 -- 初始数据
 -- 初始化角色：管理员 / 运维 / 视频值班
 INSERT INTO zws_user_role
 VALUES (1, '管理员', '*', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 INSERT INTO zws_user_role
-VALUES (2, '运维', '["ops","system"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+VALUES (2, '运维', '["ops","access","media","storage"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 INSERT INTO zws_user_role
-VALUES (3, '视频值班', '["map","live","record","alarm"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+VALUES (3, '视频值班', '["observe","media","access"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 -- 初始化管理员账号，账号admin 密码admin（MD5加密后）
 INSERT INTO zws_user
 VALUES (1, 'admin', '21232f297a57a5a743894a0e4a801fc3', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57',

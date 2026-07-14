@@ -53,10 +53,11 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 	libCfg := toLibConfig(cfg, serverID, false)
 	libCfg.Password = password
 	lib, err := gbserver.New(libCfg, gbserver.Handlers{
-		Auth:      b,
-		Register:  b,
-		Message:   b,
-		Telemetry: telemetryBridge{b: b},
+		Auth:           b,
+		Register:       b,
+		Message:        b,
+		Telemetry:      telemetryBridge{b: b},
+		CascadeInbound: b,
 	})
 	if err != nil {
 		return nil, err
@@ -71,8 +72,12 @@ func (s *Server) SetRequirePreRegister(v bool) {
 	s.sipCfg = cfg
 }
 
-func (s *Server) SetAlarmHandler(h AlarmHandler)       { s.bridge.alarm = h }
-func (s *Server) SetPositionHandler(h PositionHandler) { s.bridge.position = h }
+func (s *Server) SetAlarmHandler(h AlarmHandler)             { s.bridge.alarm = h }
+func (s *Server) SetPositionHandler(h PositionHandler)       { s.bridge.position = h }
+func (s *Server) SetSubordinateHandler(h SubordinateHandler) { s.bridge.subordinate = h }
+func (s *Server) SetCascadeInbound(h gbserver.CascadeInboundHandler) {
+	s.bridge.cascade = h
+}
 
 func (s *Server) SetLocalIP(ip string) { s.lib.SetLocalIP(ip) }
 

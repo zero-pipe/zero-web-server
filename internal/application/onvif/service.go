@@ -11,35 +11,34 @@ import (
 
 	domainonvif "zero-web-kit/internal/domain/onvif"
 	domainptz "zero-web-kit/internal/domain/ptz"
-	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	onvifinfra "zero-web-kit/internal/infrastructure/onvif"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
+	"zero-web-kit/internal/port"
 
 	onviflib "github.com/0x524a/onvif-go"
 )
 
 type Service struct {
-	devices      domainonvif.DeviceRepository
-	channels     domainonvif.ChannelRepository
-	factory      *onvifinfra.ClientFactory
-	mediaServers *mediaserverapp.Service
-	serverID     string
-	proxyKeys    sync.Map // stream -> ZMS addStreamProxy key
+	devices   domainonvif.DeviceRepository
+	channels  domainonvif.ChannelRepository
+	factory   *onvifinfra.ClientFactory
+	media     port.MediaCluster
+	serverID  string
+	proxyKeys sync.Map // stream -> ZMS addStreamProxy key
 }
 
 func NewService(
 	devices domainonvif.DeviceRepository,
 	channels domainonvif.ChannelRepository,
 	factory *onvifinfra.ClientFactory,
-	mediaServers *mediaserverapp.Service,
+	media port.MediaCluster,
 	serverID string,
 ) *Service {
 	return &Service{
-		devices:      devices,
-		channels:     channels,
-		factory:      factory,
-		mediaServers: mediaServers,
-		serverID:     serverID,
+		devices:  devices,
+		channels: channels,
+		factory:  factory,
+		media:    media,
+		serverID: serverID,
 	}
 }
 
@@ -389,12 +388,12 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken s
 	if prefer == "" {
 		prefer = "auto"
 	}
-	node, err := s.mediaServers.ResolveForStream(app, stream, prefer)
+	node, err := s.media.ResolveForStream(ctx, app, stream, prefer)
 	if err != nil {
 		return nil, err
 	}
 
-	if info := node.Client.LookupStreamMediaInfo(ctx, app, stream); isStreamReadyForPlay(info, ch.StreamChannel) {
+	if info := node.LookupStream(ctx, app, stream); isStreamReadyForPlay(info, ch.StreamChannel) {
 		return s.buildPlayResult(app, stream, ch, info, node), nil
 	}
 	s.resetONVIFStream(ctx, vhost, app, stream, node)
@@ -406,45 +405,39 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken s
 	}
 
 	// rtp_type=1: RTSP over TCP（海康等仅支持 TCP 时必需）；auto_close=false 避免切换播放器时被 ZMS 拆掉代理
-	resp, err := node.Client.AddStreamProxy(ctx, vhost, app, stream, rtspURL, "1", true, false, false)
+	resp, err := node.AddStreamProxy(ctx, vhost, app, stream, rtspURL, "1", true, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("媒体节点拉流代理失败: %w", err)
 	}
 	if resp != nil && resp.Code != 0 {
 		return nil, fmt.Errorf("媒体节点拉流代理失败: %s", resp.Msg)
 	}
-	if resp != nil && len(resp.Data) > 0 {
-		var proxyData struct {
-			Key string `json:"key"`
-		}
-		if json.Unmarshal(resp.Data, &proxyData) == nil && proxyData.Key != "" {
-			s.proxyKeys.Store(stream, proxyData.Key)
-		}
+	if resp != nil && resp.Key != "" {
+		s.proxyKeys.Store(stream, resp.Key)
 	}
-	s.mediaServers.BindStream(app, stream, node.ID())
+	s.media.BindStream(node.ID(), app, stream)
 
-	var mediaInfo *mediakit.StreamMediaInfo
+	var mediaInfo *port.StreamProbe
 	if info := s.waitStreamReady(ctx, app, stream, ch.StreamChannel, node); info != nil {
 		mediaInfo = info
 	} else {
 		s.resetONVIFStream(ctx, vhost, app, stream, node)
-		s.mediaServers.UnbindStream(app, stream)
+		s.media.UnbindStream(app, stream)
 		return nil, fmt.Errorf("等待%s就绪超时，请点「停止」后重试，或检查摄像机编码与带宽", streamChannelLabel(ch.StreamChannel))
 	}
 
 	return s.buildPlayResult(app, stream, ch, mediaInfo, node), nil
 }
 
-func (s *Service) resetONVIFStream(ctx context.Context, vhost, app, stream string, node *mediaserverapp.Node) {
-	client := node.Client
+func (s *Service) resetONVIFStream(ctx context.Context, vhost, app, stream string, node port.MediaEndpoint) {
 	if v, ok := s.proxyKeys.Load(stream); ok {
 		if key, ok := v.(string); ok && key != "" {
-			_, _ = client.DelStreamProxy(ctx, key)
+			_ = node.DelStreamProxy(ctx, key)
 		}
 		s.proxyKeys.Delete(stream)
 	}
-	_, _ = client.DelStreamProxy(ctx, fmt.Sprintf("%s/%s/%s", vhost, app, stream))
-	_, _ = client.CloseStreams(ctx, vhost, app, stream)
+	_ = node.DelStreamProxy(ctx, fmt.Sprintf("%s/%s/%s", vhost, app, stream))
+	_ = node.CloseStreams(ctx, vhost, app, stream)
 }
 
 func (s *Service) resolveRTSPURL(ctx context.Context, device *domainonvif.Device, ch *domainonvif.Channel, forceRefresh bool) (string, error) {
@@ -466,10 +459,10 @@ func (s *Service) resolveRTSPURL(ctx context.Context, device *domainonvif.Device
 	return rtspURL, nil
 }
 
-func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChannel string, node *mediaserverapp.Node) *mediakit.StreamMediaInfo {
+func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChannel string, node port.MediaEndpoint) *port.StreamProbe {
 	attempts := waitStreamReadyAttempts(streamChannel)
 	for i := 0; i < attempts; i++ {
-		if info := node.Client.LookupStreamMediaInfo(ctx, app, stream); isStreamReadyForPlay(info, streamChannel) {
+		if info := node.LookupStream(ctx, app, stream); isStreamReadyForPlay(info, streamChannel) {
 			return info
 		}
 		select {
@@ -481,7 +474,7 @@ func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChanne
 	return nil
 }
 
-func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, info *mediakit.StreamMediaInfo, node *mediaserverapp.Node) *PlayResult {
+func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, info *port.StreamProbe, node port.MediaEndpoint) *PlayResult {
 	configCodec := ch.ConfigCodec
 	if configCodec == "" {
 		configCodec = normalizeVideoCodec(ch.Codec)
@@ -514,7 +507,7 @@ func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, i
 		StreamChannel:   ch.StreamChannel,
 		StreamType:      ch.StreamType,
 		MediaResolution: mediaRes,
-		URLs:            mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream),
+		URLs:            node.PlayURLs(app, stream),
 	}
 }
 
@@ -541,10 +534,10 @@ func (s *Service) StopPlay(ctx context.Context, channelID int64, profileToken st
 	app := "onvif"
 	vhost := "__defaultVhost__"
 	stream := fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken))
-	if node, err := s.mediaServers.ResolveForStream(app, stream, "auto"); err == nil {
+	if node, err := s.media.ResolveForStream(ctx, app, stream, "auto"); err == nil {
 		s.resetONVIFStream(ctx, vhost, app, stream, node)
 	}
-	s.mediaServers.UnbindStream(app, stream)
+	s.media.UnbindStream(app, stream)
 	return nil
 }
 

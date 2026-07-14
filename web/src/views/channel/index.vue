@@ -248,7 +248,7 @@ export default {
       currentPage: this.defaultPage | 1,
       count: this.defaultCount | 15,
       total: 0,
-      beforeUrl: '/device',
+      beforeUrl: '/devices',
       editId: null,
       showPtzConfig: false,
       ptzConfigChannelId: null,

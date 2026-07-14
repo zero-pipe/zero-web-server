@@ -1,8 +1,10 @@
 package ops
 
 import (
-	mediaserverapp "zero-web-kit/internal/application/mediaserver"
+	"context"
+
 	"zero-web-kit/internal/infrastructure/persistence/model"
+	"zero-web-kit/internal/port"
 
 	"gorm.io/gorm"
 )
@@ -29,10 +31,10 @@ type MediaServerLoad struct {
 
 type Dashboard struct {
 	db    *gorm.DB
-	media *mediaserverapp.Service
+	media port.MediaCluster
 }
 
-func NewDashboard(db *gorm.DB, media *mediaserverapp.Service) *Dashboard {
+func NewDashboard(db *gorm.DB, media port.MediaCluster) *Dashboard {
 	return &Dashboard{db: db, media: media}
 }
 
@@ -61,15 +63,18 @@ func (d *Dashboard) MediaLoads() ([]MediaServerLoad, error) {
 	if d.media == nil {
 		return []MediaServerLoad{}, nil
 	}
-	nodes, err := d.media.ListOnline()
+	nodes, err := d.media.List(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	out := make([]MediaServerLoad, 0, len(nodes))
 	for _, n := range nodes {
+		if !n.Online {
+			continue
+		}
 		item := MediaServerLoad{
 			ID:        n.ID,
-			GbReceive: d.media.GetLoad(n.ID),
+			GbReceive: n.Load,
 			GbSend:    0,
 		}
 		if d.db != nil {

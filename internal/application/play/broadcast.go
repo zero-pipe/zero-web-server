@@ -98,8 +98,8 @@ func (s *Service) StopAudioBroadcast(deviceID, channelGBID string) error {
 		{AppTalk, deviceID + "_" + channelGBID},
 		{AppTalk, deviceID + "_" + channelGBID + "_talk"},
 	} {
-		_, _ = s.clientForStream(spec.app, spec.stream).CloseStreams(context.Background(), "__defaultVhost__", spec.app, spec.stream)
-		s.mediaServers.UnbindStream(spec.app, spec.stream)
+		_ = s.closeStream(spec.app, spec.stream)
+		s.media.UnbindStream(spec.app, spec.stream)
 	}
 	return nil
 }
@@ -125,17 +125,17 @@ func (s *Service) OnBroadcastStreamArrival(app, stream string) {
 }
 
 func (s *Service) buildStreamContentWithWebRTC(app, stream string, push bool) *dto.StreamContent {
-	node, err := s.mediaServers.ResolveForStream(app, stream, "auto")
+	node, err := s.media.ResolveForStream(context.Background(), app, stream, "auto")
 	var c *dto.StreamContent
 	if err != nil {
 		c = &dto.StreamContent{App: app, Stream: stream, ServerID: s.serverID}
 	} else {
 		c = s.buildStreamContent(app, stream, node)
-		s.mediaServers.BindStream(app, stream, node.ID())
+		s.media.BindStream(node.ID(), app, stream)
 	}
 	base := fmt.Sprintf("http://127.0.0.1:%d", s.serverPort)
 	if node != nil {
-		base = node.MediaConfig().SignalingBaseURL(s.serverPort)
+		base = node.SignalingBaseURL(s.serverPort)
 	}
 	rtc, rtcs := mediakit.BuildWebRTCURLs(base, app, stream, push)
 	c.Rtc, c.Rtcs = rtc, rtcs

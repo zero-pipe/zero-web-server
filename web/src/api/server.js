@@ -89,6 +89,28 @@ export function saveGbSipConfig(formData) {
   })
 }
 
+export function getObjectStoreConfig() {
+  return request({
+    method: 'get',
+    url: `/api/server/object_store_config`
+  })
+}
+
+export function saveObjectStoreConfig(formData) {
+  return request({
+    method: 'post',
+    url: `/api/server/object_store_config/save`,
+    data: formData
+  })
+}
+
+export function checkObjectStoreHealth() {
+  return request({
+    method: 'get',
+    url: `/api/server/object_store_config/health`
+  })
+}
+
 export function getMediaInfo(params) {
   const { app, stream, mediaServerId } = params
   return request({

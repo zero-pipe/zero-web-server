@@ -242,7 +242,7 @@ export default {
       currentPage: this.defaultPage | 1,
       count: this.defaultCount | 15,
       total: 0,
-      beforeUrl: '/device',
+      beforeUrl: '/devices',
       editId: null,
       ptzConfigDeviceId: null,
       ptzConfigChannelDeviceId: null,
@@ -293,7 +293,7 @@ export default {
       this.currentPage = 1
       this.count = 15
       if (this.parentChannelId === '' || this.parentChannelId === 0) {
-        this.beforeUrl = '/device/list'
+        this.beforeUrl = '/devices'
       }
     },
     currentChange: function(val) {

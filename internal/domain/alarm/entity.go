@@ -14,6 +14,7 @@ type Alarm struct {
 
 type Repository interface {
 	Create(alarm *Alarm) error
+	GetByID(id int) (*Alarm, error)
 	List(page, count int, alarmType *int, beginTime, endTime int64) ([]*Alarm, int64, error)
 	Delete(ids []int) error
 	Clear(alarmType *int, beginTime, endTime int64) error

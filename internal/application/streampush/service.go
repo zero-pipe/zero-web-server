@@ -6,22 +6,21 @@ import (
 	"sync"
 	"time"
 
-	mediaserverapp "zero-web-kit/internal/application/mediaserver"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
 	"zero-web-kit/internal/infrastructure/persistence"
 	"zero-web-kit/internal/infrastructure/persistence/model"
 	"zero-web-kit/internal/interfaces/http/dto"
+	"zero-web-kit/internal/port"
 )
 
 type Service struct {
-	repo         *persistence.StreamPushRepository
-	mediaServers *mediaserverapp.Service
-	serverID     string
-	sessions     sync.Map
+	repo     *persistence.StreamPushRepository
+	media    port.MediaCluster
+	serverID string
+	sessions sync.Map
 }
 
-func NewService(repo *persistence.StreamPushRepository, mediaServers *mediaserverapp.Service, serverID string) *Service {
-	return &Service{repo: repo, mediaServers: mediaServers, serverID: serverID}
+func NewService(repo *persistence.StreamPushRepository, media port.MediaCluster, serverID string) *Service {
+	return &Service{repo: repo, media: media, serverID: serverID}
 }
 
 func (s *Service) List(page, count int, query string, pushing *bool, mediaServerID string) ([]persistence.StreamPushView, int64, error) {
@@ -77,6 +76,7 @@ func (s *Service) RemoveFromGB(id int) error {
 }
 
 func (s *Service) Start(ctx context.Context, id int) (*dto.StreamContent, error) {
+	_ = ctx
 	push, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("推流不存在")
@@ -91,7 +91,7 @@ func (s *Service) OnPublish(app, stream, mediaServerID string) {
 	if push, err := s.repo.GetByAppStream(app, stream); err == nil {
 		_ = s.repo.UpdatePushing(push.ID, true, mediaServerID)
 		if mediaServerID != "" {
-			s.mediaServers.BindStream(app, stream, mediaServerID)
+			s.media.BindStream(mediaServerID, app, stream)
 		}
 	}
 }
@@ -100,7 +100,7 @@ func (s *Service) OnStreamDeparture(app, stream string) {
 	if push, err := s.repo.GetByAppStream(app, stream); err == nil {
 		_ = s.repo.UpdatePushing(push.ID, false, "")
 	}
-	s.mediaServers.UnbindStream(app, stream)
+	s.media.UnbindStream(app, stream)
 }
 
 func (s *Service) OnStreamStarted(app, stream string) {
@@ -116,11 +116,11 @@ func (s *Service) OnStreamStarted(app, stream string) {
 }
 
 func (s *Service) buildStreamContent(app, stream, preferID string) *dto.StreamContent {
-	node, err := s.mediaServers.ResolveForStream(app, stream, preferID)
+	node, err := s.media.ResolveForStream(context.Background(), app, stream, preferID)
 	if err != nil {
 		return &dto.StreamContent{App: app, Stream: stream, ServerID: s.serverID}
 	}
-	urls := mediakit.BuildPlayURLsFromConfig(node.MediaConfig(), app, stream)
+	urls := node.PlayURLs(app, stream)
 	return &dto.StreamContent{
 		App: app, Stream: stream, IP: node.StreamIP(),
 		Flv: urls["flv"], WsFlv: urls["ws"], Hls: urls["hls"],

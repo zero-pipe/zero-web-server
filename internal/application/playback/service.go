@@ -7,14 +7,13 @@ import (
 	"sync"
 	"time"
 
-	mediaserverapp "zero-web-kit/internal/application/mediaserver"
 	mediaapp "zero-web-kit/internal/application/media"
 	domainchannel "zero-web-kit/internal/domain/channel"
 	domaindevice "zero-web-kit/internal/domain/device"
 	domainrecord "zero-web-kit/internal/domain/record"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
 	sipinfra "zero-web-kit/internal/infrastructure/sip"
 	"zero-web-kit/internal/interfaces/http/dto"
+	"zero-web-kit/internal/port"
 )
 
 type DownloadProgress struct {
@@ -24,13 +23,13 @@ type DownloadProgress struct {
 }
 
 type Service struct {
-	devices      domaindevice.Repository
-	channels     domainchannel.Repository
-	sip          *sipinfra.Server
-	mediaServers *mediaserverapp.Service
-	serverID     string
-	ssrcSeq      int
-	sessions     sync.Map
+	devices       domaindevice.Repository
+	channels      domainchannel.Repository
+	sip           *sipinfra.Server
+	media         port.MediaCluster
+	serverID      string
+	ssrcSeq       int
+	sessions      sync.Map
 	recordTimeout time.Duration
 }
 
@@ -38,7 +37,7 @@ func NewService(
 	devices domaindevice.Repository,
 	channels domainchannel.Repository,
 	sipServer *sipinfra.Server,
-	mediaServers *mediaserverapp.Service,
+	media port.MediaCluster,
 	serverID string,
 	recordTimeoutSec int,
 ) *Service {
@@ -47,7 +46,7 @@ func NewService(
 	}
 	return &Service{
 		devices: devices, channels: channels, sip: sipServer,
-		mediaServers: mediaServers, serverID: serverID,
+		media: media, serverID: serverID,
 		recordTimeout: time.Duration(recordTimeoutSec) * time.Second,
 	}
 }
@@ -82,7 +81,7 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 	app := mediaapp.LiveApp
 	stream := fmt.Sprintf("%s_%s_playback", device.DeviceID, channel.GBDeviceID)
 	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionPlayback, startTime, endTime, 0,
-		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node *mediaserverapp.Node) string {
+		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
 			sdpIP := d.SDPIP
 			if sdpIP == "" {
 				sdpIP = node.SDPIP()
@@ -107,7 +106,7 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 	app := mediaapp.LiveApp
 	stream := fmt.Sprintf("%s_%s_download", device.DeviceID, channel.GBDeviceID)
 	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionDownload, startTime, endTime, downloadSpeed,
-		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node *mediaserverapp.Node) string {
+		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
 			sdpIP := d.SDPIP
 			if sdpIP == "" {
 				sdpIP = node.SDPIP()
@@ -126,10 +125,10 @@ func (s *Service) StopPlayback(deviceID, channelDeviceID, stream string) error {
 		stream = fmt.Sprintf("%s_%s_playback", deviceID, channelDeviceID)
 	}
 	_ = s.sip.CloseInviteSession(stream)
-	if node, err := s.mediaServers.ResolveForStream(mediaapp.LiveApp, stream, "auto"); err == nil {
-		_, _ = node.Client.CloseStreams(context.Background(), "__defaultVhost__", mediaapp.LiveApp, stream)
+	if node, err := s.media.ResolveForStream(context.Background(), mediaapp.LiveApp, stream, "auto"); err == nil {
+		_ = node.CloseStreams(context.Background(), "__defaultVhost__", mediaapp.LiveApp, stream)
 	}
-	s.mediaServers.UnbindStream(mediaapp.LiveApp, stream)
+	s.media.UnbindStream(mediaapp.LiveApp, stream)
 	return nil
 }
 
@@ -138,10 +137,10 @@ func (s *Service) StopDownload(deviceID, channelDeviceID, stream string) error {
 		stream = fmt.Sprintf("%s_%s_download", deviceID, channelDeviceID)
 	}
 	_ = s.sip.CloseInviteSession(stream)
-	if node, err := s.mediaServers.ResolveForStream(mediaapp.LiveApp, stream, "auto"); err == nil {
-		_, _ = node.Client.CloseStreams(context.Background(), "__defaultVhost__", mediaapp.LiveApp, stream)
+	if node, err := s.media.ResolveForStream(context.Background(), mediaapp.LiveApp, stream, "auto"); err == nil {
+		_ = node.CloseStreams(context.Background(), "__defaultVhost__", mediaapp.LiveApp, stream)
 	}
-	s.mediaServers.UnbindStream(mediaapp.LiveApp, stream)
+	s.media.UnbindStream(mediaapp.LiveApp, stream)
 	return nil
 }
 
@@ -197,26 +196,26 @@ func (s *Service) loadDeviceChannel(deviceID, channelDeviceID string) (*domainde
 	return device, channel, nil
 }
 
-type sdpBuilder func(*domaindevice.Device, *domainchannel.Channel, int, string, *mediaserverapp.Node) string
+type sdpBuilder func(*domaindevice.Device, *domainchannel.Channel, int, string, port.MediaEndpoint) string
 
 func (s *Service) startMediaInvite(
 	ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel,
 	app, stream string, sessionType sipinfra.SessionType,
 	startTime, endTime string, downloadSpeed int, buildSDP sdpBuilder,
 ) (*dto.StreamContent, error) {
-	node, err := s.mediaServers.ResolveForStream(app, stream, device.MediaServerID)
+	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
 	if err != nil {
 		return nil, err
 	}
 	mediaMode := sipinfra.NormalizeStreamMode(device.StreamMode)
-	rtpResp, err := node.Client.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(mediaMode))
+	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(mediaMode))
 	if err != nil {
 		return nil, fmt.Errorf("打开RTP端口失败: %w", err)
 	}
-	s.mediaServers.BindStream(app, stream, node.ID())
+	s.media.BindStream(node.ID(), app, stream)
 
 	ssrc := sipinfra.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
-	sdp := buildSDP(device, channel, rtpResp.Port, ssrc, node)
+	sdp := buildSDP(device, channel, rtpPort, ssrc, node)
 
 	done := make(chan *dto.StreamContent, 1)
 	s.sessions.Store(streamKey(app, stream), done)
@@ -237,15 +236,15 @@ func (s *Service) startMediaInvite(
 }
 
 func (s *Service) buildStreamContent(app, stream string) *dto.StreamContent {
-	node, err := s.mediaServers.ResolveForStream(app, stream, "auto")
+	node, err := s.media.ResolveForStream(context.Background(), app, stream, "auto")
 	if err != nil {
 		return &dto.StreamContent{App: app, Stream: stream, ServerID: s.serverID}
 	}
 	return s.buildStreamContentWithNode(app, stream, node)
 }
 
-func (s *Service) buildStreamContentWithNode(app, stream string, node *mediaserverapp.Node) *dto.StreamContent {
-	urls := mediakit.BuildStreamPlayURLs(node.MediaConfig(), app, stream, false, 0)
+func (s *Service) buildStreamContentWithNode(app, stream string, node port.MediaEndpoint) *dto.StreamContent {
+	urls := node.StreamPlayURLs(app, stream, false, 0)
 	content := &dto.StreamContent{
 		App: app, Stream: stream, IP: node.StreamIP(),
 		Flv: urls.Flv, WsFlv: urls.WsFlv, Hls: urls.Hls,
@@ -253,7 +252,7 @@ func (s *Service) buildStreamContentWithNode(app, stream string, node *mediaserv
 		Rtc: urls.Rtc, Rtcs: urls.Rtcs,
 		MediaServerID: node.ID(), ServerID: s.serverID,
 	}
-	if info := node.Client.LookupStreamMediaInfo(context.Background(), app, stream); info != nil {
+	if info := node.LookupStream(context.Background(), app, stream); info != nil {
 		content.VideoCodec = info.VideoCodec
 		content.AudioCodec = info.AudioCodec
 	}

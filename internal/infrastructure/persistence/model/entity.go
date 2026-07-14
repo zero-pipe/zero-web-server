@@ -342,15 +342,57 @@ func (CommonRegion) TableName() string { return "zws_common_region" }
 
 // GbSipConfig 本平台唯一国标 SIP 配置（设备接入 / 上下级级联共用）。
 type GbSipConfig struct {
+	ID                 int    `gorm:"column:id;primaryKey" json:"id"`
+	IP                 string `gorm:"column:ip;size:64;not null" json:"ip"`
+	Port               int    `gorm:"column:port;not null" json:"port"`
+	Domain             string `gorm:"column:domain;size:32;not null" json:"domain"`
+	DeviceID           string `gorm:"column:device_id;size:32;not null" json:"deviceId"`
+	Password           string `gorm:"column:password;size:64;not null" json:"password"`
+	Alarm              bool   `gorm:"column:alarm;not null;default:0" json:"alarm"`
+	RequirePreRegister bool   `gorm:"column:require_pre_register;not null;default:1" json:"requirePreRegister"`
+	Transport          string `gorm:"column:transport;size:16;not null;default:UDP" json:"transport"`
+	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime         string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (GbSipConfig) TableName() string { return "zws_gb_sip_config" }
+
+// ObjectStoreConfig 对象存储对接配置（MinIO / S3），平台不自建存储。
+type ObjectStoreConfig struct {
 	ID         int    `gorm:"column:id;primaryKey" json:"id"`
-	IP         string `gorm:"column:ip;size:64;not null" json:"ip"`
-	Port       int    `gorm:"column:port;not null" json:"port"`
-	Domain     string `gorm:"column:domain;size:32;not null" json:"domain"`
-	DeviceID   string `gorm:"column:device_id;size:32;not null" json:"deviceId"`
-	Password   string `gorm:"column:password;size:64;not null" json:"password"`
-	Alarm      bool   `gorm:"column:alarm;not null;default:0" json:"alarm"`
+	Enabled    bool   `gorm:"column:enabled;not null;default:0" json:"enabled"`
+	Provider   string `gorm:"column:provider;size:32;not null;default:noop" json:"provider"`
+	Endpoint   string `gorm:"column:endpoint;size:255" json:"endpoint"`
+	Region     string `gorm:"column:region;size:64" json:"region"`
+	Bucket     string `gorm:"column:bucket;size:128" json:"bucket"`
+	AccessKey  string `gorm:"column:access_key;size:128" json:"accessKey"`
+	SecretKey  string `gorm:"column:secret_key;size:256" json:"secretKey"`
+	UseSSL     bool   `gorm:"column:use_ssl;not null;default:0" json:"useSSL"`
+	PathStyle  bool   `gorm:"column:path_style;not null;default:1" json:"pathStyle"`
+	PublicBase string `gorm:"column:public_base;size:255" json:"publicBase"`
 	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
 	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
-func (GbSipConfig) TableName() string { return "zws_gb_sip_config" }
+func (ObjectStoreConfig) TableName() string { return "zws_object_store_config" }
+
+// SubordinatePlatform 下级国标平台（向本级 REGISTER，与摄像机设备表分离）。
+type SubordinatePlatform struct {
+	ID           int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Enable       bool   `gorm:"column:enable;not null;default:1" json:"enable"`
+	Name         string `gorm:"column:name;size:255" json:"name"`
+	DeviceGBID   string `gorm:"column:device_gb_id;size:50;uniqueIndex:uk_sub_gb_id" json:"deviceGBId"`
+	Password     string `gorm:"column:password;size:64" json:"password"`
+	Transport    string `gorm:"column:transport;size:16;default:UDP" json:"transport"`
+	Status       bool   `gorm:"column:status;not null;default:0" json:"status"`
+	IP           string `gorm:"column:ip;size:64" json:"ip"`
+	Port         int    `gorm:"column:port" json:"port"`
+	HostAddress  string `gorm:"column:host_address;size:128" json:"hostAddress"`
+	Expires      int    `gorm:"column:expires" json:"expires"`
+	RegisterCall string `gorm:"column:register_call_id;size:128" json:"registerCallId"`
+	ServerID     string `gorm:"column:server_id;size:50" json:"serverId"`
+	CreateTime   string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime   string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (SubordinatePlatform) TableName() string { return "zws_subordinate_platform" }

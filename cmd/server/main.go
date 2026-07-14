@@ -12,6 +12,7 @@ import (
 
 	appauth "zero-web-kit/internal/application/auth"
 	alarmapp "zero-web-kit/internal/application/alarm"
+	cascadeapp "zero-web-kit/internal/application/cascade"
 	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
 	commonchannelapp "zero-web-kit/internal/application/commonchannel"
 	deviceapp "zero-web-kit/internal/application/device"
@@ -22,6 +23,11 @@ import (
 	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
 	onvifapp "zero-web-kit/internal/application/onvif"
 	platformapp "zero-web-kit/internal/application/platform"
+	subordinateapp "zero-web-kit/internal/application/subordinate"
+	objectstoreapp "zero-web-kit/internal/application/objectstore"
+	snapapp "zero-web-kit/internal/application/snap"
+	mediacluster "zero-web-kit/internal/adapter/mediacluster"
+	"zero-web-kit/internal/port"
 	positionapp "zero-web-kit/internal/application/position"
 	playapp "zero-web-kit/internal/application/play"
 	playbackapp "zero-web-kit/internal/application/playback"
@@ -108,7 +114,12 @@ func main() {
 
 	authService := appauth.NewService(userRepo, jwtManager, cfg.UserSettings.ServerID)
 	deviceService := deviceapp.NewService(deviceRepo, channelRepo, redisClient)
-	deviceService.SetRequirePreRegister(cfg.GB.RequirePreRegister)
+	requirePreRegister := cfg.GB.RequirePreRegister
+	if row, err := gbSipConfigService.GetOrEmpty(); err == nil && row != nil {
+		// 库内开关优先（页面可改）；种子行默认 true
+		requirePreRegister = row.RequirePreRegister
+	}
+	deviceService.SetRequirePreRegister(requirePreRegister)
 	publishRegistry := mediaapp.NewPublishRegistry()
 	publishAuth := mediaapp.NewPublishAuth(
 		userRepo, streamPushRepo, streamProxyRepo,
@@ -117,6 +128,11 @@ func main() {
 	)
 	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加
 	mediaServerService := mediaserverapp.NewService(mediaServerRepo, cfg.UserSettings.ServerID)
+	mediaCluster := mediacluster.New(mediaServerService)
+
+	objectStoreRepo := persistence.NewObjectStoreConfigRepository(db)
+	objectStoreService := objectstoreapp.NewService(objectStoreRepo)
+	snapService := snapapp.NewService(objectStoreService)
 
 	sipServer, err := sipinfra.NewServer(sipCfg, cfg.UserSettings.ServerID, sipCfg.Password, deviceService, redisClient)
 	if err != nil {
@@ -126,12 +142,16 @@ func main() {
 	if sipCfg.IP == "" {
 		if cfg.Media.Configured() {
 			sipServer.SetLocalIP(cfg.Media.IP)
-		} else if ip := firstMediaIP(cfg, mediaServerService); ip != "" {
+		} else if ip := firstMediaIP(cfg, mediaCluster); ip != "" {
 			sipServer.SetLocalIP(ip)
 		}
 	}
 	deviceService.SetSIP(sipServer)
-	sipServer.SetRequirePreRegister(cfg.GB.RequirePreRegister)
+	sipServer.SetRequirePreRegister(requirePreRegister)
+
+	subordinateRepo := persistence.NewSubordinateRepository(db)
+	subordinateService := subordinateapp.NewService(subordinateRepo, cfg.UserSettings.ServerID)
+	sipServer.SetSubordinateHandler(subordinateService)
 
 	alarmService := alarmapp.NewService(alarmRepo, channelRepo)
 	positionService := positionapp.NewService(positionRepo, channelRepo)
@@ -143,7 +163,7 @@ func main() {
 		recordTimeoutSec = 30
 	}
 	playbackService := playbackapp.NewService(
-		deviceRepo, channelRepo, sipServer, mediaServerService, cfg.UserSettings.ServerID, recordTimeoutSec,
+		deviceRepo, channelRepo, sipServer, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
 	platformService := platformapp.NewService(platformRepo, sipCfg, cfg.UserSettings.ServerID)
 	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
@@ -151,23 +171,28 @@ func main() {
 		platformRepo, channelRepo, platformRepo, platformSIPClient,
 	)
 
-	gbSipConfigService.SetOnChange(func(updated config.SIPConfig, _ bool) {
+	gbSipConfigService.SetOnChange(func(updated config.SIPConfig, requirePre bool, _ bool) {
 		sipServer.ApplyConfig(updated)
+		sipServer.SetRequirePreRegister(requirePre)
+		deviceService.SetRequirePreRegister(requirePre)
 		platformService.ApplySIPConfig(updated)
 		platformSIPClient.ApplyConfig(updated)
 	})
 
-	playService := playapp.NewService(deviceRepo, channelRepo, sipServer, mediaServerService, cfg.UserSettings.ServerID, cfg.Server.Port)
+	playService := playapp.NewService(deviceRepo, channelRepo, sipServer, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
 	ptzService := ptzapp.NewService(deviceRepo, sipServer)
+	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)
+	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sipServer)
+	sipServer.SetCascadeInbound(cascadeInbound)
 	onvifFactory := onvifinfra.NewClientFactory(30)
 	onvifService := onvifapp.NewService(
-		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaServerService, cfg.UserSettings.ServerID,
+		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaCluster, cfg.UserSettings.ServerID,
 	)
 	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
 
-	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaServerService, cfg.UserSettings.ServerID)
-	streamPushService := streampushapp.NewService(streamPushRepo, mediaServerService, cfg.UserSettings.ServerID)
-	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaServerService, cfg.UserSettings.ServerID)
+	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, cfg.UserSettings.ServerID)
+	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)
+	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaCluster, cfg.UserSettings.ServerID)
 	recordPlanService := recordplanapp.NewService(recordPlanRepo, playService, publishRegistry, cfg.UserSettings.ServerID)
 	recordPlanService.Start()
 	defer recordPlanService.Stop()
@@ -193,7 +218,7 @@ func main() {
 		mediaBaseURL = cfg.Media.BaseURL()
 	}
 
-	dashboard := ops.NewDashboard(db, mediaServerService)
+	dashboard := ops.NewDashboard(db, mediaCluster)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -208,6 +233,7 @@ func main() {
 		AlarmService:        alarmService,
 		PlatformService:     platformService,
 		PlatformChannelSvc:  platformChannelSvc,
+		SubordinateService:  subordinateService,
 		PositionService:     positionService,
 		CloudRecordService:  cloudRecordService,
 		StreamPushService:   streamPushService,
@@ -228,8 +254,10 @@ func main() {
 		RecordInfoTimeoutMs: cfg.UserSettings.RecordInfoTimeout,
 		SIPConfig:           sipCfg,
 		GbSipConfigService:  gbSipConfigService,
+		ObjectStoreService:  objectStoreService,
+		SnapService:         snapService,
 		ServerPort:          cfg.Server.Port,
-		MediaIP:             firstMediaIP(cfg, mediaServerService),
+		MediaIP:             firstMediaIP(cfg, mediaCluster),
 		LogDir:              applog.LogDir(cfg.Log.File),
 		Metrics:             ops.DefaultMetrics,
 		Dashboard:           dashboard,
@@ -254,11 +282,11 @@ func main() {
 	}
 }
 
-func firstMediaIP(cfg *config.Config, ms *mediaserverapp.Service) string {
+func firstMediaIP(cfg *config.Config, media port.MediaCluster) string {
 	if cfg.Media.Configured() {
 		return cfg.Media.IP
 	}
-	if node, err := ms.SelectMinimumLoad(); err == nil {
+	if node, err := media.SelectMinimumLoad(context.Background()); err == nil {
 		return node.StreamIP()
 	}
 	return ""

@@ -80,6 +80,13 @@
         style="margin-bottom: 12px;"
         :title="'设备名称：' + step1.name + '；设备编号须与摄像机 GB28181 ID 一致。'"
       />
+      <el-alert
+        v-if="accessTip"
+        type="success"
+        :closable="false"
+        style="margin-bottom: 12px;"
+        :title="accessTip"
+      />
       <el-form ref="gbForm" :model="gb" :rules="gbRules" label-width="100px" size="small">
         <el-form-item label="设备编号" prop="deviceId">
           <el-input v-model="gb.deviceId" placeholder="20 位 GB28181 编码" />
@@ -142,6 +149,7 @@
 
 <script>
 import { createDevice } from '@/api/devices'
+import { getGbSipConfig } from '@/api/server'
 
 export default {
   name: 'AddWizard',
@@ -156,6 +164,7 @@ export default {
       protocol: 'gb28181',
       vendor: '',
       deviceType: '',
+      accessTip: '',
       step1: { name: '' },
       gb: {
         deviceId: '',
@@ -216,6 +225,17 @@ export default {
       this.$refs.step1Form.validate(valid => {
         if (!valid) return
         this.step = 2
+        if (this.accessMode === 'passive') {
+          this.loadAccessTip()
+        }
+      })
+    },
+    loadAccessTip() {
+      getGbSipConfig().then(res => {
+        const d = (res && res.data) || res || {}
+        this.accessTip = `请在摄像机上配置上级：IP ${d.ip || '-'} 端口 ${d.port || '-'} 编号 ${d.deviceId || '-'} 域 ${d.domain || '-'} 密码（设备密码或平台默认）。可在「系统管理→国标配置」一键复制。`
+      }).catch(() => {
+        this.accessTip = '请先在「系统管理→国标配置」填写本级平台信息，再配置摄像机。'
       })
     },
     prefillOnvif(data) {
@@ -233,6 +253,7 @@ export default {
       this.protocol = 'gb28181'
       this.vendor = ''
       this.deviceType = ''
+      this.accessTip = ''
       this.step1 = { name: '' }
       this.gb = { deviceId: '', password: '', sdpIp: '', mediaServerId: 'auto', charset: 'GB2312' }
       this.onvif = { ip: '', port: 80, username: 'admin', password: '' }
