@@ -1,4 +1,4 @@
-﻿# zero-web-kit 编译、部署、运行与验证
+# zero-web-server 编译、部署、运行与验证
 
 本文档覆盖 **Windows（无 Docker）**、**Windows（Docker）**、**Linux（无 Docker）**、**Linux（Docker）** 四种场景。
 
@@ -8,7 +8,7 @@
 
 | 组件 | 默认端口 | 说明 |
 |------|----------|------|
-| zero-web-kit HTTP | **18080** | REST API + Hook 回调 |
+| zero-web-server HTTP | **18080** | REST API + Hook 回调 |
 | GB28181 SIP | **8116** | UDP/TCP，设备注册/信令 |
 | MySQL | 3306 | 库名 `zws` |
 | Redis | 6379 | 设备状态、心跳统计等 |
@@ -18,7 +18,7 @@
 **依赖关系：**
 
 ```
-浏览器 → zero-web-kit(:18080) → MySQL / Redis
+浏览器 → zero-web-server(:18080) → MySQL / Redis
                 ↓ SIP :8116
             国标 IPC/NVR
                 ↓ RTP
@@ -81,7 +81,7 @@ mysql -u root -p zws < sql/init_zws_mysql.sql
 **Windows PowerShell**（把 `$mysql` 换成你的 mysql.exe 路径）：
 
 ```powershell
-cd E:\16_project\zero-web-kit
+cd E:\16_project\zero-web-server
 $mysql = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe"
 & $mysql -u root -p你的密码 -e "CREATE DATABASE IF NOT EXISTS zws CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 Get-Content sql\init_zws_mysql.sql -Raw | & $mysql -u root -p你的密码 zws
@@ -151,7 +151,7 @@ cd docker && docker compose up -d
 
 ```powershell
 # Windows（无 make 时）
-cd E:\16_project\zero-web-kit\docker
+cd E:\16_project\zero-web-server\docker
 docker compose up -d
 ```
 
@@ -225,17 +225,17 @@ zero-media-server 单独编译/启动，与 Windows 相同，改 `media.ip` / `m
 ### 6.1 Windows
 
 ```powershell
-cd E:\16_project\zero-web-kit
+cd E:\16_project\zero-web-server
 go mod tidy
-go build -o bin\zero-web-kit.exe .\cmd\server\
+go build -o bin\zero-web-server.exe .\cmd\server\
 ```
 
 ### 6.2 Linux
 
 ```bash
-cd /opt/zero-web-kit   # 你的路径
+cd /opt/zero-web-server   # 你的路径
 go mod tidy
-go build -o bin/zero-web-kit ./cmd/server/
+go build -o bin/zero-web-server ./cmd/server/
 ```
 
 ### 6.3 交叉编译（可选）
@@ -244,13 +244,13 @@ go build -o bin/zero-web-kit ./cmd/server/
 
 ```powershell
 $env:GOOS="linux"; $env:GOARCH="amd64"
-go build -o bin/zero-web-kit ./cmd/server/
+go build -o bin/zero-web-server ./cmd/server/
 ```
 
 在 Linux 编 Windows 包：
 
 ```bash
-GOOS=windows GOARCH=amd64 go build -o bin/zero-web-kit.exe ./cmd/server/
+GOOS=windows GOARCH=amd64 go build -o bin/zero-web-server.exe ./cmd/server/
 ```
 
 ---
@@ -279,21 +279,21 @@ go run ./cmd/server -config configs/config.yaml
 **Linux（systemd 示例）**
 
 ```bash
-cd /opt/zero-web-kit
-./bin/zero-web-kit -config configs/config.yaml
+cd /opt/zero-web-server
+./bin/zero-web-server -config configs/config.yaml
 ```
 
-可写 unit 文件 `/etc/systemd/system/zero-web-kit.service`：
+可写 unit 文件 `/etc/systemd/system/zero-web-server.service`：
 
 ```ini
 [Unit]
-Description=zero-web-kit
+Description=zero-web-server
 After=network.target mysql.service redis.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/zero-web-kit
-ExecStart=/opt/zero-web-kit/bin/zero-web-kit -config /opt/zero-web-kit/configs/config.yaml
+WorkingDirectory=/opt/zero-web-server
+ExecStart=/opt/zero-web-server/bin/zero-web-server -config /opt/zero-web-server/configs/config.yaml
 Restart=on-failure
 
 [Install]
@@ -302,19 +302,19 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now zero-web-kit
-sudo systemctl status zero-web-kit
-journalctl -u zero-web-kit -f
+sudo systemctl enable --now zero-web-server
+sudo systemctl status zero-web-server
+journalctl -u zero-web-server -f
 ```
 
 **Windows**
 
 ```powershell
-cd E:\16_project\zero-web-kit
-.\bin\zero-web-kit.exe -config configs\config.yaml
+cd E:\16_project\zero-web-server
+.\bin\zero-web-server.exe -config configs\config.yaml
 ```
 
-日志：控制台 + `logs/zero-web-kit.log`（由 `log.output: both` 控制）。
+日志：控制台 + `logs/zero-web-server.log`（由 `log.output: both` 控制）。
 
 ---
 
@@ -326,7 +326,7 @@ cd E:\16_project\zero-web-kit
 
 ```powershell
 # Windows — 本机 MySQL/Redis（无需 Docker）
-cd E:\16_project\zero-web-kit
+cd E:\16_project\zero-web-server
 .\tools\dev.ps1 start
 .\tools\dev.ps1 check    # 仅探测 :3306 / :6379 / Docker
 
@@ -372,9 +372,9 @@ make frontend-build
 
 ## 九、zero-media-server（ZMS）编译与对接
 
-> `zero-media-kit` 是 ZMS 内部的容器/协议库；zero-web-kit 通过 HTTP API + Hook 对接 **zero-media-server**，不直接依赖 media-kit。
+> `zero-media-kit` 是 ZMS 内部的容器/协议库；zero-web-server 通过 HTTP API + Hook 对接 **zero-media-server**，不直接依赖 media-kit。
 
-ZMS 源码在 **`../zms`**（与 zero-web-kit 同级目录）。完整功能说明见 [zms/README.md](../zms/README.md)。
+ZMS 源码在 **`../zms`**（与 zero-web-server 同级目录）。完整功能说明见 [zms/README.md](../zms/README.md)。
 
 ### 9.1 编译 ZMS（Windows 示例）
 
@@ -399,7 +399,7 @@ cmake --build build -j
 ```powershell
 cd E:\16_project\zms
 # 使用仓库内联调预设（改 externIP、Hook 地址为实际平台 IP）
-.\build\examples\Release\demo_media_server.exe --config conf\config.zero-web-kit.ini
+.\build\examples\Release\demo_media_server.exe --config conf\config.zero-web-server.ini
 ```
 
 `conf/` **应提交**的文件：
@@ -408,13 +408,13 @@ cd E:\16_project\zms
 |------|------|
 | `config.ini.example` | 通用模板 |
 | `config.server.ini.example` / `config.embedded.ini.example` | 预设 |
-| `config.zero-web-kit.ini` | zero-web-kit 联调预设 |
+| `config.zero-web-server.ini` | zero-web-server 联调预设 |
 
 **勿提交**：`conf/*.bak`、`conf/config.local.ini`、运行时生成的 `config.ini`、日志 `zms_media_server.log`。
 
 日志：`log_level=info` 为默认；排查流问题时临时改 `debug`。
 
-### 9.3 与 zero-web-kit 对齐
+### 9.3 与 zero-web-server 对齐
 
 1. ZMS HTTP 默认 `:8080`，与 `configs/config.yaml` 中 `media.http_port` 一致  
 2. `media.secret` 与 ZMS `[api] secret` 一致（本机联调可都留空）  
@@ -449,7 +449,7 @@ curl -s http://127.0.0.1:18080/health
 curl -s http://127.0.0.1:18080/api/server/version
 ```
 
-期望：`health` 返回 JSON 且 `code: 0`；日志出现 `zero-web-kit starting`。
+期望：`health` 返回 JSON 且 `code: 0`；日志出现 `zero-web-server starting`。
 
 ### 10.2 登录
 
@@ -473,10 +473,10 @@ redis-cli -n 7 PING
 
 ```bash
 # Linux
-tail -f logs/zero-web-kit.log
+tail -f logs/zero-web-server.log
 
 # Windows
-Get-Content logs\zero-web-kit.log -Wait -Tail 50
+Get-Content logs\zero-web-server.log -Wait -Tail 50
 ```
 
 ### 10.5 功能冒烟（浏览器）
@@ -517,7 +517,7 @@ Get-Content logs\zero-web-kit.log -Wait -Tail 50
 | 操作 | Linux | Windows (PowerShell) |
 |------|-------|----------------------|
 | 拉依赖容器 | `make docker-up` | `cd docker; docker compose up -d` |
-| 编译 | `make build` | `go build -o bin\zero-web-kit.exe .\cmd\server\` |
+| 编译 | `make build` | `go build -o bin\zero-web-server.exe .\cmd\server\` |
 | 运行 | `make run` | `go run .\cmd\server\ -config configs\config.yaml` |
 | 前端开发 | `make frontend-dev` | `cd web; npm run dev` |
 | 健康检查 | `curl localhost:18080/health` | `Invoke-RestMethod localhost:18080/health` |

@@ -6,7 +6,7 @@ import (
 	"github.com/zero-pipe/gb28181-go/ptz"
 	"github.com/zero-pipe/gb28181-go/sdp"
 
-	domainptz "zero-web-kit/internal/domain/ptz"
+	domainptz "zero-web-server/internal/domain/ptz"
 )
 
 type CatalogItem = manscdp.CatalogItem

@@ -3,9 +3,9 @@ package positionapp
 import (
 	"time"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domainposition "zero-web-kit/internal/domain/position"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domainposition "zero-web-server/internal/domain/position"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
 )
 
 type Service struct {

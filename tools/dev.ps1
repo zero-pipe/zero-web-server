@@ -1,9 +1,9 @@
-# zero-web-kit dev orchestrator (Windows)
+# zero-web-server dev orchestrator (Windows)
 # Usage:
 #   .\tools\dev.ps1                 # backend + frontend (uses local MySQL/Redis if already running)
 #   .\tools\dev.ps1 start -Docker   # optional: docker compose up MySQL/Redis first
 #   .\tools\dev.ps1 start -Media    # optional: ../zms/demo_media_server
-#   .\tools\dev.ps1 start -SkipBuild   # skip go build, use existing bin/zero-web-kit.exe
+#   .\tools\dev.ps1 start -SkipBuild   # skip go build, use existing bin/zero-web-server.exe
 #   .\tools\dev.ps1 stop | status | restart
 
 param(
@@ -137,10 +137,10 @@ function Ensure-FrontendDeps {
 function Ensure-BackendBuilt {
     param([switch]$SkipBuild)
     $binDir = Join-Path $Root "bin"
-    $exe = Join-Path $binDir "zero-web-kit.exe"
+    $exe = Join-Path $binDir "zero-web-server.exe"
     if ($SkipBuild) {
         if (-not (Test-Path $exe)) {
-            Write-Error "bin/zero-web-kit.exe not found — run without -SkipBuild"
+            Write-Error "bin/zero-web-server.exe not found — run without -SkipBuild"
         }
         return $exe
     }
@@ -370,8 +370,8 @@ function Do-Start {
         if (-not $zms) {
             Write-Warning "demo_media_server not found under ../zms/build — skip -Media"
         } else {
-            $ini = Join-Path $zms.Root "conf\config.zero-web-kit.ini"
-            $cfgArg = if (Test-Path $ini) { @("--config", "conf/config.zero-web-kit.ini") } else { @("--config", "conf/config.ini") }
+            $ini = Join-Path $zms.Root "conf\config.zero-web-server.ini"
+            $cfgArg = if (Test-Path $ini) { @("--config", "conf/config.zero-web-server.ini") } else { @("--config", "conf/config.ini") }
             Write-Title "Starting zero-media-server :8080"
             $media = Start-BackgroundLogged -Tag "media" -FileName $zms.Exe `
                 -ArgumentList $cfgArg -WorkingDirectory $zms.Root
@@ -441,7 +441,7 @@ function Do-Start {
 
 function Do-Status {
     $st = Get-DevState
-    Write-Title "zero-web-kit dev status"
+    Write-Title "zero-web-server dev status"
     if (-not $st) {
         Write-Host "  Not started via dev.ps1"
     } else {
@@ -478,7 +478,7 @@ Set-Location $Root
 switch ($Action) {
     "start" { Do-Start }
     "stop" {
-        Write-Title "Stopping zero-web-kit (API :18080, UI :9528)"
+        Write-Title "Stopping zero-web-server (API :18080, UI :9528)"
         Stop-AllDev
         $still = Test-PortsDown @(18080, 9528)
         if ($still.Count -eq 0) {

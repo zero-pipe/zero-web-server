@@ -1,13 +1,10 @@
 <template>
-  <div id="log" class="app-container">
-    <div style="height: calc(100vh - 124px);">
-      <showLog ref="recordVideoPlayer" :remote-url="wsUrl" />
-    </div>
+  <div class="real-log-page app-container">
+    <showLog ref="recordVideoPlayer" :remote-url="wsUrl" />
   </div>
 </template>
 
 <script>
-
 import showLog from './showLog.vue'
 
 export default {
@@ -33,3 +30,15 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.real-log-page {
+  height: calc(100vh - 84px);
+  max-height: calc(100vh - 84px);
+  padding: 12px 16px 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+</style>

@@ -3,8 +3,8 @@ package sipinfra
 import (
 	"time"
 
-	domainptz "zero-web-kit/internal/domain/ptz"
-	domainrecord "zero-web-kit/internal/domain/record"
+	domainptz "zero-web-server/internal/domain/ptz"
+	domainrecord "zero-web-server/internal/domain/record"
 
 	"github.com/zero-pipe/gb28181-go/manscdp"
 	"github.com/zero-pipe/gb28181-go/session"

@@ -1,84 +1,74 @@
 <template>
-  <div id="app" class="app-container">
-    <div style="height: calc(100vh - 124px);">
-      <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
-          <el-input
-            v-model="search"
-            style="margin-right: 1rem; width: auto;"
-            size="mini"
-            placeholder="关键字"
-            prefix-icon="el-icon-search"
-            clearable
-            @input="getFileList"
-          />
-        </el-form-item>
-        <el-form-item label="开始时间">
-          <el-date-picker
-            v-model="startTime"
-            size="mini"
-            type="datetime"
-            value-format="yyyy-MM-dd HH:mm:ss"
-            placeholder="选择日期时间"
-            @change="getFileList"
-          />
-        </el-form-item>
-        <el-form-item label="结束时间">
-          <el-date-picker
-            v-model="endTime"
-            size="mini"
-            type="datetime"
-            value-format="yyyy-MM-dd HH:mm:ss"
-            placeholder="选择日期时间"
-            @change="getFileList"
-          />
-        </el-form-item>
-        <el-form-item style="float: right;">
-          <el-button icon="el-icon-refresh-right" circle @click="getFileList()" />
-        </el-form-item>
-      </el-form>
-      <!--日志列表-->
-      <el-table size="medium" :data="fileList" style="width: 100%" :height="winHeight">
-        <el-table-column
-          type="selection"
-          width="55"
+  <div
+    id="operationsForHistoryLog"
+    v-loading="loading"
+    class="app-container history-log-page"
+  >
+    <div class="history-log-shell">
+      <div class="history-log-shell-head">
+        <div class="history-log-shell-title">历史日志</div>
+        <div class="history-log-shell-desc">每个运行周期一个日志文件</div>
+        <el-button
+          class="history-log-refresh"
+          size="mini"
+          icon="el-icon-refresh"
+          circle
+          :loading="loading"
+          @click="getFileList"
         />
-        <el-table-column prop="fileName" label="文件名" />
-        <el-table-column prop="fileSize" label="文件大小">
-          <template v-slot:default="scope">
-            {{ formatFileSize(scope.row.fileSize) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="开始时间">
-          <template v-slot:default="scope">
-            {{ formatTimeStamp(scope.row.startTime) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="结束时间">
-          <template v-slot:default="scope">
-            {{ formatTimeStamp(scope.row.endTime) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-document" type="text" @click="showLogView(scope.row)">查看
-            </el-button>
-            <el-button size="medium" icon="el-icon-download" type="text" @click="downloadFile(scope.row)">下载
-            </el-button>
-            <!--            <el-button size="medium" icon="el-icon-delete" type="text" style="color: #f56c6c"-->
-            <!--                       @click="deleteRecord(scope.row)">删除-->
-            <!--            </el-button>-->
-          </template>
-        </el-table-column>
-      </el-table>
+      </div>
+
+      <div v-if="!loading && fileList.length === 0" class="history-log-empty">
+        暂无日志文件
+      </div>
+
+      <div class="history-log-grid">
+        <div
+          v-for="file in fileList"
+          :key="file.fileName"
+          class="history-log-card"
+        >
+          <div class="history-log-card-head">
+            <i class="el-icon-document history-log-card-icon" />
+            <div class="history-log-card-name" :title="file.fileName">{{ file.fileName }}</div>
+            <el-tag size="mini" type="info" effect="plain">{{ formatFileSize(file.fileSize) }}</el-tag>
+          </div>
+
+          <div class="history-log-card-body">
+            <div class="history-log-field">
+              <span class="history-log-label">开始时间</span>
+              <span class="history-log-value">{{ formatTimeStamp(file.startTime) }}</span>
+            </div>
+            <div class="history-log-field">
+              <span class="history-log-label">关机时间</span>
+              <span class="history-log-value">{{ formatTimeStamp(file.endTime) }}</span>
+            </div>
+          </div>
+
+          <div class="history-log-card-footer">
+            <el-button
+              type="text"
+              icon="el-icon-view"
+              @click="showLogView(file)"
+            >查看</el-button>
+            <el-button
+              type="text"
+              icon="el-icon-download"
+              @click="downloadFile(file)"
+            >下载</el-button>
+          </div>
+        </div>
+      </div>
     </div>
+
     <el-dialog
       top="10vh"
       :title="playerTitle"
       :visible.sync="showLog"
       width="90%"
+      append-to-body
     >
-      <div style="height: 600px">
+      <div class="history-log-viewer">
         <showLog ref="recordVideoPlayer" :file-url="fileUrl" :load-end="loadEnd" />
       </div>
     </el-dialog>
@@ -97,49 +87,26 @@ export default {
   },
   data() {
     return {
-      search: '',
-      startTime: '',
-      endTime: '',
       showLog: false,
       playerTitle: '',
       fileUrl: '',
-      playerStyle: {
-        'margin': 'auto',
-        'margin-bottom': '20px',
-        'width': window.innerWidth / 2 + 'px',
-        'height': this.winHeight / 2 + 'px'
-      },
-      mediaServerList: [], // 滅体节点列表
-      mediaServerId: '', // 媒体服务
-      mediaServerPath: null, // 媒体服务地址
-      fileList: [], // 设备列表
-      chooseRecord: null, // 媒体服务
-
-      updateLooper: 0, // 数据刷新轮训标志
-      winHeight: window.innerHeight - 180,
+      file: null,
+      fileList: [],
       loading: false
-
     }
   },
-  computed: {},
   mounted() {
-    this.initData()
+    this.getFileList()
   },
   destroyed() {
     this.$destroy('recordVideoPlayer')
   },
   methods: {
-    initData: function() {
-      this.getFileList()
-    },
-    getFileList: function() {
-      this.$store.dispatch('log/queryList', {
-        query: this.search,
-        startTime: this.startTime,
-        endTime: this.endTime
-      })
+    getFileList() {
+      this.loading = true
+      this.$store.dispatch('log/queryList', {})
         .then((data) => {
-          this.fileList = data
+          this.fileList = data || []
         })
         .catch((error) => {
           console.log(error)
@@ -155,84 +122,180 @@ export default {
       this.file = file
     },
     downloadFile(file) {
-      // const link = document.createElement('a');
-      // link.target = "_blank";
-      // link.download = file.fileName;
-      // if (process.env.NODE_ENV === 'development') {
-      //   link.href = `/debug/api/log/file/${file.fileName}`
-      // }else {
-      //   link.href = `/api/log/file/${file.fileName}`
-      // }
-      //
-      // link.click();
-
-      // 文件下载地址
       const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : window.baseUrl) + `/api/log/file/${file.fileName}`
-
-      // 设置请求头
       const headers = new Headers()
-      headers.append('access-token', getToken()) // 设置授权头，替换YourAccessToken为实际的访问令牌
-      // 发起  请求
+      headers.append('access-token', getToken())
       fetch(fileUrl, {
         method: 'GET',
         headers: headers
       })
         .then(response => response.blob())
         .then(blob => {
-          console.log(blob)
-          // 创建一个虚拟的链接元素，模拟点击下载
           const link = document.createElement('a')
           link.target = '_blank'
           link.href = window.URL.createObjectURL(blob)
-          link.download = file.fileName // 设置下载文件名，替换filename.ext为实际的文件名和扩展名
+          link.download = file.fileName
           document.body.appendChild(link)
-
-          // 模拟点击
           link.click()
-
-          // 移除虚拟链接元素
           document.body.removeChild(link)
-          this.$message.success('已申请截图', { closed: true })
+          this.$message.success('下载成功')
         })
-        .catch(error => console.error('下载失败：', error))
+        .catch(error => {
+          console.error('下载失败：', error)
+          this.$message.error('下载失败')
+        })
     },
     loadEnd() {
-      this.playerTitle = this.file.fileName
-    },
-    formatTime(time) {
-      const h = parseInt(time / 3600 / 1000)
-      const minute = parseInt((time - h * 3600 * 1000) / 60 / 1000)
-      let second = Math.ceil((time - h * 3600 * 1000 - minute * 60 * 1000) / 1000)
-      if (second < 0) {
-        second = 0
+      if (this.file) {
+        this.playerTitle = this.file.fileName
       }
-      return (h > 0 ? h + `小时` : '') + (minute > 0 ? minute + '分' : '') + (second > 0 ? second + '秒' : '')
     },
     formatTimeStamp(time) {
-      return moment.unix(time / 1000).format('yyyy-MM-DD HH:mm:ss')
+      if (!time) return '—'
+      return moment.unix(time / 1000).format('YYYY-MM-DD HH:mm:ss')
     },
     formatFileSize(fileSize) {
+      if (fileSize == null || fileSize < 0) return '—'
       if (fileSize < 1024) {
-        return fileSize + 'B'
-      } else if (fileSize < (1024 * 1024)) {
-        let temp = fileSize / 1024
-        temp = temp.toFixed(2)
-        return temp + 'KB'
-      } else if (fileSize < (1024 * 1024 * 1024)) {
-        let temp = fileSize / (1024 * 1024)
-        temp = temp.toFixed(2)
-        return temp + 'MB'
-      } else {
-        let temp = fileSize / (1024 * 1024 * 1024)
-        temp = temp.toFixed(2)
-        return temp + 'GB'
+        return fileSize + ' B'
       }
+      if (fileSize < (1024 * 1024)) {
+        return (fileSize / 1024).toFixed(2) + ' KB'
+      }
+      if (fileSize < (1024 * 1024 * 1024)) {
+        return (fileSize / (1024 * 1024)).toFixed(2) + ' MB'
+      }
+      return (fileSize / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
     }
-
   }
 }
 </script>
 
-<style>
+<style scoped>
+.history-log-page {
+  padding: 16px 20px 24px;
+  min-height: calc(100vh - 124px);
+  background: #f0f4f8;
+}
 
+.history-log-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.history-log-shell-head {
+  position: relative;
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid #e3ebf5;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 40, 80, 0.05);
+}
+
+.history-log-shell-title {
+  font-size: 18px;
+  font-weight: 650;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.history-log-shell-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.history-log-refresh {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+}
+
+.history-log-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: #94a3b8;
+  background: #fff;
+  border: 1px dashed #dbe4ef;
+  border-radius: 10px;
+}
+
+.history-log-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.history-log-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e3ebf5;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(15, 40, 80, 0.04);
+  overflow: hidden;
+}
+
+.history-log-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.history-log-card-icon {
+  color: #1565c0;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.history-log-card-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-log-card-body {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  flex: 1;
+}
+
+.history-log-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-log-label {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.history-log-value {
+  font-size: 13px;
+  font-weight: 550;
+  color: #1e293b;
+}
+
+.history-log-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid #f1f5f9;
+  background: #fafbfc;
+}
+
+.history-log-viewer {
+  height: 600px;
+}
 </style>

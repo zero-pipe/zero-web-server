@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domaindevice "zero-web-kit/internal/domain/device"
-	"zero-web-kit/internal/domain/shared"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domaindevice "zero-web-server/internal/domain/device"
+	"zero-web-server/internal/domain/shared"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

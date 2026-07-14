@@ -87,7 +87,7 @@ export default {
   },
   methods: {
     isConsoleRoute() {
-      return this.$route.name === '控制台' || this.$route.path === '/dashboard'
+      return this.$route.name === '资源监控' || this.$route.path === '/dashboard'
     },
     stopLoop() {
       if (this.timer != null) {

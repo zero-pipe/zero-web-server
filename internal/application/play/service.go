@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"sync"
 
-	publishauth "zero-web-kit/internal/application/publishauth"
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domaindevice "zero-web-kit/internal/domain/device"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/internal/port"
-	applog "zero-web-kit/pkg/log"
+	publishauth "zero-web-server/internal/application/publishauth"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domaindevice "zero-web-server/internal/domain/device"
+	"zero-web-server/internal/infrastructure/media/mediakit"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/port"
+	applog "zero-web-server/pkg/log"
 )
 
 type Service struct {

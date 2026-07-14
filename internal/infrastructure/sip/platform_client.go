@@ -1,8 +1,8 @@
 package sipinfra
 
 import (
-	domainplatform "zero-web-kit/internal/domain/platform"
-	"zero-web-kit/internal/infrastructure/config"
+	domainplatform "zero-web-server/internal/domain/platform"
+	"zero-web-server/internal/infrastructure/config"
 
 	"github.com/zero-pipe/gb28181-go/cascade"
 	"github.com/zero-pipe/gb28181-go/manscdp"

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
-	applog "zero-web-kit/pkg/log"
+	"zero-web-server/internal/infrastructure/config"
+	applog "zero-web-server/pkg/log"
 )
 
 type Client struct {

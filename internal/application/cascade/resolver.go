@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domainplatform "zero-web-kit/internal/domain/platform"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domainplatform "zero-web-server/internal/domain/platform"
+	"zero-web-server/internal/infrastructure/persistence/model"
 )
 
 type platformChannelRepo interface {

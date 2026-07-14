@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"zero-web-kit/pkg/response"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

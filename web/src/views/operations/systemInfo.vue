@@ -18,21 +18,19 @@
         />
       </div>
 
-      <div class="system-info-grid">
+      <div class="system-info-card">
         <div
-          v-for="section in sectionList"
-          :key="section.key"
-          class="system-info-card"
+          v-for="group in displayGroups"
+          :key="group.title"
+          class="system-info-group"
         >
-          <div class="system-info-card-head">
-            <i :class="section.icon" class="system-info-card-icon" />
-            <span>{{ section.key }}</span>
-          </div>
-          <div class="system-info-card-body">
+          <div class="system-info-group-title">{{ group.title }}</div>
+          <div class="system-info-fields">
             <div
-              v-for="item in section.items"
+              v-for="item in group.items"
               :key="item.label"
-              class="system-info-row"
+              class="system-info-field"
+              :class="{ 'is-wide': item.wide }"
             >
               <div class="system-info-label">{{ item.label }}</div>
               <div class="system-info-value">
@@ -42,7 +40,7 @@
                   target="_blank"
                   rel="noopener noreferrer"
                 >{{ item.value }}</a>
-                <span v-else>{{ item.value || '-' }}</span>
+                <span v-else>{{ item.value || '—' }}</span>
               </div>
             </div>
           </div>
@@ -53,12 +51,34 @@
 </template>
 
 <script>
-
-const SECTION_META = [
-  { key: '平台信息', icon: 'el-icon-monitor' },
-  { key: '操作系统', icon: 'el-icon-cpu' },
-  { key: '硬件信息', icon: 'el-icon-s-platform' },
-  { key: '文档地址', icon: 'el-icon-document' }
+/** 只保留关键运行/主机信息，按分组展示 */
+const FIELD_PLAN = [
+  {
+    title: '运行',
+    items: [
+      { label: '版本', from: ['平台信息', '版本'] },
+      { label: 'Go 版本', from: ['平台信息', 'Go版本'] },
+      { label: '监听端口', from: ['平台信息', '监听端口'] },
+      { label: '启动时间', from: ['平台信息', '启动时间'] },
+      { label: '运行时长', from: ['平台信息', '运行时长'] }
+    ]
+  },
+  {
+    title: '主机',
+    items: [
+      { label: '操作系统', key: 'os' },
+      { label: 'CPU', from: ['硬件信息', 'CPU'], wide: true },
+      { label: '内存', from: ['硬件信息', '内存'] },
+      { label: '网卡', from: ['硬件信息', '网卡'], wide: true }
+    ]
+  },
+  {
+    title: '文档地址',
+    items: [
+      { label: '本机地址', from: ['文档地址', '本机地址'], wide: true },
+      { label: '项目地址', from: ['文档地址', '项目地址'], wide: true }
+    ]
+  }
 ]
 
 export default {
@@ -70,49 +90,35 @@ export default {
     }
   },
   computed: {
-    sectionList() {
-      const list = []
-      const used = {}
-      SECTION_META.forEach(meta => {
-        const group = this.systemInfoList[meta.key]
-        if (!group || typeof group !== 'object') {
-          return
-        }
-        used[meta.key] = true
-        list.push({
-          key: meta.key,
-          icon: meta.icon,
-          items: Object.keys(group).map(label => ({
-            label,
-            value: group[label]
-          }))
-        })
-      })
-      // 后端若新增分组，仍展示
-      Object.keys(this.systemInfoList || {}).forEach(key => {
-        if (used[key]) {
-          return
-        }
-        const group = this.systemInfoList[key]
-        if (!group || typeof group !== 'object') {
-          return
-        }
-        list.push({
-          key,
-          icon: 'el-icon-info',
-          items: Object.keys(group).map(label => ({
-            label,
-            value: group[label]
-          }))
-        })
-      })
-      return list
+    displayGroups() {
+      return FIELD_PLAN.map(group => ({
+        title: group.title,
+        items: group.items.map(item => ({
+          label: item.label,
+          wide: !!item.wide,
+          value: item.key === 'os'
+            ? this.osLabel()
+            : this.pick(item.from[0], item.from[1])
+        }))
+      }))
     }
   },
   created() {
     this.initData()
   },
   methods: {
+    pick(section, field) {
+      const group = this.systemInfoList && this.systemInfoList[section]
+      if (!group || typeof group !== 'object') return ''
+      return group[field] || ''
+    },
+    /** 操作系统只展示 windows / linux（其它系统原样小写） */
+    osLabel() {
+      const raw = String(this.pick('操作系统', '类型') || '').toLowerCase()
+      if (raw.indexOf('win') >= 0) return 'windows'
+      if (raw.indexOf('linux') >= 0) return 'linux'
+      return raw || '—'
+    },
     isLink(value) {
       return typeof value === 'string' && value.startsWith('http')
     },
@@ -141,7 +147,7 @@ export default {
 }
 
 .system-info-shell {
-  max-width: 1180px;
+  max-width: 720px;
   margin: 0 auto;
   background: #fff;
   border: 1px solid #e3ebf5;
@@ -176,79 +182,74 @@ export default {
   right: 18px;
 }
 
-.system-info-grid {
+.system-info-card {
+  padding: 8px 22px 22px;
+}
+
+.system-info-group {
+  padding-top: 16px;
+}
+
+.system-info-group + .system-info-group {
+  margin-top: 8px;
+  border-top: 1px solid #eef2f7;
+}
+
+.system-info-group-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  text-transform: none;
+}
+
+.system-info-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  padding: 16px;
+  gap: 12px 20px;
 }
 
-.system-info-card {
-  min-height: 160px;
-  background: #f7fafc;
-  border: 1px solid #e3ebf5;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.system-info-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
-  background: #fff;
-  border-bottom: 1px solid #e8eef6;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.system-info-card-icon {
-  color: #1565c0;
-  font-size: 16px;
-}
-
-.system-info-card-body {
-  padding: 8px 14px 12px;
-}
-
-.system-info-row {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed #e6edf5;
-}
-
-.system-info-row:last-child {
-  border-bottom: none;
+.system-info-field.is-wide {
+  grid-column: 1 / -1;
 }
 
 .system-info-label {
   font-size: 12px;
-  color: #64748b;
-  line-height: 1.5;
+  color: #94a3b8;
+  line-height: 1.3;
+  margin-bottom: 4px;
 }
 
 .system-info-value {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 550;
   color: #1e293b;
-  line-height: 1.5;
+  line-height: 1.45;
   word-break: break-all;
 }
 
 .system-info-value a {
   color: #1565c0;
   text-decoration: none;
+  font-weight: 500;
 }
 
 .system-info-value a:hover {
   text-decoration: underline;
 }
 
-@media (max-width: 900px) {
-  .system-info-grid {
+@media (max-width: 560px) {
+  .system-info-shell {
+    max-width: 100%;
+  }
+
+  .system-info-fields {
     grid-template-columns: 1fr;
+  }
+
+  .system-info-field.is-wide {
+    grid-column: auto;
   }
 }
 </style>

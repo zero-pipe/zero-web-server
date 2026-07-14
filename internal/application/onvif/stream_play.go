@@ -1,7 +1,7 @@
 package onvifapp
 
 import (
-	"zero-web-kit/internal/port"
+	"zero-web-server/internal/port"
 )
 
 const minPlayBytesSpeed int64 = 2048

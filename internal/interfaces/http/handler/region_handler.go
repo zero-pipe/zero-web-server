@@ -1,10 +1,10 @@
 package handler
 
 import (
-	regionapp "zero-web-kit/internal/application/region"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	regionapp "zero-web-server/internal/application/region"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

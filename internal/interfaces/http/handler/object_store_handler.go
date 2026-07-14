@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	objectstoreapp "zero-web-kit/internal/application/objectstore"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/pkg/response"
+	objectstoreapp "zero-web-server/internal/application/objectstore"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

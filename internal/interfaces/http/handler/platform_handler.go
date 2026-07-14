@@ -3,10 +3,10 @@ package handler
 import (
 	"strconv"
 
-	upstreamapp "zero-web-kit/internal/application/upstream"
-	domainplatform "zero-web-kit/internal/domain/platform"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	upstreamapp "zero-web-server/internal/application/upstream"
+	domainplatform "zero-web-server/internal/domain/platform"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

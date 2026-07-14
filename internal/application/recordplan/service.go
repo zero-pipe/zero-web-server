@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	publishauth "zero-web-kit/internal/application/publishauth"
-	playapp "zero-web-kit/internal/application/play"
-	"zero-web-kit/internal/domain/shared"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	applog "zero-web-kit/pkg/log"
+	publishauth "zero-web-server/internal/application/publishauth"
+	playapp "zero-web-server/internal/application/play"
+	"zero-web-server/internal/domain/shared"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	applog "zero-web-server/pkg/log"
 )
 
 type PlanView struct {

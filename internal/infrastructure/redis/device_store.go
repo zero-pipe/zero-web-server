@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	domaindevice "zero-web-kit/internal/domain/device"
+	domaindevice "zero-web-server/internal/domain/device"
 
 	goredis "github.com/redis/go-redis/v9"
 )

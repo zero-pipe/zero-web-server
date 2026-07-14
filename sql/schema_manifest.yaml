@@ -1,4 +1,4 @@
-# zero-web-kit 数据库表清单
+# zero-web-server 数据库表清单
 # 新安装：只执行 sql/init_zws_mysql.sql（全量，含 ONVIF）
 # 升级：AutoMigrate 补列；旧库缺 ONVIF 时再执行 add_onvif_tables.sql
 

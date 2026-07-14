@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"zero-web-kit/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/config"
 
 	goredis "github.com/redis/go-redis/v9"
 )

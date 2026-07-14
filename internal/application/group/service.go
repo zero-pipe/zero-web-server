@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	domaintree "zero-web-kit/internal/domain/tree"
-	"zero-web-kit/internal/infrastructure/persistence"
+	domaintree "zero-web-server/internal/domain/tree"
+	"zero-web-server/internal/infrastructure/persistence"
 )
 
 var (

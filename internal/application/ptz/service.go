@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	domaindevice "zero-web-kit/internal/domain/device"
-	domainptz "zero-web-kit/internal/domain/ptz"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	domaindevice "zero-web-server/internal/domain/device"
+	domainptz "zero-web-server/internal/domain/ptz"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
 )
 
 const (

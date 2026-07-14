@@ -3,10 +3,10 @@ package upstreamapp
 import (
 	"fmt"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domainplatform "zero-web-kit/internal/domain/platform"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domainplatform "zero-web-server/internal/domain/platform"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
 )
 
 type channelRepo interface {

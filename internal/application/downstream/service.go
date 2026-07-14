@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	domainsub "zero-web-kit/internal/domain/subordinate"
+	domainsub "zero-web-server/internal/domain/subordinate"
 	gbserver "github.com/zero-pipe/gb28181-go/server"
 )
 

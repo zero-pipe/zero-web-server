@@ -3,10 +3,10 @@ package handler
 import (
 	"strconv"
 
-	recordplanapp "zero-web-kit/internal/application/recordplan"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	recordplanapp "zero-web-server/internal/application/recordplan"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

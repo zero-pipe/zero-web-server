@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
 )
 
 var ErrDeviceOffline = errors.New("设备已离线")

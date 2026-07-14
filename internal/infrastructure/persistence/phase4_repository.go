@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	domainalarm "zero-web-kit/internal/domain/alarm"
-	domainplatform "zero-web-kit/internal/domain/platform"
-	domainposition "zero-web-kit/internal/domain/position"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	domainalarm "zero-web-server/internal/domain/alarm"
+	domainplatform "zero-web-server/internal/domain/platform"
+	domainposition "zero-web-server/internal/domain/position"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

@@ -1,12 +1,12 @@
 package sipinfra
 
 import (
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domaindevice "zero-web-kit/internal/domain/device"
-	domainptz "zero-web-kit/internal/domain/ptz"
-	domainrecord "zero-web-kit/internal/domain/record"
-	"zero-web-kit/internal/infrastructure/config"
-	redisinfra "zero-web-kit/internal/infrastructure/redis"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domaindevice "zero-web-server/internal/domain/device"
+	domainptz "zero-web-server/internal/domain/ptz"
+	domainrecord "zero-web-server/internal/domain/record"
+	"zero-web-server/internal/infrastructure/config"
+	redisinfra "zero-web-server/internal/infrastructure/redis"
 
 	"context"
 

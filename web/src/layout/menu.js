@@ -64,7 +64,7 @@ export const primaryMenus = [
     title: '运维管理',
     icon: 'menu-ops',
     children: [
-      { title: '控制台', path: '/dashboard', icon: 'dashboard' },
+      { title: '资源监控', path: '/dashboard', icon: 'dashboard' },
       { title: '平台信息', path: '/operations/systemInfo', icon: 'systemInfo' },
       { title: '历史日志', path: '/operations/historyLog', icon: 'historyLog' },
       { title: '实时日志', path: '/operations/realLog', icon: 'realLog' }

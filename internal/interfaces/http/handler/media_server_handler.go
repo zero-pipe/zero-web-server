@@ -1,12 +1,12 @@
 package handler
 
 import (
-	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
-	mediaserverapp "zero-web-kit/internal/application/mediaserver"
-	"zero-web-kit/internal/application/ops"
-	"zero-web-kit/internal/infrastructure/config"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/pkg/response"
+	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
+	mediaserverapp "zero-web-server/internal/application/mediaserver"
+	"zero-web-server/internal/application/ops"
+	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

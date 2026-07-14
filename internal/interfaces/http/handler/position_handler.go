@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	positionapp "zero-web-kit/internal/application/position"
-	"zero-web-kit/pkg/response"
+	positionapp "zero-web-server/internal/application/position"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

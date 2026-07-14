@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	applog "zero-web-kit/pkg/log"
+	applog "zero-web-server/pkg/log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -20,13 +20,14 @@ var logWSUpgrader = websocket.Upgrader{
 	},
 }
 
+const realtimeLogTailLines = 50
+
 // LogChannel WebSocket 实时日志（/channel/log）。
-// 鉴权：query access-token，或兼容 Sec-WebSocket-Protocol。
+// 连接后先推送最近约 200 行，再以 tail -f 方式跟随日志文件；同时订阅内存 Hub 兜底。
 func LogChannel(c *gin.Context) {
 	proto := c.GetHeader("Sec-WebSocket-Protocol")
 	header := http.Header{}
 	if proto != "" {
-		// 仅回显简单子协议；JWT 含非法 token 字符时不要当 protocol
 		first := strings.TrimSpace(strings.Split(proto, ",")[0])
 		if first != "" && !strings.Contains(first, ".") {
 			header.Set("Sec-WebSocket-Protocol", first)
@@ -45,8 +46,28 @@ func LogChannel(c *gin.Context) {
 		return nil
 	})
 
+	writeLine := func(line string) error {
+		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		return conn.WriteMessage(websocket.TextMessage, []byte(line))
+	}
+
+	// 有落盘文件时以文件跟随为准（与历史日志一致）；无文件时走内存 Hub
 	ch := applog.DefaultHub.Subscribe()
 	defer applog.DefaultHub.Unsubscribe(ch)
+	useFile := applog.FilePath() != ""
+
+	recent := applog.TailRecent(realtimeLogTailLines)
+	follower := applog.NewFileFollower()
+	if len(recent) == 0 {
+		_ = writeLine("--- 实时日志已连接，等待新日志 ---")
+	} else {
+		for _, line := range recent {
+			if err := writeLine(line); err != nil {
+				return
+			}
+		}
+	}
+	follower.SeekEnd()
 
 	done := make(chan struct{})
 	go func() {
@@ -59,8 +80,10 @@ func LogChannel(c *gin.Context) {
 		}
 	}()
 
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
+	pingTicker := time.NewTicker(30 * time.Second)
+	defer pingTicker.Stop()
+	pollTicker := time.NewTicker(400 * time.Millisecond)
+	defer pollTicker.Stop()
 
 	for {
 		select {
@@ -70,11 +93,23 @@ func LogChannel(c *gin.Context) {
 			if !ok {
 				return
 			}
-			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := conn.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
+			// 已跟文件时忽略 Hub，避免同一条日志两种格式各推一次
+			if useFile {
+				continue
+			}
+			if err := writeLine(line); err != nil {
 				return
 			}
-		case <-ticker.C:
+		case <-pollTicker.C:
+			if !useFile {
+				continue
+			}
+			for _, line := range follower.Poll() {
+				if err := writeLine(line); err != nil {
+					return
+				}
+			}
+		case <-pingTicker.C:
 			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if err := conn.WriteControl(websocket.PingMessage, []byte("ping"), time.Now().Add(5*time.Second)); err != nil {
 				return

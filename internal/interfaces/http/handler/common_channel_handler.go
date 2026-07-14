@@ -3,9 +3,9 @@ package handler
 import (
 	"strconv"
 
-	channelapp "zero-web-kit/internal/application/channel"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	channelapp "zero-web-server/internal/application/channel"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

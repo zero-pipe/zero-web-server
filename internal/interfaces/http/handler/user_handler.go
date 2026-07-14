@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	appauth "zero-web-kit/internal/application/auth"
-	"zero-web-kit/internal/application/ops"
-	"zero-web-kit/pkg/jwt"
-	"zero-web-kit/pkg/response"
+	appauth "zero-web-server/internal/application/auth"
+	"zero-web-server/internal/application/ops"
+	"zero-web-server/pkg/jwt"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,7 +65,7 @@ func NewHealthHandler(version string) *HealthHandler {
 }
 
 func (h *HealthHandler) Version(c *gin.Context) {
-	response.OK(c, gin.H{"version": h.version, "name": "zero-web-kit"})
+	response.OK(c, gin.H{"version": h.version, "name": "zero-web-server"})
 }
 
 func (h *HealthHandler) Health(c *gin.Context) {

@@ -1,9 +1,9 @@
 package handler
 
 import (
-	gbsipconfig "zero-web-kit/internal/application/gbsipconfig"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/pkg/response"
+	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

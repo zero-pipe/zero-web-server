@@ -3,11 +3,11 @@ package handler
 import (
 	"strconv"
 
-	deviceapp "zero-web-kit/internal/application/device"
-	domaindevice "zero-web-kit/internal/domain/device"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	deviceapp "zero-web-server/internal/application/device"
+	domaindevice "zero-web-server/internal/domain/device"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

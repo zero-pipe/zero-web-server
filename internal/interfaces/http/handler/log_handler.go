@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"zero-web-kit/internal/application/ops"
-	"zero-web-kit/pkg/response"
+	"zero-web-server/internal/application/ops"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

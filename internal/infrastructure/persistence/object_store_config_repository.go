@@ -4,8 +4,8 @@ import (
 	"errors"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/port"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/port"
 
 	"gorm.io/gorm"
 )

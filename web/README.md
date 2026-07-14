@@ -1,4 +1,4 @@
-# ZWS Web（zero-web-kit 管理台）
+# ZWS Web（zero-web-server 管理台）
 
 Vue 2 + Element UI。开发：
 

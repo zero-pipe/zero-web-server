@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	domaindevice "zero-web-kit/internal/domain/device"
+	domaindevice "zero-web-server/internal/domain/device"
 )
 
 type subscribeRenewal struct {

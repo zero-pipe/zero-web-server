@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	streampushapp "zero-web-kit/internal/application/streampush"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	streampushapp "zero-web-server/internal/application/streampush"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

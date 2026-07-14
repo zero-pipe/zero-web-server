@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
-	"zero-web-kit/internal/interfaces/http/dto"
+	domainchannel "zero-web-server/internal/domain/channel"
+	"zero-web-server/internal/infrastructure/media/mediakit"
+	"zero-web-server/internal/interfaces/http/dto"
 )
 
 const (

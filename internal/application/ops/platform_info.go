@@ -61,7 +61,7 @@ func PlatformInfo(version, serverID string, serverPort int, scheme, requestHost 
 	}
 
 	doc := out["文档地址"]
-	doc["项目地址"] = "https://github.com/zero-pipe/zero-web-kit"
+	doc["项目地址"] = "https://github.com/zero-pipe/zero-web-server"
 	if scheme == "" {
 		scheme = "http"
 	}

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	domainonvif "zero-web-kit/internal/domain/onvif"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	domainonvif "zero-web-server/internal/domain/onvif"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

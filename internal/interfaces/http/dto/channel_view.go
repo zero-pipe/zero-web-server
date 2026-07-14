@@ -1,6 +1,6 @@
 package dto
 
-import domainchannel "zero-web-kit/internal/domain/channel"
+import domainchannel "zero-web-server/internal/domain/channel"
 
 var ptzTypeTexts = map[int]string{
 	0: "未知",

@@ -50,9 +50,9 @@ export const constantRoutes = [
     redirect: '/map',
     children: [{
       path: 'dashboard',
-      name: '控制台',
+      name: '资源监控',
       component: () => import('@/views/dashboard/index'),
-      meta: { title: '控制台', icon: 'dashboard' }
+      meta: { title: '资源监控', icon: 'dashboard' }
     }]
   },
   {

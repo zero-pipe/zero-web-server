@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	domaindevice "zero-web-kit/internal/domain/device"
-	redisinfra "zero-web-kit/internal/infrastructure/redis"
+	domaindevice "zero-web-server/internal/domain/device"
+	redisinfra "zero-web-server/internal/infrastructure/redis"
 )
 
 type StatusMonitor struct {

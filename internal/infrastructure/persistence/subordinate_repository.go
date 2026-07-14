@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	domainsub "zero-web-kit/internal/domain/subordinate"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	domainsub "zero-web-server/internal/domain/subordinate"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

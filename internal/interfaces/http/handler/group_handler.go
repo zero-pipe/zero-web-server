@@ -3,10 +3,10 @@ package handler
 import (
 	"strconv"
 
-	groupapp "zero-web-kit/internal/application/group"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	groupapp "zero-web-server/internal/application/group"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

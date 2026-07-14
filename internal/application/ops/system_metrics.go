@@ -14,7 +14,7 @@ import (
 
 const metricsHistory = 30
 
-// Metrics 控制台 CPU/内存/网络时序 + 磁盘快照（内存环形缓冲）。
+// Metrics 资源监控 CPU/内存/网络时序 + 磁盘快照（内存环形缓冲）。
 type Metrics struct {
 	mu sync.RWMutex
 

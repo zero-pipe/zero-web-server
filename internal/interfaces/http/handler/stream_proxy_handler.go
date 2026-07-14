@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	streamproxyapp "zero-web-kit/internal/application/streamproxy"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	streamproxyapp "zero-web-server/internal/application/streamproxy"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

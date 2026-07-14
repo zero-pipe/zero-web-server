@@ -5,11 +5,11 @@ import (
 	"strings"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	applog "zero-web-kit/pkg/log"
+	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	applog "zero-web-server/pkg/log"
 
 	"gorm.io/gorm"
 )

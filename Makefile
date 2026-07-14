@@ -17,7 +17,7 @@ dev-status:
 	else echo "Run: powershell -File tools/dev.ps1 status"; fi
 
 build:
-	go build -o bin/zero-web-kit ./cmd/server
+	go build -o bin/zero-web-server ./cmd/server
 
 tidy:
 	go mod tidy

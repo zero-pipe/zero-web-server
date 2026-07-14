@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	playbackapp "zero-web-kit/internal/application/playback"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	"zero-web-kit/pkg/response"
+	playbackapp "zero-web-server/internal/application/playback"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

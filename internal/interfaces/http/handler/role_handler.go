@@ -3,9 +3,9 @@ package handler
 import (
 	"strings"
 
-	appauth "zero-web-kit/internal/application/auth"
-	"zero-web-kit/internal/application/rbac"
-	"zero-web-kit/pkg/response"
+	appauth "zero-web-server/internal/application/auth"
+	"zero-web-server/internal/application/rbac"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

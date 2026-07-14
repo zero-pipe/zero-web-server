@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	domainonvif "zero-web-kit/internal/domain/onvif"
+	domainonvif "zero-web-server/internal/domain/onvif"
 )
 
 // 海康 RTSP 常见路径：/Streaming/Channels/101（主） /102（子）

@@ -1,7 +1,7 @@
 {
   "name": "zws-web",
   "version": "1.0.0",
-  "description": "ZWS (zero-web-kit) Vue 管理台",
+  "description": "ZWS (zero-web-server) Vue 管理台",
   "author": "zero-pipe",
   "scripts": {
     "dev": "vue-cli-service serve --host=0.0.0.0",

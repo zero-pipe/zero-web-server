@@ -3,9 +3,9 @@ package handler
 import (
 	"strconv"
 
-	downstreamapp "zero-web-kit/internal/application/downstream"
-	domainsub "zero-web-kit/internal/domain/subordinate"
-	"zero-web-kit/pkg/response"
+	downstreamapp "zero-web-server/internal/application/downstream"
+	domainsub "zero-web-server/internal/domain/subordinate"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

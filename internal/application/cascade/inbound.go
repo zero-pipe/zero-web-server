@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	playapp "zero-web-kit/internal/application/play"
-	domaindevice "zero-web-kit/internal/domain/device"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	applog "zero-web-kit/pkg/log"
+	playapp "zero-web-server/internal/application/play"
+	domaindevice "zero-web-server/internal/domain/device"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	applog "zero-web-server/pkg/log"
 
 	"github.com/zero-pipe/gb28181-go/manscdp"
 	gbserver "github.com/zero-pipe/gb28181-go/server"

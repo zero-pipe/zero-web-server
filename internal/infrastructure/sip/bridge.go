@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	domaindevice "zero-web-kit/internal/domain/device"
-	"zero-web-kit/internal/infrastructure/config"
-	redisinfra "zero-web-kit/internal/infrastructure/redis"
+	domaindevice "zero-web-server/internal/domain/device"
+	"zero-web-server/internal/infrastructure/config"
+	redisinfra "zero-web-server/internal/infrastructure/redis"
 
 	"github.com/zero-pipe/gb28181-go/manscdp"
 	gbserver "github.com/zero-pipe/gb28181-go/server"

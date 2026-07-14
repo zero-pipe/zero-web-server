@@ -1,15 +1,15 @@
 package hook
 
 import (
-	cloudrecordapp "zero-web-kit/internal/application/cloudrecord"
-	publishauth "zero-web-kit/internal/application/publishauth"
-	playapp "zero-web-kit/internal/application/play"
-	playbackapp "zero-web-kit/internal/application/playback"
-	recordplanapp "zero-web-kit/internal/application/recordplan"
-	streampushapp "zero-web-kit/internal/application/streampush"
-	streamproxyapp "zero-web-kit/internal/application/streamproxy"
-	applog "zero-web-kit/pkg/log"
-	"zero-web-kit/pkg/response"
+	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
+	publishauth "zero-web-server/internal/application/publishauth"
+	playapp "zero-web-server/internal/application/play"
+	playbackapp "zero-web-server/internal/application/playback"
+	recordplanapp "zero-web-server/internal/application/recordplan"
+	streampushapp "zero-web-server/internal/application/streampush"
+	streamproxyapp "zero-web-server/internal/application/streamproxy"
+	applog "zero-web-server/pkg/log"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

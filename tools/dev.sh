@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# zero-web-kit dev orchestrator (Linux / macOS)
+# zero-web-server dev orchestrator (Linux / macOS)
 # Usage:
 #   ./tools/dev.sh                  # backend + frontend (local MySQL/Redis if already running)
 #   ./tools/dev.sh start --docker   # optional: docker compose up MySQL/Redis
@@ -200,8 +200,8 @@ ensure_frontend() {
 }
 
 ensure_backend_built() {
-    local exe="$ROOT/bin/zero-web-kit"
-    [[ "$SKIP_BUILD" -eq 1 ]] && { [[ -x "$exe" ]] || exe="$ROOT/bin/zero-web-kit.exe"; echo "$exe"; return; }
+    local exe="$ROOT/bin/zero-web-server"
+    [[ "$SKIP_BUILD" -eq 1 ]] && { [[ -x "$exe" ]] || exe="$ROOT/bin/zero-web-server.exe"; echo "$exe"; return; }
     mkdir -p "$ROOT/bin"
     cyan "== Building backend (go build) =="
     (cd "$ROOT" && go build -o "$exe" ./cmd/server) || { red "go build failed"; exit 1; }
@@ -258,7 +258,7 @@ do_check() {
 }
 
 do_status() {
-    cyan "== zero-web-kit dev status =="
+    cyan "== zero-web-server dev status =="
     if [[ ! -f "$STATE_FILE" ]]; then
         echo "  Not started via dev.sh"
     else
@@ -317,7 +317,7 @@ do_start() {
         if info=$(find_media); then
             IFS='|' read -r exe zroot <<<"$info"
             local cfg="conf/config.ini"
-            [[ -f "$zroot/conf/config.zero-web-kit.ini" ]] && cfg="conf/config.zero-web-kit.ini"
+            [[ -f "$zroot/conf/config.zero-web-server.ini" ]] && cfg="conf/config.zero-web-server.ini"
             cyan "== Starting zero-media-server :8080 =="
             media=$(start_bg media bash -c "cd '$zroot' && exec '$exe' --config '$cfg'")
             green "Media server (pid $media)"
@@ -358,7 +358,7 @@ do_start() {
 cd "$ROOT"
 case "$ACTION" in
     start) do_start ;;
-    stop) cyan "== Stopping zero-web-kit (:18080 :9528) =="; stop_all
+    stop) cyan "== Stopping zero-web-server (:18080 :9528) =="; stop_all
         if port_open 18080 || port_open 9528; then
             yellow "Some ports still open — check manually"
         else

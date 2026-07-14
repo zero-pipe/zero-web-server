@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	publishauth "zero-web-kit/internal/application/publishauth"
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domaindevice "zero-web-kit/internal/domain/device"
-	domainrecord "zero-web-kit/internal/domain/record"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/internal/port"
+	publishauth "zero-web-server/internal/application/publishauth"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domaindevice "zero-web-server/internal/domain/device"
+	domainrecord "zero-web-server/internal/domain/record"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/port"
 )
 
 type DownloadProgress struct {

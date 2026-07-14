@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/internal/port"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/port"
 )
 
 type Service struct {

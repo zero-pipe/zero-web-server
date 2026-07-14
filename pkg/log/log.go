@@ -9,23 +9,33 @@ import (
 	"strings"
 	"sync"
 
-	"zero-web-kit/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/config"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
-	mu     sync.Mutex
-	logger *slog.Logger
+	mu      sync.Mutex
+	logger  *slog.Logger
+	logPath string // 当前写入的日志文件路径（空表示未落盘）
 )
 
 // Init configures process-wide structured logging (stdout and/or rotating file).
+//
+// 约定（对齐常见运维 / 采集实践）：
+//   - level:  debug | info | warn | error
+//   - format: text（人读）| json（采集）
+//   - text:   2026-07-14 15:04:05.000 INFO  message key=value
+//   - json:   {"ts":"...","level":"info","msg":"...","key":"..."}
 func Init(cfg config.LogConfig) error {
 	mu.Lock()
 	defer mu.Unlock()
 
 	level := parseLevel(cfg.Level)
-	opts := &slog.HandlerOptions{Level: level}
+	opts := &slog.HandlerOptions{
+		Level:     level,
+		AddSource: level <= slog.LevelDebug,
+	}
 	var writers []io.Writer
 
 	switch strings.ToLower(cfg.Output) {
@@ -35,6 +45,7 @@ func Init(cfg config.LogConfig) error {
 			return err
 		}
 		writers = append(writers, w)
+		logPath = resolveLogPath(cfg.File)
 	case "both":
 		writers = append(writers, os.Stdout)
 		w, err := openLogFile(cfg.File)
@@ -42,15 +53,20 @@ func Init(cfg config.LogConfig) error {
 			return err
 		}
 		writers = append(writers, w)
+		logPath = resolveLogPath(cfg.File)
 	default:
 		writers = append(writers, os.Stdout)
+		logPath = ""
 	}
 
+	mw := io.MultiWriter(writers...)
 	var handler slog.Handler
 	if strings.EqualFold(cfg.Format, "json") {
-		handler = slog.NewJSONHandler(io.MultiWriter(writers...), opts)
+		jsonOpts := *opts
+		jsonOpts.ReplaceAttr = jsonReplaceAttr
+		handler = slog.NewJSONHandler(mw, &jsonOpts)
 	} else {
-		handler = slog.NewTextHandler(io.MultiWriter(writers...), opts)
+		handler = newTextHandler(mw, opts)
 	}
 	handler = NewBroadcastHandler(handler, DefaultHub)
 	logger = slog.New(handler)
@@ -60,18 +76,26 @@ func Init(cfg config.LogConfig) error {
 
 // LogDir returns the directory containing the rotating log file.
 func LogDir(cfg config.LogFileConfig) string {
+	return filepath.Dir(resolveLogPath(cfg))
+}
+
+// FilePath returns the active log file path set by Init (may be empty if stdout-only).
+func FilePath() string {
+	mu.Lock()
+	defer mu.Unlock()
+	return logPath
+}
+
+func resolveLogPath(cfg config.LogFileConfig) string {
 	path := cfg.Path
 	if path == "" {
-		path = "logs/zero-web-kit.log"
+		path = "logs/zero-web-server.log"
 	}
-	return filepath.Dir(path)
+	return path
 }
 
 func openLogFile(cfg config.LogFileConfig) (io.Writer, error) {
-	path := cfg.Path
-	if path == "" {
-		path = "logs/zero-web-kit.log"
-	}
+	path := resolveLogPath(cfg)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
@@ -98,12 +122,14 @@ func openLogFile(cfg config.LogFileConfig) (io.Writer, error) {
 
 func parseLevel(s string) slog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "debug":
+	case "debug", "trace":
 		return slog.LevelDebug
 	case "warn", "warning":
 		return slog.LevelWarn
-	case "error":
+	case "error", "fatal", "panic":
 		return slog.LevelError
+	case "info", "":
+		return slog.LevelInfo
 	default:
 		return slog.LevelInfo
 	}

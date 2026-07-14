@@ -43,15 +43,20 @@ gb:
 #   secret: ""
 
 log:
-  level: info          # debug | info | warn | error
-  format: text         # text | json
-  output: both         # stdout | file | both
+  # 级别：debug | info | warn | error（生产建议 info；排障临时开 debug）
+  level: info
+  # 格式：text 人读（控制台/实时日志）| json 采集（ELK/Loki 等）
+  # text 示例：2026-07-14 15:04:05.000 INFO  message key=value
+  # json 示例：{"ts":"...","level":"info","msg":"...","key":"..."}
+  format: text
+  # 输出：stdout | file | both
+  output: both
   file:
-    path: logs/zero-web-kit.log
-    max_size_mb: 100   # 单文件上限（MB），超出自动切分为 zero-web-kit-*.log[.gz]
-    max_backups: 20    # 最多保留多少个历史文件（与天数同时生效，先到先删）
-    max_age_days: 7    # 历史文件最长保留天数，超时自动删除，避免撑满磁盘
-    compress: true     # 切分后的历史文件 gzip 压缩
+    path: logs/zero-web-server.log
+    max_size_mb: 100   # 单文件上限（MB），超出自动切分
+    max_backups: 20    # 最多保留历史文件个数
+    max_age_days: 7    # 历史文件最长保留天数
+    compress: true     # 历史文件 gzip 压缩
 
 user_settings:
   play_timeout: 180000

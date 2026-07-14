@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	domainplatform "zero-web-kit/internal/domain/platform"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	"zero-web-kit/internal/infrastructure/config"
+	domainplatform "zero-web-server/internal/domain/platform"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/infrastructure/config"
 )
 
 type Service struct {

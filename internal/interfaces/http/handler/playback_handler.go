@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	playbackapp "zero-web-kit/internal/application/playback"
-	"zero-web-kit/pkg/response"
+	playbackapp "zero-web-server/internal/application/playback"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

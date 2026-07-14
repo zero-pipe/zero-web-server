@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	deviceapp "zero-web-kit/internal/application/device"
-	onvifapp "zero-web-kit/internal/application/onvif"
-	domaindevice "zero-web-kit/internal/domain/device"
-	domainonvif "zero-web-kit/internal/domain/onvif"
+	deviceapp "zero-web-server/internal/application/device"
+	onvifapp "zero-web-server/internal/application/onvif"
+	domaindevice "zero-web-server/internal/domain/device"
+	domainonvif "zero-web-server/internal/domain/onvif"
 )
 
 const (

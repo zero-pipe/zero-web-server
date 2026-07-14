@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	onvifapp "zero-web-kit/internal/application/onvif"
-	"zero-web-kit/pkg/response"
+	onvifapp "zero-web-server/internal/application/onvif"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

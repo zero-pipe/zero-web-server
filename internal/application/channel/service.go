@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	onvifapp "zero-web-kit/internal/application/onvif"
-	playapp "zero-web-kit/internal/application/play"
-	playbackapp "zero-web-kit/internal/application/playback"
-	ptzapp "zero-web-kit/internal/application/ptz"
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domainptz "zero-web-kit/internal/domain/ptz"
-	"zero-web-kit/internal/domain/shared"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/interfaces/http/dto"
+	onvifapp "zero-web-server/internal/application/onvif"
+	playapp "zero-web-server/internal/application/play"
+	playbackapp "zero-web-server/internal/application/playback"
+	ptzapp "zero-web-server/internal/application/ptz"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domainptz "zero-web-server/internal/domain/ptz"
+	"zero-web-server/internal/domain/shared"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/interfaces/http/dto"
 )
 
 type View struct {

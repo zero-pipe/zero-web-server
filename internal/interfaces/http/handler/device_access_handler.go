@@ -1,9 +1,9 @@
 package handler
 
 import (
-	deviceaccess "zero-web-kit/internal/application/deviceaccess"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	deviceaccess "zero-web-server/internal/application/deviceaccess"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

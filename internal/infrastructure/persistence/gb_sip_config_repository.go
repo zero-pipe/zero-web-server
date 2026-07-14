@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

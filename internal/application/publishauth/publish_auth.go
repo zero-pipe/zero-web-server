@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"zero-web-kit/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence"
 )
 
 const (

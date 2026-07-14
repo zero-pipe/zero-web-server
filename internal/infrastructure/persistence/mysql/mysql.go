@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	applog "zero-web-kit/pkg/log"
+	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	applog "zero-web-server/pkg/log"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

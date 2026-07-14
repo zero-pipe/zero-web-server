@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-kit/internal/infrastructure/config"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/media/mediakit"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence/model"
 )
 
 // View 媒体节点列表/详情视图。

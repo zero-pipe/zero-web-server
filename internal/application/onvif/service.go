@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	domainonvif "zero-web-kit/internal/domain/onvif"
-	domainptz "zero-web-kit/internal/domain/ptz"
-	onvifinfra "zero-web-kit/internal/infrastructure/onvif"
-	"zero-web-kit/internal/port"
+	domainonvif "zero-web-server/internal/domain/onvif"
+	domainptz "zero-web-server/internal/domain/ptz"
+	onvifinfra "zero-web-server/internal/infrastructure/onvif"
+	"zero-web-server/internal/port"
 
 	onviflib "github.com/0x524a/onvif-go"
 )

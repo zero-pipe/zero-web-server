@@ -12,6 +12,14 @@
     >
       <div id="formStep" style="margin-top: 1rem; margin-right: 20px;">
         <el-form v-if="currentStep === 1" ref="mediaServerForm" :rules="rules" :model="mediaServerForm" label-width="140px">
+          <el-form-item label="节点 ID" prop="id">
+            <el-input
+              v-model="mediaServerForm.id"
+              placeholder="如 1（mediaServerId，Hook/调度用；留空则用 IP:端口）"
+              clearable
+              :disabled="!!editingId"
+            />
+          </el-form-item>
           <el-form-item label="IP" prop="ip">
             <el-input v-model="mediaServerForm.ip" placeholder="媒体服务IP" clearable />
           </el-form-item>
@@ -40,6 +48,9 @@
         <el-row :gutter="24">
           <el-col :span="12">
             <el-form v-if="currentStep === 2 || currentStep === 3" ref="mediaServerForm1" :rules="rules" :model="mediaServerForm" label-width="140px">
+              <el-form-item label="节点 ID" prop="id">
+                <el-input v-model="mediaServerForm.id" :disabled="!!editingId" placeholder="mediaServerId，留空则用 IP:端口" />
+              </el-form-item>
               <el-form-item label="IP" prop="ip">
                 <el-input v-if="currentStep === 2" v-model="mediaServerForm.ip" />
                 <el-input v-if="currentStep === 3" v-model="mediaServerForm.ip" />
@@ -143,6 +154,7 @@ export default {
       isLoging: false,
       dialogLoading: false,
       currentStep: 1,
+      editingId: '',
       platformList: [],
       serverCheck: 0,
       recordServerCheck: 0,
@@ -204,6 +216,7 @@ export default {
     openDialog(param, callback) {
       this.showDialog = true
       this.listChangeCallback = callback
+      this.editingId = (param && param.id) || ''
       if (param != null) {
         this.mediaServerForm = Object.assign({}, this.mediaServerForm, param)
         this.currentStep = 3
@@ -314,6 +327,7 @@ export default {
       this.showDialog = false
       this.dialogLoading = false
       this.serverCheck = 0
+      this.editingId = ''
       this.mediaServerForm = {
         id: '',
         ip: '',

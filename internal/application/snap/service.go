@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	objectstoreapp "zero-web-kit/internal/application/objectstore"
+	objectstoreapp "zero-web-server/internal/application/objectstore"
 )
 
 // Service 抓拍图归档到 ObjectStore（固定 key：最新一帧可覆盖）。

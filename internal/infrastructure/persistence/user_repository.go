@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	domainuser "zero-web-kit/internal/domain/user"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	domainuser "zero-web-server/internal/domain/user"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

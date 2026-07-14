@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	playapp "zero-web-kit/internal/application/play"
-	"zero-web-kit/pkg/response"
+	playapp "zero-web-server/internal/application/play"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

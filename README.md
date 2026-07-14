@@ -1,4 +1,4 @@
-# zero-web-kit（ZWS · Zero Web Server）
+# zero-web-server（ZWS · Zero Web Server）
 
 国标 GB28181 + ONVIF 设备管理平台。后端 Go 重写，前端 Vue 2 管理台，流媒体对接 **[zero-media-server](https://github.com/zero-pipe/zero-media-server)**（ZMS）。
 
@@ -17,7 +17,7 @@
 ## 目录结构
 
 ```
-zero-web-kit/
+zero-web-server/
 ├── 3rdpart/                 # 第三方源码（vendored）
 │   └── onvif-go/            # ONVIF 客户端/发现库
 ├── cmd/server/              # 程序入口
@@ -63,10 +63,10 @@ make frontend-install && make frontend-dev
 
 ## 流媒体（zero-media-server / ZMS）
 
-> **说明**：`zero-media-kit` 是 ZMS 内部的容器/协议库；zero-web-kit 对接的是 **zero-media-server** 产品（HTTP API + Hook），不是 media-kit 库本身。
+> **说明**：`zero-media-kit` 是 ZMS 内部的容器/协议库；zero-web-server 对接的是 **zero-media-server** 产品（HTTP API + Hook），不是 media-kit 库本身。
 
-- 源码目录：与 zero-web-kit 同级的 **`zms/`**，编译产物为 `demo_media_server`
-- 联调配置：`zms/conf/config.zero-web-kit.ini`（Hook → `:18080`，HTTP → `:8080`）
+- 源码目录：与 zero-web-server 同级的 **`zms/`**，编译产物为 `demo_media_server`
+- 联调配置：`zms/conf/config.zero-web-server.ini`（Hook → `:18080`，HTTP → `:8080`）
 - 平台配置：`configs/config.yaml` 中 `media.type: zms`
 - 编译与启动详见 [docs/DEPLOY.md](docs/DEPLOY.md) 第九节；ZMS 日志级别见 [zms/README.md](../zms/README.md)
 - WebRTC 信令可由平台反向代理：`/index/api/webrtc`

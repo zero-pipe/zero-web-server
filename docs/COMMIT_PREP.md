@@ -1,6 +1,6 @@
 # 提交前检查清单
 
-## zero-web-kit
+## zero-web-server
 
 ```bash
 # 敏感配置放 configs/config.local.yaml（已 gitignore）
@@ -19,7 +19,7 @@ cmake --build build --config Release   # 或 Linux: cmake --build build -j
 
 确认未 `git add`：`conf/*.bak`、`conf/config.local.ini`、`config.ini`、`zms_media_server.log`、`www/`、`build/`。
 
-**`conf/` 应提交**：`config.ini.example`、`config.server.ini.example`、`config.embedded.ini.example`、`config.zero-web-kit.ini`。
+**`conf/` 应提交**：`config.ini.example`、`config.server.ini.example`、`config.embedded.ini.example`、`config.zero-web-server.ini`。
 
 日志规范：`log_level=info` 为默认；调试期临时 `debug`，提交前勿把生产 ini 改成长期 `debug`。
 
@@ -29,7 +29,7 @@ cmake --build build --config Release   # 或 Linux: cmake --build build -j
 git init   # 已完成
 git add -A
 git status
-git commit -m "chore: initial zero-web-kit layout with zero-media-server integration and structured logging"
+git commit -m "chore: initial zero-web-server layout with zero-media-server integration and structured logging"
 ```
 
 ## 子模块说明
@@ -39,5 +39,5 @@ git commit -m "chore: initial zero-web-kit layout with zero-media-server integra
 ## 运行依赖
 
 - MySQL + Redis：`make docker-up`
-- ZMS：单独编译运行 `demo_media_server --config conf/config.zero-web-kit.ini`
-- zero-web-kit `configs/config.yaml` 的 `media` 段与 ZMS HTTP 地址、secret、Hook 一致
+- ZMS：单独编译运行 `demo_media_server --config conf/config.zero-web-server.ini`
+- zero-web-server `configs/config.yaml` 的 `media` 段与 ZMS HTTP 地址、secret、Hook 一致

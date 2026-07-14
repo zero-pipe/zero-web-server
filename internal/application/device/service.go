@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	domainchannel "zero-web-kit/internal/domain/channel"
-	domaindevice "zero-web-kit/internal/domain/device"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
-	redisinfra "zero-web-kit/internal/infrastructure/redis"
+	domainchannel "zero-web-server/internal/domain/channel"
+	domaindevice "zero-web-server/internal/domain/device"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
+	redisinfra "zero-web-server/internal/infrastructure/redis"
 )
 
 var (

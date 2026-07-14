@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"zero-web-kit/internal/domain/shared"
-	"zero-web-kit/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/domain/shared"
+	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
 )

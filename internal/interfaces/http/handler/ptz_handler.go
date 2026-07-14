@@ -3,8 +3,8 @@ package handler
 import (
 	"strconv"
 
-	ptzapp "zero-web-kit/internal/application/ptz"
-	"zero-web-kit/pkg/response"
+	ptzapp "zero-web-server/internal/application/ptz"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

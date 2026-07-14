@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strings"
 
-	"zero-web-kit/internal/application/rbac"
-	domainuser "zero-web-kit/internal/domain/user"
-	jwtmgr "zero-web-kit/pkg/jwt"
-	"zero-web-kit/pkg/response"
+	"zero-web-server/internal/application/rbac"
+	domainuser "zero-web-server/internal/domain/user"
+	jwtmgr "zero-web-server/pkg/jwt"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

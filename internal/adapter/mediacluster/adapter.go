@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"zero-web-kit/internal/application/mediaserver"
-	"zero-web-kit/internal/infrastructure/media/mediakit"
-	"zero-web-kit/internal/port"
+	"zero-web-server/internal/application/mediaserver"
+	"zero-web-server/internal/infrastructure/media/mediakit"
+	"zero-web-server/internal/port"
 )
 
 // Adapter 将现有 mediaserver.Service 暴露为 port.MediaCluster。

@@ -4,8 +4,8 @@ import (
 	"io"
 	"net/http"
 
-	snapapp "zero-web-kit/internal/application/snap"
-	"zero-web-kit/pkg/response"
+	snapapp "zero-web-server/internal/application/snap"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

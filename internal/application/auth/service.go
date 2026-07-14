@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"zero-web-kit/internal/application/rbac"
-	domainuser "zero-web-kit/internal/domain/user"
-	jwtmgr "zero-web-kit/pkg/jwt"
+	"zero-web-server/internal/application/rbac"
+	domainuser "zero-web-server/internal/domain/user"
+	jwtmgr "zero-web-server/pkg/jwt"
 )
 
 var ErrInvalidCredentials = errors.New("用户名或密码错误")

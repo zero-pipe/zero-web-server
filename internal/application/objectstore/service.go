@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	objadapter "zero-web-kit/internal/adapter/objectstore"
-	"zero-web-kit/internal/infrastructure/persistence"
-	"zero-web-kit/internal/infrastructure/persistence/model"
-	"zero-web-kit/internal/port"
+	objadapter "zero-web-server/internal/adapter/objectstore"
+	"zero-web-server/internal/infrastructure/persistence"
+	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/port"
 
 	"gorm.io/gorm"
 )

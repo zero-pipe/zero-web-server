@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
-	domainalarm "zero-web-kit/internal/domain/alarm"
-	domainchannel "zero-web-kit/internal/domain/channel"
-	sipinfra "zero-web-kit/internal/infrastructure/sip"
+	domainalarm "zero-web-server/internal/domain/alarm"
+	domainchannel "zero-web-server/internal/domain/channel"
+	sipinfra "zero-web-server/internal/infrastructure/sip"
 )
 
 type Service struct {

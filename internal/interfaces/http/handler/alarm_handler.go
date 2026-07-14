@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	alarmapp "zero-web-kit/internal/application/alarm"
-	objectstoreapp "zero-web-kit/internal/application/objectstore"
-	"zero-web-kit/internal/interfaces/http/dto"
-	"zero-web-kit/pkg/response"
+	alarmapp "zero-web-server/internal/application/alarm"
+	objectstoreapp "zero-web-server/internal/application/objectstore"
+	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
