@@ -50,3 +50,7 @@ web/node_modules/.cache/
 # Temporary
 tmp/
 temp/
+
+# gb28181-go is its own git repo (push from 3rdpart/gb28181-go)
+3rdpart/gb28181-go/
+
