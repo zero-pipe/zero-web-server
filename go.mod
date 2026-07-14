@@ -81,4 +81,4 @@ require (
 
 replace github.com/0x524a/onvif-go => ./3rdpart/onvif-go
 
-replace github.com/zero-pipe/gb28181-go => ../gb28181-go
+replace github.com/zero-pipe/gb28181-go => ./3rdpart/gb28181-go
