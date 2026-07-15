@@ -38,6 +38,7 @@ import (
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
 	"zero-web-server/internal/application/ops"
 	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/infrastructure/civilcode"
 	onvifinfra "zero-web-server/internal/infrastructure/onvif"
 	"zero-web-server/internal/infrastructure/persistence"
 	"zero-web-server/internal/infrastructure/persistence/mysql"
@@ -60,8 +61,13 @@ func main() {
 	if err != nil {
 		applog.Fatalf("load config: %v", err)
 	}
+	// 行政区划 CSV 默认与 config.yaml 同目录（运行时读取，不 embed）
+	civilcode.Configure(filepath.Join(filepath.Dir(*configPath), "civilCode.csv"))
 	if err := applog.Init(cfg.Log); err != nil {
 		applog.Fatalf("init log: %v", err)
+	}
+	if err := civilcode.LoadError(); err != nil {
+		applog.Warn("civilcode csv not loaded", "err", err)
 	}
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)

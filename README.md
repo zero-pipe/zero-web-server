@@ -33,7 +33,7 @@ zero-web-server/
 │   ├── gb28181-go/          # 国标 SIP 栈
 │   └── onvif-go/            # ONVIF 客户端 / 发现
 ├── cmd/server/              # 程序入口
-├── configs/                 # config.yaml；jwk.json；config.local.yaml（可选，不入库）
+├── configs/                 # config.yaml、jwk.json、civilCode.csv；config.local.yaml（可选，不入库）
 ├── docker/                  # MySQL + Redis Compose
 ├── docs/                    # 部署与设计文档（含 DEPLOY.md）
 ├── internal/
@@ -46,7 +46,6 @@ zero-web-server/
 │   ├── jwt/
 │   ├── log/                 # 结构化日志 + 文件轮转 + 实时推送
 │   └── response/            # 统一 JSON 响应 {code,msg,data}
-├── resources/               # 静态资源（如 civilCode.csv）
 ├── tools/                   # dev.ps1 / dev.sh 一键启停
 ├── web/                     # Vue 管理台
 ├── logs/                    # 运行时日志（gitignore），默认 zero-web-server.log
