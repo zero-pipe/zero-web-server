@@ -124,12 +124,7 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 		return nil, err
 	}
 
-	// 已有 INVITE 会话，或流已在推：只返回拉流地址，禁止二次 INVITE。
-	if _, hasInvite := s.sip.InviteManager().Get(stream); hasInvite {
-		applog.Infof("[GB28181 play] skip re-INVITE, invite session exists stream=%s", stream)
-		s.media.BindStream(node.ID(), app, stream)
-		return s.buildStreamContent(app, stream, node), nil
-	}
+	// 流已在推：只返回拉流地址，禁止二次 INVITE。
 	if info := node.LookupStream(ctx, app, stream); gbLiveStreamReady(info) {
 		applog.Infof("[GB28181 play] skip re-INVITE, stream live app=%s stream=%s bytesSpeed=%d fps=%d readers=%d",
 			app, stream, info.BytesSpeed, info.VideoFps, info.ReaderCount)
@@ -137,6 +132,12 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 		content := s.buildStreamContent(app, stream, node)
 		mediakit.LogPlayStreamPaths("[GB28181 play] reuse live URLs", app, stream, "", node.PlayURLs(app, stream))
 		return content, nil
+	}
+	// INVITE 会话还在但媒体未就绪（常见于设备重启）：清掉僵死会话后重新 INVITE。
+	if _, hasInvite := s.sip.InviteManager().Get(stream); hasInvite {
+		applog.Warnf("[GB28181 play] stale invite without media, close and re-INVITE stream=%s", stream)
+		_ = s.sip.CloseInviteSession(stream)
+		_ = node.CloseStreams(ctx, "__defaultVhost__", app, stream)
 	}
 
 	sdpIP := device.SDPIP
