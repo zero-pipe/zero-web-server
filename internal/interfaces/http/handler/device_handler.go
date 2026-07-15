@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 
 	deviceapp "zero-web-server/internal/application/device"
 	domaindevice "zero-web-server/internal/domain/device"
@@ -21,6 +22,15 @@ func NewDeviceHandler(svc *deviceapp.Service) *DeviceHandler {
 }
 
 func (h *DeviceHandler) GetDevice(c *gin.Context) {
+	if code := strings.TrimSpace(c.Query("internalCode")); code != "" {
+		device, err := h.svc.GetByInternalCode(code)
+		if err != nil {
+			response.Error(c, response.CodeError, "设备不存在")
+			return
+		}
+		response.OK(c, device)
+		return
+	}
 	device, err := h.svc.GetByDeviceID(c.Param("deviceId"))
 	if err != nil {
 		response.Error(c, response.CodeError, "设备不存在")
@@ -166,6 +176,119 @@ func (h *DeviceHandler) SubscribeAlarm(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	cycle, _ := strconv.Atoi(c.Query("cycle"))
 	if err := h.svc.SubscribeAlarm(id, cycle); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// Guard GET /api/device/control/guard?deviceId=&guardCmd=SetGuard|ResetGuard
+func (h *DeviceHandler) Guard(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	guardCmd := strings.TrimSpace(c.Query("guardCmd"))
+	if deviceID == "" || guardCmd == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 guardCmd 不能为空")
+		return
+	}
+	if err := h.svc.Guard(deviceID, guardCmd); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// Record GET /api/device/control/record?deviceId=&channelId=&recordCmdStr=Record|StopRecord
+func (h *DeviceHandler) Record(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	recordCmd := strings.TrimSpace(c.Query("recordCmdStr"))
+	if deviceID == "" || recordCmd == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 recordCmdStr 不能为空")
+		return
+	}
+	if err := h.svc.Record(deviceID, channelID, recordCmd); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DragZoomIn GET /api/device/control/drag_zoom/zoom_in
+func (h *DeviceHandler) DragZoomIn(c *gin.Context) {
+	h.dragZoom(c, true)
+}
+
+// DragZoomOut GET /api/device/control/drag_zoom/zoom_out
+func (h *DeviceHandler) DragZoomOut(c *gin.Context) {
+	h.dragZoom(c, false)
+}
+
+func (h *DeviceHandler) dragZoom(c *gin.Context, zoomIn bool) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	length, _ := strconv.Atoi(c.Query("length"))
+	width, _ := strconv.Atoi(c.Query("width"))
+	midX, _ := strconv.Atoi(c.Query("midPointX"))
+	midY, _ := strconv.Atoi(c.Query("midPointY"))
+	lengthX, _ := strconv.Atoi(c.Query("lengthX"))
+	lengthY, _ := strconv.Atoi(c.Query("lengthY"))
+	if err := h.svc.DragZoom(deviceID, channelID, zoomIn, length, width, midX, midY, lengthX, lengthY); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// HomePosition GET /api/device/control/home_position
+func (h *DeviceHandler) HomePosition(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	enabled, _ := strconv.Atoi(c.DefaultQuery("enabled", "1"))
+	resetTime, _ := strconv.Atoi(c.DefaultQuery("resetTime", "0"))
+	presetIndex, _ := strconv.Atoi(c.DefaultQuery("presetIndex", "1"))
+	if err := h.svc.HomePosition(deviceID, channelID, enabled, resetTime, presetIndex); err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}
+
+// QueryBasicParam GET /api/device/config/query/basicParam
+func (h *DeviceHandler) QueryBasicParam(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	data, err := h.svc.QueryBasicParam(deviceID)
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+	response.OK(c, data)
+}
+
+// SetBasicParam GET /api/device/config/set/basicParam
+func (h *DeviceHandler) SetBasicParam(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	name := c.Query("name")
+	expiration, _ := strconv.Atoi(c.DefaultQuery("expiration", "3600"))
+	heartBeatInterval, _ := strconv.Atoi(c.DefaultQuery("heartBeatInterval", "60"))
+	heartBeatCount, _ := strconv.Atoi(c.DefaultQuery("heartBeatCount", "3"))
+	positionCapability, _ := strconv.Atoi(c.DefaultQuery("positionCapability", "0"))
+	if err := h.svc.SetBasicParam(deviceID, name, expiration, heartBeatInterval, heartBeatCount, positionCapability); err != nil {
 		response.Error(c, response.CodeError, err.Error())
 		return
 	}

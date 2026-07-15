@@ -73,12 +73,19 @@ func (s *Service) GetByDeviceID(deviceID string) (*domaindevice.Device, error) {
 	return dbDev, nil
 }
 
+func (s *Service) GetByInternalCode(code string) (*domaindevice.Device, error) {
+	return s.devices.GetByInternalCode(code)
+}
+
 // mergeDeviceIdentityFromDB 用库表补齐 Redis 缓存里缺失的身份字段，避免注册/心跳把厂商等写空。
 func mergeDeviceIdentityFromDB(dst, db *domaindevice.Device) {
 	if dst == nil || db == nil {
 		return
 	}
 	dst.ID = db.ID
+	if db.InternalCode != "" {
+		dst.InternalCode = db.InternalCode
+	}
 	if dst.Password == "" {
 		dst.Password = db.Password
 	}
@@ -352,9 +359,11 @@ func (s *Service) ensureDefaultIPCChannel(device *domaindevice.Device) error {
 	if device.CustomName != "" {
 		deviceName = device.CustomName
 	}
+	// 132 设备常见做法：通道国标号为同号段的 131 类型（…131…0001），
+	// EasyGBDSimulator 等多通道模拟器也按此编码；INVITE 设备号会导致设备侧通道表 miss。
 	ch := &domainchannel.Channel{
 		DeviceID:     device.DeviceID,
-		GBDeviceID:   device.DeviceID,
+		GBDeviceID:   defaultIPCChannelGBID(device.DeviceID),
 		Name:         channelDisplayName(deviceName, 1),
 		Manufacturer: device.Manufacturer,
 		Model:        device.Model,
@@ -364,6 +373,20 @@ func (s *Service) ensureDefaultIPCChannel(device *domaindevice.Device) error {
 		UpdateTime:   now,
 	}
 	return s.channels.ResetByDevice(device.DeviceID, device.ID, []*domainchannel.Channel{ch})
+}
+
+// defaultIPCChannelGBID 将 132 IPC 设备号映射为默认摄像机通道号（类型位改 131，末四位 0001）。
+func defaultIPCChannelGBID(deviceID string) string {
+	if len(deviceID) < 20 {
+		return deviceID
+	}
+	if deviceID[10:13] != "132" {
+		return deviceID
+	}
+	b := []byte(deviceID)
+	b[10], b[11], b[12] = '1', '3', '1'
+	copy(b[len(b)-4:], []byte("0001"))
+	return string(b)
 }
 
 func (s *Service) List(page, count int, query string, online *bool) ([]*domaindevice.Device, int64, error) {
@@ -557,6 +580,103 @@ func (s *Service) GetKeepaliveStatistics(deviceID string, count int) []domaindev
 
 func (s *Service) GetRegisterStatistics(deviceID string, count int) []domaindevice.TimeStatistics {
 	return s.getTimeStatistics(deviceID, count, false)
+}
+
+// Guard 向国标设备发送布防/撤防（SetGuard / ResetGuard）。
+func (s *Service) Guard(deviceID, guardCmd string) error {
+	if s.sip == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	return s.sip.SendGuardCmd(device, device.DeviceID, guardCmd)
+}
+
+// Record 向国标设备发送录像控制（Record / StopRecord）。
+func (s *Service) Record(deviceID, channelID, recordCmd string) error {
+	if s.sip == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	return s.sip.SendRecordCmd(device, channelID, recordCmd)
+}
+
+// DragZoom 拉框放大/缩小。
+func (s *Service) DragZoom(deviceID, channelID string, zoomIn bool, length, width, midX, midY, lengthX, lengthY int) error {
+	if s.sip == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	return s.sip.SendDragZoom(device, channelID, zoomIn, length, width, midX, midY, lengthX, lengthY)
+}
+
+// HomePosition 看守位。
+func (s *Service) HomePosition(deviceID, channelID string, enabled, resetTime, presetIndex int) error {
+	if s.sip == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	return s.sip.SendHomePosition(device, channelID, enabled, resetTime, presetIndex)
+}
+
+// SetBasicParam 下发基础参数。
+func (s *Service) SetBasicParam(deviceID, name string, expiration, heartBeatInterval, heartBeatCount, positionCapability int) error {
+	if s.sip == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	return s.sip.SendBasicParamConfig(device, name, expiration, heartBeatInterval, heartBeatCount, positionCapability)
+}
+
+// QueryBasicParam 发起 ConfigDownload（暂无等待设备回包，返回设备本地已知字段）。
+func (s *Service) QueryBasicParam(deviceID string) (map[string]interface{}, error) {
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	if s.sip != nil && device.OnLine {
+		_ = s.sip.SendConfigDownloadQuery(device, "BasicParam")
+	}
+	out := map[string]interface{}{
+		"deviceId":           device.DeviceID,
+		"name":               device.Name,
+		"expiration":         device.Expires,
+		"heartBeatInterval":  device.HeartBeatInterval,
+		"heartBeatCount":     device.HeartBeatCount,
+		"positionCapability": 0,
+		"longitude":          nil,
+		"latitude":           nil,
+	}
+	return out, nil
 }
 
 func (s *Service) getTimeStatistics(deviceID string, count int, keepalive bool) []domaindevice.TimeStatistics {

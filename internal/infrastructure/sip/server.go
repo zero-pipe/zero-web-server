@@ -1,14 +1,16 @@
 package sipinfra
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
 	domainptz "zero-web-server/internal/domain/ptz"
 	domainrecord "zero-web-server/internal/domain/record"
 	"zero-web-server/internal/infrastructure/config"
 	redisinfra "zero-web-server/internal/infrastructure/redis"
-
-	"context"
 
 	"github.com/emiago/sipgo/sip"
 	"github.com/zero-pipe/gb28181-go/manscdp"
@@ -130,6 +132,83 @@ func (s *Server) SendPTZ(device *domaindevice.Device, channelID, direction strin
 
 func (s *Server) SendFrontEndCmd(device *domaindevice.Device, channelID string, cmdCode, parameter1, parameter2, combineCode2 int) error {
 	return s.lib.SendFrontEndCmd(toPeer(device), channelID, cmdCode, parameter1, parameter2, combineCode2)
+}
+
+// SendGuardCmd 发送布防/撤防（GuardCmd=SetGuard|ResetGuard）。channelID 空则用设备国标编号。
+func (s *Server) SendGuardCmd(device *domaindevice.Device, channelID, guardCmd string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	cmd := strings.TrimSpace(guardCmd)
+	if cmd != "SetGuard" && cmd != "ResetGuard" {
+		return fmt.Errorf("无效布防命令: %s", guardCmd)
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildGuardCmd(target, s.lib.NextSN(), cmd)
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendRecordCmd 发送设备录像控制（RecordCmd=Record|StopRecord）。channelID 空则用设备国标编号。
+func (s *Server) SendRecordCmd(device *domaindevice.Device, channelID, recordCmd string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	cmd := strings.TrimSpace(recordCmd)
+	if cmd != "Record" && cmd != "StopRecord" {
+		return fmt.Errorf("无效录像命令: %s", recordCmd)
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildRecordCmd(target, s.lib.NextSN(), cmd)
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendDragZoom 发送拉框放大/缩小。
+func (s *Server) SendDragZoom(device *domaindevice.Device, channelID string, zoomIn bool, length, width, midX, midY, lengthX, lengthY int) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildDragZoom(target, s.lib.NextSN(), zoomIn, length, width, midX, midY, lengthX, lengthY)
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendHomePosition 发送看守位控制。
+func (s *Server) SendHomePosition(device *domaindevice.Device, channelID string, enabled, resetTime, presetIndex int) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildHomePosition(target, s.lib.NextSN(), enabled, resetTime, presetIndex)
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendBasicParamConfig 下发基础参数配置。
+func (s *Server) SendBasicParamConfig(device *domaindevice.Device, name string, expiration, heartBeatInterval, heartBeatCount, positionCapability int) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	body := manscdp.BuildBasicParamConfig(device.DeviceID, s.lib.NextSN(), name, expiration, heartBeatInterval, heartBeatCount, positionCapability)
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendConfigDownloadQuery 查询设备配置（BasicParam 等），当前不阻塞等待响应。
+func (s *Server) SendConfigDownloadQuery(device *domaindevice.Device, configType string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	return s.lib.SendConfigDownloadQuery(toPeer(device), configType)
 }
 
 func (s *Server) SendAudioBroadcast(device *domaindevice.Device, channelGBID string) error {

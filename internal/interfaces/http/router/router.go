@@ -222,6 +222,7 @@ func Setup(r *gin.Engine, deps Deps) {
 			devices := auth.Group("/devices")
 			{
 				devices.GET("", deviceAccessHandler.List)
+				devices.GET("/detail", deviceAccessHandler.Get)
 				devices.POST("", deviceAccessHandler.Create)
 				devices.PUT("", deviceAccessHandler.Update)
 				devices.DELETE("", deviceAccessHandler.Delete)
@@ -296,6 +297,21 @@ func Setup(r *gin.Engine, deps Deps) {
 			deviceQuery.POST("/channel/audio", deviceHandler.ChangeChannelAudio)
 			deviceQuery.GET("/snap/:deviceId/:channelId", snapHandler.GetChannelSnap)
 			deviceQuery.POST("/snap/:deviceId/:channelId", snapHandler.UploadChannelSnap)
+		}
+
+		deviceControl := auth.Group("/device/control")
+		{
+			deviceControl.GET("/guard", deviceHandler.Guard)
+			deviceControl.GET("/record", deviceHandler.Record)
+			deviceControl.GET("/home_position", deviceHandler.HomePosition)
+			deviceControl.GET("/drag_zoom/zoom_in", deviceHandler.DragZoomIn)
+			deviceControl.GET("/drag_zoom/zoom_out", deviceHandler.DragZoomOut)
+		}
+
+		deviceConfig := auth.Group("/device/config")
+		{
+			deviceConfig.GET("/query/basicParam", deviceHandler.QueryBasicParam)
+			deviceConfig.GET("/set/basicParam", deviceHandler.SetBasicParam)
 		}
 
 		auth.GET("/play/start/:deviceId/:channelId", playHandler.Start)
@@ -419,6 +435,21 @@ func Setup(r *gin.Engine, deps Deps) {
 			frontEnd.GET("/preset/add/:deviceId/:channelId", ptzHandler.AddPreset)
 			frontEnd.GET("/preset/call/:deviceId/:channelId", ptzHandler.CallPreset)
 			frontEnd.GET("/preset/delete/:deviceId/:channelId", ptzHandler.DeletePreset)
+			frontEnd.GET("/fi/focus/:deviceId/:channelId", ptzHandler.Focus)
+			frontEnd.GET("/fi/iris/:deviceId/:channelId", ptzHandler.Iris)
+			frontEnd.GET("/wiper/:deviceId/:channelId", ptzHandler.Wiper)
+			frontEnd.GET("/auxiliary/:deviceId/:channelId", ptzHandler.Auxiliary)
+			frontEnd.GET("/cruise/point/add/:deviceId/:channelId", ptzHandler.AddCruisePoint)
+			frontEnd.GET("/cruise/point/delete/:deviceId/:channelId", ptzHandler.DeleteCruisePoint)
+			frontEnd.GET("/cruise/speed/:deviceId/:channelId", ptzHandler.SetCruiseSpeed)
+			frontEnd.GET("/cruise/time/:deviceId/:channelId", ptzHandler.SetCruiseTime)
+			frontEnd.GET("/cruise/start/:deviceId/:channelId", ptzHandler.StartCruise)
+			frontEnd.GET("/cruise/stop/:deviceId/:channelId", ptzHandler.StopCruise)
+			frontEnd.GET("/scan/start/:deviceId/:channelId", ptzHandler.StartScan)
+			frontEnd.GET("/scan/stop/:deviceId/:channelId", ptzHandler.StopScan)
+			frontEnd.GET("/scan/set/left/:deviceId/:channelId", ptzHandler.SetScanLeft)
+			frontEnd.GET("/scan/set/right/:deviceId/:channelId", ptzHandler.SetScanRight)
+			frontEnd.GET("/scan/set/speed/:deviceId/:channelId", ptzHandler.SetScanSpeed)
 		}
 
 		common := auth.Group("/common/channel")
