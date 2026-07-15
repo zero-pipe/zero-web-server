@@ -1,7 +1,6 @@
-# zero-web-kit MySQL 8 native schema (canonical)
--- 新安装全量脚本：一次建齐全部业务表（含 ONVIF / 国标 SIP / 云录像 play_url）
--- 升级已有库：依赖 AutoMigrate 补列；勿把 AutoMigrate 当新装手段
--- See schema_manifest.yaml for required/optional tables
+# zero-web-server MySQL 8 schema（全量建表，唯一权威）
+-- 开发期：空库执行本脚本即可；表结构变更只改本文件，不维护增量合并 SQL。
+-- See schema_manifest.yaml
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -12,6 +11,7 @@ CREATE TABLE IF NOT EXISTS zws_device
 (
     id                                  INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
     device_id                           VARCHAR(50) not null COMMENT '国标设备编号',
+    internal_code                       VARCHAR(32) COMMENT '平台内码（Open API）',
     name                                VARCHAR(255) COMMENT '设备名称',
     manufacturer                        VARCHAR(255) COMMENT '设备厂商',
     model                               VARCHAR(255) COMMENT '设备型号',
@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS zws_device
     position_capability                 INT COMMENT '定位能力标识',
     broadcast_push_after_ack            TINYINT(1) DEFAULT 0 COMMENT 'ACK后是否自动推流',
     server_id                           VARCHAR(50) COMMENT '所属信令服务器ID',
-    UNIQUE KEY uk_device_device (device_id)
+    UNIQUE KEY uk_device_device (device_id),
+    UNIQUE KEY uk_device_internal_code (internal_code)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 存储移动位置订阅上报的数据
@@ -66,6 +67,7 @@ DROP TABLE IF EXISTS zws_device_channel;
 CREATE TABLE IF NOT EXISTS zws_device_channel
 (
     id                           INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    internal_code                VARCHAR(32) COMMENT '平台内码（Open API）',
     device_id                    VARCHAR(50) COMMENT '所属设备ID',
     name                         VARCHAR(255) COMMENT '通道名称',
     manufacturer                 VARCHAR(255) COMMENT '厂商',
@@ -153,7 +155,8 @@ CREATE TABLE IF NOT EXISTS zws_device_channel
     KEY idx_data_type (data_type),
     KEY idx_data_device_id (data_device_id),
     UNIQUE KEY uk_zws_unique_channel (gb_device_id),
-    UNIQUE KEY uk_device_channel_source (data_device_id, device_id)
+    UNIQUE KEY uk_device_channel_source (data_device_id, device_id),
+    UNIQUE KEY uk_channel_internal_code (internal_code)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 媒体服务器（zero-media-server / ZMS）节点信息
@@ -598,11 +601,13 @@ CREATE TABLE IF NOT EXISTS zws_alarm (
                           alarm_time bigint COMMENT '报警时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ONVIF 设备（新安装全量包含；旧库升级可用 add_onvif_tables.sql）
+-- ONVIF 设备 / 通道
 DROP TABLE IF EXISTS zws_onvif_channel;
 DROP TABLE IF EXISTS zws_onvif_device;
 CREATE TABLE IF NOT EXISTS zws_onvif_device (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    internal_code   VARCHAR(32) COMMENT '平台内码（Open API）',
+    gb_code         VARCHAR(50) COMMENT '可选国标编号（级联上级时手填）',
     name            VARCHAR(255) COMMENT '设备名称',
     ip              VARCHAR(64) NOT NULL COMMENT '设备IP',
     port            INT DEFAULT 80 COMMENT 'ONVIF端口',
@@ -623,11 +628,14 @@ CREATE TABLE IF NOT EXISTS zws_onvif_device (
     server_id       VARCHAR(50),
     create_time     VARCHAR(50),
     update_time     VARCHAR(50),
-    UNIQUE KEY uk_onvif_ip_port (ip, port)
+    UNIQUE KEY uk_onvif_ip_port (ip, port),
+    UNIQUE KEY uk_onvif_device_internal_code (internal_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF设备';
 
 CREATE TABLE IF NOT EXISTS zws_onvif_channel (
     id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    internal_code   VARCHAR(32) COMMENT '平台内码（Open API）',
+    gb_code         VARCHAR(50) COMMENT '可选国标通道编号',
     device_id       BIGINT NOT NULL COMMENT '关联 zws_onvif_device.id',
     profile_token   VARCHAR(255) NOT NULL COMMENT 'ONVIF Profile Token',
     name            VARCHAR(255) COMMENT '通道名称',
@@ -639,9 +647,11 @@ CREATE TABLE IF NOT EXISTS zws_onvif_channel (
     has_ptz         TINYINT(1) DEFAULT 0,
     stream_uri      VARCHAR(1024) COMMENT 'RTSP地址',
     status          VARCHAR(50) DEFAULT 'OFF',
+    profiles_json   TEXT COMMENT '同视频源下可选码流 JSON',
     create_time     VARCHAR(50),
     update_time     VARCHAR(50),
     UNIQUE KEY uk_device_profile (device_id, profile_token),
+    UNIQUE KEY uk_onvif_channel_internal_code (internal_code),
     KEY idx_device_id (device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF通道';
 

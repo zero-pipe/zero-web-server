@@ -25,6 +25,8 @@ func (User) TableName() string { return "zws_user" }
 
 type OnvifDevice struct {
 	ID            int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	InternalCode  string `gorm:"column:internal_code;size:32;uniqueIndex:uk_onvif_device_internal_code" json:"internalCode"`
+	GbCode        string `gorm:"column:gb_code;size:50" json:"gbCode"` // 可选国标编号（级联上级时手填）
 	Name          string `gorm:"column:name;size:255"`
 	IP            string `gorm:"column:ip;size:64"`
 	Port          int    `gorm:"column:port"`
@@ -51,6 +53,8 @@ func (OnvifDevice) TableName() string { return "zws_onvif_device" }
 
 type OnvifChannel struct {
 	ID           int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_onvif_channel_internal_code" json:"internalCode"`
+	GbCode       string `gorm:"column:gb_code;size:50" json:"gbCode"` // 可选国标通道编号
 	DeviceID     int64  `gorm:"column:device_id"`
 	ProfileToken string `gorm:"column:profile_token;size:255"`
 	Name         string `gorm:"column:name;size:255"`
@@ -93,6 +97,7 @@ func (MediaServer) TableName() string { return "zws_media_server" }
 
 type GBDevice struct {
 	ID                               int    `gorm:"column:id;primaryKey;autoIncrement"`
+	InternalCode                     string `gorm:"column:internal_code;size:32;uniqueIndex:uk_device_internal_code" json:"internalCode"`
 	DeviceID                         string `gorm:"column:device_id;size:50"`
 	Name                             string `gorm:"column:name;size:255"`
 	Manufacturer                     string `gorm:"column:manufacturer;size:255"`
@@ -126,6 +131,7 @@ func (GBDevice) TableName() string { return "zws_device" }
 
 type GBDeviceChannel struct {
 	ID                int     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	InternalCode      string  `gorm:"column:internal_code;size:32;uniqueIndex:uk_channel_internal_code" json:"internalCode"`
 	DeviceID          string  `gorm:"column:device_id;size:50" json:"deviceId"`
 	Name              string  `gorm:"column:name;size:255" json:"name"`
 	Manufacturer      string  `gorm:"column:manufacturer;size:255" json:"manufacturer"`

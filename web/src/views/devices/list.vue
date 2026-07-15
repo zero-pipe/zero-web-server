@@ -5,7 +5,7 @@
         <el-input
           v-model="query"
           style="width: 180px;"
-          placeholder="名称 / 编号 / IP"
+          placeholder="名称 / 内码 / IP"
           prefix-icon="el-icon-search"
           clearable
           @input="reload"
@@ -43,7 +43,6 @@
     <!-- 红框融合列：统一列 + 国标流传输/订阅/统计；无能力协议格子留空 -->
     <el-table v-loading="loading" size="small" :data="list" height="calc(100% - 96px)" header-row-class-name="table-header">
       <el-table-column prop="name" label="名称" min-width="140" />
-      <el-table-column prop="rawId" label="设备编号" min-width="160" show-overflow-tooltip />
       <el-table-column label="模式" width="80">
         <template v-slot:default="{ row }">
           <el-tag v-if="row.accessMode === 'passive'" size="mini" type="success">被动</el-tag>

@@ -2,6 +2,7 @@ package channel
 
 type Channel struct {
 	ID              int     `json:"id"`
+	InternalCode    string  `json:"internalCode"`
 	DeviceID        string  `json:"deviceId"`
 	DataType        int     `json:"dataType"`
 	DataDeviceID    int     `json:"dataDeviceId"`
@@ -25,6 +26,7 @@ type Channel struct {
 type Repository interface {
 	GetOne(deviceID, channelDeviceID string) (*Channel, error)
 	GetByID(id int) (*Channel, error)
+	GetByInternalCode(code string) (*Channel, error)
 	ListByDevice(deviceID string, page, count int, query string, online *bool) ([]*Channel, int64, error)
 	ResetByDevice(deviceID string, dataDeviceID int, channels []*Channel) error
 	DeleteByDevice(deviceID string) error

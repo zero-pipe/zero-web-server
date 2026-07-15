@@ -6,7 +6,7 @@
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
-            placeholder="关键字"
+            placeholder="名称 / 内码 / 国标编码"
             prefix-icon="el-icon-search"
             clearable
             @input="search"
@@ -81,7 +81,6 @@
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="gbName" label="名称" min-width="180" />
-        <el-table-column prop="gbDeviceId" label="编号" min-width="180" />
         <el-table-column label="类型" min-width="100">
           <template v-slot:default="scope">
             <div slot="reference" class="name-wrapper">
@@ -219,7 +218,8 @@ export default {
       channelList: [],
       excelFields: {
         名称: 'gbName',
-        编号: 'gbDeviceId',
+        内码: 'internalCode',
+        国标编码: 'gbDeviceId',
         厂家: 'gbManufacturer',
         类型: {
           field: 'dataType',

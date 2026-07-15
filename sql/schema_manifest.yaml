@@ -1,6 +1,5 @@
 # zero-web-server 数据库表清单
-# 新安装：只执行 sql/init_zws_mysql.sql（全量，含 ONVIF）
-# 升级：AutoMigrate 补列；旧库缺 ONVIF 时再执行 add_onvif_tables.sql
+# 权威建表：sql/init_zws_mysql.sql（开发期不维护增量合并脚本）
 
 version: "0.7.1"
 mysql_min: "8.0"
@@ -8,11 +7,9 @@ mysql_min: "8.0"
 scripts:
   new_install:
     - init_zws_mysql.sql
-  upgrade_optional:
-    - add_onvif_tables.sql
 
 required:
-  description: 后端已实现功能依赖，新装由 init_zws_mysql.sql 一次建齐
+  description: 后端已实现功能依赖，由 init_zws_mysql.sql 一次建齐
   tables:
     - name: zws_user
       module: auth
@@ -20,13 +17,14 @@ required:
       module: auth
     - name: zws_device
       module: gb28181
+      notes: 含 internal_code（平台内码）
     - name: zws_device_channel
       module: gb28181
+      notes: 含 internal_code
     - name: zws_media_server
       module: media
     - name: zws_gb_sip_config
       module: gb28181
-      notes: 国标 SIP 单例配置，定义于 init_zws_mysql.sql
     - name: zws_subordinate_platform
       module: cascade
       notes: 下级平台预登记（向本级 REGISTER）
@@ -55,10 +53,10 @@ required:
       notes: channel_id 为 INT，对应 zws_device_channel.id
     - name: zws_onvif_device
       module: onvif
-      notes: 已并入 init_zws_mysql.sql
+      notes: 含 internal_code / gb_code
     - name: zws_onvif_channel
       module: onvif
-      notes: 已并入 init_zws_mysql.sql
+      notes: 含 internal_code / gb_code / profiles_json
     - name: zws_common_group
       module: channel
     - name: zws_common_region

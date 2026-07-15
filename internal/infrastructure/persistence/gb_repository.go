@@ -9,6 +9,7 @@ import (
 	domaindevice "zero-web-server/internal/domain/device"
 	"zero-web-server/internal/domain/shared"
 	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/idcode"
 
 	"gorm.io/gorm"
 )
@@ -38,6 +39,13 @@ func (r *DeviceRepository) GetByID(id int) (*domaindevice.Device, error) {
 }
 
 func (r *DeviceRepository) Create(device *domaindevice.Device) error {
+	if strings.TrimSpace(device.InternalCode) == "" {
+		code, err := idcode.Device()
+		if err != nil {
+			return err
+		}
+		device.InternalCode = code
+	}
 	m := toModelDevice(device)
 	if err := r.db.Create(m).Error; err != nil {
 		return err
@@ -63,6 +71,18 @@ func (r *DeviceRepository) DeleteByDeviceID(deviceID string) error {
 	return r.db.Where("device_id = ?", deviceID).Delete(&model.GBDevice{}).Error
 }
 
+func (r *DeviceRepository) GetByInternalCode(code string) (*domaindevice.Device, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var m model.GBDevice
+	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return toDomainDevice(&m), nil
+}
+
 func (r *DeviceRepository) List(page, count int, query string, online *bool) ([]*domaindevice.Device, int64, error) {
 	if page <= 0 {
 		page = 1
@@ -74,7 +94,8 @@ func (r *DeviceRepository) List(page, count int, query string, online *bool) ([]
 		(SELECT COUNT(0) FROM zws_device_channel dc WHERE dc.data_type = 1 AND dc.data_device_id = de.id) AS channel_count`)
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("de.device_id LIKE ? OR de.name LIKE ? OR de.custom_name LIKE ? OR de.ip LIKE ?", like, like, like, like)
+		q = q.Where("de.device_id LIKE ? OR de.internal_code LIKE ? OR de.name LIKE ? OR de.custom_name LIKE ? OR de.ip LIKE ?",
+			like, like, like, like, like)
 	}
 	if online != nil {
 		q = q.Where("de.on_line = ?", *online)
@@ -147,7 +168,7 @@ func (r *ChannelRepository) ListByDevice(deviceID string, page, count int, query
 	q := r.db.Model(&model.GBDeviceChannel{}).Where("device_id = ?", deviceID)
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("name LIKE ? OR gb_device_id LIKE ?", like, like)
+		q = q.Where("name LIKE ? OR gb_name LIKE ? OR gb_device_id LIKE ? OR internal_code LIKE ?", like, like, like, like)
 	}
 	if online != nil {
 		if *online {
@@ -171,8 +192,30 @@ func (r *ChannelRepository) ListByDevice(deviceID string, page, count int, query
 	return list, total, nil
 }
 
+func (r *ChannelRepository) GetByInternalCode(code string) (*domainchannel.Channel, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var m model.GBDeviceChannel
+	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return toDomainChannel(&m), nil
+}
+
 func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, channels []*domainchannel.Channel) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 目录重同步时按国标通道号保留内码，避免 Open API 引用失效
+		var existing []model.GBDeviceChannel
+		_ = tx.Where("device_id = ?", deviceID).Find(&existing).Error
+		keep := make(map[string]string, len(existing))
+		for _, row := range existing {
+			gb := strings.TrimSpace(row.GBDeviceID)
+			if gb != "" && strings.TrimSpace(row.InternalCode) != "" {
+				keep[gb] = row.InternalCode
+			}
+		}
 		if err := tx.Where("device_id = ?", deviceID).Delete(&model.GBDeviceChannel{}).Error; err != nil {
 			return err
 		}
@@ -181,7 +224,21 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 		}
 		models := make([]model.GBDeviceChannel, 0, len(channels))
 		for _, ch := range channels {
+			code := strings.TrimSpace(ch.InternalCode)
+			if code == "" {
+				if prev, ok := keep[strings.TrimSpace(ch.GBDeviceID)]; ok {
+					code = prev
+				} else {
+					var err error
+					code, err = idcode.Channel()
+					if err != nil {
+						return err
+					}
+				}
+			}
+			ch.InternalCode = code
 			models = append(models, model.GBDeviceChannel{
+				InternalCode: code,
 				DeviceID:     deviceID,
 				DataType:     shared.ChannelDataTypeGB28181,
 				DataDeviceID: dataDeviceID,
@@ -260,7 +317,7 @@ func (r *ChannelRepository) ListCommon(page, count int, query string, channelTyp
 	q := r.db.Model(&model.GBDeviceChannel{})
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("name LIKE ? OR gb_device_id LIKE ? OR device_id LIKE ?", like, like, like)
+		q = q.Where("name LIKE ? OR gb_device_id LIKE ? OR device_id LIKE ? OR internal_code LIKE ?", like, like, like, like)
 	}
 	if channelType != nil {
 		q = q.Where("data_type = ?", *channelType)
@@ -304,7 +361,7 @@ func (r *ChannelRepository) ListAll(page, count int, query string) ([]*domaincha
 	q := r.db.Model(&model.GBDeviceChannel{})
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("name LIKE ? OR gb_device_id LIKE ? OR device_id LIKE ?", like, like, like)
+		q = q.Where("name LIKE ? OR gb_device_id LIKE ? OR device_id LIKE ? OR internal_code LIKE ?", like, like, like, like)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -509,6 +566,7 @@ func nowTimeStr() string {
 func toDomainDevice(m *model.GBDevice) *domaindevice.Device {
 	return &domaindevice.Device{
 		ID:                       m.ID,
+		InternalCode:             m.InternalCode,
 		DeviceID:                 m.DeviceID,
 		Name:                     m.Name,
 		Manufacturer:             m.Manufacturer,
@@ -542,6 +600,7 @@ func toDomainDevice(m *model.GBDevice) *domaindevice.Device {
 func toModelDevice(d *domaindevice.Device) *model.GBDevice {
 	return &model.GBDevice{
 		ID:                       d.ID,
+		InternalCode:             d.InternalCode,
 		DeviceID:                 d.DeviceID,
 		Name:                     d.Name,
 		Manufacturer:             d.Manufacturer,
@@ -603,6 +662,7 @@ func toDomainChannel(m *model.GBDeviceChannel) *domainchannel.Channel {
 	}
 	return &domainchannel.Channel{
 		ID:              m.ID,
+		InternalCode:    m.InternalCode,
 		DeviceID:        m.DeviceID,
 		DataType:        m.DataType,
 		DataDeviceID:    m.DataDeviceID,

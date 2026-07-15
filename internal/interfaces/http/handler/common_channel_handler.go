@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 
 	channelapp "zero-web-server/internal/application/channel"
 	"zero-web-server/internal/interfaces/http/dto"
@@ -19,6 +20,15 @@ func NewCommonChannelHandler(svc *channelapp.Service) *CommonChannelHandler {
 }
 
 func (h *CommonChannelHandler) One(c *gin.Context) {
+	if code := strings.TrimSpace(c.Query("internalCode")); code != "" {
+		v, err := h.svc.GetByInternalCode(code)
+		if err != nil {
+			response.Error(c, response.CodeError, err.Error())
+			return
+		}
+		response.OK(c, v)
+		return
+	}
 	id, _ := strconv.Atoi(c.Query("id"))
 	v, err := h.svc.GetOne(id)
 	if err != nil {

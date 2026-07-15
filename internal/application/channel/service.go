@@ -21,6 +21,7 @@ import (
 
 type View struct {
 	GbID               int       `json:"gbId"`
+	InternalCode       string    `json:"internalCode"`
 	GbDeviceId         string    `json:"gbDeviceId"`
 	GbName             string    `json:"gbName"`
 	GbManufacturer     string    `json:"gbManufacturer"`
@@ -47,6 +48,7 @@ type View struct {
 func toView(ch *domainchannel.Channel) View {
 	return View{
 		GbID:              ch.ID,
+		InternalCode:      ch.InternalCode,
 		GbDeviceId:        ch.GBDeviceID,
 		GbName:            ch.Name,
 		GbManufacturer:    ch.Manufacturer,
@@ -155,6 +157,15 @@ func NewService(
 
 func (s *Service) GetOne(id int) (*View, error) {
 	ch, err := s.channels.GetByID(id)
+	if err != nil {
+		return nil, fmt.Errorf("通道不存在")
+	}
+	v := toView(ch)
+	return &v, nil
+}
+
+func (s *Service) GetByInternalCode(code string) (*View, error) {
+	ch, err := s.channels.GetByInternalCode(code)
 	if err != nil {
 		return nil, fmt.Errorf("通道不存在")
 	}

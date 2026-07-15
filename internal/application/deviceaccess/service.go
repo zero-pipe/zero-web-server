@@ -28,6 +28,7 @@ const (
 
 type DeviceView struct {
 	ID           string       `json:"id"`
+	InternalCode string       `json:"internalCode"`
 	Name         string       `json:"name"`
 	AccessMode   string       `json:"accessMode"`
 	Protocol     string       `json:"protocol"`
@@ -63,6 +64,7 @@ type OnvifConfig struct {
 	Port     int    `json:"port"`
 	Username string `json:"username"`
 	Password string `json:"password"`
+	GbCode   string `json:"gbCode"`
 }
 
 type CreateRequest struct {
@@ -99,6 +101,32 @@ type Service struct {
 
 func NewService(gb *deviceapp.Service, onvif *onvifapp.Service) *Service {
 	return &Service{gb: gb, onvif: onvif}
+}
+
+// GetByInternalCode 按平台内码查找统一设备视图（GB / ONVIF）。
+func (s *Service) GetByInternalCode(ctx context.Context, code string) (*DeviceView, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, fmt.Errorf("内码为空")
+	}
+	if d, err := s.gb.GetByInternalCode(code); err == nil && d != nil {
+		v := viewFromGB(d)
+		return v, nil
+	}
+	list, _, err := s.onvif.ListDevices(ctx, 1, 5000, code)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range list {
+		if d != nil && strings.EqualFold(strings.TrimSpace(d.InternalCode), code) {
+			v := viewFromONVIF(d)
+			if n, err := s.onvif.ChannelCount(ctx, d.ID); err == nil {
+				v.ChannelCount = n
+			}
+			return v, nil
+		}
+	}
+	return nil, fmt.Errorf("设备不存在")
 }
 
 func (s *Service) List(ctx context.Context, q ListQuery) ([]*DeviceView, int64, error) {
@@ -294,6 +322,7 @@ func (s *Service) updateONVIF(ctx context.Context, id int64, req UpdateRequest) 
 	if req.Onvif != nil {
 		upd.Username = req.Onvif.Username
 		upd.Password = req.Onvif.Password
+		upd.GbCode = req.Onvif.GbCode
 		if req.Onvif.Port > 0 {
 			upd.Port = req.Onvif.Port
 		}
@@ -428,6 +457,7 @@ func viewFromGB(d *domaindevice.Device) *DeviceView {
 	}
 	return &DeviceView{
 		ID:                              "gb:" + d.DeviceID,
+		InternalCode:                    d.InternalCode,
 		Name:                            name,
 		AccessMode:                      AccessPassive,
 		Protocol:                        ProtocolGB28181,
@@ -468,6 +498,7 @@ func viewFromONVIF(d *domainonvif.Device) *DeviceView {
 	}
 	return &DeviceView{
 		ID:           fmt.Sprintf("onvif:%d", d.ID),
+		InternalCode: d.InternalCode,
 		Name:         name,
 		AccessMode:   AccessActive,
 		Protocol:     ProtocolONVIF,
@@ -484,6 +515,7 @@ func viewFromONVIF(d *domainonvif.Device) *DeviceView {
 			Port:     d.Port,
 			Username: d.Username,
 			Password: d.Password,
+			GbCode:   d.GbCode,
 		},
 		CreateTime: d.CreateTime,
 		UpdateTime: d.UpdateTime,

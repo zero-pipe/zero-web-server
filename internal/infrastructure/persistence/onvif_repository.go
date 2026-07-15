@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	domainonvif "zero-web-server/internal/domain/onvif"
 	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/idcode"
 
 	"gorm.io/gorm"
 )
@@ -21,6 +23,13 @@ func NewOnvifDeviceRepository(db *gorm.DB) *OnvifDeviceRepository {
 }
 
 func (r *OnvifDeviceRepository) Create(ctx context.Context, device *domainonvif.Device) error {
+	if strings.TrimSpace(device.InternalCode) == "" {
+		code, err := idcode.Device()
+		if err != nil {
+			return err
+		}
+		device.InternalCode = code
+	}
 	m := toOnvifDeviceModel(device)
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
 		return err
@@ -57,7 +66,8 @@ func (r *OnvifDeviceRepository) List(ctx context.Context, page, count int, keywo
 	q := r.db.WithContext(ctx).Model(&model.OnvifDevice{})
 	if keyword != "" {
 		like := fmt.Sprintf("%%%s%%", keyword)
-		q = q.Where("name LIKE ? OR ip LIKE ? OR custom_name LIKE ?", like, like, like)
+		q = q.Where("name LIKE ? OR ip LIKE ? OR custom_name LIKE ? OR internal_code LIKE ? OR gb_code LIKE ?",
+			like, like, like, like, like)
 	}
 
 	var total int64
@@ -112,6 +122,13 @@ func (r *OnvifChannelRepository) BatchCreate(ctx context.Context, channels []*do
 	}
 	models := make([]model.OnvifChannel, 0, len(channels))
 	for _, ch := range channels {
+		if strings.TrimSpace(ch.InternalCode) == "" {
+			code, err := idcode.Channel()
+			if err != nil {
+				return err
+			}
+			ch.InternalCode = code
+		}
 		models = append(models, *toOnvifChannelModel(ch))
 	}
 	if err := r.db.WithContext(ctx).Create(&models).Error; err != nil {
@@ -140,6 +157,7 @@ func (r *OnvifChannelRepository) Update(ctx context.Context, channel *domainonvi
 		"stream_uri":    channel.StreamURI,
 		"status":        channel.Status,
 		"profiles_json": channel.ProfilesJSON,
+		"gb_code":       channel.GbCode,
 		"update_time":   channel.UpdateTime,
 	}).Error
 }
@@ -202,6 +220,8 @@ func nowStr() string {
 func toOnvifDeviceModel(d *domainonvif.Device) *model.OnvifDevice {
 	return &model.OnvifDevice{
 		ID:            d.ID,
+		InternalCode:  d.InternalCode,
+		GbCode:        d.GbCode,
 		Name:          d.Name,
 		IP:            d.IP,
 		Port:          d.Port,
@@ -228,6 +248,8 @@ func toOnvifDeviceModel(d *domainonvif.Device) *model.OnvifDevice {
 func toOnvifDeviceDomain(m *model.OnvifDevice) *domainonvif.Device {
 	return &domainonvif.Device{
 		ID:            m.ID,
+		InternalCode:  m.InternalCode,
+		GbCode:        m.GbCode,
 		Name:          m.Name,
 		IP:            m.IP,
 		Port:          m.Port,
@@ -260,6 +282,8 @@ func toOnvifChannelModel(c *domainonvif.Channel) *model.OnvifChannel {
 	}
 	return &model.OnvifChannel{
 		ID:           c.ID,
+		InternalCode: c.InternalCode,
+		GbCode:       c.GbCode,
 		DeviceID:     c.DeviceID,
 		ProfileToken: c.ProfileToken,
 		Name:         c.Name,
@@ -280,6 +304,8 @@ func toOnvifChannelModel(c *domainonvif.Channel) *model.OnvifChannel {
 func toOnvifChannelDomain(m *model.OnvifChannel) *domainonvif.Channel {
 	ch := &domainonvif.Channel{
 		ID:           m.ID,
+		InternalCode: m.InternalCode,
+		GbCode:       m.GbCode,
 		DeviceID:     m.DeviceID,
 		ProfileToken: m.ProfileToken,
 		Name:         m.Name,

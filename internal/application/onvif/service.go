@@ -163,6 +163,7 @@ type UpdateDeviceRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Port     int    `json:"port"`
+	GbCode   string `json:"gbCode"`
 }
 
 func (s *Service) UpdateDevice(ctx context.Context, id int64, req UpdateDeviceRequest) (*domainonvif.Device, error) {
@@ -187,6 +188,8 @@ func (s *Service) UpdateDevice(ctx context.Context, id int64, req UpdateDeviceRe
 	if req.Port > 0 {
 		device.Port = req.Port
 	}
+	// 允许清空国标编号（显式传空串）
+	device.GbCode = strings.TrimSpace(req.GbCode)
 	device.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 	if err := s.devices.Update(ctx, device); err != nil {
 		return nil, err
@@ -251,6 +254,39 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainon
 		ch.StreamProfiles = streamProfiles
 		ch.Name = channelName(deviceName, i+1)
 		channels = append(channels, ch)
+	}
+
+	// 同步时按 VideoSource 保留内码/国标码，避免 Open API 引用失效
+	if existing, err := s.channels.ListByDeviceID(ctx, deviceID); err == nil {
+		keepCode := make(map[string]string, len(existing))
+		keepGb := make(map[string]string, len(existing))
+		for _, row := range existing {
+			key := strings.TrimSpace(row.VideoSource)
+			if key == "" {
+				key = strings.TrimSpace(row.ProfileToken)
+			}
+			if key == "" {
+				continue
+			}
+			if c := strings.TrimSpace(row.InternalCode); c != "" {
+				keepCode[key] = c
+			}
+			if g := strings.TrimSpace(row.GbCode); g != "" {
+				keepGb[key] = g
+			}
+		}
+		for _, ch := range channels {
+			key := strings.TrimSpace(ch.VideoSource)
+			if key == "" {
+				key = strings.TrimSpace(ch.ProfileToken)
+			}
+			if c, ok := keepCode[key]; ok {
+				ch.InternalCode = c
+			}
+			if g, ok := keepGb[key]; ok {
+				ch.GbCode = g
+			}
+		}
 	}
 
 	if err := s.channels.DeleteByDeviceID(ctx, deviceID); err != nil {

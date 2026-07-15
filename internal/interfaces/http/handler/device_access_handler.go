@@ -33,6 +33,20 @@ func (h *DeviceAccessHandler) List(c *gin.Context) {
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
 }
 
+// Get GET /api/devices/detail?id=gb:xxx 或 ?internalCode=D...
+func (h *DeviceAccessHandler) Get(c *gin.Context) {
+	if code := c.Query("internalCode"); code != "" {
+		view, err := h.svc.GetByInternalCode(c.Request.Context(), code)
+		if err != nil {
+			response.Error(c, response.CodeError, err.Error())
+			return
+		}
+		response.OK(c, view)
+		return
+	}
+	response.Error(c, response.CodeBadReq, "请提供 internalCode")
+}
+
 func (h *DeviceAccessHandler) Create(c *gin.Context) {
 	var req deviceaccess.CreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

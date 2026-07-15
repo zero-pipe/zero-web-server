@@ -31,11 +31,6 @@
       header-row-class-name="table-header"
     >
       <el-table-column prop="name" label="名称" min-width="180" />
-      <el-table-column label="编号" min-width="160">
-        <template v-slot:default>
-          <span class="text-muted">—</span>
-        </template>
-      </el-table-column>
       <el-table-column label="开启音频" min-width="100">
         <template v-slot:default="scope">
           <el-switch

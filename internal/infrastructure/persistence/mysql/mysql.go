@@ -3,10 +3,12 @@ package mysql
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"zero-web-server/internal/infrastructure/config"
 	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/idcode"
 	applog "zero-web-server/pkg/log"
 
 	"gorm.io/driver/mysql"
@@ -17,8 +19,7 @@ import (
 )
 
 // NewDB 连接 MySQL：库不存在则创建。
-// 表结构原则：新安装必须先执行 sql/init_zws_mysql.sql 全量脚本；
-// AutoMigrate 仅用于已有库升级时补缺表/缺列，不是新装建表手段。
+// 开发期权威建表：sql/init_zws_mysql.sql；AutoMigrate 仅作启动兜底补缺。
 func NewDB(cfg config.MySQLConfig) (*gorm.DB, error) {
 	if cfg.Charset == "" {
 		cfg.Charset = "utf8mb4"
@@ -94,7 +95,6 @@ func ensureDatabase(cfg config.MySQLConfig) error {
 }
 
 func autoMigrateAll(db *gorm.DB) error {
-	// 升级路径：已有表只补缺列；若运维未跑全量 SQL 而缺整表，此处会创建（不应作为新装依赖）。
 	models := []any{
 		&model.UserRole{},
 		&model.User{},
@@ -127,44 +127,56 @@ func autoMigrateAll(db *gorm.DB) error {
 			applog.Info("created table", "model", fmt.Sprintf("%T", m))
 		}
 	}
-	// 历史库若由精简 AutoMigrate 建表，可能缺行政区划相关列；再兜底补一次
-	if err := ensureDeviceChannelColumns(db); err != nil {
+	if err := ensureInternalCodes(db); err != nil {
 		return err
 	}
 	return nil
 }
 
-func ensureDeviceChannelColumns(db *gorm.DB) error {
-	type col struct {
-		name string
-		ddl  string
+// ensureInternalCodes 为空内码行补生成（开发期未清库时 AutoMigrate 补列后用）。
+func ensureInternalCodes(db *gorm.DB) error {
+	type rowID struct {
+		ID int64 `gorm:"column:id"`
 	}
-	cols := []col{
-		{"channel_type", "ALTER TABLE zws_device_channel ADD COLUMN channel_type INT NOT NULL DEFAULT 0 COMMENT '通道类型'"},
-		{"civil_code", "ALTER TABLE zws_device_channel ADD COLUMN civil_code VARCHAR(50) NULL COMMENT '行政区划代码'"},
-		{"business_group_id", "ALTER TABLE zws_device_channel ADD COLUMN business_group_id VARCHAR(255) NULL COMMENT '业务分组ID'"},
-		{"gb_name", "ALTER TABLE zws_device_channel ADD COLUMN gb_name VARCHAR(255) NULL"},
-		{"gb_civil_code", "ALTER TABLE zws_device_channel ADD COLUMN gb_civil_code VARCHAR(255) NULL"},
-		{"gb_parent_id", "ALTER TABLE zws_device_channel ADD COLUMN gb_parent_id VARCHAR(255) NULL"},
-		{"gb_status", "ALTER TABLE zws_device_channel ADD COLUMN gb_status VARCHAR(50) NULL"},
-		{"gb_business_group_id", "ALTER TABLE zws_device_channel ADD COLUMN gb_business_group_id VARCHAR(50) NULL"},
-		{"gb_longitude", "ALTER TABLE zws_device_channel ADD COLUMN gb_longitude DOUBLE NULL"},
-		{"gb_latitude", "ALTER TABLE zws_device_channel ADD COLUMN gb_latitude DOUBLE NULL"},
-		{"gb_ptz_type", "ALTER TABLE zws_device_channel ADD COLUMN gb_ptz_type INT NULL"},
-	}
-	for _, c := range cols {
-		if db.Migrator().HasColumn(&model.GBDeviceChannel{}, c.name) {
-			continue
+	backfill := func(table string, gen func() (string, error)) error {
+		var rows []rowID
+		if err := db.Raw(
+			"SELECT id FROM `"+table+"` WHERE internal_code IS NULL OR TRIM(internal_code) = ''",
+		).Scan(&rows).Error; err != nil {
+			if strings.Contains(err.Error(), "doesn't exist") {
+				return nil
+			}
+			return fmt.Errorf("list empty internal_code on %s: %w", table, err)
 		}
-		if err := db.Exec(c.ddl).Error; err != nil {
-			return fmt.Errorf("add column %s: %w", c.name, err)
+		for _, row := range rows {
+			code, err := gen()
+			if err != nil {
+				return err
+			}
+			if err := db.Exec(
+				"UPDATE `"+table+"` SET internal_code = ? WHERE id = ? AND (internal_code IS NULL OR TRIM(internal_code) = '')",
+				code, row.ID,
+			).Error; err != nil {
+				return fmt.Errorf("backfill %s id=%d: %w", table, row.ID, err)
+			}
 		}
-		applog.Info("added missing column", "table", "zws_device_channel", "column", c.name)
+		if len(rows) > 0 {
+			applog.Info("backfilled internal codes", "table", table, "count", len(rows))
+		}
+		return nil
 	}
-	// 空串会被 COALESCE 当成有效值，导致树节点无名/离线；统一洗成 NULL
-	_ = db.Exec(`UPDATE zws_device_channel SET gb_name = NULL WHERE gb_name IS NOT NULL AND TRIM(gb_name) = ''`).Error
-	_ = db.Exec(`UPDATE zws_device_channel SET gb_status = NULL WHERE gb_status IS NOT NULL AND TRIM(gb_status) = ''`).Error
-	_ = db.Exec(`UPDATE zws_device_channel SET gb_device_id = NULL WHERE gb_device_id IS NOT NULL AND TRIM(gb_device_id) = ''`).Error
+	if err := backfill("zws_device", idcode.Device); err != nil {
+		return err
+	}
+	if err := backfill("zws_device_channel", idcode.Channel); err != nil {
+		return err
+	}
+	if err := backfill("zws_onvif_device", idcode.Device); err != nil {
+		return err
+	}
+	if err := backfill("zws_onvif_channel", idcode.Channel); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -4,6 +4,8 @@ import "context"
 
 type Device struct {
 	ID            int64  `json:"id"`
+	InternalCode  string `json:"internalCode"`
+	GbCode        string `json:"gbCode"`
 	Name          string `json:"name"`
 	IP            string `json:"ip"`
 	Port          int    `json:"port"`
@@ -28,6 +30,8 @@ type Device struct {
 
 type Channel struct {
 	ID            int64  `json:"id"`
+	InternalCode  string `json:"internalCode"`
+	GbCode        string `json:"gbCode"`
 	DeviceID      int64  `json:"deviceId"`
 	ProfileToken  string `json:"profileToken"`
 	Name          string `json:"name"`

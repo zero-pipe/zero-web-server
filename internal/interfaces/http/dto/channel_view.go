@@ -12,6 +12,7 @@ var ptzTypeTexts = map[int]string{
 
 type ChannelView struct {
 	ID                   int     `json:"id"`
+	InternalCode         string  `json:"internalCode"`
 	ChannelID            int     `json:"channelId"`
 	DeviceID             string  `json:"deviceId"`
 	ParentDeviceID       string  `json:"parentDeviceId"`
@@ -43,6 +44,7 @@ func NewChannelView(ch *domainchannel.Channel) ChannelView {
 	}
 	return ChannelView{
 		ID:             ch.ID,
+		InternalCode:   ch.InternalCode,
 		ChannelID:      ch.ID,
 		DeviceID:       channelGBID,
 		ParentDeviceID: ch.DeviceID,

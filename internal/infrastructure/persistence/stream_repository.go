@@ -8,6 +8,7 @@ import (
 
 	"zero-web-server/internal/domain/shared"
 	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/pkg/idcode"
 
 	"gorm.io/gorm"
 )
@@ -110,8 +111,13 @@ func (r *StreamPushRepository) UpsertGBChannel(pushID int, gbDeviceID, gbName st
 	err := r.db.Where("data_type = ? AND data_device_id = ?", shared.ChannelDataTypeStreamPush, pushID).First(&ch).Error
 	now := nowTimeStr()
 	if err == gorm.ErrRecordNotFound {
+		code, genErr := idcode.Channel()
+		if genErr != nil {
+			return genErr
+		}
 		return r.db.Create(&model.GBDeviceChannel{
-			DataType: shared.ChannelDataTypeStreamPush, DataDeviceID: pushID,
+			InternalCode: code,
+			DataType:     shared.ChannelDataTypeStreamPush, DataDeviceID: pushID,
 			GBDeviceID: gbDeviceID, Name: gbName, Status: "ON", CreateTime: now, UpdateTime: now,
 		}).Error
 	}
@@ -197,8 +203,13 @@ func (r *StreamProxyRepository) UpsertGBChannel(proxyID int, gbDeviceID, gbName,
 	err := r.db.Where("data_type = ? AND data_device_id = ?", shared.ChannelDataTypeStreamProxy, proxyID).First(&ch).Error
 	now := nowTimeStr()
 	if err == gorm.ErrRecordNotFound {
+		code, genErr := idcode.Channel()
+		if genErr != nil {
+			return genErr
+		}
 		return r.db.Create(&model.GBDeviceChannel{
-			DeviceID: app, DataType: shared.ChannelDataTypeStreamProxy, DataDeviceID: proxyID,
+			InternalCode: code,
+			DeviceID:     app, DataType: shared.ChannelDataTypeStreamProxy, DataDeviceID: proxyID,
 			GBDeviceID: gbDeviceID, Name: gbName, Status: "ON", CreateTime: now, UpdateTime: now,
 		}).Error
 	}

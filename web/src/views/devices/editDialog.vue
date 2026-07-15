@@ -17,6 +17,9 @@
       <el-form-item label="设备名称" prop="name">
         <el-input v-model="form.name" maxlength="64" show-word-limit />
       </el-form-item>
+      <el-form-item label="内码">
+        <el-input :value="form.internalCode" disabled placeholder="平台自动生成" />
+      </el-form-item>
       <el-form-item label="厂商">
         <el-select v-model="form.vendor" clearable placeholder="不限 / 未知" style="width: 100%;">
           <el-option label="海康" value="海康" />
@@ -50,6 +53,9 @@
       </template>
 
       <template v-if="row && row.protocol === 'onvif'">
+        <el-form-item label="国标编号">
+          <el-input v-model="form.onvif.gbCode" maxlength="20" show-word-limit placeholder="可空；级联上级前填写" />
+        </el-form-item>
         <el-form-item label="IP">
           <el-input :value="form.onvif.ip" disabled />
         </el-form-item>
@@ -86,8 +92,9 @@ export default {
       form: {
         name: '',
         vendor: '',
+        internalCode: '',
         gb: { deviceId: '', password: '', sdpIp: '', mediaServerId: 'auto', charset: 'GB2312' },
-        onvif: { ip: '', port: 80, username: '', password: '' }
+        onvif: { ip: '', port: 80, username: '', password: '', gbCode: '' }
       },
       rules: {
         name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }]
@@ -109,6 +116,7 @@ export default {
     fill(row) {
       this.form.name = row.name || ''
       this.form.vendor = row.vendor || ''
+      this.form.internalCode = row.internalCode || ''
       const gb = row.gb || {}
       this.form.gb = {
         deviceId: gb.deviceId || row.rawId || '',
@@ -122,15 +130,17 @@ export default {
         ip: ov.ip || '',
         port: ov.port || 80,
         username: ov.username || '',
-        password: ov.password || ''
+        password: ov.password || '',
+        gbCode: ov.gbCode || ''
       }
     },
     reset() {
       this.form = {
         name: '',
         vendor: '',
+        internalCode: '',
         gb: { deviceId: '', password: '', sdpIp: '', mediaServerId: 'auto', charset: 'GB2312' },
-        onvif: { ip: '', port: 80, username: '', password: '' }
+        onvif: { ip: '', port: 80, username: '', password: '', gbCode: '' }
       }
     },
     submit() {

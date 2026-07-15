@@ -2,6 +2,7 @@ package device
 
 type Device struct {
 	ID                              int    `json:"id"`
+	InternalCode                    string `json:"internalCode"`
 	DeviceID                        string `json:"deviceId"`
 	Name                            string `json:"name"`
 	Manufacturer                    string `json:"manufacturer"`
@@ -47,4 +48,5 @@ type Repository interface {
 	DeleteByDeviceID(deviceID string) error
 	List(page, count int, query string, online *bool) ([]*Device, int64, error)
 	ListOnline() ([]*Device, error)
+	GetByInternalCode(code string) (*Device, error)
 }

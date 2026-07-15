@@ -72,7 +72,6 @@
         header-row-class-name="table-header"
       >
         <el-table-column prop="name" label="名称" min-width="180" />
-        <el-table-column prop="deviceId" label="编号" min-width="180" />
         <el-table-column label="开启音频" min-width="100">
           <template v-slot:default="scope">
             <el-switch v-model="scope.row.hasAudio" active-color="#409EFF" @change="updateChannel(scope.row)" />
