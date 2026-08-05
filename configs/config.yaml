@@ -1,0 +1,73 @@
+server:
+  port: 18080
+  mode: debug # debug | release
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: "cqw881013"
+  database: zws
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  host: 127.0.0.1
+  port: 6379
+  password: "cqw881013"
+  database: 7
+  pool_size: 10
+
+# 国标 SIP 默认值：库空时启动写入 zws_gb_sip_config；之后以库为准。
+# 页面「系统管理 → 国标配置」可改编码/域/密码/IP，热更新无需重启；改监听端口需重启。
+sip:
+  ip: "192.168.1.5"                           # 空则自动探测本机网卡；也可填摄像机可达的平台 IP
+  port: 5060
+  domain: "3402000000"             # 宜为国标编号前 10 位
+  id: "34020000002000000001"       # 本平台 20 位国标编号
+  password: "12345678"
+  alarm: false
+
+# 国标接入行为：true=必须先在「设备列表」预添加，未预置设备 REGISTER 返回 403
+gb:
+  require_pre_register: true
+
+# 媒体节点改为页面「媒体节点」动态添加并落库，启动时可为空。
+# 如需兼容临时指定，可取消注释（IP+http_port 非空才生效）。
+# media:
+#   id: zero-media-server
+#   type: zms
+#   ip: 192.168.1.5
+#   http_port: 8080
+#   secret: ""
+
+log:
+  # 级别：debug | info | warn | error（生产建议 info；排障临时开 debug）
+  level: info
+  # 格式：text 人读（控制台/实时日志）| json 采集（ELK/Loki 等）
+  # text 示例：2026-07-14 15:04:05.000 INFO  message key=value
+  # json 示例：{"ts":"...","level":"info","msg":"...","key":"..."}
+  format: text
+  # 输出：stdout | file | both
+  output: both
+  file:
+    path: logs/zero-web-server.log
+    max_size_mb: 100   # 单文件上限（MB），超出自动切分
+    max_backups: 20    # 最多保留历史文件个数
+    max_age_days: 7    # 历史文件最长保留天数
+    compress: true     # 历史文件 gzip 压缩
+
+user_settings:
+  play_timeout: 180000
+  record_info_timeout: 30000
+  stream_on_demand: true
+  push_authority: false
+  record_push_live: false
+  server_id: "000000"
+  login_timeout: 60 # minutes
+  jwk_file: "configs/jwk.json"
+
+onvif:
+  discovery_timeout: 5 # seconds
+  probe_interval: 60   # seconds

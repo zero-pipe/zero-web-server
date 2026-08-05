@@ -1,0 +1,4 @@
+[submodule "3rdpart/gb28181-go"]
+	path = 3rdpart/gb28181-go
+	url = https://github.com/zero-pipe/gb28181-go.git
+	branch = master

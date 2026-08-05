@@ -1,0 +1,90 @@
+#app {
+
+  .main-container {
+    min-height: 100%;
+    transition: margin-left .28s;
+    margin-left: var(--sidebar-width, #{$sideBarWidth});
+    position: relative;
+    background: #f0f4f8;
+  }
+
+  .sidebar-container {
+    transition: width 0.28s;
+    width: var(--sidebar-width, #{$sideBarWidth}) !important;
+    background-color: transparent;
+    height: 100%;
+    position: fixed;
+    font-size: 0px;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1001;
+    overflow: hidden;
+    border: none;
+    box-shadow: none;
+
+    .horizontal-collapse-transition {
+      transition: 0s width ease-in-out, 0s padding-left ease-in-out, 0s padding-right ease-in-out;
+    }
+
+    .scrollbar-wrapper {
+      overflow-x: hidden !important;
+    }
+
+    .el-scrollbar__bar.is-vertical {
+      right: 0px;
+    }
+
+    .el-scrollbar {
+      height: 100%;
+    }
+
+    a {
+      width: 100%;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    a.secondary-item {
+      display: flex;
+      overflow: visible;
+    }
+  }
+
+  .hideSidebar {
+    .sidebar-container {
+      width: 64px !important;
+    }
+
+    .main-container {
+      margin-left: 64px;
+    }
+  }
+
+  .mobile {
+    .main-container {
+      margin-left: 0px;
+    }
+
+    .sidebar-container {
+      transition: transform .28s;
+      width: var(--sidebar-width, #{$sideBarWidth}) !important;
+    }
+
+    &.hideSidebar {
+      .sidebar-container {
+        pointer-events: none;
+        transition-duration: 0.3s;
+        transform: translate3d(calc(-1 * var(--sidebar-width, #{$sideBarWidth})), 0, 0);
+      }
+    }
+  }
+
+  .withoutAnimation {
+    .main-container,
+    .sidebar-container {
+      transition: none;
+    }
+  }
+}

@@ -1,0 +1,24 @@
+// sidebar — 蓝白双列主题
+$menuText: #64748b;
+$menuActiveText: #1565c0;
+$subMenuActiveText: #1565c0;
+
+$menuBg: #1565c0;
+$menuHover: #1976d2;
+
+$subMenuBg: #f5f8fc;
+$subMenuHover: #e8f1fb;
+
+// 默认展开宽度（一级 84 + 二级 176）
+$sideBarWidth: 260px;
+
+:export {
+  menuText: $menuText;
+  menuActiveText: $menuActiveText;
+  subMenuActiveText: $subMenuActiveText;
+  menuBg: $menuBg;
+  menuHover: $menuHover;
+  subMenuBg: $subMenuBg;
+  subMenuHover: $subMenuHover;
+  sideBarWidth: $sideBarWidth;
+}
