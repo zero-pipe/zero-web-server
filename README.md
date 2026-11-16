@@ -70,6 +70,7 @@ cd web && npm install && npm run dev
 - 部署（Docker / 端口 / 升级）：[docs/DEPLOY.md](docs/DEPLOY.md)
 - 配置项说明：[docs/CONFIG.md](docs/CONFIG.md)
 - 架构与依赖规则：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- IPC 私有 SDK 插件化接入设计：[docs/IPC_PLUGIN_DESIGN.md](docs/IPC_PLUGIN_DESIGN.md)
 
 ## 目录结构
 
