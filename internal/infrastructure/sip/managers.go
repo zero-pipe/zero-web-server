@@ -28,8 +28,8 @@ type RecordManager struct {
 	inner *session.RecordWaiter
 }
 
-func (m *RecordManager) Wait(sn string, timeout time.Duration) (*domainrecord.RecordInfo, error) {
-	info, err := m.inner.Wait(sn, timeout)
+func (m *RecordManager) Wait(sn string, ch <-chan *session.RecordInfo, timeout time.Duration) (*domainrecord.RecordInfo, error) {
+	info, err := m.inner.Wait(sn, ch, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +45,8 @@ type PresetManager struct {
 	inner *session.PresetWaiter
 }
 
-func (m *PresetManager) Wait(sn string, timeout time.Duration) ([]domainptz.Preset, error) {
-	items, err := m.inner.Wait(sn, timeout)
+func (m *PresetManager) Wait(sn string, ch <-chan []manscdp.Preset, timeout time.Duration) ([]domainptz.Preset, error) {
+	items, err := m.inner.Wait(sn, ch, timeout)
 	if err != nil {
 		return nil, err
 	}
