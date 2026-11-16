@@ -716,3 +716,114 @@ CREATE TABLE IF NOT EXISTS zws_plugin_channel
     KEY idx_plugin_channel_device (device_db_id),
     UNIQUE KEY uk_plugin_channel_code (internal_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备通道';
+
+-- ---------------------------------------------------------------------------
+-- 统一设备资产 / 资源模型（单接入；一个物理设备一个 AccessBinding）
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS zws_physical_device;
+CREATE TABLE IF NOT EXISTS zws_physical_device
+(
+    id            VARCHAR(36) NOT NULL PRIMARY KEY,
+    internal_code VARCHAR(32),
+    name          VARCHAR(255),
+    vendor        VARCHAR(128),
+    model         VARCHAR(128),
+    serial_number VARCHAR(128),
+    enabled       TINYINT NOT NULL DEFAULT 1,
+    online        TINYINT NOT NULL DEFAULT 0,
+    create_time   VARCHAR(50),
+    update_time   VARCHAR(50),
+    UNIQUE KEY uk_physical_code (internal_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物理设备资产';
+
+DROP TABLE IF EXISTS zws_access_binding;
+CREATE TABLE IF NOT EXISTS zws_access_binding
+(
+    id                 VARCHAR(36) NOT NULL PRIMARY KEY,
+    device_id          VARCHAR(36) NOT NULL,
+    protocol           VARCHAR(32) NOT NULL,
+    mode               VARCHAR(16),
+    external_id        VARCHAR(255),
+    endpoint           VARCHAR(255),
+    plugin_instance_id VARCHAR(128),
+    config_json        LONGTEXT,
+    status             VARCHAR(32),
+    last_seen          BIGINT NOT NULL DEFAULT 0,
+    legacy_device_id   INT NOT NULL DEFAULT 0,
+    create_time        VARCHAR(50),
+    update_time        VARCHAR(50),
+    UNIQUE KEY uk_binding_device (device_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备接入绑定(1:1)';
+
+DROP TABLE IF EXISTS zws_resource;
+CREATE TABLE IF NOT EXISTS zws_resource
+(
+    id                VARCHAR(36) NOT NULL PRIMARY KEY,
+    device_id         VARCHAR(36) NOT NULL,
+    binding_id        VARCHAR(36),
+    kind              VARCHAR(32) NOT NULL,
+    external_key      VARCHAR(255),
+    name              VARCHAR(255),
+    status            VARCHAR(32),
+    legacy_channel_id INT NOT NULL DEFAULT 0,
+    attrs_json        LONGTEXT,
+    create_time       VARCHAR(50),
+    update_time       VARCHAR(50),
+    KEY idx_resource_device (device_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备资源';
+
+DROP TABLE IF EXISTS zws_stream_profile;
+CREATE TABLE IF NOT EXISTS zws_stream_profile
+(
+    id            VARCHAR(36) NOT NULL PRIMARY KEY,
+    resource_id   VARCHAR(36) NOT NULL,
+    role          VARCHAR(16),
+    name          VARCHAR(128),
+    selector_json TEXT,
+    codec         VARCHAR(64),
+    resolution    VARCHAR(64),
+    is_default    TINYINT NOT NULL DEFAULT 0,
+    create_time   VARCHAR(50),
+    update_time   VARCHAR(50),
+    KEY idx_profile_resource (resource_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视频资源码流';
+
+DROP TABLE IF EXISTS zws_capability;
+CREATE TABLE IF NOT EXISTS zws_capability
+(
+    id          VARCHAR(36) NOT NULL PRIMARY KEY,
+    scope_type  VARCHAR(16) NOT NULL,
+    scope_id    VARCHAR(36) NOT NULL,
+    operation   VARCHAR(64) NOT NULL,
+    supported   TINYINT NOT NULL DEFAULT 1,
+    configured  TINYINT NOT NULL DEFAULT 1,
+    available   TINYINT NOT NULL DEFAULT 0,
+    params_json TEXT,
+    source      VARCHAR(32),
+    update_time VARCHAR(50),
+    KEY idx_cap_scope (scope_type, scope_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='能力事实';
+
+DROP TABLE IF EXISTS zws_event_source;
+CREATE TABLE IF NOT EXISTS zws_event_source
+(
+    id           VARCHAR(36) NOT NULL PRIMARY KEY,
+    device_id    VARCHAR(36) NOT NULL,
+    resource_id  VARCHAR(36),
+    kind         VARCHAR(32),
+    external_key VARCHAR(255),
+    enabled      TINYINT NOT NULL DEFAULT 0,
+    config_json  TEXT,
+    KEY idx_event_device (device_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件来源';
+
+DROP TABLE IF EXISTS zws_unified_ref;
+CREATE TABLE IF NOT EXISTS zws_unified_ref
+(
+    id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    legacy_table VARCHAR(64) NOT NULL,
+    legacy_id    VARCHAR(64) NOT NULL,
+    entity_type  VARCHAR(32),
+    unified_id   VARCHAR(36),
+    UNIQUE KEY uk_legacy_ref (legacy_table, legacy_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='旧对象到统一对象映射';

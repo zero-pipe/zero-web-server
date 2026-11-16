@@ -109,6 +109,18 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/assets',
+    component: Layout,
+    children: [
+      {
+        path: '/assets',
+        name: 'DeviceAssets',
+        component: () => import('@/views/assets/index'),
+        meta: { title: '设备资产', icon: 'menu-access' }
+      }
+    ]
+  },
+  {
     path: '/plugins',
     component: Layout,
     children: [

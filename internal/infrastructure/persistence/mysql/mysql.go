@@ -120,6 +120,13 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.Plugin{},
 		&model.PluginDevice{},
 		&model.PluginChannel{},
+		&model.PhysicalDevice{},
+		&model.AccessBinding{},
+		&model.AssetResource{},
+		&model.AssetStreamProfile{},
+		&model.AssetCapability{},
+		&model.AssetEventSource{},
+		&model.UnifiedRef{},
 	}
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)

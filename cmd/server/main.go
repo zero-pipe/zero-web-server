@@ -13,6 +13,7 @@ import (
 	ipcplugin "zero-web-server/internal/adapter/ipcplugin"
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	alarmapp "zero-web-server/internal/application/alarm"
+	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
 	cascadeapp "zero-web-server/internal/application/cascade"
 	channelapp "zero-web-server/internal/application/channel"
@@ -148,6 +149,12 @@ func main() {
 	pluginToken := os.Getenv("ZWS_PLUGIN_TOKEN")
 	ipcService := ipcdevice.NewService(pluginService, pluginRepo, mediaCluster, ipcplugin.NewFactory(pluginToken), cfg.UserSettings.ServerID)
 
+	assetRepo := persistence.NewAssetRepository(db)
+	assetProjector := persistence.NewAssetProjector(db)
+	if err := assetProjector.Backfill(); err != nil {
+		applog.Warn("asset backfill", "err", err)
+	}
+
 	objectStoreRepo := persistence.NewObjectStoreConfigRepository(db)
 	objectStoreService := objectstoreapp.NewService(objectStoreRepo)
 	snapService := snapapp.NewService(objectStoreService)
@@ -208,6 +215,7 @@ func main() {
 		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaCluster, cfg.UserSettings.ServerID,
 	)
 	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
+	assetService := assetapp.NewService(assetRepo, assetProjector, playService, onvifService, ipcService, deviceService)
 
 	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)
@@ -284,6 +292,7 @@ func main() {
 		PluginService:       pluginService,
 		IPCService:          ipcService,
 		PluginToken:         pluginToken,
+		AssetService:        assetService,
 	})
 
 	go func() {

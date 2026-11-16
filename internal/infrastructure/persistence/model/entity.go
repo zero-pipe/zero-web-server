@@ -458,3 +458,111 @@ type PluginChannel struct {
 }
 
 func (PluginChannel) TableName() string { return "zws_plugin_channel" }
+
+// PhysicalDevice 统一物理设备资产。
+type PhysicalDevice struct {
+	ID           string `gorm:"column:id;primaryKey;size:36"`
+	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_physical_code"`
+	Name         string `gorm:"column:name;size:255"`
+	Vendor       string `gorm:"column:vendor;size:128"`
+	Model        string `gorm:"column:model;size:128"`
+	SerialNumber string `gorm:"column:serial_number;size:128"`
+	Enabled      bool   `gorm:"column:enabled;default:1"`
+	Online       bool   `gorm:"column:online"`
+	CreateTime   string `gorm:"column:create_time;size:50"`
+	UpdateTime   string `gorm:"column:update_time;size:50"`
+}
+
+func (PhysicalDevice) TableName() string { return "zws_physical_device" }
+
+// AccessBinding 设备唯一接入绑定。
+type AccessBinding struct {
+	ID               string `gorm:"column:id;primaryKey;size:36"`
+	DeviceID         string `gorm:"column:device_id;size:36;uniqueIndex:uk_binding_device"`
+	Protocol         string `gorm:"column:protocol;size:32"`
+	Mode             string `gorm:"column:mode;size:16"`
+	ExternalID       string `gorm:"column:external_id;size:255"`
+	Endpoint         string `gorm:"column:endpoint;size:255"`
+	PluginInstanceID string `gorm:"column:plugin_instance_id;size:128"`
+	ConfigJSON       string `gorm:"column:config_json;type:longtext"`
+	Status           string `gorm:"column:status;size:32"`
+	LastSeen         int64  `gorm:"column:last_seen"`
+	LegacyDeviceID   int    `gorm:"column:legacy_device_id"`
+	CreateTime       string `gorm:"column:create_time;size:50"`
+	UpdateTime       string `gorm:"column:update_time;size:50"`
+}
+
+func (AccessBinding) TableName() string { return "zws_access_binding" }
+
+// AssetResource 统一设备资源。
+type AssetResource struct {
+	ID              string `gorm:"column:id;primaryKey;size:36"`
+	DeviceID        string `gorm:"column:device_id;size:36;index"`
+	BindingID       string `gorm:"column:binding_id;size:36"`
+	Kind            string `gorm:"column:kind;size:32"`
+	ExternalKey     string `gorm:"column:external_key;size:255"`
+	Name            string `gorm:"column:name;size:255"`
+	Status          string `gorm:"column:status;size:32"`
+	LegacyChannelID int    `gorm:"column:legacy_channel_id"`
+	AttrsJSON       string `gorm:"column:attrs_json;type:longtext"`
+	CreateTime      string `gorm:"column:create_time;size:50"`
+	UpdateTime      string `gorm:"column:update_time;size:50"`
+}
+
+func (AssetResource) TableName() string { return "zws_resource" }
+
+// AssetStreamProfile 资源码流。
+type AssetStreamProfile struct {
+	ID           string `gorm:"column:id;primaryKey;size:36"`
+	ResourceID   string `gorm:"column:resource_id;size:36;index"`
+	Role         string `gorm:"column:role;size:16"`
+	Name         string `gorm:"column:name;size:128"`
+	SelectorJSON string `gorm:"column:selector_json;type:text"`
+	Codec        string `gorm:"column:codec;size:64"`
+	Resolution   string `gorm:"column:resolution;size:64"`
+	IsDefault    bool   `gorm:"column:is_default"`
+	CreateTime   string `gorm:"column:create_time;size:50"`
+	UpdateTime   string `gorm:"column:update_time;size:50"`
+}
+
+func (AssetStreamProfile) TableName() string { return "zws_stream_profile" }
+
+// AssetCapability 能力事实。
+type AssetCapability struct {
+	ID         string `gorm:"column:id;primaryKey;size:36"`
+	ScopeType  string `gorm:"column:scope_type;size:16;index"`
+	ScopeID    string `gorm:"column:scope_id;size:36;index"`
+	Operation  string `gorm:"column:operation;size:64"`
+	Supported  bool   `gorm:"column:supported"`
+	Configured bool   `gorm:"column:configured"`
+	Available  bool   `gorm:"column:available"`
+	ParamsJSON string `gorm:"column:params_json;type:text"`
+	Source     string `gorm:"column:source;size:32"`
+	UpdateTime string `gorm:"column:update_time;size:50"`
+}
+
+func (AssetCapability) TableName() string { return "zws_capability" }
+
+// AssetEventSource 事件来源。
+type AssetEventSource struct {
+	ID          string `gorm:"column:id;primaryKey;size:36"`
+	DeviceID    string `gorm:"column:device_id;size:36;index"`
+	ResourceID  string `gorm:"column:resource_id;size:36"`
+	Kind        string `gorm:"column:kind;size:32"`
+	ExternalKey string `gorm:"column:external_key;size:255"`
+	Enabled     bool   `gorm:"column:enabled"`
+	ConfigJSON  string `gorm:"column:config_json;type:text"`
+}
+
+func (AssetEventSource) TableName() string { return "zws_event_source" }
+
+// UnifiedRef 旧对象到统一对象的映射。
+type UnifiedRef struct {
+	ID          int    `gorm:"column:id;primaryKey;autoIncrement"`
+	LegacyTable string `gorm:"column:legacy_table;size:64;uniqueIndex:uk_legacy_ref"`
+	LegacyID    string `gorm:"column:legacy_id;size:64;uniqueIndex:uk_legacy_ref"`
+	EntityType  string `gorm:"column:entity_type;size:32"`
+	UnifiedID   string `gorm:"column:unified_id;size:36"`
+}
+
+func (UnifiedRef) TableName() string { return "zws_unified_ref" }

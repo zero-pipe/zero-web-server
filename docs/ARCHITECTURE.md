@@ -52,3 +52,23 @@ ZMS 通过 `/index/hook/*` 回调平台（`on_publish`、`on_stream_changed`、`
 
 - 前缀 `/api/v1`；健康检查 `/health`、实时日志 `/channel/log`、媒体 Hook `/index/hook/*`、WebRTC 反代 `/index/api/*` 不在 `/api/v1` 下。
 - 统一响应：`{ "code": 0, "msg": "success", "data": ... }`。
+
+## 统一设备资产模型
+
+为消除 GB28181 / ONVIF / 插件三套设备通道模型的概念差异，新增一层**增量投影**（不替换旧表）：
+
+```
+PhysicalDevice (zws_physical_device)  物理资产
+  └─ AccessBinding (zws_access_binding) 唯一接入方式（1:1，不支持多协议关联）
+       └─ Resource (zws_resource)       video_sensor / audio_* / alarm_* / relay_* / metadata_source
+            └─ StreamProfile (zws_stream_profile)  main / sub / third / custom
+Capability (zws_capability)             设备 / 资源 / 码流作用域的能力事实
+EventSource (zws_event_source)          事件/数据来源（与 Alarm 记录分离）
+UnifiedRef (zws_unified_ref)            旧表主键 → 统一 UUID 的映射
+```
+
+- 统一 ID 使用 UUID；旧 `InternalCode` 保留为业务别名；旧数字通道 ID 继续被录像计划、分组、级联、告警引用。
+- 启动时 `assetProjector.Backfill()` 幂等回填 GB / ONVIF / 插件数据（`zws_unified_ref` 保证可重入）。
+- 新 API：`/api/v1/assets`、`/api/v1/assets/:id`、`/api/v1/assets/:id/sync`、`/api/v1/resources/:id`、`/api/v1/resources/:id/live/start|stop`。
+- 播放路由：按绑定协议翻译为 GB（设备号+通道号）、ONVIF（channelID+profileToken）、插件（deviceId+channelId），媒体仍由 ZMS 输出。
+- 旧 API/页面保持可用；录像计划/分组/级联/告警尚未迁移到统一 Resource，属于后续阶段。

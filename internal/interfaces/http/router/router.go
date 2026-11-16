@@ -2,6 +2,7 @@ package router
 
 import (
 	alarmapp "zero-web-server/internal/application/alarm"
+	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
 	channelapp "zero-web-server/internal/application/channel"
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
@@ -79,6 +80,7 @@ type Deps struct {
 	PluginService       *pluginapp.Service
 	IPCService          *ipcdevice.Service
 	PluginToken         string
+	AssetService        *assetapp.Service
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -130,6 +132,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
 	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.PluginToken)
+	assetHandler := handler.NewAssetHandler(deps.AssetService)
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
@@ -156,6 +159,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		auth.POST("/user/changePassword", userHandler.ChangePassword)
 
 		registerPlugin(auth, pluginHandler)
+		registerAssets(auth, assetHandler)
 
 		registerUserMgmt(auth, userHandler, roleHandler)
 

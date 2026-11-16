@@ -1,0 +1,155 @@
+package asset
+
+// PhysicalDevice 是对用户可见的物理设备资产。
+type PhysicalDevice struct {
+	ID           string `json:"id"`
+	InternalCode string `json:"internalCode"`
+	Name         string `json:"name"`
+	Vendor       string `json:"vendor"`
+	Model        string `json:"model"`
+	SerialNumber string `json:"serialNumber"`
+	Enabled      bool   `json:"enabled"`
+	Online       bool   `json:"online"`
+	CreateTime   string `json:"createTime"`
+	UpdateTime   string `json:"updateTime"`
+}
+
+// AccessBinding 是物理设备唯一的接入方式（本次设计严格 1:1）。
+type AccessBinding struct {
+	ID               string `json:"id"`
+	DeviceID         string `json:"deviceId"`
+	Protocol         string `json:"protocol"` // gb28181 | onvif | plugin
+	Mode             string `json:"mode"`     // passive | active
+	ExternalID       string `json:"externalId"`
+	Endpoint         string `json:"endpoint"`
+	PluginInstanceID string `json:"pluginInstanceId"`
+	ConfigJSON       string `json:"configJson"`
+	Status           string `json:"status"`
+	LastSeen         int64  `json:"lastSeen"`
+	LegacyDeviceID   int    `json:"-"`
+	CreateTime       string `json:"createTime"`
+	UpdateTime       string `json:"updateTime"`
+}
+
+// 资源类型。
+const (
+	ResourceVideoSensor   = "video_sensor"
+	ResourceAudioInput    = "audio_input"
+	ResourceAudioOutput   = "audio_output"
+	ResourceAlarmInput    = "alarm_input"
+	ResourceRelayOutput   = "relay_output"
+	ResourceMetadataPoint = "metadata_source"
+)
+
+// Resource 是设备提供的稳定子资源（视频源、音频、告警输入、AI 元数据等）。
+type Resource struct {
+	ID              string `json:"id"`
+	DeviceID        string `json:"deviceId"`
+	BindingID       string `json:"bindingId"`
+	Kind            string `json:"kind"`
+	ExternalKey     string `json:"externalKey"`
+	Name            string `json:"name"`
+	Status          string `json:"status"`
+	LegacyChannelID int    `json:"-"`
+	AttrsJSON       string `json:"attrsJson"`
+	CreateTime      string `json:"createTime"`
+	UpdateTime      string `json:"updateTime"`
+}
+
+// 码流角色。
+const (
+	ProfileMain   = "main"
+	ProfileSub    = "sub"
+	ProfileThird  = "third"
+	ProfileCustom = "custom"
+)
+
+// StreamProfile 是视频资源的一个码流配置。
+type StreamProfile struct {
+	ID           string `json:"id"`
+	ResourceID   string `json:"resourceId"`
+	Role         string `json:"role"`
+	Name         string `json:"name"`
+	SelectorJSON string `json:"selectorJson"`
+	Codec        string `json:"codec"`
+	Resolution   string `json:"resolution"`
+	IsDefault    bool   `json:"isDefault"`
+	CreateTime   string `json:"createTime"`
+	UpdateTime   string `json:"updateTime"`
+}
+
+// Capability 是某作用域上的能力事实。
+type Capability struct {
+	ID         string `json:"id"`
+	ScopeType  string `json:"scopeType"` // device | resource | profile
+	ScopeID    string `json:"scopeId"`
+	Operation  string `json:"operation"`
+	Supported  bool   `json:"supported"`
+	Configured bool   `json:"configured"`
+	Available  bool   `json:"available"`
+	ParamsJSON string `json:"paramsJson"`
+	Source     string `json:"source"`
+	UpdateTime string `json:"updateTime"`
+}
+
+// EventSource 是事件/数据来源（与告警记录分离）。
+type EventSource struct {
+	ID          string `json:"id"`
+	DeviceID    string `json:"deviceId"`
+	ResourceID  string `json:"resourceId"`
+	Kind        string `json:"kind"`
+	ExternalKey string `json:"externalKey"`
+	Enabled     bool   `json:"enabled"`
+	ConfigJSON  string `json:"configJson"`
+}
+
+// DeviceSummary 用于列表展示。
+type DeviceSummary struct {
+	Device        *PhysicalDevice `json:"device"`
+	Binding       *AccessBinding  `json:"binding"`
+	ResourceCount int             `json:"resourceCount"`
+}
+
+// DeviceDetail 用于详情展示。
+type DeviceDetail struct {
+	Device       *PhysicalDevice `json:"device"`
+	Binding      *AccessBinding  `json:"binding"`
+	Resources    []*Resource     `json:"resources"`
+	Capabilities []*Capability   `json:"capabilities"`
+	EventSources []*EventSource  `json:"eventSources"`
+}
+
+// ResourceDetail 包含资源、码流与能力。
+type ResourceDetail struct {
+	Resource     *Resource        `json:"resource"`
+	Profiles     []*StreamProfile `json:"profiles"`
+	Capabilities []*Capability    `json:"capabilities"`
+}
+
+type Repository interface {
+	CreateDevice(d *PhysicalDevice) error
+	UpsertDevice(d *PhysicalDevice) error
+	GetDevice(id string) (*PhysicalDevice, error)
+	ListDevices(page, count int, query, protocol, status string) ([]*DeviceSummary, int64, error)
+
+	CreateBinding(b *AccessBinding) error
+	UpsertBinding(b *AccessBinding) error
+	GetBindingByDevice(deviceID string) (*AccessBinding, error)
+
+	UpsertResource(r *Resource) error
+	ListResources(deviceID string) ([]*Resource, error)
+	GetResource(id string) (*Resource, error)
+
+	UpsertProfile(p *StreamProfile) error
+	ListProfiles(resourceID string) ([]*StreamProfile, error)
+	GetProfile(id string) (*StreamProfile, error)
+
+	ReplaceCapabilities(scopeType, scopeID string, caps []*Capability) error
+	ListCapabilities(scopeType, scopeID string) ([]*Capability, error)
+
+	UpsertEventSource(e *EventSource) error
+	ListEventSources(deviceID string) ([]*EventSource, error)
+
+	GetLegacyRef(table string, legacyID string) (entityType, unifiedID string, err error)
+	UpsertLegacyRef(table, legacyID, entityType, unifiedID string) error
+}
