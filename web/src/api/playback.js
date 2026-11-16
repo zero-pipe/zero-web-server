@@ -5,30 +5,30 @@ import request from '@/utils/request'
 export function play([deviceId, channelId, startTime, endTime]) {
   return request({
     method: 'get',
-    url: '/api/playback/start/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' + endTime
+    url: '/api/v1/playback/start/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' + endTime
   })
 }
 export function resume(streamId) {
   return request({
     method: 'get',
-    url: '/api/playback/resume/' + streamId
+    url: '/api/v1/playback/resume/' + streamId
   })
 }
 export function pause(streamId) {
   return request({
     method: 'get',
-    url: '/api/playback/pause/' + streamId
+    url: '/api/v1/playback/pause/' + streamId
   })
 }
 export function setSpeed([streamId, speed]) {
   return request({
     method: 'get',
-    url: `/api/playback/speed/${streamId}/${speed}`
+    url: `/api/v1/playback/speed/${streamId}/${speed}`
   })
 }
 export function stop(deviceId, channelId, streamId) {
   return request({
     method: 'get',
-    url: '/api/playback/stop/' + deviceId + '/' + channelId + '/' + streamId
+    url: '/api/v1/playback/stop/' + deviceId + '/' + channelId + '/' + streamId
   })
 }

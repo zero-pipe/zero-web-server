@@ -281,7 +281,7 @@ export default {
     },
     getSnap: function(row) {
       const baseUrl = window.baseUrl ? window.baseUrl : ''
-      return ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + '/api/device/query/snap/' + this.device.phoneNumber + '/' + row.channelId
+      return ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + '/api/v1/device/query/snap/' + this.device.phoneNumber + '/' + row.channelId
     },
     getBigSnap: function(row) {
       return [this.getSnap(row)]
@@ -295,7 +295,7 @@ export default {
         }
         setTimeout(() => {
           const baseUrl = window.baseUrl ? window.baseUrl : ''
-          const url = (process.env.NODE_ENV === 'development' ? process.env.VUE_APP_BASE_API : baseUrl) + '/api/device/query/snap/' + deviceId + '/' + channelId
+          const url = (process.env.NODE_ENV === 'development' ? process.env.VUE_APP_BASE_API : baseUrl) + '/api/v1/device/query/snap/' + deviceId + '/' + channelId
           this.loadSnap[deviceId + channelId]++
           document.getElementById(deviceId + channelId).setAttribute('src', url + '?' + new Date().getTime())
         }, 1000)
@@ -340,7 +340,7 @@ export default {
       this.$message.success('已申请截图,完成后自动下载', { closed: true })
       // 文件下载地址
       const baseUrl = window.baseUrl ? window.baseUrl : ''
-      const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/jt1078/snap?phoneNumber=${this.device.phoneNumber}&channelId=${row.channelId}`
+      const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/v1/jt1078/snap?phoneNumber=${this.device.phoneNumber}&channelId=${row.channelId}`
       let controller = new AbortController()
       let signal = controller.signal
       // 设置请求头

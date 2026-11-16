@@ -11,7 +11,7 @@ import (
 
 	domainonvif "zero-web-server/internal/domain/onvif"
 	domainptz "zero-web-server/internal/domain/ptz"
-	onvifinfra "zero-web-server/internal/infrastructure/onvif"
+	"zero-web-server/internal/onvifcli"
 	"zero-web-server/internal/port"
 
 	onviflib "github.com/0x524a/onvif-go"
@@ -20,7 +20,7 @@ import (
 type Service struct {
 	devices   domainonvif.DeviceRepository
 	channels  domainonvif.ChannelRepository
-	factory   *onvifinfra.ClientFactory
+	factory   port.ONVIFFactory
 	media     port.MediaCluster
 	serverID  string
 	proxyKeys sync.Map // stream -> ZMS addStreamProxy key
@@ -29,7 +29,7 @@ type Service struct {
 func NewService(
 	devices domainonvif.DeviceRepository,
 	channels domainonvif.ChannelRepository,
-	factory *onvifinfra.ClientFactory,
+	factory port.ONVIFFactory,
 	media port.MediaCluster,
 	serverID string,
 ) *Service {
@@ -43,7 +43,7 @@ func NewService(
 }
 
 func (s *Service) Discover(ctx context.Context, timeoutSec int) ([]*domainonvif.DiscoveredDevice, error) {
-	found, err := onvifinfra.Discover(ctx, timeoutSec)
+	found, err := onvifcli.Discover(ctx, timeoutSec)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (s *Service) Discover(ctx context.Context, timeoutSec int) ([]*domainonvif.
 	result := make([]*domainonvif.DiscoveredDevice, 0, len(found))
 	for _, d := range found {
 		endpoint := d.GetDeviceEndpoint()
-		host, port, _, _ := onvifinfra.ParseEndpoint(endpoint)
+		host, port, _, _ := onvifcli.ParseEndpoint(endpoint)
 		result = append(result, &domainonvif.DiscoveredDevice{
 			Name:     d.GetName(),
 			IP:       host,
@@ -84,7 +84,7 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 		endpoint = fmt.Sprintf("http://%s:%d/onvif/device_service", host, port)
 	} else {
 		var err error
-		host, port, endpoint, err = onvifinfra.ParseEndpoint(endpoint)
+		host, port, endpoint, err = onvifcli.ParseEndpoint(endpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -388,18 +388,18 @@ func (s *Service) ProbeAll(ctx context.Context) error {
 }
 
 type PlayResult struct {
-	App              string            `json:"app"`
-	Stream           string            `json:"stream"`
-	MediaServerID    string            `json:"mediaServerId"`
-	ConfigCodec      string            `json:"configCodec"`
-	VideoCodec       string            `json:"videoCodec"`
-	AudioCodec       string            `json:"audioCodec"`
-	HasAudio         bool              `json:"hasAudio"`
-	PreferredPlayer  string            `json:"preferredPlayer"`
-	StreamChannel    string            `json:"streamChannel"`
-	StreamType       string            `json:"streamType"`
-	MediaResolution  string            `json:"mediaResolution"`
-	URLs             map[string]string `json:"urls"`
+	App             string            `json:"app"`
+	Stream          string            `json:"stream"`
+	MediaServerID   string            `json:"mediaServerId"`
+	ConfigCodec     string            `json:"configCodec"`
+	VideoCodec      string            `json:"videoCodec"`
+	AudioCodec      string            `json:"audioCodec"`
+	HasAudio        bool              `json:"hasAudio"`
+	PreferredPlayer string            `json:"preferredPlayer"`
+	StreamChannel   string            `json:"streamChannel"`
+	StreamType      string            `json:"streamType"`
+	MediaResolution string            `json:"mediaResolution"`
+	URLs            map[string]string `json:"urls"`
 }
 
 func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken string) (*PlayResult, error) {

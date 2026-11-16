@@ -5,8 +5,8 @@ import (
 
 	domainchannel "zero-web-server/internal/domain/channel"
 	domainplatform "zero-web-server/internal/domain/platform"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/gbsip"
+	"zero-web-server/internal/port"
 )
 
 type channelRepo interface {
@@ -19,8 +19,8 @@ type PlatformChannelRepository interface {
 	AddPlatformChannel(platformID, channelID int) error
 	RemovePlatformChannel(platformID, channelID int) error
 	ListChannelIDsByDevice(deviceID string) ([]int, error)
-	GetPlatformChannel(platformID, channelID int) (*model.PlatformChannel, error)
-	GetByCustomDeviceID(platformID int, customID string) (*model.PlatformChannel, error)
+	GetPlatformChannel(platformID, channelID int) (*domainplatform.Channel, error)
+	GetByCustomDeviceID(platformID int, customID string) (*domainplatform.Channel, error)
 	UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error
 }
 
@@ -35,14 +35,14 @@ type ChannelService struct {
 	platforms  domainplatform.Repository
 	channels   channelRepo
 	platformCh PlatformChannelRepository
-	sip        *sipinfra.PlatformClient
+	sip        port.PlatformClient
 }
 
 func NewChannelService(
 	platforms domainplatform.Repository,
 	channels channelRepo,
 	platformCh PlatformChannelRepository,
-	sipClient *sipinfra.PlatformClient,
+	sipClient port.PlatformClient,
 ) *ChannelService {
 	return &ChannelService{platforms: platforms, channels: channels, platformCh: platformCh, sip: sipClient}
 }
@@ -160,7 +160,7 @@ func (s *ChannelService) PushCatalog(platformID int) error {
 	if err != nil || len(channelIDs) == 0 {
 		return fmt.Errorf("未配置共享通道")
 	}
-	items := make([]sipinfra.CatalogItem, 0, len(channelIDs))
+	items := make([]gbsip.CatalogItem, 0, len(channelIDs))
 	for _, id := range channelIDs {
 		ch, err := s.channels.GetByID(id)
 		if err != nil {
@@ -180,7 +180,7 @@ func (s *ChannelService) PushCatalog(platformID int) error {
 				catalogName = row.CustomName
 			}
 		}
-		items = append(items, sipinfra.CatalogItem{
+		items = append(items, gbsip.CatalogItem{
 			DeviceID: catalogID, Name: catalogName, Status: status,
 		})
 	}

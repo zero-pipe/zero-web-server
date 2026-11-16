@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	domaingroupregion "zero-web-server/internal/domain/groupregion"
 	domaintree "zero-web-server/internal/domain/tree"
 
 	"gorm.io/gorm"
@@ -159,15 +160,7 @@ WHERE channel_type = 0 AND gb_civil_code = ?`
 	return rows, nil
 }
 
-type RegionRecord struct {
-	ID             int    `json:"id"`
-	DeviceID       string `json:"deviceId"`
-	Name           string `json:"name"`
-	ParentID       *int   `json:"parentId"`
-	ParentDeviceID string `json:"parentDeviceId"`
-}
-
-func (r *GroupRegionRepository) AddRegion(region *RegionRecord) error {
+func (r *GroupRegionRepository) AddRegion(region *domaingroupregion.RegionRecord) error {
 	now := nowTimeStr()
 	parentDeviceID := strings.TrimSpace(region.ParentDeviceID)
 	return r.db.Exec(`
@@ -177,7 +170,7 @@ VALUES (?, ?, ?, NULLIF(?, ''), ?, ?)`,
 	).Error
 }
 
-func (r *GroupRegionRepository) UpdateRegion(region *RegionRecord) error {
+func (r *GroupRegionRepository) UpdateRegion(region *domaingroupregion.RegionRecord) error {
 	parentDeviceID := strings.TrimSpace(region.ParentDeviceID)
 	return r.db.Exec(`
 UPDATE zws_common_region
@@ -187,19 +180,8 @@ WHERE id = ?`,
 	).Error
 }
 
-type GroupRecord struct {
-	ID             int    `json:"id"`
-	DeviceID       string `json:"deviceId"`
-	Name           string `json:"name"`
-	ParentID       *int   `json:"parentId"`
-	ParentDeviceID string `json:"parentDeviceId"`
-	BusinessGroup  string `json:"businessGroup"`
-	CivilCode      string `json:"civilCode"`
-	Alias          string `json:"alias"`
-}
-
-func (r *GroupRegionRepository) GetGroupRecordByID(id int) (*GroupRecord, error) {
-	var row GroupRecord
+func (r *GroupRegionRepository) GetGroupRecordByID(id int) (*domaingroupregion.GroupRecord, error) {
+	var row domaingroupregion.GroupRecord
 	if err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias
@@ -212,8 +194,8 @@ FROM zws_common_group WHERE id = ?`, id).Scan(&row).Error; err != nil {
 	return &row, nil
 }
 
-func (r *GroupRegionRepository) GetGroupByDeviceID(deviceID string) (*GroupRecord, error) {
-	var row GroupRecord
+func (r *GroupRegionRepository) GetGroupByDeviceID(deviceID string) (*domaingroupregion.GroupRecord, error) {
+	var row domaingroupregion.GroupRecord
 	if err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias
@@ -262,8 +244,8 @@ func gbGroupTypeCode(deviceID string) string {
 	return ""
 }
 
-func (r *GroupRegionRepository) GetGroupByDeviceAndBusiness(deviceID, businessGroup string) (*GroupRecord, error) {
-	var row GroupRecord
+func (r *GroupRegionRepository) GetGroupByDeviceAndBusiness(deviceID, businessGroup string) (*domaingroupregion.GroupRecord, error) {
+	var row domaingroupregion.GroupRecord
 	if err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias
@@ -276,8 +258,8 @@ FROM zws_common_group WHERE device_id = ? AND business_group = ?`, deviceID, bus
 	return &row, nil
 }
 
-func (r *GroupRegionRepository) GetBusinessGroup(businessGroup string) (*GroupRecord, error) {
-	var row GroupRecord
+func (r *GroupRegionRepository) GetBusinessGroup(businessGroup string) (*domaingroupregion.GroupRecord, error) {
+	var row domaingroupregion.GroupRecord
 	if err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias
@@ -302,7 +284,7 @@ func (r *GroupRegionRepository) ExistsGroupDeviceID(deviceID string, excludeID i
 	return count > 0, nil
 }
 
-func (r *GroupRegionRepository) AddBusinessGroup(group *GroupRecord) error {
+func (r *GroupRegionRepository) AddBusinessGroup(group *domaingroupregion.GroupRecord) error {
 	now := nowTimeStr()
 	civilCode := strings.TrimSpace(group.CivilCode)
 	alias := strings.TrimSpace(group.Alias)
@@ -313,7 +295,7 @@ VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))`,
 	).Error
 }
 
-func (r *GroupRegionRepository) AddVirtualGroup(group *GroupRecord) error {
+func (r *GroupRegionRepository) AddVirtualGroup(group *domaingroupregion.GroupRecord) error {
 	now := nowTimeStr()
 	parentDeviceID := strings.TrimSpace(group.ParentDeviceID)
 	civilCode := strings.TrimSpace(group.CivilCode)
@@ -325,7 +307,7 @@ VALUES (?, ?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))`,
 	).Error
 }
 
-func (r *GroupRegionRepository) UpdateGroup(group *GroupRecord) error {
+func (r *GroupRegionRepository) UpdateGroup(group *domaingroupregion.GroupRecord) error {
 	parentDeviceID := strings.TrimSpace(group.ParentDeviceID)
 	civilCode := strings.TrimSpace(group.CivilCode)
 	alias := strings.TrimSpace(group.Alias)
@@ -339,36 +321,36 @@ WHERE id = ?`,
 	).Error
 }
 
-func (r *GroupRegionRepository) ListGroupsByBusinessGroup(businessGroup string) ([]GroupRecord, error) {
-	var rows []GroupRecord
+func (r *GroupRegionRepository) ListGroupsByBusinessGroup(businessGroup string) ([]domaingroupregion.GroupRecord, error) {
+	var rows []domaingroupregion.GroupRecord
 	err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias
 FROM zws_common_group WHERE business_group = ? AND device_id <> ?`, businessGroup, businessGroup).Scan(&rows).Error
 	if rows == nil {
-		rows = []GroupRecord{}
+		rows = []domaingroupregion.GroupRecord{}
 	}
 	return rows, err
 }
 
-func (r *GroupRegionRepository) ListGroupChildren(parentID int) ([]GroupRecord, error) {
-	var rows []GroupRecord
+func (r *GroupRegionRepository) ListGroupChildren(parentID int) ([]domaingroupregion.GroupRecord, error) {
+	var rows []domaingroupregion.GroupRecord
 	err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias
 FROM zws_common_group WHERE parent_id = ?`, parentID).Scan(&rows).Error
 	if rows == nil {
-		rows = []GroupRecord{}
+		rows = []domaingroupregion.GroupRecord{}
 	}
 	return rows, err
 }
 
-func (r *GroupRegionRepository) CollectGroupDescendants(rootID int) ([]GroupRecord, error) {
+func (r *GroupRegionRepository) CollectGroupDescendants(rootID int) ([]domaingroupregion.GroupRecord, error) {
 	root, err := r.GetGroupRecordByID(rootID)
 	if err != nil {
 		return nil, err
 	}
-	out := []GroupRecord{*root}
+	out := []domaingroupregion.GroupRecord{*root}
 	queue := []int{rootID}
 	for len(queue) > 0 {
 		id := queue[0]
@@ -408,3 +390,5 @@ UPDATE zws_device_channel
 SET gb_parent_id = NULL, gb_business_group_id = NULL, update_time = ?
 WHERE channel_type = 0 AND gb_parent_id IN ?`, nowTimeStr(), deviceIDs).Error
 }
+
+var _ domaingroupregion.Repository = (*GroupRegionRepository)(nil)

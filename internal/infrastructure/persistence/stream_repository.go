@@ -6,12 +6,18 @@ import (
 	"strconv"
 	"time"
 
+	domaincloudrecord "zero-web-server/internal/domain/cloudrecord"
+	domainrecordplan "zero-web-server/internal/domain/recordplan"
 	"zero-web-server/internal/domain/shared"
+	domainstreamproxy "zero-web-server/internal/domain/streamproxy"
+	domainstreampush "zero-web-server/internal/domain/streampush"
 	"zero-web-server/internal/infrastructure/persistence/model"
 	"zero-web-server/pkg/idcode"
 
 	"gorm.io/gorm"
 )
+
+var _ domaincloudrecord.Repository = (*CloudRecordRepository)(nil)
 
 // --- Stream Push ---
 
@@ -37,35 +43,40 @@ type StreamPushRepository struct{ db *gorm.DB }
 
 func NewStreamPushRepository(db *gorm.DB) *StreamPushRepository { return &StreamPushRepository{db: db} }
 
-func (r *StreamPushRepository) Create(m *model.StreamPush) error {
-	return r.db.Create(m).Error
+func (r *StreamPushRepository) Create(d *domainstreampush.StreamPush) error {
+	m := toModelStreamPush(d)
+	if err := r.db.Create(m).Error; err != nil {
+		return err
+	}
+	d.ID = m.ID
+	return nil
 }
 
-func (r *StreamPushRepository) Update(m *model.StreamPush) error {
-	return r.db.Save(m).Error
+func (r *StreamPushRepository) Update(d *domainstreampush.StreamPush) error {
+	return r.db.Save(toModelStreamPush(d)).Error
 }
 
 func (r *StreamPushRepository) Delete(id int) error {
 	return r.db.Delete(&model.StreamPush{}, id).Error
 }
 
-func (r *StreamPushRepository) GetByID(id int) (*model.StreamPush, error) {
+func (r *StreamPushRepository) GetByID(id int) (*domainstreampush.StreamPush, error) {
 	var m model.StreamPush
 	if err := r.db.First(&m, id).Error; err != nil {
 		return nil, err
 	}
-	return &m, nil
+	return toDomainStreamPush(&m), nil
 }
 
-func (r *StreamPushRepository) GetByAppStream(app, stream string) (*model.StreamPush, error) {
+func (r *StreamPushRepository) GetByAppStream(app, stream string) (*domainstreampush.StreamPush, error) {
 	var m model.StreamPush
 	if err := r.db.Where("app = ? AND stream = ?", app, stream).First(&m).Error; err != nil {
 		return nil, err
 	}
-	return &m, nil
+	return toDomainStreamPush(&m), nil
 }
 
-func (r *StreamPushRepository) List(page, count int, query string, pushing *bool, mediaServerID string) ([]StreamPushView, int64, error) {
+func (r *StreamPushRepository) List(page, count int, query string, pushing *bool, mediaServerID string) ([]domainstreampush.View, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -91,13 +102,25 @@ func (r *StreamPushRepository) List(page, count int, query string, pushing *bool
 		return nil, 0, err
 	}
 	var rows []StreamPushView
-	err := base.Order("st.pushing DESC, st.create_time DESC").Offset((page - 1) * count).Limit(count).Scan(&rows).Error
-	for i := range rows {
-		if rows[i].DataType == 0 {
-			rows[i].DataType = shared.ChannelDataTypeStreamPush
-		}
+	if err := base.Order("st.pushing DESC, st.create_time DESC").Offset((page - 1) * count).Limit(count).Scan(&rows).Error; err != nil {
+		return nil, 0, err
 	}
-	return rows, total, err
+	out := make([]domainstreampush.View, 0, len(rows))
+	for i := range rows {
+		dt := rows[i].DataType
+		if dt == 0 {
+			dt = shared.ChannelDataTypeStreamPush
+		}
+		out = append(out, domainstreampush.View{
+			ID: rows[i].ID, App: rows[i].App, Stream: rows[i].Stream,
+			MediaServerID: rows[i].MediaServerID, ServerID: rows[i].ServerID,
+			PushTime: rows[i].PushTime, CreateTime: rows[i].CreateTime, UpdateTime: rows[i].UpdateTime,
+			Pushing: rows[i].Pushing, StartOfflinePush: rows[i].StartOfflinePush,
+			GbID: rows[i].GbID, GbDeviceID: rows[i].GbDeviceID, GbName: rows[i].GbName,
+			Name: rows[i].Name, DataType: dt,
+		})
+	}
+	return out, total, nil
 }
 
 func (r *StreamPushRepository) UpdatePushing(id int, pushing bool, mediaServerID string) error {
@@ -139,29 +162,36 @@ func (r *StreamPushRepository) RemoveGBChannel(pushID int) error {
 
 type StreamProxyRepository struct{ db *gorm.DB }
 
-func NewStreamProxyRepository(db *gorm.DB) *StreamProxyRepository { return &StreamProxyRepository{db: db} }
-
-func (r *StreamProxyRepository) Create(m *model.StreamProxy) error {
-	return r.db.Create(m).Error
+func NewStreamProxyRepository(db *gorm.DB) *StreamProxyRepository {
+	return &StreamProxyRepository{db: db}
 }
 
-func (r *StreamProxyRepository) Update(m *model.StreamProxy) error {
-	return r.db.Save(m).Error
+func (r *StreamProxyRepository) Create(d *domainstreamproxy.StreamProxy) error {
+	m := toModelStreamProxy(d)
+	if err := r.db.Create(m).Error; err != nil {
+		return err
+	}
+	d.ID = m.ID
+	return nil
+}
+
+func (r *StreamProxyRepository) Update(d *domainstreamproxy.StreamProxy) error {
+	return r.db.Save(toModelStreamProxy(d)).Error
 }
 
 func (r *StreamProxyRepository) Delete(id int) error {
 	return r.db.Delete(&model.StreamProxy{}, id).Error
 }
 
-func (r *StreamProxyRepository) GetByID(id int) (*model.StreamProxy, error) {
+func (r *StreamProxyRepository) GetByID(id int) (*domainstreamproxy.StreamProxy, error) {
 	var m model.StreamProxy
 	if err := r.db.First(&m, id).Error; err != nil {
 		return nil, err
 	}
-	return &m, nil
+	return toDomainStreamProxy(&m), nil
 }
 
-func (r *StreamProxyRepository) List(page, count int, query string, pulling *bool, mediaServerID string) ([]model.StreamProxy, int64, error) {
+func (r *StreamProxyRepository) List(page, count int, query string, pulling *bool, mediaServerID string) ([]domainstreamproxy.StreamProxy, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -187,15 +217,19 @@ func (r *StreamProxyRepository) List(page, count int, query string, pulling *boo
 	if err := q.Order("id DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
-	return rows, total, nil
+	out := make([]domainstreamproxy.StreamProxy, 0, len(rows))
+	for i := range rows {
+		out = append(out, *toDomainStreamProxy(&rows[i]))
+	}
+	return out, total, nil
 }
 
-func (r *StreamProxyRepository) GetByAppStream(app, stream string) (*model.StreamProxy, error) {
+func (r *StreamProxyRepository) GetByAppStream(app, stream string) (*domainstreamproxy.StreamProxy, error) {
 	var m model.StreamProxy
 	if err := r.db.Where("app = ? AND stream = ?", app, stream).First(&m).Error; err != nil {
 		return nil, err
 	}
-	return &m, nil
+	return toDomainStreamProxy(&m), nil
 }
 
 func (r *StreamProxyRepository) UpsertGBChannel(proxyID int, gbDeviceID, gbName, app, stream string) error {
@@ -226,34 +260,47 @@ func (r *StreamProxyRepository) UpsertGBChannel(proxyID int, gbDeviceID, gbName,
 
 type CloudRecordRepository struct{ db *gorm.DB }
 
-func NewCloudRecordRepository(db *gorm.DB) *CloudRecordRepository { return &CloudRecordRepository{db: db} }
+func NewCloudRecordRepository(db *gorm.DB) *CloudRecordRepository {
+	return &CloudRecordRepository{db: db}
+}
 
-func (r *CloudRecordRepository) Create(rec *model.CloudRecord) error {
-	return r.db.Create(rec).Error
+func (r *CloudRecordRepository) Create(rec *domaincloudrecord.Record) error {
+	m := toModelCloudRecord(rec)
+	if err := r.db.Create(m).Error; err != nil {
+		return err
+	}
+	rec.ID = m.ID
+	return nil
 }
 
 func (r *CloudRecordRepository) Delete(ids []int) error {
 	return r.db.Where("id IN ?", ids).Delete(&model.CloudRecord{}).Error
 }
 
-func (r *CloudRecordRepository) ListByIDs(ids []int) ([]model.CloudRecord, error) {
-	var rows []model.CloudRecord
+func (r *CloudRecordRepository) ListByIDs(ids []int) ([]domaincloudrecord.Record, error) {
+	out := make([]domaincloudrecord.Record, 0, len(ids))
 	if len(ids) == 0 {
-		return rows, nil
+		return out, nil
 	}
-	err := r.db.Where("id IN ?", ids).Find(&rows).Error
-	return rows, err
+	var rows []model.CloudRecord
+	if err := r.db.Where("id IN ?", ids).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		out = append(out, *toDomainCloudRecord(&rows[i]))
+	}
+	return out, nil
 }
 
-func (r *CloudRecordRepository) GetByID(id int) (*model.CloudRecord, error) {
+func (r *CloudRecordRepository) GetByID(id int) (*domaincloudrecord.Record, error) {
 	var m model.CloudRecord
 	if err := r.db.First(&m, id).Error; err != nil {
 		return nil, err
 	}
-	return &m, nil
+	return toDomainCloudRecord(&m), nil
 }
 
-func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]model.CloudRecord, int64, error) {
+func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]domaincloudrecord.Record, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -305,8 +352,34 @@ func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID
 		order = "start_time ASC"
 	}
 	var rows []model.CloudRecord
-	err := q.Order(order).Offset((page - 1) * count).Limit(count).Find(&rows).Error
-	return rows, total, err
+	if err := q.Order(order).Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	out := make([]domaincloudrecord.Record, 0, len(rows))
+	for i := range rows {
+		out = append(out, *toDomainCloudRecord(&rows[i]))
+	}
+	return out, total, nil
+}
+
+func toModelCloudRecord(d *domaincloudrecord.Record) *model.CloudRecord {
+	return &model.CloudRecord{
+		ID: d.ID, App: d.App, Stream: d.Stream, CallID: d.CallID,
+		StartTime: d.StartTime, EndTime: d.EndTime,
+		MediaServerID: d.MediaServerID, ServerID: d.ServerID,
+		FileName: d.FileName, Folder: d.Folder, FilePath: d.FilePath,
+		PlayURL: d.PlayURL, Collect: d.Collect, FileSize: d.FileSize, TimeLen: d.TimeLen,
+	}
+}
+
+func toDomainCloudRecord(m *model.CloudRecord) *domaincloudrecord.Record {
+	return &domaincloudrecord.Record{
+		ID: m.ID, App: m.App, Stream: m.Stream, CallID: m.CallID,
+		StartTime: m.StartTime, EndTime: m.EndTime,
+		MediaServerID: m.MediaServerID, ServerID: m.ServerID,
+		FileName: m.FileName, Folder: m.Folder, FilePath: m.FilePath,
+		PlayURL: m.PlayURL, Collect: m.Collect, FileSize: m.FileSize, TimeLen: m.TimeLen,
+	}
 }
 
 func (r *CloudRecordRepository) DateList(app, stream, mediaServerID string, year, month int) ([]string, error) {
@@ -347,24 +420,28 @@ type RecordPlanRepository struct{ db *gorm.DB }
 
 func NewRecordPlanRepository(db *gorm.DB) *RecordPlanRepository { return &RecordPlanRepository{db: db} }
 
-func (r *RecordPlanRepository) Create(plan *model.RecordPlan, items []model.RecordPlanItem) error {
+func (r *RecordPlanRepository) Create(plan *domainrecordplan.Plan, items []domainrecordplan.Item) error {
+	mp := toModelRecordPlan(plan)
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(plan).Error; err != nil {
+		if err := tx.Create(mp).Error; err != nil {
 			return err
 		}
+		plan.ID = mp.ID
 		for i := range items {
 			items[i].PlanID = plan.ID
-			if err := tx.Create(&items[i]).Error; err != nil {
+			mi := toModelRecordPlanItem(&items[i])
+			if err := tx.Create(mi).Error; err != nil {
 				return err
 			}
+			items[i].ID = mi.ID
 		}
 		return nil
 	})
 }
 
-func (r *RecordPlanRepository) Update(plan *model.RecordPlan, items []model.RecordPlanItem) error {
+func (r *RecordPlanRepository) Update(plan *domainrecordplan.Plan, items []domainrecordplan.Item) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(plan).Error; err != nil {
+		if err := tx.Save(toModelRecordPlan(plan)).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("plan_id = ?", plan.ID).Delete(&model.RecordPlanItem{}).Error; err != nil {
@@ -372,7 +449,7 @@ func (r *RecordPlanRepository) Update(plan *model.RecordPlan, items []model.Reco
 		}
 		for i := range items {
 			items[i].PlanID = plan.ID
-			if err := tx.Create(&items[i]).Error; err != nil {
+			if err := tx.Create(toModelRecordPlanItem(&items[i])).Error; err != nil {
 				return err
 			}
 		}
@@ -388,17 +465,21 @@ func (r *RecordPlanRepository) Delete(id int) error {
 	})
 }
 
-func (r *RecordPlanRepository) GetByID(id int) (*model.RecordPlan, []model.RecordPlanItem, error) {
+func (r *RecordPlanRepository) GetByID(id int) (*domainrecordplan.Plan, []domainrecordplan.Item, error) {
 	var plan model.RecordPlan
 	if err := r.db.First(&plan, id).Error; err != nil {
 		return nil, nil, err
 	}
-	var items []model.RecordPlanItem
-	_ = r.db.Where("plan_id = ?", id).Find(&items)
-	return &plan, items, nil
+	var rows []model.RecordPlanItem
+	_ = r.db.Where("plan_id = ?", id).Find(&rows)
+	items := make([]domainrecordplan.Item, 0, len(rows))
+	for i := range rows {
+		items = append(items, *toDomainRecordPlanItem(&rows[i]))
+	}
+	return toDomainRecordPlan(&plan), items, nil
 }
 
-func (r *RecordPlanRepository) List(page, count int, query string) ([]model.RecordPlan, int64, error) {
+func (r *RecordPlanRepository) List(page, count int, query string) ([]domainrecordplan.Plan, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -414,8 +495,14 @@ func (r *RecordPlanRepository) List(page, count int, query string) ([]model.Reco
 		return nil, 0, err
 	}
 	var rows []model.RecordPlan
-	err := q.Order("id DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error
-	return rows, total, err
+	if err := q.Order("id DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	out := make([]domainrecordplan.Plan, 0, len(rows))
+	for i := range rows {
+		out = append(out, *toDomainRecordPlan(&rows[i]))
+	}
+	return out, total, nil
 }
 
 func (r *RecordPlanRepository) LinkChannels(planID int, channelIDs []int) error {
@@ -447,7 +534,7 @@ func (r *RecordPlanRepository) UnlinkAll(planID int) error {
 	return r.db.Model(&model.GBDeviceChannel{}).Where("record_plan_id = ?", planID).Update("record_plan_id", 0).Error
 }
 
-func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query string, hasLink *bool, online, channelType string) ([]model.GBDeviceChannel, int64, error) {
+func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query string, hasLink *bool, online, channelType string) ([]domainrecordplan.ChannelRecord, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -481,8 +568,14 @@ func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query st
 		return nil, 0, err
 	}
 	var rows []model.GBDeviceChannel
-	err := q.Order("id ASC").Offset((page - 1) * count).Limit(count).Find(&rows).Error
-	return rows, total, err
+	if err := q.Order("id ASC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
+	for i := range rows {
+		out = append(out, *toDomainChannelRecord(&rows[i]))
+	}
+	return out, total, nil
 }
 
 func (r *RecordPlanRepository) CountChannels(planID int) int64 {
@@ -491,7 +584,7 @@ func (r *RecordPlanRepository) CountChannels(planID int) int64 {
 	return n
 }
 
-func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) ([]model.GBDeviceChannel, error) {
+func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) ([]domainrecordplan.ChannelRecord, error) {
 	var rows []model.GBDeviceChannel
 	err := r.db.Table("zws_device_channel wdc").
 		Select("wdc.*").
@@ -499,5 +592,94 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 		Where("wrpi.week_day = ? AND wrpi.start <= ? AND wrpi.stop >= ?", weekDay, minuteIndex, minuteIndex).
 		Group("wdc.id").
 		Find(&rows).Error
-	return rows, err
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
+	for i := range rows {
+		out = append(out, *toDomainChannelRecord(&rows[i]))
+	}
+	return out, nil
 }
+
+func toModelStreamPush(d *domainstreampush.StreamPush) *model.StreamPush {
+	return &model.StreamPush{
+		ID: d.ID, App: d.App, Stream: d.Stream, MediaServerID: d.MediaServerID,
+		ServerID: d.ServerID, PushTime: d.PushTime, Status: d.Status, UpdateTime: d.UpdateTime,
+		CreateTime: d.CreateTime, Pushing: d.Pushing, StartOfflinePush: d.StartOfflinePush,
+	}
+}
+
+func toDomainStreamPush(m *model.StreamPush) *domainstreampush.StreamPush {
+	return &domainstreampush.StreamPush{
+		ID: m.ID, App: m.App, Stream: m.Stream, MediaServerID: m.MediaServerID,
+		ServerID: m.ServerID, PushTime: m.PushTime, Status: m.Status, UpdateTime: m.UpdateTime,
+		CreateTime: m.CreateTime, Pushing: m.Pushing, StartOfflinePush: m.StartOfflinePush,
+	}
+}
+
+func toModelStreamProxy(d *domainstreamproxy.StreamProxy) *model.StreamProxy {
+	return &model.StreamProxy{
+		ID: d.ID, Type: d.Type, App: d.App, Stream: d.Stream, SrcURL: d.SrcURL, Timeout: d.Timeout,
+		FFmpegCmdKey: d.FFmpegCmdKey, RTSPType: d.RTSPType, MediaServerID: d.MediaServerID,
+		EnableAudio: d.EnableAudio, EnableMP4: d.EnableMP4, Pulling: d.Pulling, Enable: d.Enable,
+		CreateTime: d.CreateTime, Name: d.Name, UpdateTime: d.UpdateTime, StreamKey: d.StreamKey,
+		ServerID: d.ServerID, EnableDisableNoneReader: d.EnableDisableNoneReader,
+		RelatesMediaServerID: d.RelatesMediaServerID,
+	}
+}
+
+func toDomainStreamProxy(m *model.StreamProxy) *domainstreamproxy.StreamProxy {
+	return &domainstreamproxy.StreamProxy{
+		ID: m.ID, Type: m.Type, App: m.App, Stream: m.Stream, SrcURL: m.SrcURL, Timeout: m.Timeout,
+		FFmpegCmdKey: m.FFmpegCmdKey, RTSPType: m.RTSPType, MediaServerID: m.MediaServerID,
+		EnableAudio: m.EnableAudio, EnableMP4: m.EnableMP4, Pulling: m.Pulling, Enable: m.Enable,
+		CreateTime: m.CreateTime, Name: m.Name, UpdateTime: m.UpdateTime, StreamKey: m.StreamKey,
+		ServerID: m.ServerID, EnableDisableNoneReader: m.EnableDisableNoneReader,
+		RelatesMediaServerID: m.RelatesMediaServerID,
+	}
+}
+
+var (
+	_ domainstreampush.Repository  = (*StreamPushRepository)(nil)
+	_ domainstreamproxy.Repository = (*StreamProxyRepository)(nil)
+)
+
+func toModelRecordPlan(d *domainrecordplan.Plan) *model.RecordPlan {
+	return &model.RecordPlan{ID: d.ID, Snap: d.Snap, Name: d.Name, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime}
+}
+
+func toDomainRecordPlan(m *model.RecordPlan) *domainrecordplan.Plan {
+	return &domainrecordplan.Plan{ID: m.ID, Snap: m.Snap, Name: m.Name, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime}
+}
+
+func toModelRecordPlanItem(d *domainrecordplan.Item) *model.RecordPlanItem {
+	return &model.RecordPlanItem{
+		ID: d.ID, Start: d.Start, Stop: d.Stop, WeekDay: d.WeekDay, PlanID: d.PlanID,
+		CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
+	}
+}
+
+func toDomainRecordPlanItem(m *model.RecordPlanItem) *domainrecordplan.Item {
+	return &domainrecordplan.Item{
+		ID: m.ID, Start: m.Start, Stop: m.Stop, WeekDay: m.WeekDay, PlanID: m.PlanID,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+}
+
+func toDomainChannelRecord(m *model.GBDeviceChannel) *domainrecordplan.ChannelRecord {
+	return &domainrecordplan.ChannelRecord{
+		ID: m.ID, InternalCode: m.InternalCode, DeviceID: m.DeviceID, Name: m.Name,
+		Manufacturer: m.Manufacturer, Model: m.Model, Owner: m.Owner, CivilCode: m.CivilCode,
+		Block: m.Block, Address: m.Address, Parental: m.Parental, ParentID: m.ParentID,
+		Status: m.Status, Longitude: m.Longitude, Latitude: m.Latitude, PTZType: m.PTZType,
+		BusinessGroupID: m.BusinessGroupID, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+		SubCount: m.SubCount, HasAudio: m.HasAudio, ChannelType: m.ChannelType, MapLevel: m.MapLevel,
+		GBDeviceID: m.GBDeviceID, GBName: m.GBName, GBManufacturer: m.GBManufacturer, GBModel: m.GBModel,
+		GBCivilCode: m.GBCivilCode, GBParentID: m.GBParentID, GBStatus: m.GBStatus,
+		GBLongitude: m.GBLongitude, GBLatitude: m.GBLatitude, GBBusinessGroupID: m.GBBusinessGroupID,
+		GBPTZType: m.GBPTZType, RecordPlanID: m.RecordPlanID, DataType: m.DataType, DataDeviceID: m.DataDeviceID,
+	}
+}
+
+var _ domainrecordplan.Repository = (*RecordPlanRepository)(nil)

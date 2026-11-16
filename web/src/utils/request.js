@@ -30,7 +30,7 @@ service.interceptors.request.use(
 // response interceptor
 service.interceptors.response.use(
   response => {
-    if (response.config.url && response.config.url.indexOf('/api/user/logout') >= 0) {
+    if (response.config.url && response.config.url.indexOf('/api/v1/user/logout') >= 0) {
       return
     }
     const res = response.data

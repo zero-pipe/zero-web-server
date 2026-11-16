@@ -31,7 +31,7 @@ func (h *PlayHandler) Start(c *gin.Context) {
 
 	content, err := h.svc.StartPlay(ctx, deviceID, channelID)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -39,7 +39,7 @@ func (h *PlayHandler) Start(c *gin.Context) {
 
 func (h *PlayHandler) Stop(c *gin.Context) {
 	if err := h.svc.StopPlay(c.Param("deviceId"), c.Param("channelId")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -49,7 +49,7 @@ func (h *PlayHandler) Broadcast(c *gin.Context) {
 	broadcastMode := c.Query("broadcastMode") == "true"
 	result, err := h.svc.AudioBroadcast(c.Param("deviceId"), c.Param("channelId"), broadcastMode)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, result)
@@ -57,7 +57,7 @@ func (h *PlayHandler) Broadcast(c *gin.Context) {
 
 func (h *PlayHandler) BroadcastStop(c *gin.Context) {
 	if err := h.svc.StopAudioBroadcast(c.Param("deviceId"), c.Param("channelId")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

@@ -26,7 +26,7 @@ const users = {
 module.exports = [
   // user login
   {
-    url: '/api/mock/user/login',
+    url: '/api/v1/mock/user/login',
     type: 'post',
     response: config => {
       const { username } = config.body
@@ -49,7 +49,7 @@ module.exports = [
 
   // get user info
   {
-    url: '/api/mock/user/info\.*',
+    url: '/api/v1/mock/user/info\.*',
     type: 'get',
     response: config => {
       const { token } = config.query
@@ -72,7 +72,7 @@ module.exports = [
 
   // user logout
   {
-    url: '/api/mock/user/logout',
+    url: '/api/v1/mock/user/logout',
     type: 'post',
     response: _ => {
       return {

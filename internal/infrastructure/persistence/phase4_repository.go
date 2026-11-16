@@ -241,23 +241,32 @@ func (r *PlatformRepository) RemovePlatformChannel(platformID, channelID int) er
 		Delete(&model.PlatformChannel{}).Error
 }
 
-func (r *PlatformRepository) GetPlatformChannel(platformID, channelID int) (*model.PlatformChannel, error) {
+func (r *PlatformRepository) GetPlatformChannel(platformID, channelID int) (*domainplatform.Channel, error) {
 	var row model.PlatformChannel
 	err := r.db.Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).First(&row).Error
 	if err != nil {
 		return nil, err
 	}
-	return &row, nil
+	return toDomainPlatformChannel(&row), nil
 }
 
-func (r *PlatformRepository) GetByCustomDeviceID(platformID int, customID string) (*model.PlatformChannel, error) {
+func (r *PlatformRepository) GetByCustomDeviceID(platformID int, customID string) (*domainplatform.Channel, error) {
 	var row model.PlatformChannel
 	err := r.db.Where("platform_id = ? AND custom_device_id = ?", platformID, customID).First(&row).Error
 	if err != nil {
 		return nil, err
 	}
-	return &row, nil
+	return toDomainPlatformChannel(&row), nil
 }
+
+func toDomainPlatformChannel(m *model.PlatformChannel) *domainplatform.Channel {
+	return &domainplatform.Channel{
+		ID: m.ID, PlatformID: m.PlatformID, DeviceChannelID: m.DeviceChannelID,
+		CustomDeviceID: m.CustomDeviceID, CustomName: m.CustomName,
+	}
+}
+
+var _ domainplatform.ChannelRepository = (*PlatformRepository)(nil)
 
 func (r *PlatformRepository) UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error {
 	return r.db.Model(&model.PlatformChannel{}).

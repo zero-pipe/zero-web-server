@@ -6,7 +6,7 @@ import (
 
 	domainalarm "zero-web-server/internal/domain/alarm"
 	domainchannel "zero-web-server/internal/domain/channel"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/gbsip"
 )
 
 type Service struct {
@@ -18,7 +18,7 @@ func NewService(alarms domainalarm.Repository, channels domainchannel.Repository
 	return &Service{alarms: alarms, channels: channels}
 }
 
-func (s *Service) HandleNotify(deviceID, channelGBID string, n *sipinfra.AlarmNotify) error {
+func (s *Service) HandleNotify(deviceID, channelGBID string, n *gbsip.AlarmNotify) error {
 	if n == nil {
 		return nil
 	}

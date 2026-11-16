@@ -2,7 +2,7 @@ import request from '@/utils/request'
 
 export function login(params) {
   return request({
-    url: '/api/user/login',
+    url: '/api/v1/user/login',
     method: 'get',
     params: params
   })
@@ -10,14 +10,14 @@ export function login(params) {
 
 export function logout() {
   return request({
-    url: '/api/user/logout',
+    url: '/api/v1/user/logout',
     method: 'get'
   })
 }
 export function getUserInfo() {
   return request({
     method: 'post',
-    url: '/api/user/userInfo'
+    url: '/api/v1/user/userInfo'
   })
 }
 
@@ -25,7 +25,7 @@ export function changePushKey(params) {
   const { pushKey, userId } = params
   return request({
     method: 'post',
-    url: '/api/user/changePushKey',
+    url: '/api/v1/user/changePushKey',
     params: {
       pushKey: pushKey,
       userId: userId
@@ -37,7 +37,7 @@ export function queryList(params) {
   const { page, count } = params
   return request({
     method: 'get',
-    url: `/api/user/users`,
+    url: `/api/v1/user/users`,
     params: {
       page: page,
       count: count
@@ -48,7 +48,7 @@ export function queryList(params) {
 export function removeById(id) {
   return request({
     method: 'delete',
-    url: `/api/user/delete?id=${id}`
+    url: `/api/v1/user/delete?id=${id}`
 
   })
 }
@@ -57,7 +57,7 @@ export function add(params) {
   const { username, password, roleId } = params
   return request({
     method: 'post',
-    url: '/api/user/add',
+    url: '/api/v1/user/add',
     params: {
       username: username,
       password: password,
@@ -70,7 +70,7 @@ export function changePassword(params) {
   const { oldPassword, password } = params
   return request({
     method: 'post',
-    url: '/api/user/changePassword',
+    url: '/api/v1/user/changePassword',
     params: {
       oldPassword: oldPassword,
       password: password
@@ -82,7 +82,7 @@ export function changePasswordForAdmin(params) {
   const { password, userId } = params
   return request({
     method: 'post',
-    url: '/api/user/changePasswordForAdmin',
+    url: '/api/v1/user/changePasswordForAdmin',
     params: {
       password: password,
       userId: userId

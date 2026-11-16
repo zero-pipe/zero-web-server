@@ -6,8 +6,8 @@ import (
 
 	deviceapp "zero-web-server/internal/application/device"
 	domaindevice "zero-web-server/internal/domain/device"
+	"zero-web-server/internal/dto"
 	sipinfra "zero-web-server/internal/infrastructure/sip"
-	"zero-web-server/internal/interfaces/http/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -49,7 +49,7 @@ func (h *DeviceHandler) ListDevices(c *gin.Context) {
 	}
 	devices, total, err := h.svc.List(page, count, query, online)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(devices, total, page, count))
@@ -66,7 +66,7 @@ func (h *DeviceHandler) ListChannels(c *gin.Context) {
 	}
 	channels, total, err := h.svc.ListChannels(deviceID, page, count, query, online)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(dto.NewChannelViews(channels), total, page, count))
@@ -75,7 +75,7 @@ func (h *DeviceHandler) ListChannels(c *gin.Context) {
 func (h *DeviceHandler) SyncDevice(c *gin.Context) {
 	deviceID := c.Param("deviceId")
 	if err := h.svc.SyncCatalog(deviceID); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -94,7 +94,7 @@ func (h *DeviceHandler) SyncStatus(c *gin.Context) {
 
 func (h *DeviceHandler) DeleteDevice(c *gin.Context) {
 	if err := h.svc.Delete(c.Param("deviceId")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -107,7 +107,7 @@ func (h *DeviceHandler) AddDevice(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AddDevice(&device); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -120,7 +120,7 @@ func (h *DeviceHandler) UpdateDevice(c *gin.Context) {
 		return
 	}
 	if err := h.svc.UpdateDevice(&device); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -145,7 +145,7 @@ func (h *DeviceHandler) SetTransport(c *gin.Context) {
 	}
 	device.StreamMode = sipinfra.NormalizeStreamMode(c.Param("streamMode"))
 	if err := h.svc.UpdateDevice(device); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -155,7 +155,7 @@ func (h *DeviceHandler) SubscribeCatalog(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	cycle, _ := strconv.Atoi(c.Query("cycle"))
 	if err := h.svc.SubscribeCatalog(id, cycle); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -166,7 +166,7 @@ func (h *DeviceHandler) SubscribeMobilePosition(c *gin.Context) {
 	cycle, _ := strconv.Atoi(c.Query("cycle"))
 	interval, _ := strconv.Atoi(c.DefaultQuery("interval", "5"))
 	if err := h.svc.SubscribeMobilePosition(id, cycle, interval); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -176,7 +176,7 @@ func (h *DeviceHandler) SubscribeAlarm(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	cycle, _ := strconv.Atoi(c.Query("cycle"))
 	if err := h.svc.SubscribeAlarm(id, cycle); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -191,7 +191,7 @@ func (h *DeviceHandler) Guard(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Guard(deviceID, guardCmd); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -207,7 +207,7 @@ func (h *DeviceHandler) Record(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Record(deviceID, channelID, recordCmd); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -237,7 +237,7 @@ func (h *DeviceHandler) dragZoom(c *gin.Context, zoomIn bool) {
 	lengthX, _ := strconv.Atoi(c.Query("lengthX"))
 	lengthY, _ := strconv.Atoi(c.Query("lengthY"))
 	if err := h.svc.DragZoom(deviceID, channelID, zoomIn, length, width, midX, midY, lengthX, lengthY); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -255,7 +255,7 @@ func (h *DeviceHandler) HomePosition(c *gin.Context) {
 	resetTime, _ := strconv.Atoi(c.DefaultQuery("resetTime", "0"))
 	presetIndex, _ := strconv.Atoi(c.DefaultQuery("presetIndex", "1"))
 	if err := h.svc.HomePosition(deviceID, channelID, enabled, resetTime, presetIndex); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -270,7 +270,7 @@ func (h *DeviceHandler) QueryBasicParam(c *gin.Context) {
 	}
 	data, err := h.svc.QueryBasicParam(deviceID)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, data)
@@ -289,7 +289,7 @@ func (h *DeviceHandler) SetBasicParam(c *gin.Context) {
 	heartBeatCount, _ := strconv.Atoi(c.DefaultQuery("heartBeatCount", "3"))
 	positionCapability, _ := strconv.Atoi(c.DefaultQuery("positionCapability", "0"))
 	if err := h.svc.SetBasicParam(deviceID, name, expiration, heartBeatInterval, heartBeatCount, positionCapability); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -322,7 +322,7 @@ func (h *DeviceHandler) ChangeChannelAudio(c *gin.Context) {
 	}
 	audio := c.PostForm("audio") == "true" || c.Query("audio") == "true"
 	if err := h.svc.ChangeChannelAudio(channelID, audio); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

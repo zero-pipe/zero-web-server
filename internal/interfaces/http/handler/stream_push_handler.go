@@ -6,8 +6,8 @@ import (
 	"time"
 
 	streampushapp "zero-web-server/internal/application/streampush"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	domainstreampush "zero-web-server/internal/domain/streampush"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +27,7 @@ func NewStreamPushHandler(svc *streampushapp.Service, playTimeoutMs int) *Stream
 }
 
 type streamPushBody struct {
-	model.StreamPush
+	domainstreampush.StreamPush
 	GBDeviceID string `json:"gbDeviceId"`
 	GBName     string `json:"gbName"`
 	GbID       string `json:"gbId"`
@@ -43,7 +43,7 @@ func (h *StreamPushHandler) List(c *gin.Context) {
 	}
 	list, total, err := h.svc.List(page, count, c.Query("query"), pushing, c.Query("mediaServerId"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -64,20 +64,20 @@ func (h *StreamPushHandler) Add(c *gin.Context) {
 		name = body.Name
 	}
 	if err := h.svc.Add(&body.StreamPush, gbID, name); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, body.StreamPush)
 }
 
 func (h *StreamPushHandler) Update(c *gin.Context) {
-	var body model.StreamPush
+	var body domainstreampush.StreamPush
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, response.CodeBadReq, "参数错误")
 		return
 	}
 	if err := h.svc.Update(&body); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -86,7 +86,7 @@ func (h *StreamPushHandler) Update(c *gin.Context) {
 func (h *StreamPushHandler) Remove(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	if err := h.svc.Remove(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -101,7 +101,7 @@ func (h *StreamPushHandler) BatchRemove(c *gin.Context) {
 		return
 	}
 	if err := h.svc.BatchRemove(body.IDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -118,7 +118,7 @@ func (h *StreamPushHandler) SaveToGB(c *gin.Context) {
 		return
 	}
 	if err := h.svc.SaveToGB(body.ID, body.GBDeviceID, body.Name); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -130,7 +130,7 @@ func (h *StreamPushHandler) Start(c *gin.Context) {
 	defer cancel()
 	content, err := h.svc.Start(ctx, id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -145,7 +145,7 @@ func (h *StreamPushHandler) RemoveFromGB(c *gin.Context) {
 		return
 	}
 	if err := h.svc.RemoveFromGB(body.ID); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

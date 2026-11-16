@@ -6,8 +6,8 @@ import (
 	"time"
 
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	domaincloudrecord "zero-web-server/internal/domain/cloudrecord"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -55,11 +55,11 @@ func (h *CloudRecordHandler) List(c *gin.Context) {
 	list, total, err := h.svc.List(page, count, c.Query("app"), c.Query("stream"), c.Query("query"),
 		c.Query("callId"), c.Query("mediaServerId"), startTime, endTime, asc)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	if list == nil {
-		list = []model.CloudRecord{}
+		list = []domaincloudrecord.Record{}
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
 }
@@ -69,7 +69,7 @@ func (h *CloudRecordHandler) DateList(c *gin.Context) {
 	month, _ := strconv.Atoi(c.Query("month"))
 	dates, err := h.svc.DateList(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"), year, month)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dates)
@@ -84,7 +84,7 @@ func (h *CloudRecordHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Delete(body.IDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -94,7 +94,7 @@ func (h *CloudRecordHandler) PlayPath(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("recordId"))
 	info, err := h.svc.GetPlayPath(id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, info)
@@ -106,7 +106,7 @@ func (h *CloudRecordHandler) LoadRecord(c *gin.Context) {
 	defer cancel()
 	content, err := h.svc.LoadRecord(ctx, c.Query("app"), c.Query("stream"), cloudID)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -115,7 +115,7 @@ func (h *CloudRecordHandler) LoadRecord(c *gin.Context) {
 func (h *CloudRecordHandler) Seek(c *gin.Context) {
 	seek, _ := strconv.ParseFloat(c.Query("seek"), 64)
 	if err := h.svc.Seek(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"), seek, c.Query("schema")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -124,7 +124,7 @@ func (h *CloudRecordHandler) Seek(c *gin.Context) {
 func (h *CloudRecordHandler) Speed(c *gin.Context) {
 	speed, _ := strconv.Atoi(c.Query("speed"))
 	if err := h.svc.Speed(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"), speed, c.Query("schema")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -133,7 +133,7 @@ func (h *CloudRecordHandler) Speed(c *gin.Context) {
 func (h *CloudRecordHandler) AddTask(c *gin.Context) {
 	taskID, err := h.svc.AddTask(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"), c.Query("startTime"), c.Query("endTime"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, taskID)
@@ -147,7 +147,7 @@ func (h *CloudRecordHandler) TaskList(c *gin.Context) {
 	}
 	list, err := h.svc.QueryTaskList(c.Query("mediaServerId"), isEnd)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)

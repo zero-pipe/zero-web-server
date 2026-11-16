@@ -3,7 +3,7 @@ import request from '@/utils/request'
 export function querySubordinate(params) {
   return request({
     method: 'get',
-    url: '/api/subordinate/query',
+    url: '/api/v1/subordinate/query',
     params
   })
 }
@@ -11,7 +11,7 @@ export function querySubordinate(params) {
 export function addSubordinate(data) {
   return request({
     method: 'post',
-    url: '/api/subordinate/add',
+    url: '/api/v1/subordinate/add',
     data
   })
 }
@@ -19,7 +19,7 @@ export function addSubordinate(data) {
 export function updateSubordinate(id, data) {
   return request({
     method: 'post',
-    url: `/api/subordinate/update/${id}`,
+    url: `/api/v1/subordinate/update/${id}`,
     data
   })
 }
@@ -27,6 +27,6 @@ export function updateSubordinate(id, data) {
 export function removeSubordinate(id) {
   return request({
     method: 'delete',
-    url: `/api/subordinate/delete/${id}`
+    url: `/api/v1/subordinate/delete/${id}`
   })
 }

@@ -4,17 +4,18 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"zero-web-server/internal/apperr"
 
-	domainsub "zero-web-server/internal/domain/subordinate"
 	gbserver "github.com/zero-pipe/gb28181-go/server"
+	domainsub "zero-web-server/internal/domain/subordinate"
 )
 
 var (
-	ErrNameRequired   = errors.New("名称不能为空")
-	ErrGBIDRequired   = errors.New("下级平台国标编号不能为空")
-	ErrGBIDLength     = errors.New("下级平台国标编号须为20位")
-	ErrPasswordRequired = errors.New("注册密码不能为空")
-	ErrDisabled       = errors.New("下级平台未启用")
+	ErrNameRequired     = apperr.New(apperr.CodeCascade+1, "名称不能为空")
+	ErrGBIDRequired     = apperr.New(apperr.CodeCascade+2, "下级平台国标编号不能为空")
+	ErrGBIDLength       = apperr.New(apperr.CodeCascade+3, "下级平台国标编号须为20位")
+	ErrPasswordRequired = apperr.New(apperr.CodeCascade+4, "注册密码不能为空")
+	ErrDisabled         = apperr.New(apperr.CodeCascade+5, "下级平台未启用")
 )
 
 type Service struct {

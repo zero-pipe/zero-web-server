@@ -2,12 +2,12 @@ package hook
 
 import (
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
-	publishauth "zero-web-server/internal/application/publishauth"
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
+	publishauth "zero-web-server/internal/application/publishauth"
 	recordplanapp "zero-web-server/internal/application/recordplan"
-	streampushapp "zero-web-server/internal/application/streampush"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
+	streampushapp "zero-web-server/internal/application/streampush"
 	applog "zero-web-server/pkg/log"
 	"zero-web-server/pkg/response"
 

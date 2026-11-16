@@ -8,22 +8,22 @@ import (
 	"time"
 
 	domainplatform "zero-web-server/internal/domain/platform"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
 	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/port"
 )
 
 type Service struct {
 	platforms domainplatform.Repository
-	sip       *sipinfra.PlatformClient
+	sip       port.PlatformClient
 	cfg       config.SIPConfig
 	serverID  string
 	tasks     sync.Map // platformID -> cancel func
 }
 
-func NewService(platforms domainplatform.Repository, sipCfg config.SIPConfig, serverID string) *Service {
+func NewService(platforms domainplatform.Repository, sipCfg config.SIPConfig, sipClient port.PlatformClient, serverID string) *Service {
 	return &Service{
 		platforms: platforms,
-		sip:       sipinfra.NewPlatformClient(sipCfg),
+		sip:       sipClient,
 		cfg:       sipCfg,
 		serverID:  serverID,
 	}
@@ -68,19 +68,16 @@ func (s *Service) Delete(id int) error {
 
 func (s *Service) ServerConfig() map[string]any {
 	return map[string]any{
-		"deviceIp":   s.cfg.IP,
-		"deviceId":   s.cfg.ID,
+		"deviceIp":     s.cfg.IP,
+		"deviceId":     s.cfg.ID,
 		"deviceDomain": s.cfg.Domain,
-		"devicePort": s.cfg.Port,
-		"password":  s.cfg.Password,
+		"devicePort":   s.cfg.Port,
+		"password":     s.cfg.Password,
 	}
 }
 
 func (s *Service) ApplySIPConfig(cfg config.SIPConfig) {
 	s.cfg = cfg
-	if s.sip != nil {
-		s.sip.ApplyConfig(cfg)
-	}
 }
 
 func (s *Service) registerPlatform(p *domainplatform.Platform) {

@@ -3,21 +3,21 @@ import request from '@/utils/request'
 export function getAll() {
   return request({
     method: 'get',
-    url: '/api/role/all'
+    url: '/api/v1/role/all'
   })
 }
 
 export function getMenus() {
   return request({
     method: 'get',
-    url: '/api/role/menus'
+    url: '/api/v1/role/menus'
   })
 }
 
 export function addRole(data) {
   return request({
     method: 'post',
-    url: '/api/role/add',
+    url: '/api/v1/role/add',
     data
   })
 }
@@ -25,7 +25,7 @@ export function addRole(data) {
 export function updateRole(data) {
   return request({
     method: 'post',
-    url: '/api/role/update',
+    url: '/api/v1/role/update',
     data
   })
 }
@@ -33,7 +33,7 @@ export function updateRole(data) {
 export function deleteRole(id) {
   return request({
     method: 'delete',
-    url: '/api/role/delete',
+    url: '/api/v1/role/delete',
     params: { id }
   })
 }

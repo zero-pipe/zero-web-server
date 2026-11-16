@@ -281,7 +281,7 @@ export default {
     },
     getSnapUrl(id) {
       const baseUrl = window.baseUrl ? window.baseUrl : ''
-      return ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/alarm/snap/${id}`
+      return ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/v1/alarm/snap/${id}`
     },
     openPlayback(row) {
       if (!row.channelId) {

@@ -6,13 +6,12 @@ import (
 
 	domainchannel "zero-web-server/internal/domain/channel"
 	domainplatform "zero-web-server/internal/domain/platform"
-	"zero-web-server/internal/infrastructure/persistence/model"
 )
 
 type platformChannelRepo interface {
-	GetByCustomDeviceID(platformID int, customID string) (*model.PlatformChannel, error)
+	GetByCustomDeviceID(platformID int, customID string) (*domainplatform.Channel, error)
 	ListPlatformChannels(platformID int) ([]int, error)
-	GetPlatformChannel(platformID, channelID int) (*model.PlatformChannel, error)
+	GetPlatformChannel(platformID, channelID int) (*domainplatform.Channel, error)
 }
 
 type channelRepo interface {

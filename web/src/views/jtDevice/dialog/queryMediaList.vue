@@ -228,7 +228,7 @@ export default {
       this.$message.success('下载请求已发送', { closed: true })
       // 文件下载地址
       const baseUrl = window.baseUrl ? window.baseUrl : ''
-      const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/jt1078/media/upload/one/upload?phoneNumber=${this.phoneNumber}&mediaId=${row.id}`
+      const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/v1/jt1078/media/upload/one/upload?phoneNumber=${this.phoneNumber}&mediaId=${row.id}`
       let controller = new AbortController()
       let signal = controller.signal
       // 设置请求头

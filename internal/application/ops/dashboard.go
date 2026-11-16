@@ -3,11 +3,16 @@ package ops
 import (
 	"context"
 
-	"zero-web-server/internal/infrastructure/persistence/model"
 	"zero-web-server/internal/port"
-
-	"gorm.io/gorm"
 )
+
+// StatsRepository 仪表盘统计所需的只读仓储端口。
+type StatsRepository interface {
+	DeviceCount() (total, online int64, err error)
+	ChannelCount() (total, online int64, err error)
+	StreamPushCount(mediaServerID string) (total, online int64, err error)
+	StreamProxyCount(mediaServerID string) (total, online int64, err error)
+}
 
 type ResourceBase struct {
 	Total  int64 `json:"total"`
@@ -30,11 +35,11 @@ type MediaServerLoad struct {
 }
 
 type Dashboard struct {
-	db    *gorm.DB
+	db    StatsRepository
 	media port.MediaCluster
 }
 
-func NewDashboard(db *gorm.DB, media port.MediaCluster) *Dashboard {
+func NewDashboard(db StatsRepository, media port.MediaCluster) *Dashboard {
 	return &Dashboard{db: db, media: media}
 }
 
@@ -43,19 +48,10 @@ func (d *Dashboard) ResourceInfo() ResourceInfo {
 	if d.db == nil {
 		return out
 	}
-	_ = d.db.Model(&model.GBDevice{}).Count(&out.Device.Total).Error
-	_ = d.db.Model(&model.GBDevice{}).Where("on_line = ?", true).Count(&out.Device.Online).Error
-
-	_ = d.db.Model(&model.GBDeviceChannel{}).Count(&out.Channel.Total).Error
-	_ = d.db.Model(&model.GBDeviceChannel{}).
-		Where("UPPER(COALESCE(NULLIF(TRIM(gb_status), ''), NULLIF(TRIM(status), ''), 'OFF')) = ?", "ON").
-		Count(&out.Channel.Online).Error
-
-	_ = d.db.Model(&model.StreamPush{}).Count(&out.Push.Total).Error
-	_ = d.db.Model(&model.StreamPush{}).Where("pushing = ?", true).Count(&out.Push.Online).Error
-
-	_ = d.db.Model(&model.StreamProxy{}).Count(&out.Proxy.Total).Error
-	_ = d.db.Model(&model.StreamProxy{}).Where("pulling = ?", true).Count(&out.Proxy.Online).Error
+	out.Device.Total, out.Device.Online, _ = d.db.DeviceCount()
+	out.Channel.Total, out.Channel.Online, _ = d.db.ChannelCount()
+	out.Push.Total, out.Push.Online, _ = d.db.StreamPushCount("")
+	out.Proxy.Total, out.Proxy.Online, _ = d.db.StreamProxyCount("")
 	return out
 }
 
@@ -78,12 +74,8 @@ func (d *Dashboard) MediaLoads() ([]MediaServerLoad, error) {
 			GbSend:    0,
 		}
 		if d.db != nil {
-			_ = d.db.Model(&model.StreamPush{}).
-				Where("pushing = ? AND media_server_id = ?", true, n.ID).
-				Count(&item.Push).Error
-			_ = d.db.Model(&model.StreamProxy{}).
-				Where("pulling = ? AND media_server_id = ?", true, n.ID).
-				Count(&item.Proxy).Error
+			_, item.Push, _ = d.db.StreamPushCount(n.ID)
+			_, item.Proxy, _ = d.db.StreamProxyCount(n.ID)
 		}
 		out = append(out, item)
 	}

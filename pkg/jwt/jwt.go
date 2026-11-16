@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	Header    = "access-token"
-	Audience  = "Audience"
-	KeyID     = "3e79646c4dbc408383a9eed09f2b85ae"
-	Subject   = "login"
+	Header   = "access-token"
+	Audience = "Audience"
+	KeyID    = "3e79646c4dbc408383a9eed09f2b85ae"
+	Subject  = "login"
 )
 
 type Claims struct {

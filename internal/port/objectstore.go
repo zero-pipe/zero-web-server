@@ -33,6 +33,6 @@ type ObjectStoreConfig struct {
 	AccessKey  string
 	SecretKey  string
 	UseSSL     bool
-	PathStyle  bool // MinIO 常用 path-style
+	PathStyle  bool   // MinIO 常用 path-style
 	PublicBase string // 可选：对外访问前缀
 }

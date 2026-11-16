@@ -5,21 +5,21 @@ import request from '@/utils/request'
 export function getOnlineMediaServerList() {
   return request({
     method: 'get',
-    url: `/api/server/media_server/online/list`
+    url: `/api/v1/server/media_server/online/list`
   })
 }
 
 export function getMediaServerList() {
   return request({
     method: 'get',
-    url: `/api/server/media_server/list`
+    url: `/api/v1/server/media_server/list`
   })
 }
 
 export function getMediaServer(id) {
   return request({
     method: 'get',
-    url: `/api/server/media_server/one/` + id
+    url: `/api/v1/server/media_server/one/` + id
   })
 }
 
@@ -27,7 +27,7 @@ export function checkMediaServer(params) {
   const { ip, httpPort, secret, type } = params
   return request({
     method: 'get',
-    url: `/api/server/media_server/check`,
+    url: `/api/v1/server/media_server/check`,
     params: {
       ip: ip,
       port: httpPort,
@@ -41,7 +41,7 @@ export function checkMediaServerRecord(params) {
   const { ip, port } = params
   return request({
     method: 'get',
-    url: `/api/server/media_server/record/check`,
+    url: `/api/v1/server/media_server/record/check`,
     params: {
       ip: ip,
       port: port
@@ -52,7 +52,7 @@ export function checkMediaServerRecord(params) {
 export function saveMediaServer(formData) {
   return request({
     method: 'post',
-    url: `/api/server/media_server/save`,
+    url: `/api/v1/server/media_server/save`,
     data: formData
   })
 }
@@ -60,7 +60,7 @@ export function saveMediaServer(formData) {
 export function deleteMediaServer(id) {
   return request({
     method: 'delete',
-    url: `/api/server/media_server/delete`,
+    url: `/api/v1/server/media_server/delete`,
     params: {
       id: id
     }
@@ -70,21 +70,21 @@ export function deleteMediaServer(id) {
 export function getSystemConfig() {
   return request({
     method: 'get',
-    url: `/api/server/system/configInfo`
+    url: `/api/v1/server/system/configInfo`
   })
 }
 
 export function getGbSipConfig() {
   return request({
     method: 'get',
-    url: `/api/server/gb_sip_config`
+    url: `/api/v1/server/gb_sip_config`
   })
 }
 
 export function saveGbSipConfig(formData) {
   return request({
     method: 'post',
-    url: `/api/server/gb_sip_config/save`,
+    url: `/api/v1/server/gb_sip_config/save`,
     data: formData
   })
 }
@@ -92,14 +92,14 @@ export function saveGbSipConfig(formData) {
 export function getObjectStoreConfig() {
   return request({
     method: 'get',
-    url: `/api/server/object_store_config`
+    url: `/api/v1/server/object_store_config`
   })
 }
 
 export function saveObjectStoreConfig(formData) {
   return request({
     method: 'post',
-    url: `/api/server/object_store_config/save`,
+    url: `/api/v1/server/object_store_config/save`,
     data: formData
   })
 }
@@ -107,7 +107,7 @@ export function saveObjectStoreConfig(formData) {
 export function checkObjectStoreHealth() {
   return request({
     method: 'get',
-    url: `/api/server/object_store_config/health`
+    url: `/api/v1/server/object_store_config/health`
   })
 }
 
@@ -115,7 +115,7 @@ export function getMediaInfo(params) {
   const { app, stream, mediaServerId } = params
   return request({
     method: 'get',
-    url: `/api/server/media_server/media_info`,
+    url: `/api/v1/server/media_server/media_info`,
     params: {
       app: app,
       stream: stream,
@@ -127,41 +127,41 @@ export function getMediaInfo(params) {
 export function getSystemInfo() {
   return request({
     method: 'get',
-    url: `/api/server/system/info`
+    url: `/api/v1/server/system/info`
   })
 }
 
 export function getMediaServerLoad() {
   return request({
     method: 'get',
-    url: `/api/server/media_server/load`
+    url: `/api/v1/server/media_server/load`
   })
 }
 
 export function getResourceInfo() {
   return request({
     method: 'get',
-    url: `/api/server/resource/info`
+    url: `/api/v1/server/resource/info`
   })
 }
 
 export function info() {
   return request({
     method: 'get',
-    url: `/api/server/info`
+    url: `/api/v1/server/info`
   })
 }
 
 export function getMapConfig() {
   return request({
     method: 'get',
-    url: `/api/server/map/config`
+    url: `/api/v1/server/map/config`
   })
 }
 export function getModelList() {
   return request({
     method: 'get',
-    url: `/api/server/map/model-icon/list`
+    url: `/api/v1/server/map/model-icon/list`
   })
 }
 

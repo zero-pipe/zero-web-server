@@ -5,7 +5,7 @@ import (
 
 	domainchannel "zero-web-server/internal/domain/channel"
 	domainposition "zero-web-server/internal/domain/position"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/gbsip"
 )
 
 type Service struct {
@@ -17,7 +17,7 @@ func NewService(positions domainposition.Repository, channels domainchannel.Repo
 	return &Service{positions: positions, channels: channels}
 }
 
-func (s *Service) HandleNotify(deviceID, channelGBID string, n *sipinfra.MobilePositionNotify) error {
+func (s *Service) HandleNotify(deviceID, channelGBID string, n *gbsip.MobilePositionNotify) error {
 	if n == nil {
 		return nil
 	}

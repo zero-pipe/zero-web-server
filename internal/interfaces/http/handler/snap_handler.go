@@ -50,18 +50,18 @@ func (h *SnapHandler) UploadChannelSnap(c *gin.Context) {
 	}
 	f, err := fh.Open()
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	defer f.Close()
 	data, err := io.ReadAll(f)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	key, url, err := h.snap.PutJPEG(c.Request.Context(), deviceID, channelID, data)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, gin.H{"key": key, "url": url})

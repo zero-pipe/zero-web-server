@@ -24,7 +24,7 @@ func (h *SubordinateHandler) List(c *gin.Context) {
 	query := c.Query("query")
 	list, total, err := h.svc.List(page, count, query)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, gin.H{"list": list, "total": total})
@@ -34,7 +34,7 @@ func (h *SubordinateHandler) Get(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	p, err := h.svc.Get(id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, p)
@@ -47,7 +47,7 @@ func (h *SubordinateHandler) Add(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Add(&body); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, body)
@@ -63,7 +63,7 @@ func (h *SubordinateHandler) Update(c *gin.Context) {
 		body.ID = id
 	}
 	if err := h.svc.Update(&body); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, body)
@@ -72,7 +72,7 @@ func (h *SubordinateHandler) Update(c *gin.Context) {
 func (h *SubordinateHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	if err := h.svc.Delete(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

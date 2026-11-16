@@ -33,7 +33,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 	loginUser, token, err := h.auth.Login(username, password)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 

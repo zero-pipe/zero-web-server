@@ -47,7 +47,7 @@ export default {
         if (valid) {
           this.$axios({
             method: 'post',
-            url: `/api/platform/catalog/${!this.isEdit ? 'add' : 'edit'}`,
+            url: `/api/v1/platform/catalog/${!this.isEdit ? 'add' : 'edit'}`,
             data: this.form
           }).then((res) => {
             if (res.data.code === 0) {

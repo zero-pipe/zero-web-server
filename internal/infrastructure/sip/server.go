@@ -11,6 +11,7 @@ import (
 	domainrecord "zero-web-server/internal/domain/record"
 	"zero-web-server/internal/infrastructure/config"
 	redisinfra "zero-web-server/internal/infrastructure/redis"
+	"zero-web-server/internal/port"
 
 	"github.com/emiago/sipgo/sip"
 	"github.com/zero-pipe/gb28181-go/manscdp"
@@ -18,16 +19,7 @@ import (
 	"github.com/zero-pipe/gb28181-go/session"
 )
 
-type DeviceService interface {
-	GetByDeviceID(deviceID string) (*domaindevice.Device, error)
-	Online(device *domaindevice.Device) error
-	Offline(device *domaindevice.Device) error
-	SaveRegister(device *domaindevice.Device) (*domaindevice.Device, error)
-	HandleKeepalive(deviceID, ip string, port int) error
-	HandleCatalog(deviceID string, items []CatalogItem) error
-	HandleDeviceInfo(deviceID, name, manufacturer, model, firmware string) error
-	OnDeviceOnline(device *domaindevice.Device)
-}
+type DeviceService = port.DeviceLifecycle
 
 type AlarmHandler interface {
 	HandleNotify(deviceID, channelGBID string, alarm *AlarmNotify) error
@@ -39,10 +31,10 @@ type PositionHandler interface {
 
 // Server wraps gb28181-go platform SIP server with ZWS domain adapters.
 type Server struct {
-	lib     *gbserver.Server
-	bridge  *bridge
-	cfg     config.SIPConfig
-	sipCfg  gbserver.Config
+	lib    *gbserver.Server
+	bridge *bridge
+	cfg    config.SIPConfig
+	sipCfg gbserver.Config
 }
 
 func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc DeviceService, redis *redisinfra.Client) (*Server, error) {

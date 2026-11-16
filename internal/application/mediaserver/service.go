@@ -7,10 +7,9 @@ import (
 	"sync"
 	"time"
 
+	domainmediaserver "zero-web-server/internal/domain/mediaserver"
 	"zero-web-server/internal/infrastructure/config"
-	"zero-web-server/internal/infrastructure/media/mediakit"
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
+	"zero-web-server/internal/mediakit"
 )
 
 // View 媒体节点列表/详情视图。
@@ -35,7 +34,7 @@ type View struct {
 
 // Node 选中的媒体节点（开流/拉流用）。
 type Node struct {
-	Model  model.MediaServer
+	Model  domainmediaserver.MediaServer
 	Client *mediakit.Client
 }
 
@@ -62,7 +61,7 @@ func (n *Node) MediaConfig() config.MediaConfig {
 	return ToMediaConfig(n.Model)
 }
 
-func ToMediaConfig(m model.MediaServer) config.MediaConfig {
+func ToMediaConfig(m domainmediaserver.MediaServer) config.MediaConfig {
 	return config.MediaConfig{
 		ID:       m.ID,
 		Type:     m.Type,
@@ -73,7 +72,7 @@ func ToMediaConfig(m model.MediaServer) config.MediaConfig {
 }
 
 type Service struct {
-	repo     *persistence.MediaServerRepository
+	repo     domainmediaserver.Repository
 	serverID string
 
 	mu         sync.RWMutex
@@ -86,7 +85,7 @@ type Service struct {
 const onlineProbeTTL = 3 * time.Second
 const onlineProbeTimeout = 1500 * time.Millisecond
 
-func NewService(repo *persistence.MediaServerRepository, serverID string) *Service {
+func NewService(repo domainmediaserver.Repository, serverID string) *Service {
 	s := &Service{
 		repo:       repo,
 		serverID:   serverID,
@@ -170,7 +169,7 @@ func (s *Service) Check(ip string, port int, secret string) (*View, error) {
 	}, nil
 }
 
-func (s *Service) Save(m *model.MediaServer) error {
+func (s *Service) Save(m *domainmediaserver.MediaServer) error {
 	if m == nil {
 		return fmt.Errorf("参数为空")
 	}
@@ -301,7 +300,7 @@ func (s *Service) Lookup(id string) (*Node, error) {
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("未配置媒体节点，请先在「媒体管理 → 媒体节点」添加")
 	}
-	var fallback *model.MediaServer
+	var fallback *domainmediaserver.MediaServer
 	for i := range rows {
 		row := rows[i]
 		if row.DefaultServer {
@@ -337,7 +336,7 @@ func (s *Service) SelectMinimumLoad() (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	var best *model.MediaServer
+	var best *domainmediaserver.MediaServer
 	var bestLoad int64 = -1
 	for i := range rows {
 		row := rows[i]
@@ -366,7 +365,7 @@ func (s *Service) FirstOnlineBaseURL() string {
 	return fmt.Sprintf("http://%s:%d", node.StreamIP(), node.Model.HTTPPort)
 }
 
-func (s *Service) wrap(m model.MediaServer) *Node {
+func (s *Service) wrap(m domainmediaserver.MediaServer) *Node {
 	return &Node{
 		Model:  m,
 		Client: mediakit.NewClientAddr(m.IP, m.HTTPPort, m.Secret),
@@ -449,7 +448,7 @@ func (s *Service) decLocked(id string) {
 	}
 }
 
-func (s *Service) isOnline(m model.MediaServer) bool {
+func (s *Service) isOnline(m domainmediaserver.MediaServer) bool {
 	s.mu.RLock()
 	if t, ok := s.onlineAt[m.ID]; ok && time.Since(t) < onlineProbeTTL {
 		v := s.onlineOK[m.ID]
@@ -470,7 +469,7 @@ func (s *Service) isOnline(m model.MediaServer) bool {
 	return ok
 }
 
-func (s *Service) toView(m model.MediaServer, online bool) View {
+func (s *Service) toView(m domainmediaserver.MediaServer, online bool) View {
 	return View{
 		ID: m.ID, IP: m.IP, HookIP: m.HookIP, SDPIP: m.SDPIP, StreamIP: m.StreamIP,
 		HTTPPort: m.HTTPPort, HTTPSSLPort: m.HTTPSSLPort,

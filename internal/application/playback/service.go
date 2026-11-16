@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	publishauth "zero-web-server/internal/application/publishauth"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
 	domainrecord "zero-web-server/internal/domain/record"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
+	"zero-web-server/internal/gbsip"
 	"zero-web-server/internal/port"
 )
 
@@ -25,10 +26,10 @@ type DownloadProgress struct {
 type Service struct {
 	devices       domaindevice.Repository
 	channels      domainchannel.Repository
-	sip           *sipinfra.Server
+	sip           port.GBPlaybacker
 	media         port.MediaCluster
 	serverID      string
-	ssrcSeq       int
+	ssrcSeq       atomic.Int64
 	sessions      sync.Map
 	recordTimeout time.Duration
 }
@@ -36,7 +37,7 @@ type Service struct {
 func NewService(
 	devices domaindevice.Repository,
 	channels domainchannel.Repository,
-	sipServer *sipinfra.Server,
+	sipServer port.GBPlaybacker,
 	media port.MediaCluster,
 	serverID string,
 	recordTimeoutSec int,
@@ -69,7 +70,7 @@ func (s *Service) QueryRecord(ctx context.Context, deviceID, channelDeviceID, st
 		return nil, ctx.Err()
 	case <-time.After(s.recordTimeout):
 		s.sip.CancelRecordQuery(sn)
-		return nil, sipinfra.ErrRecordTimeout
+		return nil, gbsip.ErrRecordTimeout
 	}
 }
 
@@ -80,13 +81,13 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 	}
 	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s_playback", device.DeviceID, channel.GBDeviceID)
-	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionPlayback, startTime, endTime, 0,
+	content, err := s.startMediaInvite(ctx, device, channel, app, stream, gbsip.SessionPlayback, startTime, endTime, 0,
 		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
 			sdpIP := d.SDPIP
 			if sdpIP == "" {
 				sdpIP = node.SDPIP()
 			}
-			return sipinfra.BuildPlaybackSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, sipinfra.NormalizeStreamMode(d.StreamMode), startTime, endTime)
+			return gbsip.BuildPlaybackSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, gbsip.NormalizeStreamMode(d.StreamMode), startTime, endTime)
 		})
 	if err != nil {
 		return nil, err
@@ -105,13 +106,13 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 	}
 	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s_download", device.DeviceID, channel.GBDeviceID)
-	content, err := s.startMediaInvite(ctx, device, channel, app, stream, sipinfra.SessionDownload, startTime, endTime, downloadSpeed,
+	content, err := s.startMediaInvite(ctx, device, channel, app, stream, gbsip.SessionDownload, startTime, endTime, downloadSpeed,
 		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
 			sdpIP := d.SDPIP
 			if sdpIP == "" {
 				sdpIP = node.SDPIP()
 			}
-			return sipinfra.BuildDownloadSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, sipinfra.NormalizeStreamMode(d.StreamMode), startTime, endTime, downloadSpeed)
+			return gbsip.BuildDownloadSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, gbsip.NormalizeStreamMode(d.StreamMode), startTime, endTime, downloadSpeed)
 		})
 	if err != nil {
 		return nil, err
@@ -151,25 +152,25 @@ func (s *Service) DownloadProgress(stream string) (*DownloadProgress, error) {
 	}
 	return &DownloadProgress{
 		Progress:      sess.Progress(),
-		DownloadSpeed: sess.DownloadSpeed,
+		DownloadSpeed: sess.DownloadSpeed(),
 		Stream:        stream,
 	}, nil
 }
 
 func (s *Service) PausePlayback(streamID string) error {
-	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackPause(s.sip.NextInfoCSeq()))
+	return s.sip.SendPlaybackControl(streamID, gbsip.BuildPlaybackPause(s.sip.NextInfoCSeq()))
 }
 
 func (s *Service) ResumePlayback(streamID string) error {
-	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackResume(s.sip.NextInfoCSeq()))
+	return s.sip.SendPlaybackControl(streamID, gbsip.BuildPlaybackResume(s.sip.NextInfoCSeq()))
 }
 
 func (s *Service) SpeedPlayback(streamID string, speed float64) error {
-	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackSpeed(s.sip.NextInfoCSeq(), speed))
+	return s.sip.SendPlaybackControl(streamID, gbsip.BuildPlaybackSpeed(s.sip.NextInfoCSeq(), speed))
 }
 
 func (s *Service) SeekPlayback(streamID string, seekTime int64) error {
-	return s.sip.SendPlaybackControl(streamID, sipinfra.BuildPlaybackSeek(s.sip.NextInfoCSeq(), seekTime))
+	return s.sip.SendPlaybackControl(streamID, gbsip.BuildPlaybackSeek(s.sip.NextInfoCSeq(), seekTime))
 }
 
 func (s *Service) OnStreamStarted(app, stream string) {
@@ -200,21 +201,21 @@ type sdpBuilder func(*domaindevice.Device, *domainchannel.Channel, int, string, 
 
 func (s *Service) startMediaInvite(
 	ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel,
-	app, stream string, sessionType sipinfra.SessionType,
+	app, stream string, sessionType gbsip.SessionType,
 	startTime, endTime string, downloadSpeed int, buildSDP sdpBuilder,
 ) (*dto.StreamContent, error) {
 	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
 	if err != nil {
 		return nil, err
 	}
-	mediaMode := sipinfra.NormalizeStreamMode(device.StreamMode)
+	mediaMode := gbsip.NormalizeStreamMode(device.StreamMode)
 	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(mediaMode))
 	if err != nil {
 		return nil, fmt.Errorf("打开RTP端口失败: %w", err)
 	}
 	s.media.BindStream(node.ID(), app, stream)
 
-	ssrc := sipinfra.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
+	ssrc := gbsip.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
 	sdp := buildSDP(device, channel, rtpPort, ssrc, node)
 
 	done := make(chan *dto.StreamContent, 1)
@@ -260,8 +261,7 @@ func (s *Service) buildStreamContentWithNode(app, stream string, node port.Media
 }
 
 func (s *Service) nextSSRCSeq() int {
-	s.ssrcSeq++
-	return s.ssrcSeq
+	return int(s.ssrcSeq.Add(1))
 }
 
 func streamKey(app, stream string) string { return app + "/" + stream }

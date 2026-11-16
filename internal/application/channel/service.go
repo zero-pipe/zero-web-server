@@ -12,37 +12,36 @@ import (
 	playbackapp "zero-web-server/internal/application/playback"
 	ptzapp "zero-web-server/internal/application/ptz"
 	domainchannel "zero-web-server/internal/domain/channel"
+	domaingroupregion "zero-web-server/internal/domain/groupregion"
 	domainptz "zero-web-server/internal/domain/ptz"
 	"zero-web-server/internal/domain/shared"
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
 )
 
 type View struct {
-	GbID               int       `json:"gbId"`
-	InternalCode       string    `json:"internalCode"`
-	GbDeviceId         string    `json:"gbDeviceId"`
-	GbName             string    `json:"gbName"`
-	GbManufacturer     string    `json:"gbManufacturer"`
-	GbModel            string    `json:"gbModel"`
-	GbStatus           string    `json:"gbStatus"`
-	GbParentId         string    `json:"gbParentId"`
-	GbBusinessGroupId  string    `json:"gbBusinessGroupId"`
-	GbParental         int       `json:"gbParental"`
-	GbPtzType          int       `json:"gbPtzType"`
-	DeviceId           string    `json:"deviceId"`
-	DataType           int       `json:"dataType"`
-	DataDeviceId       int       `json:"dataDeviceId"`
-	Name               string    `json:"name"`
-	Status             string    `json:"status"`
-	PTZType            int       `json:"ptzType"`
-	Longitude          FlexFloat `json:"longitude"`
-	GbLongitude        FlexFloat `json:"gbLongitude"`
-	Latitude           FlexFloat `json:"latitude"`
-	GbLatitude         FlexFloat `json:"gbLatitude"`
-	HasAudio           bool      `json:"hasAudio"`
-	RecordPlanId       int       `json:"recordPlanId"`
+	GbID              int       `json:"gbId"`
+	InternalCode      string    `json:"internalCode"`
+	GbDeviceId        string    `json:"gbDeviceId"`
+	GbName            string    `json:"gbName"`
+	GbManufacturer    string    `json:"gbManufacturer"`
+	GbModel           string    `json:"gbModel"`
+	GbStatus          string    `json:"gbStatus"`
+	GbParentId        string    `json:"gbParentId"`
+	GbBusinessGroupId string    `json:"gbBusinessGroupId"`
+	GbParental        int       `json:"gbParental"`
+	GbPtzType         int       `json:"gbPtzType"`
+	DeviceId          string    `json:"deviceId"`
+	DataType          int       `json:"dataType"`
+	DataDeviceId      int       `json:"dataDeviceId"`
+	Name              string    `json:"name"`
+	Status            string    `json:"status"`
+	PTZType           int       `json:"ptzType"`
+	Longitude         FlexFloat `json:"longitude"`
+	GbLongitude       FlexFloat `json:"gbLongitude"`
+	Latitude          FlexFloat `json:"latitude"`
+	GbLatitude        FlexFloat `json:"gbLatitude"`
+	HasAudio          bool      `json:"hasAudio"`
+	RecordPlanId      int       `json:"recordPlanId"`
 }
 
 func toView(ch *domainchannel.Channel) View {
@@ -124,20 +123,14 @@ func (s *Service) Update(v *View) error {
 		ch.PTZType = ptz
 	}
 
-	return s.channels.Update(&model.GBDeviceChannel{
-		ID: ch.ID, DeviceID: ch.DeviceID, GBDeviceID: ch.GBDeviceID, Name: ch.Name,
-		Manufacturer: ch.Manufacturer, Model: ch.Model,
-		Longitude: ch.Longitude, Latitude: ch.Latitude, PTZType: ch.PTZType,
-		Status: ch.Status, DataType: ch.DataType, DataDeviceID: ch.DataDeviceID,
-		ParentID: parentID, GBParentID: parentID,
-		BusinessGroupID: bizGroup, GBBusinessGroupID: bizGroup,
-		CreateTime: ch.CreateTime,
-	})
+	ch.ParentID = parentID
+	ch.BusinessGroupID = bizGroup
+	return s.channels.Update(ch)
 }
 
 type Service struct {
-	channels *persistence.ChannelRepository
-	groups   *persistence.GroupRegionRepository
+	channels domainchannel.Repository
+	groups   domaingroupregion.Repository
 	play     *playapp.Service
 	playback *playbackapp.Service
 	ptz      *ptzapp.Service
@@ -145,8 +138,8 @@ type Service struct {
 }
 
 func NewService(
-	ch *persistence.ChannelRepository,
-	groups *persistence.GroupRegionRepository,
+	ch domainchannel.Repository,
+	groups domaingroupregion.Repository,
 	play *playapp.Service,
 	playback *playbackapp.Service,
 	ptz *ptzapp.Service,

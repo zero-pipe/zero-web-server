@@ -33,3 +33,22 @@ type Repository interface {
 	UpdateStatus(id int, online bool) error
 	ListEnabled() ([]*Platform, error)
 }
+
+// Channel 上级平台共享通道映射（领域实体）。
+type Channel struct {
+	ID              int    `json:"id"`
+	PlatformID      int    `json:"platformId"`
+	DeviceChannelID int    `json:"deviceChannelId"`
+	CustomDeviceID  string `json:"customDeviceId"`
+	CustomName      string `json:"customName"`
+}
+
+type ChannelRepository interface {
+	ListPlatformChannels(platformID int) ([]int, error)
+	AddPlatformChannel(platformID, channelID int) error
+	RemovePlatformChannel(platformID, channelID int) error
+	ListChannelIDsByDevice(deviceID string) ([]int, error)
+	GetPlatformChannel(platformID, channelID int) (*Channel, error)
+	GetByCustomDeviceID(platformID int, customID string) (*Channel, error)
+	UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error
+}

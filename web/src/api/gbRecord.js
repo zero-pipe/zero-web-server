@@ -3,14 +3,14 @@ import request from '@/utils/request'
 export function query([deviceId, channelId, startTime, endTime]) {
   return request({
     method: 'get',
-    url: '/api/gb_record/query/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' + endTime
+    url: '/api/v1/gb_record/query/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' + endTime
 
   })
 }
 
 export function startDownLoad([deviceId, channelId, startTime, endTime, downloadSpeed]) {
   return request({
-    url: '/api/gb_record/download/start/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' +
+    url: '/api/v1/gb_record/download/start/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' +
       endTime + '&downloadSpeed=' + downloadSpeed
 
   })
@@ -19,7 +19,7 @@ export function startDownLoad([deviceId, channelId, startTime, endTime, download
 export function stopDownLoad(deviceId, channelId, streamId) {
   return request({
     method: 'get',
-    url: '/api/gb_record/download/stop/' + deviceId + '/' + channelId + '/' + streamId
+    url: '/api/v1/gb_record/download/stop/' + deviceId + '/' + channelId + '/' + streamId
 
   })
 }
@@ -27,7 +27,7 @@ export function stopDownLoad(deviceId, channelId, streamId) {
 export function queryDownloadProgress([deviceId, channelId, streamId]) {
   return request({
     method: 'get',
-    url: `/api/gb_record/download/progress/${deviceId}/${channelId}/${streamId}`
+    url: `/api/v1/gb_record/download/progress/${deviceId}/${channelId}/${streamId}`
   })
 }
 

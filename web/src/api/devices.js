@@ -2,7 +2,7 @@ import request from '@/utils/request'
 
 export function listDevices(params) {
   return request({
-    url: '/api/devices',
+    url: '/api/v1/devices',
     method: 'get',
     params
   })
@@ -10,7 +10,7 @@ export function listDevices(params) {
 
 export function createDevice(data) {
   return request({
-    url: '/api/devices',
+    url: '/api/v1/devices',
     method: 'post',
     data
   })
@@ -18,7 +18,7 @@ export function createDevice(data) {
 
 export function updateDevice(id, data) {
   return request({
-    url: '/api/devices',
+    url: '/api/v1/devices',
     method: 'put',
     params: { id },
     data
@@ -27,7 +27,7 @@ export function updateDevice(id, data) {
 
 export function deleteDevice(id) {
   return request({
-    url: '/api/devices/delete',
+    url: '/api/v1/devices/delete',
     method: 'post',
     data: { id }
   })
@@ -35,7 +35,7 @@ export function deleteDevice(id) {
 
 export function syncDevice(id) {
   return request({
-    url: '/api/devices/sync',
+    url: '/api/v1/devices/sync',
     method: 'post',
     params: { id }
   })

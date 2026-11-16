@@ -31,4 +31,22 @@ type Repository interface {
 	ResetByDevice(deviceID string, dataDeviceID int, channels []*Channel) error
 	DeleteByDevice(deviceID string) error
 	ChangeAudio(channelID int, audio bool) error
+	Update(ch *Channel) error
+
+	// 业务分组 / 行政区划 / 通用检索相关（channel、group、region 应用服务使用）
+	ListCommon(page, count int, query string, channelType *int, online *bool, hasRecordPlan *bool) ([]*Channel, int64, error)
+	ListAll(page, count int, query string) ([]*Channel, int64, error)
+	ListByCivilCode(page, count int, query string, channelType *int, online *bool, civilCode string) ([]*Channel, int64, error)
+	ListByGroupParent(page, count int, query string, channelType *int, online *bool, groupDeviceID string) ([]*Channel, int64, error)
+	ListIDsByDevice(deviceID string) ([]int, error)
+	CountCommonByIDs(channelIDs []int) (int64, error)
+	CountCommonByDataDeviceIDs(dataDeviceIDs []int) (int64, error)
+	SetCivilCode(civilCode string, channelIDs []int) error
+	ClearCivilCode(channelIDs []int) error
+	SetCivilCodeByDataDeviceIDs(civilCode string, dataDeviceIDs []int) error
+	ClearCivilCodeByDataDeviceIDs(dataDeviceIDs []int) error
+	SetGroup(parentID, businessGroup string, channelIDs []int) error
+	SetGroupByDataDeviceIDs(parentID, businessGroup string, dataDeviceIDs []int) error
+	ClearGroupParent(channelIDs []int) error
+	ClearGroupByDataDeviceIDs(dataDeviceIDs []int) error
 }

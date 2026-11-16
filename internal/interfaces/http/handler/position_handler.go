@@ -25,7 +25,7 @@ func (h *PositionHandler) History(c *gin.Context) {
 	if channelID, err := strconv.Atoi(c.Query("channelId")); err == nil && channelID > 0 {
 		list, err := h.svc.HistoryByChannelDBID(channelID, start, end)
 		if err != nil {
-			response.Error(c, response.CodeError, err.Error())
+			response.FromError(c, err)
 			return
 		}
 		response.OK(c, list)
@@ -40,7 +40,7 @@ func (h *PositionHandler) History(c *gin.Context) {
 
 	list, err := h.svc.History(deviceID, channelGBID, start, end)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)
@@ -54,7 +54,7 @@ func (h *PositionHandler) Latest(c *gin.Context) {
 	}
 	pos, err := h.svc.Latest(channelID)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, pos)

@@ -6,28 +6,27 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	domainstreamproxy "zero-web-server/internal/domain/streamproxy"
+	"zero-web-server/internal/dto"
 	"zero-web-server/internal/port"
 )
 
 type Service struct {
-	repo     *persistence.StreamProxyRepository
+	repo     domainstreamproxy.Repository
 	media    port.MediaCluster
 	serverID string
 	sessions sync.Map
 }
 
-func NewService(repo *persistence.StreamProxyRepository, media port.MediaCluster, serverID string) *Service {
+func NewService(repo domainstreamproxy.Repository, media port.MediaCluster, serverID string) *Service {
 	return &Service{repo: repo, media: media, serverID: serverID}
 }
 
-func (s *Service) List(page, count int, query string, pulling *bool, mediaServerID string) ([]model.StreamProxy, int64, error) {
+func (s *Service) List(page, count int, query string, pulling *bool, mediaServerID string) ([]domainstreamproxy.StreamProxy, int64, error) {
 	return s.repo.List(page, count, query, pulling, mediaServerID)
 }
 
-func (s *Service) Add(m *model.StreamProxy, gbDeviceID, gbName string) error {
+func (s *Service) Add(m *domainstreamproxy.StreamProxy, gbDeviceID, gbName string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	m.CreateTime = now
 	m.UpdateTime = now
@@ -51,7 +50,7 @@ func (s *Service) Add(m *model.StreamProxy, gbDeviceID, gbName string) error {
 	return nil
 }
 
-func (s *Service) Update(m *model.StreamProxy) error {
+func (s *Service) Update(m *domainstreamproxy.StreamProxy) error {
 	m.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 	return s.repo.Update(m)
 }
@@ -157,7 +156,7 @@ func (s *Service) OnStreamStarted(app, stream string) {
 	}
 }
 
-func (s *Service) resolveProxy(proxy *model.StreamProxy) (port.MediaEndpoint, error) {
+func (s *Service) resolveProxy(proxy *domainstreamproxy.StreamProxy) (port.MediaEndpoint, error) {
 	prefer := proxy.MediaServerID
 	if prefer == "" {
 		prefer = "auto"

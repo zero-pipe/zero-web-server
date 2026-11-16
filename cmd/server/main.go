@@ -10,41 +10,41 @@ import (
 	"syscall"
 	"time"
 
-	appauth "zero-web-server/internal/application/auth"
+	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	alarmapp "zero-web-server/internal/application/alarm"
+	appauth "zero-web-server/internal/application/auth"
 	cascadeapp "zero-web-server/internal/application/cascade"
-	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
 	channelapp "zero-web-server/internal/application/channel"
+	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
-	groupapp "zero-web-server/internal/application/group"
-	publishauth "zero-web-server/internal/application/publishauth"
-	mediaserverapp "zero-web-server/internal/application/mediaserver"
-	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
-	onvifapp "zero-web-server/internal/application/onvif"
-	upstreamapp "zero-web-server/internal/application/upstream"
 	downstreamapp "zero-web-server/internal/application/downstream"
+	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
+	groupapp "zero-web-server/internal/application/group"
+	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
-	snapapp "zero-web-server/internal/application/snap"
-	mediacluster "zero-web-server/internal/adapter/mediacluster"
-	"zero-web-server/internal/port"
-	positionapp "zero-web-server/internal/application/position"
+	onvifapp "zero-web-server/internal/application/onvif"
+	"zero-web-server/internal/application/ops"
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
+	positionapp "zero-web-server/internal/application/position"
 	ptzapp "zero-web-server/internal/application/ptz"
-	regionapp "zero-web-server/internal/application/region"
+	publishauth "zero-web-server/internal/application/publishauth"
 	recordplanapp "zero-web-server/internal/application/recordplan"
-	streampushapp "zero-web-server/internal/application/streampush"
+	regionapp "zero-web-server/internal/application/region"
+	snapapp "zero-web-server/internal/application/snap"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
-	"zero-web-server/internal/application/ops"
+	streampushapp "zero-web-server/internal/application/streampush"
+	upstreamapp "zero-web-server/internal/application/upstream"
+	"zero-web-server/internal/civilcode"
 	"zero-web-server/internal/infrastructure/config"
-	"zero-web-server/internal/infrastructure/civilcode"
 	onvifinfra "zero-web-server/internal/infrastructure/onvif"
 	"zero-web-server/internal/infrastructure/persistence"
 	"zero-web-server/internal/infrastructure/persistence/mysql"
 	redisinfra "zero-web-server/internal/infrastructure/redis"
 	sipinfra "zero-web-server/internal/infrastructure/sip"
 	"zero-web-server/internal/interfaces/http/router"
+	"zero-web-server/internal/port"
 	jwtmgr "zero-web-server/pkg/jwt"
 	applog "zero-web-server/pkg/log"
 
@@ -119,7 +119,11 @@ func main() {
 	}
 
 	authService := appauth.NewService(userRepo, jwtManager, cfg.UserSettings.ServerID)
-	deviceService := deviceapp.NewService(deviceRepo, channelRepo, redisClient)
+	var deviceCache port.DeviceCache = port.NoopDeviceCache{}
+	if redisClient != nil {
+		deviceCache = redisClient
+	}
+	deviceService := deviceapp.NewService(deviceRepo, channelRepo, deviceCache)
 	requirePreRegister := cfg.GB.RequirePreRegister
 	if row, err := gbSipConfigService.GetOrEmpty(); err == nil && row != nil {
 		// 库内开关优先（页面可改）；种子行默认 true
@@ -153,6 +157,7 @@ func main() {
 		}
 	}
 	deviceService.SetSIP(sipServer)
+	sessionAdapter := sipinfra.NewSessionAdapter(sipServer)
 	sipServer.SetRequirePreRegister(requirePreRegister)
 
 	subordinateRepo := persistence.NewSubordinateRepository(db)
@@ -169,10 +174,10 @@ func main() {
 		recordTimeoutSec = 30
 	}
 	playbackService := playbackapp.NewService(
-		deviceRepo, channelRepo, sipServer, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
+		deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
-	platformService := upstreamapp.NewService(platformRepo, sipCfg, cfg.UserSettings.ServerID)
 	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
+	platformService := upstreamapp.NewService(platformRepo, sipCfg, platformSIPClient, cfg.UserSettings.ServerID)
 	platformChannelSvc := upstreamapp.NewChannelService(
 		platformRepo, channelRepo, platformRepo, platformSIPClient,
 	)
@@ -185,10 +190,10 @@ func main() {
 		platformSIPClient.ApplyConfig(updated)
 	})
 
-	playService := playapp.NewService(deviceRepo, channelRepo, sipServer, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
-	ptzService := ptzapp.NewService(deviceRepo, sipServer)
+	playService := playapp.NewService(deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
+	ptzService := ptzapp.NewService(deviceRepo, sessionAdapter)
 	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)
-	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sipServer)
+	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sessionAdapter)
 	sipServer.SetCascadeInbound(cascadeInbound)
 	onvifFactory := onvifinfra.NewClientFactory(30)
 	onvifService := onvifapp.NewService(
@@ -207,7 +212,7 @@ func main() {
 	groupService := groupapp.NewService(groupRegionRepo)
 	regionService := regionapp.NewService(groupRegionRepo)
 
-	statusMonitor := deviceapp.NewStatusMonitor(deviceRepo, redisClient, cfg.UserSettings.ServerID)
+	statusMonitor := deviceapp.NewStatusMonitor(deviceRepo, deviceCache, cfg.UserSettings.ServerID)
 	statusMonitor.Start()
 	defer statusMonitor.Stop()
 
@@ -224,7 +229,7 @@ func main() {
 		mediaBaseURL = cfg.Media.BaseURL()
 	}
 
-	dashboard := ops.NewDashboard(db, mediaCluster)
+	dashboard := ops.NewDashboard(persistence.NewStatsRepository(db), mediaCluster)
 
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())

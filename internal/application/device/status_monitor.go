@@ -6,17 +6,17 @@ import (
 	"time"
 
 	domaindevice "zero-web-server/internal/domain/device"
-	redisinfra "zero-web-server/internal/infrastructure/redis"
+	"zero-web-server/internal/port"
 )
 
 type StatusMonitor struct {
 	devices  domaindevice.Repository
-	redis    *redisinfra.Client
+	redis    port.DeviceCache
 	serverID string
 	stop     chan struct{}
 }
 
-func NewStatusMonitor(devices domaindevice.Repository, redis *redisinfra.Client, serverID string) *StatusMonitor {
+func NewStatusMonitor(devices domaindevice.Repository, redis port.DeviceCache, serverID string) *StatusMonitor {
 	return &StatusMonitor{
 		devices: devices, redis: redis, serverID: serverID, stop: make(chan struct{}),
 	}

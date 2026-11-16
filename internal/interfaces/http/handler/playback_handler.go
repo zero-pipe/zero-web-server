@@ -39,7 +39,7 @@ func (h *PlaybackHandler) Start(c *gin.Context) {
 
 	content, err := h.svc.StartPlayback(ctx, deviceID, channelID, startTime, endTime)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -48,7 +48,7 @@ func (h *PlaybackHandler) Start(c *gin.Context) {
 func (h *PlaybackHandler) Stop(c *gin.Context) {
 	stream := c.Param("streamId")
 	if err := h.svc.StopPlayback(c.Param("deviceId"), c.Param("channelId"), stream); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -56,7 +56,7 @@ func (h *PlaybackHandler) Stop(c *gin.Context) {
 
 func (h *PlaybackHandler) Pause(c *gin.Context) {
 	if err := h.svc.PausePlayback(c.Param("streamId")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -64,7 +64,7 @@ func (h *PlaybackHandler) Pause(c *gin.Context) {
 
 func (h *PlaybackHandler) Resume(c *gin.Context) {
 	if err := h.svc.ResumePlayback(c.Param("streamId")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -76,7 +76,7 @@ func (h *PlaybackHandler) Speed(c *gin.Context) {
 		speed = 1
 	}
 	if err := h.svc.SpeedPlayback(c.Param("streamId"), speed); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -85,7 +85,7 @@ func (h *PlaybackHandler) Speed(c *gin.Context) {
 func (h *PlaybackHandler) Seek(c *gin.Context) {
 	seekTime, _ := strconv.ParseInt(c.Param("seekTime"), 10, 64)
 	if err := h.svc.SeekPlayback(c.Param("streamId"), seekTime); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

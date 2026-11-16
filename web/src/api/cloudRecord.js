@@ -5,7 +5,7 @@ import request from '@/utils/request'
 export function getPlayPath(id) {
   return request({
     method: 'get',
-    url: `/api/cloud/record/play/path`,
+    url: `/api/v1/cloud/record/play/path`,
     params: {
       recordId: id
     }
@@ -16,7 +16,7 @@ export function queryListByData(params) {
   const { app, stream, year, month, mediaServerId } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/date/list`,
+    url: `/api/v1/cloud/record/date/list`,
     params: {
       app: app,
       stream: stream,
@@ -31,7 +31,7 @@ export function loadRecord(params) {
   const { app, stream, cloudRecordId } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/loadRecord`,
+    url: `/api/v1/cloud/record/loadRecord`,
     params: {
       app: app,
       stream: stream,
@@ -44,7 +44,7 @@ export function seek(params) {
   const { mediaServerId, app, stream, seek, schema } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/seek`,
+    url: `/api/v1/cloud/record/seek`,
     params: {
       mediaServerId: mediaServerId,
       app: app,
@@ -59,7 +59,7 @@ export function speed(params) {
   const { mediaServerId, app, stream, speed, schema } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/speed`,
+    url: `/api/v1/cloud/record/speed`,
     params: {
       mediaServerId: mediaServerId,
       app: app,
@@ -74,7 +74,7 @@ export function addTask(params) {
   const { app, stream, mediaServerId, startTime, endTime } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/task/add`,
+    url: `/api/v1/cloud/record/task/add`,
     params: {
       app: app,
       stream: stream,
@@ -89,7 +89,7 @@ export function queryTaskList(params) {
   const { mediaServerId, isEnd } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/task/list`,
+    url: `/api/v1/cloud/record/task/list`,
     params: {
       mediaServerId: mediaServerId,
       isEnd: isEnd
@@ -101,7 +101,7 @@ export function queryTaskList(params) {
 export function deleteRecord(ids) {
   return request({
     method: 'delete',
-    url: `/api/cloud/record/delete`,
+    url: `/api/v1/cloud/record/delete`,
     data: {
       ids: ids
     }
@@ -113,7 +113,7 @@ export function queryList(params) {
   const { app, stream, query, callId, startTime, endTime, mediaServerId, page, count, ascOrder } = params
   return request({
     method: 'get',
-    url: `/api/cloud/record/list`,
+    url: `/api/v1/cloud/record/list`,
     params: {
       app: app,
       stream: stream,

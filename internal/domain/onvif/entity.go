@@ -49,8 +49,8 @@ type Channel struct {
 	// StreamProfiles 同一视频源下的主/子码流等可选 Profile（播放时按所选 token 取流）
 	StreamProfiles []StreamProfile `json:"streamProfiles,omitempty"`
 	ProfilesJSON   string          `json:"-"`
-	CreateTime    string `json:"createTime"`
-	UpdateTime    string `json:"updateTime"`
+	CreateTime     string          `json:"createTime"`
+	UpdateTime     string          `json:"updateTime"`
 }
 
 // StreamProfile 可选码流（对应一个 ONVIF Media Profile）

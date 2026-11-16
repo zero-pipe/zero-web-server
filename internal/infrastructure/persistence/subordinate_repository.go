@@ -72,12 +72,12 @@ func (r *SubordinateRepository) Create(p *domainsub.Platform) error {
 
 func (r *SubordinateRepository) Update(p *domainsub.Platform) error {
 	return r.db.Model(&model.SubordinatePlatform{}).Where("id = ?", p.ID).Updates(map[string]any{
-		"enable":     p.Enable,
-		"name":       p.Name,
+		"enable":       p.Enable,
+		"name":         p.Name,
 		"device_gb_id": p.DeviceGBID,
-		"password":   p.Password,
-		"transport":  p.Transport,
-		"update_time": p.UpdateTime,
+		"password":     p.Password,
+		"transport":    p.Transport,
+		"update_time":  p.UpdateTime,
 	}).Error
 }
 

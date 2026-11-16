@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"zero-web-server/internal/application/mediaserver"
-	"zero-web-server/internal/infrastructure/media/mediakit"
+	"zero-web-server/internal/mediakit"
 	"zero-web-server/internal/port"
 )
 

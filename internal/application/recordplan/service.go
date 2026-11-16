@@ -6,18 +6,17 @@ import (
 	"sync"
 	"time"
 
-	publishauth "zero-web-server/internal/application/publishauth"
 	playapp "zero-web-server/internal/application/play"
+	publishauth "zero-web-server/internal/application/publishauth"
+	domainrecordplan "zero-web-server/internal/domain/recordplan"
 	"zero-web-server/internal/domain/shared"
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
 	applog "zero-web-server/pkg/log"
 )
 
 type PlanView struct {
-	model.RecordPlan
-	PlanItemList []model.RecordPlanItem `json:"planItemList"`
-	ChannelCount int64                  `json:"channelCount"`
+	domainrecordplan.Plan
+	PlanItemList []domainrecordplan.Item `json:"planItemList"`
+	ChannelCount int64                   `json:"channelCount"`
 }
 
 type LinkParam struct {
@@ -28,7 +27,7 @@ type LinkParam struct {
 }
 
 type Service struct {
-	repo     *persistence.RecordPlanRepository
+	repo     domainrecordplan.Repository
 	play     *playapp.Service
 	publish  *publishauth.PublishRegistry
 	serverID string
@@ -38,13 +37,13 @@ type Service struct {
 }
 
 type activeMeta struct {
-	DeviceID   string
-	ChannelID  string
-	App        string
-	Stream     string
+	DeviceID  string
+	ChannelID string
+	App       string
+	Stream    string
 }
 
-func NewService(repo *persistence.RecordPlanRepository, play *playapp.Service, publish *publishauth.PublishRegistry, serverID string) *Service {
+func NewService(repo domainrecordplan.Repository, play *playapp.Service, publish *publishauth.PublishRegistry, serverID string) *Service {
 	return &Service{
 		repo: repo, play: play, publish: publish, serverID: serverID,
 		stopCh: make(chan struct{}),
@@ -83,7 +82,7 @@ func (s *Service) tick() {
 		applog.Warnf("[record-plan] query recording channels: %v", err)
 		return
 	}
-	need := make(map[int]model.GBDeviceChannel, len(channels))
+	need := make(map[int]domainrecordplan.ChannelRecord, len(channels))
 	for _, ch := range channels {
 		need[ch.ID] = ch
 	}
@@ -107,7 +106,7 @@ func (s *Service) tick() {
 	}
 }
 
-func (s *Service) startRecord(ch model.GBDeviceChannel) {
+func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
 	app := publishauth.LiveApp
 	stream := fmt.Sprintf("%s_%s", ch.DeviceID, ch.GBDeviceID)
 	s.publish.EnableMP4(app, stream)
@@ -147,16 +146,16 @@ func (s *Service) stopRecord(channelID int) {
 	}
 }
 
-func (s *Service) Add(name string, items []model.RecordPlanItem) error {
+func (s *Service) Add(name string, items []domainrecordplan.Item) error {
 	if len(items) == 0 {
 		return fmt.Errorf("录制计划不可为空")
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	plan := &model.RecordPlan{Name: name, CreateTime: now, UpdateTime: now}
+	plan := &domainrecordplan.Plan{Name: name, CreateTime: now, UpdateTime: now}
 	return s.repo.Create(plan, items)
 }
 
-func (s *Service) Update(id int, name string, items []model.RecordPlanItem) error {
+func (s *Service) Update(id int, name string, items []domainrecordplan.Item) error {
 	plan, _, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
@@ -176,7 +175,7 @@ func (s *Service) Get(id int) (*PlanView, error) {
 		return nil, err
 	}
 	return &PlanView{
-		RecordPlan:   *plan,
+		Plan:         *plan,
 		PlanItemList: items,
 		ChannelCount: s.repo.CountChannels(id),
 	}, nil
@@ -191,7 +190,7 @@ func (s *Service) Query(page, count int, query string) ([]PlanView, int64, error
 	for i, p := range rows {
 		_, items, _ := s.repo.GetByID(p.ID)
 		out[i] = PlanView{
-			RecordPlan:   p,
+			Plan:         p,
 			PlanItemList: items,
 			ChannelCount: s.repo.CountChannels(p.ID),
 		}
@@ -231,7 +230,7 @@ func (s *Service) Link(param LinkParam) error {
 	return nil
 }
 
-func (s *Service) ChannelList(page, count, planID int, query string, hasLink *bool, online, channelType string) ([]model.GBDeviceChannel, int64, error) {
+func (s *Service) ChannelList(page, count, planID int, query string, hasLink *bool, online, channelType string) ([]domainrecordplan.ChannelRecord, int64, error) {
 	return s.repo.ChannelList(page, count, planID, query, hasLink, online, channelType)
 }
 
@@ -272,7 +271,7 @@ func (s *Service) OnStreamDeparture(app, stream string) {
 		s.stopRecord(channelID)
 		return
 	}
-	var ch *model.GBDeviceChannel
+	var ch *domainrecordplan.ChannelRecord
 	for i := range channels {
 		if channels[i].ID == channelID {
 			ch = &channels[i]

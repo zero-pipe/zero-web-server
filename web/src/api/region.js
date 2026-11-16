@@ -6,7 +6,7 @@ export function getTreeList(params) {
   const {query, parent, hasChannel} = params
   return request({
     method: 'get',
-    url: `/api/region/tree/list`,
+    url: `/api/v1/region/tree/list`,
     params: {
       query: query,
       parent: parent,
@@ -18,7 +18,7 @@ export function getTreeList(params) {
 export function deleteRegion(id) {
   return request({
     method: "delete",
-    url: `/api/region/delete`,
+    url: `/api/v1/region/delete`,
     params: {
       id: id,
     }
@@ -28,7 +28,7 @@ export function deleteRegion(id) {
 export function description(civilCode) {
   return request({
     method: 'get',
-    url: `/api/region/description`,
+    url: `/api/v1/region/description`,
     params: {
       civilCode: civilCode,
     }
@@ -38,7 +38,7 @@ export function description(civilCode) {
 export function addByCivilCode(civilCode) {
   return request({
     method: 'get',
-    url: `/api/region/addByCivilCode`,
+    url: `/api/v1/region/addByCivilCode`,
     params: {
       civilCode: civilCode,
     }
@@ -48,7 +48,7 @@ export function addByCivilCode(civilCode) {
 export function queryChildListInBase(parent) {
   return request({
     method: 'get',
-    url: "/api/region/base/child/list",
+    url: "/api/v1/region/base/child/list",
     params: {
       parent: parent,
     }
@@ -58,7 +58,7 @@ export function queryChildListInBase(parent) {
 export function update(data) {
   return request({
     method: 'post',
-    url: "/api/region/update",
+    url: "/api/v1/region/update",
     data: data
 
   })
@@ -67,7 +67,7 @@ export function update(data) {
 export function add(data) {
   return request({
     method: 'post',
-    url: "/api/region/add",
+    url: "/api/v1/region/add",
     data: data
   })
 }
@@ -75,7 +75,7 @@ export function add(data) {
 export function queryPath(deviceId) {
   return request({
     method: 'get',
-    url: `/api/region/path`,
+    url: `/api/v1/region/path`,
     params: {
       deviceId: deviceId,
     }
@@ -85,7 +85,7 @@ export function queryTree(params) {
   const { page, count, query } = params
   return request({
     method: 'get',
-    url: `/api/region/tree/query`,
+    url: `/api/v1/region/tree/query`,
     params: {
       query: query,
       page: page,

@@ -47,6 +47,8 @@ func NewLoginUser(u *User, token, serverID string, menus []string) *LoginUser {
 type Repository interface {
 	FindByUsername(username string) (*User, error)
 	FindByID(id int) (*User, error)
+	ListAll() ([]*User, error)
+	CheckPushAuthority(callID, sign string) bool
 	List(page, count int) ([]*User, int64, error)
 	Create(username, password string, roleID int) error
 	Delete(id int) error

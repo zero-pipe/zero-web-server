@@ -3,8 +3,8 @@ package port
 import "errors"
 
 var (
-	ErrNoCandidate     = errors.New("no healthy candidate")
-	ErrStoreDisabled   = errors.New("object store disabled or not configured")
+	ErrNoCandidate      = errors.New("no healthy candidate")
+	ErrStoreDisabled    = errors.New("object store disabled or not configured")
 	ErrStoreUnsupported = errors.New("object store provider not supported")
 )
 

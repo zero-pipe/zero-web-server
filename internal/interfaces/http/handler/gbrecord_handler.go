@@ -45,7 +45,7 @@ func (h *GBRecordHandler) Query(c *gin.Context) {
 			response.Error(c, response.CodeError, "录像查询超时")
 			return
 		}
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, info)
@@ -67,7 +67,7 @@ func (h *GBRecordHandler) DownloadStart(c *gin.Context) {
 
 	content, err := h.svc.StartDownload(ctx, deviceID, channelID, startTime, endTime, speed)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -76,7 +76,7 @@ func (h *GBRecordHandler) DownloadStart(c *gin.Context) {
 func (h *GBRecordHandler) DownloadStop(c *gin.Context) {
 	stream := c.Param("stream")
 	if err := h.svc.StopDownload(c.Param("deviceId"), c.Param("channelId"), stream); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -85,7 +85,7 @@ func (h *GBRecordHandler) DownloadStop(c *gin.Context) {
 func (h *GBRecordHandler) DownloadProgress(c *gin.Context) {
 	progress, err := h.svc.DownloadProgress(c.Param("stream"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, progress)

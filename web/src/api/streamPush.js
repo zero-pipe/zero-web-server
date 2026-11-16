@@ -5,7 +5,7 @@ import request from '@/utils/request'
 export function saveToGb(data) {
   return request({
     method: 'post',
-    url: `/api/push/save_to_gb`,
+    url: `/api/v1/push/save_to_gb`,
     data: data
   })
 }
@@ -13,7 +13,7 @@ export function saveToGb(data) {
 export function add(data) {
   return request({
     method: 'post',
-    url: `/api/push/add`,
+    url: `/api/v1/push/add`,
     data: data
   })
 }
@@ -21,7 +21,7 @@ export function add(data) {
 export function update(data) {
   return request({
     method: 'post',
-    url: '/api/push/update',
+    url: '/api/v1/push/update',
     data: data
   })
 }
@@ -30,7 +30,7 @@ export function queryList(params) {
   const { page, count, query, pushing, mediaServerId } = params
   return request({
     method: 'get',
-    url: `/api/push/list`,
+    url: `/api/v1/push/list`,
     params: {
       page: page,
       count: count,
@@ -44,7 +44,7 @@ export function queryList(params) {
 export function play(id) {
   return request({
     method: 'get',
-    url: '/api/push/start',
+    url: '/api/v1/push/start',
     params: {
       id: id
     }
@@ -54,7 +54,7 @@ export function play(id) {
 export function remove(id) {
   return request({
     method: 'post',
-    url: '/api/push/remove',
+    url: '/api/v1/push/remove',
     params: {
       id: id
     }
@@ -64,7 +64,7 @@ export function remove(id) {
 export function removeFormGb(data) {
   return request({
     method: 'delete',
-    url: '/api/push/remove_form_gb',
+    url: '/api/v1/push/remove_form_gb',
     data: data
   })
 }
@@ -72,7 +72,7 @@ export function removeFormGb(data) {
 export function batchRemove(ids) {
   return request({
     method: 'delete',
-    url: '/api/push/batchRemove',
+    url: '/api/v1/push/batchRemove',
     data: {
       ids: ids
     }

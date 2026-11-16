@@ -365,9 +365,9 @@ export default {
       let baseApi = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl)
       let tileUrl = null
       if (index === 1) {
-        tileUrl = baseApi + '/api/common/channel/map/tile/{z}/{x}/{y}'
+        tileUrl = baseApi + '/api/v1/common/channel/map/tile/{z}/{x}/{y}'
       }else if (index === 2) {
-        tileUrl = baseApi + '/api/common/channel/map/thin/tile/{z}/{x}/{y}'
+        tileUrl = baseApi + '/api/v1/common/channel/map/thin/tile/{z}/{x}/{y}'
       }
       channelTileLayer = this.$refs.mapComponent.addVectorTileLayer(tileUrl, this.clientEvent)
     },
@@ -573,7 +573,7 @@ export default {
       let geoCoordSys = this.$refs.mapComponent.getCoordSys()
       const baseUrl = window.baseUrl ? window.baseUrl : ''
       let baseApi = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl)
-      let tileUrl = baseApi + `/api/common/channel/map/thin/tile/{z}/{x}/{y}?geoCoordSys=${geoCoordSys}&thinId=${thinId}&accessToken=${this.$store.getters.token}`
+      let tileUrl = baseApi + `/api/v1/common/channel/map/thin/tile/{z}/{x}/{y}?geoCoordSys=${geoCoordSys}&thinId=${thinId}&accessToken=${this.$store.getters.token}`
       this.drawThinLayer = this.$refs.mapComponent.addVectorTileLayer(tileUrl, this.clientEvent)
     },
     boxDrawThin: function (){

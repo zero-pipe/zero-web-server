@@ -24,7 +24,7 @@ func NewLogHandler(svc *ops.LogService) *LogHandler {
 func (h *LogHandler) List(c *gin.Context) {
 	list, err := h.svc.List(c.Query("query"), c.Query("startTime"), c.Query("endTime"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	if list == nil {

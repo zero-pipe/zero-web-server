@@ -9,7 +9,7 @@ import (
 
 	alarmapp "zero-web-server/internal/application/alarm"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -35,7 +35,7 @@ func (h *AlarmHandler) List(c *gin.Context) {
 	}
 	list, total, err := h.svc.List(page, count, alarmType, c.Query("beginTime"), c.Query("endTime"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -48,7 +48,7 @@ func (h *AlarmHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Delete(ids); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -63,7 +63,7 @@ func (h *AlarmHandler) Clear(c *gin.Context) {
 		}
 	}
 	if err := h.svc.Clear(alarmType, c.Query("beginTime"), c.Query("endTime")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, 0)

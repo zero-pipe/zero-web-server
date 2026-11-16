@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	publishauth "zero-web-server/internal/application/publishauth"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
-	"zero-web-server/internal/infrastructure/media/mediakit"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
+	"zero-web-server/internal/gbsip"
+	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/port"
 	applog "zero-web-server/pkg/log"
 )
@@ -18,11 +19,11 @@ import (
 type Service struct {
 	devices    domaindevice.Repository
 	channels   domainchannel.Repository
-	sip        *sipinfra.Server
+	sip        port.GBInviter
 	media      port.MediaCluster
 	serverID   string
 	serverPort int
-	ssrcSeq    int
+	ssrcSeq    atomic.Int64
 	sessions   sync.Map
 	broadcast  *broadcastRegistry
 }
@@ -30,7 +31,7 @@ type Service struct {
 func NewService(
 	devices domaindevice.Repository,
 	channels domainchannel.Repository,
-	sipServer *sipinfra.Server,
+	sipServer port.GBInviter,
 	media port.MediaCluster,
 	serverID string,
 	serverPort int,
@@ -86,7 +87,7 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 	if sdpIP == "" {
 		sdpIP = node.SDPIP()
 	}
-	streamMode := sipinfra.NormalizeStreamMode(device.StreamMode)
+	streamMode := gbsip.NormalizeStreamMode(device.StreamMode)
 	tcpMode := streamModeToTCP(streamMode)
 	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, tcpMode)
 	if err != nil {
@@ -96,10 +97,10 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 
 	ssrc := preferSSRC
 	if ssrc == "" {
-		ssrc = sipinfra.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
+		ssrc = gbsip.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
 	}
-	answerSDP = sipinfra.BuildPlaySDP(s.sip.Domain(), sdpIP, rtpPort, ssrc, streamMode, "")
-	deviceSDP := sipinfra.BuildPlaySDP(device.DeviceID, sdpIP, rtpPort, ssrc, streamMode, "")
+	answerSDP = gbsip.BuildPlaySDP(s.sip.Domain(), sdpIP, rtpPort, ssrc, streamMode, "")
+	deviceSDP := gbsip.BuildPlaySDP(device.DeviceID, sdpIP, rtpPort, ssrc, streamMode, "")
 
 	go func() {
 		tcpConnect := func(host string, port int) error {
@@ -108,7 +109,7 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 			}
 			return node.ConnectRtpServer(ctx, app, stream, host, port)
 		}
-		if err := s.sip.SendInvitePlay(device, channel, deviceSDP, ssrc, stream, streamMode, tcpConnect, nil); err != nil {
+		if err := s.sip.SendInvitePlay(device, channel, deviceSDP, ssrc, stream, streamMode, tcpConnect); err != nil {
 			applog.Warnf("[cascade play] SIP INVITE FAILED device=%s channel=%s err=%v", device.DeviceID, channel.GBDeviceID, err)
 		}
 	}()
@@ -130,7 +131,7 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 			app, stream, info.BytesSpeed, info.VideoFps, info.ReaderCount)
 		s.media.BindStream(node.ID(), app, stream)
 		content := s.buildStreamContent(app, stream, node)
-		mediakit.LogPlayStreamPaths("[GB28181 play] reuse live URLs", app, stream, "", node.PlayURLs(app, stream))
+		mediaurl.LogPlayStreamPaths("[GB28181 play] reuse live URLs", app, stream, "", node.PlayURLs(app, stream))
 		return content, nil
 	}
 	// INVITE 会话还在但媒体未就绪（常见于设备重启）：清掉僵死会话后重新 INVITE。
@@ -145,7 +146,7 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 		sdpIP = node.SDPIP()
 	}
 
-	streamMode := sipinfra.NormalizeStreamMode(device.StreamMode)
+	streamMode := gbsip.NormalizeStreamMode(device.StreamMode)
 	applog.Debugf("[GB28181 play 1/6] start device=%s channel=%s target=%s:%d sipTransport=%s mediaStreamMode=%s sdpIP=%s mediaNode=%s zms=%s",
 		device.DeviceID, channel.GBDeviceID, device.IP, device.Port, device.Transport, streamMode, sdpIP, node.ID(), node.BaseURL())
 
@@ -158,8 +159,8 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 	applog.Debugf("[GB28181 play 2/6] openRtpServer OK stream=%s port=%d tcp_mode=%d node=%s", stream, rtpPort, tcpMode, node.ID())
 	s.media.BindStream(node.ID(), app, stream)
 
-	ssrc := sipinfra.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
-	sdp := sipinfra.BuildPlaySDP(device.DeviceID, sdpIP, rtpPort, ssrc, streamMode, "")
+	ssrc := gbsip.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
+	sdp := gbsip.BuildPlaySDP(device.DeviceID, sdpIP, rtpPort, ssrc, streamMode, "")
 	applog.Debugf("[GB28181 play 3/6] SDP ready ssrc=%s streamMode=%s port=%d", ssrc, streamMode, rtpPort)
 
 	go func() {
@@ -171,15 +172,15 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 			}
 			return node.ConnectRtpServer(ctx, app, stream, host, port)
 		}
-		if err := s.sip.SendInvitePlay(device, channel, sdp, ssrc, stream, streamMode, tcpConnect, nil); err != nil {
+		if err := s.sip.SendInvitePlay(device, channel, sdp, ssrc, stream, streamMode, tcpConnect); err != nil {
 			applog.Warnf("[GB28181 play 4/6] SIP INVITE FAILED device=%s channel=%s ssrc=%s rtpPort=%d err=%v",
 				device.DeviceID, channel.GBDeviceID, ssrc, rtpPort, err)
 		}
 	}()
 
-	pushURL := mediakit.BuildGB28181PushURL(sdpIP, rtpPort, tcpMode)
+	pushURL := mediaurl.BuildGB28181PushURL(sdpIP, rtpPort, tcpMode)
 	content := s.buildStreamContent(app, stream, node)
-	mediakit.LogPlayStreamPaths("[GB28181 play 6/6] URLs ready (invite async)", app, stream, pushURL, node.PlayURLs(app, stream))
+	mediaurl.LogPlayStreamPaths("[GB28181 play 6/6] URLs ready (invite async)", app, stream, pushURL, node.PlayURLs(app, stream))
 	return content, nil
 }
 
@@ -214,7 +215,7 @@ func (s *Service) OnStreamStarted(app, stream string) {
 	applog.Debugf("[GB28181 play 5/6] hook on_stream_changed regist app=%s stream=%s key=%s", app, stream, key)
 	if nodeID, ok := s.media.StreamNodeID(app, stream); ok {
 		if node, err := s.media.Resolve(context.Background(), nodeID); err == nil {
-			mediakit.LogPlayStreamPaths("[GB28181 play 5/6] pull URLs", app, stream, "", node.PlayURLs(app, stream))
+			mediaurl.LogPlayStreamPaths("[GB28181 play 5/6] pull URLs", app, stream, "", node.PlayURLs(app, stream))
 		}
 	}
 	if v, ok := s.sessions.Load(key); ok {
@@ -269,8 +270,7 @@ func (s *Service) closeStream(app, stream string) error {
 }
 
 func (s *Service) nextSSRCSeq() int {
-	s.ssrcSeq++
-	return s.ssrcSeq
+	return int(s.ssrcSeq.Add(1))
 }
 
 func streamKey(app, stream string) string {

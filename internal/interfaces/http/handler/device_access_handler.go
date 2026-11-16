@@ -2,7 +2,7 @@ package handler
 
 import (
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +27,7 @@ func (h *DeviceAccessHandler) List(c *gin.Context) {
 		Status:     c.Query("status"),
 	})
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -38,7 +38,7 @@ func (h *DeviceAccessHandler) Get(c *gin.Context) {
 	if code := c.Query("internalCode"); code != "" {
 		view, err := h.svc.GetByInternalCode(c.Request.Context(), code)
 		if err != nil {
-			response.Error(c, response.CodeError, err.Error())
+			response.FromError(c, err)
 			return
 		}
 		response.OK(c, view)
@@ -55,7 +55,7 @@ func (h *DeviceAccessHandler) Create(c *gin.Context) {
 	}
 	view, err := h.svc.Create(c.Request.Context(), req)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, view)
@@ -75,7 +75,7 @@ func (h *DeviceAccessHandler) Update(c *gin.Context) {
 	}
 	view, err := h.svc.Update(c.Request.Context(), id, req)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, view)
@@ -96,7 +96,7 @@ func (h *DeviceAccessHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -110,7 +110,7 @@ func (h *DeviceAccessHandler) Sync(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Sync(c.Request.Context(), id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

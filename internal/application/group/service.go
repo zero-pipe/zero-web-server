@@ -4,27 +4,28 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"zero-web-server/internal/apperr"
 
+	domaingroupregion "zero-web-server/internal/domain/groupregion"
 	domaintree "zero-web-server/internal/domain/tree"
-	"zero-web-server/internal/infrastructure/persistence"
 )
 
 var (
-	ErrGroupNameRequired     = errors.New("分组名称不可为NULL")
-	ErrGroupDeviceIDRequired = errors.New("分组编号不可为NULL")
-	ErrGroupDeviceIDLength   = errors.New("分组编号必须为20位")
-	ErrGroupDeviceIDInvalid  = errors.New("分组编号不满足国标定义")
-	ErrGroupDuplicate        = errors.New("该节点编号已存在")
-	ErrGroupNotFound         = errors.New("分组不存在")
-	ErrBusinessGroupMissing  = errors.New("所属的业务分组分组不存在")
-	ErrParentGroupMissing    = errors.New("所属的上级分组分组不存在")
+	ErrGroupNameRequired     = apperr.New(apperr.CodeGroup+1, "分组名称不可为NULL")
+	ErrGroupDeviceIDRequired = apperr.New(apperr.CodeGroup+2, "分组编号不可为NULL")
+	ErrGroupDeviceIDLength   = apperr.New(apperr.CodeGroup+3, "分组编号必须为20位")
+	ErrGroupDeviceIDInvalid  = apperr.New(apperr.CodeGroup+4, "分组编号不满足国标定义")
+	ErrGroupDuplicate        = apperr.New(apperr.CodeGroup+5, "该节点编号已存在")
+	ErrGroupNotFound         = apperr.New(apperr.CodeGroup+6, "分组不存在")
+	ErrBusinessGroupMissing  = apperr.New(apperr.CodeGroup+7, "所属的业务分组分组不存在")
+	ErrParentGroupMissing    = apperr.New(apperr.CodeGroup+8, "所属的上级分组分组不存在")
 )
 
 type Service struct {
-	repo *persistence.GroupRegionRepository
+	repo domaingroupregion.Repository
 }
 
-func NewService(repo *persistence.GroupRegionRepository) *Service {
+func NewService(repo domaingroupregion.Repository) *Service {
 	return &Service{repo: repo}
 }
 
@@ -47,7 +48,7 @@ func (s *Service) QueryForTree(query string, parentID *int, hasChannel *bool) ([
 	return append(nodes, channels...), nil
 }
 
-func (s *Service) Add(group *persistence.GroupRecord) error {
+func (s *Service) Add(group *domaingroupregion.GroupRecord) error {
 	if err := validateGroupRecord(group, 0); err != nil {
 		return err
 	}
@@ -82,7 +83,7 @@ func (s *Service) Add(group *persistence.GroupRecord) error {
 	return s.repo.AddVirtualGroup(group)
 }
 
-func (s *Service) Update(group *persistence.GroupRecord) error {
+func (s *Service) Update(group *domaingroupregion.GroupRecord) error {
 	if group.ID <= 0 {
 		return errors.New("更新必须携带分组ID")
 	}
@@ -108,13 +109,13 @@ func (s *Service) Delete(id int) error {
 		return ErrGroupNotFound
 	}
 	typeCode := gbTypeCode(group.DeviceID)
-	var toDelete []persistence.GroupRecord
+	var toDelete []domaingroupregion.GroupRecord
 	if typeCode == "215" {
 		children, err := s.repo.ListGroupsByBusinessGroup(group.DeviceID)
 		if err != nil {
 			return err
 		}
-		toDelete = append([]persistence.GroupRecord{*group}, children...)
+		toDelete = append([]domaingroupregion.GroupRecord{*group}, children...)
 		if err := s.repo.ClearChannelsByBusinessGroup(group.DeviceID); err != nil {
 			return err
 		}
@@ -139,7 +140,7 @@ func (s *Service) Delete(id int) error {
 	return s.repo.DeleteGroupsByIDs(ids)
 }
 
-func (s *Service) GetPath(deviceID, businessGroup string) ([]persistence.GroupRecord, error) {
+func (s *Service) GetPath(deviceID, businessGroup string) ([]domaingroupregion.GroupRecord, error) {
 	if _, err := s.repo.GetBusinessGroup(businessGroup); err != nil {
 		return nil, errors.New("业务分组不存在")
 	}
@@ -147,10 +148,10 @@ func (s *Service) GetPath(deviceID, businessGroup string) ([]persistence.GroupRe
 	if err != nil {
 		return nil, errors.New("虚拟组织不存在")
 	}
-	path := make([]persistence.GroupRecord, 0, 4)
+	path := make([]domaingroupregion.GroupRecord, 0, 4)
 	current := group
 	for {
-		path = append([]persistence.GroupRecord{*current}, path...)
+		path = append([]domaingroupregion.GroupRecord{*current}, path...)
 		if current.ParentDeviceID == "" || current.DeviceID == current.BusinessGroup {
 			break
 		}
@@ -163,7 +164,7 @@ func (s *Service) GetPath(deviceID, businessGroup string) ([]persistence.GroupRe
 	return path, nil
 }
 
-func validateGroupRecord(group *persistence.GroupRecord, excludeID int) error {
+func validateGroupRecord(group *domaingroupregion.GroupRecord, excludeID int) error {
 	_ = excludeID
 	if strings.TrimSpace(group.Name) == "" {
 		return ErrGroupNameRequired

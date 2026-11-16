@@ -5,7 +5,7 @@ import (
 
 	upstreamapp "zero-web-server/internal/application/upstream"
 	domainplatform "zero-web-server/internal/domain/platform"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -28,7 +28,7 @@ func (h *PlatformHandler) Query(c *gin.Context) {
 	page, count := parsePageCount(c)
 	list, total, err := h.svc.List(page, count, c.Query("query"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -41,7 +41,7 @@ func (h *PlatformHandler) Add(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Add(&p); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -54,7 +54,7 @@ func (h *PlatformHandler) Update(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Update(&p); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -67,7 +67,7 @@ func (h *PlatformHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Delete(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -75,7 +75,7 @@ func (h *PlatformHandler) Delete(c *gin.Context) {
 
 func (h *PlatformHandler) Exit(c *gin.Context) {
 	if err := h.svc.Exit(c.Param("deviceGbId")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -84,7 +84,7 @@ func (h *PlatformHandler) Exit(c *gin.Context) {
 func (h *PlatformHandler) PushChannel(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	if err := h.channel.PushCatalog(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -100,7 +100,7 @@ func (h *PlatformHandler) ChannelList(c *gin.Context) {
 	}
 	list, total, err := h.channel.List(platformID, page, count, c.Query("query"), hasShare)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -124,7 +124,7 @@ func (h *PlatformHandler) ChannelAdd(c *gin.Context) {
 		return
 	}
 	if err := h.channel.AddChannels(req.PlatformID, req.ChannelIDs, req.All); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -137,7 +137,7 @@ func (h *PlatformHandler) ChannelDeviceAdd(c *gin.Context) {
 		return
 	}
 	if err := h.channel.AddChannelsByDevice(req.PlatformID, req.DeviceIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -150,7 +150,7 @@ func (h *PlatformHandler) ChannelDeviceRemove(c *gin.Context) {
 		return
 	}
 	if err := h.channel.RemoveChannelsByDevice(req.PlatformID, req.DeviceIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -163,7 +163,7 @@ func (h *PlatformHandler) ChannelRemove(c *gin.Context) {
 		return
 	}
 	if err := h.channel.RemoveChannels(req.PlatformID, req.ChannelIDs, req.All); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -181,7 +181,7 @@ func (h *PlatformHandler) ChannelCustomUpdate(c *gin.Context) {
 		return
 	}
 	if err := h.channel.UpdateCustom(body.PlatformID, body.ID, body.CustomDeviceID, body.CustomName); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

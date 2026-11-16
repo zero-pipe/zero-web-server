@@ -3,7 +3,7 @@ import request from '@/utils/request'
 export function getPlan(id) {
   return request({
     method: 'get',
-    url: '/api/record/plan/get',
+    url: '/api/v1/record/plan/get',
     params: {
       planId: id
     }
@@ -15,7 +15,7 @@ export function addPlan(params) {
   return request({
 
     method: 'post',
-    url: '/api/record/plan/add',
+    url: '/api/v1/record/plan/add',
     data: {
       name: name,
       planItemList: planList
@@ -27,7 +27,7 @@ export function update(params) {
   const { id, name, planList } = params
   return request({
     method: 'post',
-    url: '/api/record/plan/update',
+    url: '/api/v1/record/plan/update',
     data: {
       id: id,
       name: name,
@@ -40,7 +40,7 @@ export function queryList(params) {
   const { page, count, query } = params
   return request({
     method: 'get',
-    url: `/api/record/plan/query`,
+    url: `/api/v1/record/plan/query`,
     params: {
       page: page,
       count: count,
@@ -52,7 +52,7 @@ export function queryList(params) {
 export function deletePlan(id) {
   return request({
     method: 'delete',
-    url: '/api/record/plan/delete',
+    url: '/api/v1/record/plan/delete',
     params: {
       planId: id
     }
@@ -63,7 +63,7 @@ export function queryChannelList(params) {
   const { page, count, channelType, query, online, planId , hasLink } = params
   return request({
     method: 'get',
-    url: `/api/record/plan/channel/list`,
+    url: `/api/v1/record/plan/channel/list`,
     params: {
       page: page,
       count: count,
@@ -79,7 +79,7 @@ export function queryChannelList(params) {
 export function linkPlan(data) {
   return request({
     method: 'post',
-    url: `/api/record/plan/link`,
+    url: `/api/v1/record/plan/link`,
     data: data
   })
 }

@@ -8,20 +8,19 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	domaincloudrecord "zero-web-server/internal/domain/cloudrecord"
+	"zero-web-server/internal/dto"
 	"zero-web-server/internal/port"
 )
 
 type Service struct {
-	repo     *persistence.CloudRecordRepository
+	repo     domaincloudrecord.Repository
 	media    port.MediaCluster
 	serverID string
 	sessions sync.Map
 }
 
-func NewService(repo *persistence.CloudRecordRepository, media port.MediaCluster, serverID string) *Service {
+func NewService(repo domaincloudrecord.Repository, media port.MediaCluster, serverID string) *Service {
 	return &Service{repo: repo, media: media, serverID: serverID}
 }
 
@@ -39,7 +38,7 @@ func (s *Service) OnRecordMp4(param RecordHookParam) error {
 	} else {
 		playURL = s.rewritePlayURLHost(mediaID, playURL)
 	}
-	rec := &model.CloudRecord{
+	rec := &domaincloudrecord.Record{
 		App:           param.App,
 		Stream:        param.Stream,
 		StartTime:     startMs,
@@ -71,7 +70,7 @@ func normalizeRecordTimes(startSecOrMs int64, timeLenSecOrMs float64) (startMs i
 	return startMs, timeLenMs
 }
 
-func normalizeCloudRecord(rec *model.CloudRecord) {
+func normalizeCloudRecord(rec *domaincloudrecord.Record) {
 	if rec == nil {
 		return
 	}
@@ -100,7 +99,7 @@ type RecordHookParam struct {
 	MediaServerID string
 }
 
-func (s *Service) List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]model.CloudRecord, int64, error) {
+func (s *Service) List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]domaincloudrecord.Record, int64, error) {
 	rows, total, err := s.repo.List(page, count, app, stream, query, callID, mediaServerID, startTime, endTime, asc)
 	if err != nil {
 		return nil, 0, err
@@ -263,7 +262,7 @@ func (s *Service) buildStreamContent(app, stream string, node port.MediaEndpoint
 	}
 }
 
-func (s *Service) ensurePlayURL(rec *model.CloudRecord) {
+func (s *Service) ensurePlayURL(rec *domaincloudrecord.Record) {
 	if rec == nil || rec.PlayURL != "" {
 		return
 	}

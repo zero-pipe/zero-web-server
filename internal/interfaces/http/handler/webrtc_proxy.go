@@ -1,9 +1,6 @@
 package handler
 
-
-
 import (
-
 	"bytes"
 
 	"io"
@@ -16,25 +13,16 @@ import (
 
 	"time"
 
-
-
 	"github.com/gin-gonic/gin"
-
 )
-
-
 
 // WebRTCProxyHandler 将 WebRTC 信令转发到 ZMS，供前端 rtc 字段走平台同源地址。
 
 type WebRTCProxyHandler struct {
-
 	mediaBaseURL string
 
-	client       *http.Client
-
+	client *http.Client
 }
-
-
 
 func NewWebRTCProxyHandler(mediaBaseURL string) *WebRTCProxyHandler {
 
@@ -42,13 +30,10 @@ func NewWebRTCProxyHandler(mediaBaseURL string) *WebRTCProxyHandler {
 
 		mediaBaseURL: strings.TrimRight(mediaBaseURL, "/"),
 
-		client:       &http.Client{Timeout: 30 * time.Second},
-
+		client: &http.Client{Timeout: 30 * time.Second},
 	}
 
 }
-
-
 
 func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
 
@@ -60,8 +45,6 @@ func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
 
 	}
 
-
-
 	body, err := io.ReadAll(c.Request.Body)
 
 	if err != nil {
@@ -71,8 +54,6 @@ func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
 		return
 
 	}
-
-
 
 	req, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, target, bytes.NewReader(body))
 
@@ -96,8 +77,6 @@ func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
 
 	}
 
-
-
 	resp, err := h.client.Do(req)
 
 	if err != nil {
@@ -112,11 +91,7 @@ func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
 
 	defer resp.Body.Close()
 
-
-
 	log.Printf("[webrtc-proxy] %s %s body=%d -> %d", c.Request.Method, target, len(body), resp.StatusCode)
-
-
 
 	for k, vals := range resp.Header {
 
@@ -137,4 +112,3 @@ func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
 	}
 
 }
-

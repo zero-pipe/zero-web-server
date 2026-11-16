@@ -3,23 +3,24 @@ package regionapp
 import (
 	"errors"
 	"strings"
+	"zero-web-server/internal/apperr"
 
+	"zero-web-server/internal/civilcode"
+	domaingroupregion "zero-web-server/internal/domain/groupregion"
 	domaintree "zero-web-server/internal/domain/tree"
-	"zero-web-server/internal/infrastructure/civilcode"
-	"zero-web-server/internal/infrastructure/persistence"
 )
 
 var (
-	ErrRegionNameRequired     = errors.New("名称必须存在")
-	ErrRegionDeviceIDRequired = errors.New("国标编号必须存在")
-	ErrRegionDuplicate        = errors.New("此行政区划已存在")
+	ErrRegionNameRequired     = apperr.New(apperr.CodeGroup+20, "名称必须存在")
+	ErrRegionDeviceIDRequired = apperr.New(apperr.CodeGroup+21, "国标编号必须存在")
+	ErrRegionDuplicate        = apperr.New(apperr.CodeGroup+22, "此行政区划已存在")
 )
 
 type Service struct {
-	repo *persistence.GroupRegionRepository
+	repo domaingroupregion.Repository
 }
 
-func NewService(repo *persistence.GroupRegionRepository) *Service {
+func NewService(repo domaingroupregion.Repository) *Service {
 	return &Service{repo: repo}
 }
 
@@ -50,7 +51,7 @@ func (s *Service) GetDescription(code string) string {
 	return civilcode.GetDescription(code)
 }
 
-func (s *Service) Add(region *persistence.RegionRecord) error {
+func (s *Service) Add(region *domaingroupregion.RegionRecord) error {
 	if strings.TrimSpace(region.Name) == "" {
 		return ErrRegionNameRequired
 	}
@@ -69,7 +70,7 @@ func (s *Service) Add(region *persistence.RegionRecord) error {
 	return nil
 }
 
-func (s *Service) Update(region *persistence.RegionRecord) error {
+func (s *Service) Update(region *domaingroupregion.RegionRecord) error {
 	if region.ID <= 0 {
 		return errors.New("无效的区划ID")
 	}

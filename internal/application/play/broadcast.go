@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	domainchannel "zero-web-server/internal/domain/channel"
-	"zero-web-server/internal/infrastructure/media/mediakit"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
+	"zero-web-server/internal/mediaurl"
 )
 
 const (
@@ -137,7 +137,7 @@ func (s *Service) buildStreamContentWithWebRTC(app, stream string, push bool) *d
 	if node != nil {
 		base = node.SignalingBaseURL(s.serverPort)
 	}
-	rtc, rtcs := mediakit.BuildWebRTCURLs(base, app, stream, push)
+	rtc, rtcs := mediaurl.BuildWebRTCURLs(base, app, stream, push)
 	c.Rtc, c.Rtcs = rtc, rtcs
 	return c
 }

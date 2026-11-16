@@ -141,7 +141,7 @@ func ensureInternalCodes(db *gorm.DB) error {
 	backfill := func(table string, gen func() (string, error)) error {
 		var rows []rowID
 		if err := db.Raw(
-			"SELECT id FROM `"+table+"` WHERE internal_code IS NULL OR TRIM(internal_code) = ''",
+			"SELECT id FROM `" + table + "` WHERE internal_code IS NULL OR TRIM(internal_code) = ''",
 		).Scan(&rows).Error; err != nil {
 			if strings.Contains(err.Error(), "doesn't exist") {
 				return nil

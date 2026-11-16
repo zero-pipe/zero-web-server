@@ -117,12 +117,12 @@ export default {
     },
     showLogView(file) {
       this.playerTitle = '正在加载日志...'
-      this.fileUrl = `/api/log/file/${file.fileName}`
+      this.fileUrl = `/api/v1/log/file/${file.fileName}`
       this.showLog = true
       this.file = file
     },
     downloadFile(file) {
-      const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : window.baseUrl) + `/api/log/file/${file.fileName}`
+      const fileUrl = ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : window.baseUrl) + `/api/v1/log/file/${file.fileName}`
       const headers = new Headers()
       headers.append('access-token', getToken())
       fetch(fileUrl, {

@@ -4,8 +4,8 @@ import (
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	"zero-web-server/internal/application/ops"
+	domainmediaserver "zero-web-server/internal/domain/mediaserver"
 	"zero-web-server/internal/infrastructure/config"
-	"zero-web-server/internal/infrastructure/persistence/model"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -46,7 +46,7 @@ func NewMediaServerHandler(
 func (h *MediaServerHandler) List(c *gin.Context) {
 	list, err := h.svc.List()
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)
@@ -55,7 +55,7 @@ func (h *MediaServerHandler) List(c *gin.Context) {
 func (h *MediaServerHandler) OnlineList(c *gin.Context) {
 	list, err := h.svc.ListOnline()
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)
@@ -64,7 +64,7 @@ func (h *MediaServerHandler) OnlineList(c *gin.Context) {
 func (h *MediaServerHandler) One(c *gin.Context) {
 	v, err := h.svc.GetOne(c.Param("id"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, v)
@@ -76,20 +76,20 @@ func (h *MediaServerHandler) Check(c *gin.Context) {
 	secret := c.Query("secret")
 	v, err := h.svc.Check(ip, port, secret)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, v)
 }
 
 func (h *MediaServerHandler) Save(c *gin.Context) {
-	var m model.MediaServer
+	var m domainmediaserver.MediaServer
 	if err := c.ShouldBindJSON(&m); err != nil {
 		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
 		return
 	}
 	if err := h.svc.Save(&m); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -97,7 +97,7 @@ func (h *MediaServerHandler) Save(c *gin.Context) {
 
 func (h *MediaServerHandler) Delete(c *gin.Context) {
 	if err := h.svc.Delete(c.Query("id")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -106,7 +106,7 @@ func (h *MediaServerHandler) Delete(c *gin.Context) {
 func (h *MediaServerHandler) MediaInfo(c *gin.Context) {
 	info, err := h.svc.MediaInfo(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, info)
@@ -119,7 +119,7 @@ func (h *MediaServerHandler) Load(c *gin.Context) {
 	}
 	list, err := h.dashboard.MediaLoads()
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)

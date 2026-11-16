@@ -59,6 +59,15 @@ func (r *DeviceRepository) Update(device *domaindevice.Device) error {
 	return r.db.Save(m).Error
 }
 
+// UpdateFields 仅更新 map 中给出的列。用于注册/心跳等高频、可能来自缓存的写入，
+// 避免全行覆盖把未加载的列写空，并降低并发更新互相覆盖的风险。
+func (r *DeviceRepository) UpdateFields(deviceID string, fields map[string]interface{}) error {
+	if deviceID == "" || len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.GBDevice{}).Where("device_id = ?", deviceID).Updates(fields).Error
+}
+
 func (r *DeviceRepository) UpdateOnline(deviceID string, online bool) error {
 	return r.db.Model(&model.GBDevice{}).Where("device_id = ?", deviceID).
 		Updates(map[string]any{
@@ -264,38 +273,35 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 	})
 }
 
-func (r *ChannelRepository) Update(m *model.GBDeviceChannel) error {
-	m.UpdateTime = nowTimeStr()
+func (r *ChannelRepository) Update(ch *domainchannel.Channel) error {
 	// 勿用 Save 全字段覆盖：会把未赋值的 gb_name/gb_status 写成空串，
 	// 树查询 COALESCE(gb_name, name) 遇到 '' 不会回退到 name，导致分屏/地图无名。
-	m.UpdateTime = nowTimeStr()
-	// 勿用 Save 全字段覆盖：会把未赋值的 gb_name/gb_status 写成空串。
 	// 业务分组挂载字段仅在有值时更新，避免编辑经纬度等把 gb_parent_id 清掉。
 	updates := map[string]interface{}{
-		"name":            m.Name,
-		"gb_name":         m.Name,
-		"gb_device_id":    m.GBDeviceID,
-		"manufacturer":    m.Manufacturer,
-		"gb_manufacturer": firstNonEmpty(m.GBManufacturer, m.Manufacturer),
-		"model":           m.Model,
-		"gb_model":        firstNonEmpty(m.GBModel, m.Model),
-		"status":          m.Status,
-		"gb_status":       firstNonEmpty(m.GBStatus, m.Status),
-		"longitude":       m.Longitude,
-		"gb_longitude":    m.Longitude,
-		"latitude":        m.Latitude,
-		"gb_latitude":     m.Latitude,
-		"ptz_type":        m.PTZType,
-		"gb_ptz_type":     m.PTZType,
-		"update_time":     m.UpdateTime,
+		"name":            ch.Name,
+		"gb_name":         ch.Name,
+		"gb_device_id":    ch.GBDeviceID,
+		"manufacturer":    ch.Manufacturer,
+		"gb_manufacturer": ch.Manufacturer,
+		"model":           ch.Model,
+		"gb_model":        ch.Model,
+		"status":          ch.Status,
+		"gb_status":       ch.Status,
+		"longitude":       ch.Longitude,
+		"gb_longitude":    ch.Longitude,
+		"latitude":        ch.Latitude,
+		"gb_latitude":     ch.Latitude,
+		"ptz_type":        ch.PTZType,
+		"gb_ptz_type":     ch.PTZType,
+		"update_time":     nowTimeStr(),
 	}
-	if pid := firstNonEmpty(m.GBParentID, m.ParentID); pid != "" {
+	if pid := strings.TrimSpace(ch.ParentID); pid != "" {
 		updates["gb_parent_id"] = pid
 	}
-	if biz := firstNonEmpty(m.GBBusinessGroupID, m.BusinessGroupID); biz != "" {
+	if biz := strings.TrimSpace(ch.BusinessGroupID); biz != "" {
 		updates["gb_business_group_id"] = biz
 	}
-	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", m.ID).Updates(updates).Error
+	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", ch.ID).Updates(updates).Error
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -565,69 +571,69 @@ func nowTimeStr() string {
 
 func toDomainDevice(m *model.GBDevice) *domaindevice.Device {
 	return &domaindevice.Device{
-		ID:                       m.ID,
-		InternalCode:             m.InternalCode,
-		DeviceID:                 m.DeviceID,
-		Name:                     m.Name,
-		Manufacturer:             m.Manufacturer,
-		Model:                    m.Model,
-		Firmware:                 m.Firmware,
-		Transport:                m.Transport,
-		StreamMode:               m.StreamMode,
-		IP:                       m.IP,
-		Port:                     m.Port,
-		HostAddress:              m.HostAddress,
-		OnLine:                   m.OnLine,
-		Charset:                  m.Charset,
-		Expires:                  m.Expires,
-		Password:                 m.Password,
-		MediaServerID:            m.MediaServerID,
-		CustomName:               m.CustomName,
-		SDPIP:                    m.SDPIP,
-		LocalIP:                  m.LocalIP,
-		ServerID:                 m.ServerID,
-		HeartBeatInterval:        m.HeartBeatInterval,
-		HeartBeatCount:           m.HeartBeatCount,
+		ID:                               m.ID,
+		InternalCode:                     m.InternalCode,
+		DeviceID:                         m.DeviceID,
+		Name:                             m.Name,
+		Manufacturer:                     m.Manufacturer,
+		Model:                            m.Model,
+		Firmware:                         m.Firmware,
+		Transport:                        m.Transport,
+		StreamMode:                       m.StreamMode,
+		IP:                               m.IP,
+		Port:                             m.Port,
+		HostAddress:                      m.HostAddress,
+		OnLine:                           m.OnLine,
+		Charset:                          m.Charset,
+		Expires:                          m.Expires,
+		Password:                         m.Password,
+		MediaServerID:                    m.MediaServerID,
+		CustomName:                       m.CustomName,
+		SDPIP:                            m.SDPIP,
+		LocalIP:                          m.LocalIP,
+		ServerID:                         m.ServerID,
+		HeartBeatInterval:                m.HeartBeatInterval,
+		HeartBeatCount:                   m.HeartBeatCount,
 		SubscribeCycleForCatalog:         m.SubscribeCycleForCatalog,
 		SubscribeCycleForMobilePosition:  m.SubscribeCycleForMobilePosition,
 		MobilePositionSubmissionInterval: m.MobilePositionSubmissionInterval,
 		SubscribeCycleForAlarm:           m.SubscribeCycleForAlarm,
-		CreateTime:               m.CreateTime,
-		UpdateTime:               m.UpdateTime,
+		CreateTime:                       m.CreateTime,
+		UpdateTime:                       m.UpdateTime,
 	}
 }
 
 func toModelDevice(d *domaindevice.Device) *model.GBDevice {
 	return &model.GBDevice{
-		ID:                       d.ID,
-		InternalCode:             d.InternalCode,
-		DeviceID:                 d.DeviceID,
-		Name:                     d.Name,
-		Manufacturer:             d.Manufacturer,
-		Model:                    d.Model,
-		Firmware:                 d.Firmware,
-		Transport:                d.Transport,
-		StreamMode:               d.StreamMode,
-		OnLine:                   d.OnLine,
-		IP:                       d.IP,
-		Port:                     d.Port,
-		Expires:                  d.Expires,
-		HostAddress:              d.HostAddress,
-		Charset:                  d.Charset,
-		MediaServerID:            d.MediaServerID,
-		CustomName:               d.CustomName,
-		SDPIP:                    d.SDPIP,
-		LocalIP:                  d.LocalIP,
-		Password:                 d.Password,
-		HeartBeatInterval:        d.HeartBeatInterval,
-		HeartBeatCount:           d.HeartBeatCount,
+		ID:                               d.ID,
+		InternalCode:                     d.InternalCode,
+		DeviceID:                         d.DeviceID,
+		Name:                             d.Name,
+		Manufacturer:                     d.Manufacturer,
+		Model:                            d.Model,
+		Firmware:                         d.Firmware,
+		Transport:                        d.Transport,
+		StreamMode:                       d.StreamMode,
+		OnLine:                           d.OnLine,
+		IP:                               d.IP,
+		Port:                             d.Port,
+		Expires:                          d.Expires,
+		HostAddress:                      d.HostAddress,
+		Charset:                          d.Charset,
+		MediaServerID:                    d.MediaServerID,
+		CustomName:                       d.CustomName,
+		SDPIP:                            d.SDPIP,
+		LocalIP:                          d.LocalIP,
+		Password:                         d.Password,
+		HeartBeatInterval:                d.HeartBeatInterval,
+		HeartBeatCount:                   d.HeartBeatCount,
 		SubscribeCycleForCatalog:         d.SubscribeCycleForCatalog,
 		SubscribeCycleForMobilePosition:  d.SubscribeCycleForMobilePosition,
 		MobilePositionSubmissionInterval: d.MobilePositionSubmissionInterval,
 		SubscribeCycleForAlarm:           d.SubscribeCycleForAlarm,
-		ServerID:                 d.ServerID,
-		CreateTime:               d.CreateTime,
-		UpdateTime:               d.UpdateTime,
+		ServerID:                         d.ServerID,
+		CreateTime:                       d.CreateTime,
+		UpdateTime:                       d.UpdateTime,
 	}
 }
 

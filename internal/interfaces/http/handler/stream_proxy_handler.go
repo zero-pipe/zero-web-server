@@ -6,8 +6,8 @@ import (
 	"time"
 
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	domainstreamproxy "zero-web-server/internal/domain/streamproxy"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +27,7 @@ func NewStreamProxyHandler(svc *streamproxyapp.Service, playTimeoutMs int) *Stre
 }
 
 type streamProxyBody struct {
-	model.StreamProxy
+	domainstreamproxy.StreamProxy
 	GBDeviceID string `json:"gbDeviceId"`
 	GbID       string `json:"gbId"`
 }
@@ -41,7 +41,7 @@ func (h *StreamProxyHandler) List(c *gin.Context) {
 	}
 	list, total, err := h.svc.List(page, count, c.Query("query"), pulling, c.Query("mediaServerId"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -58,20 +58,20 @@ func (h *StreamProxyHandler) Add(c *gin.Context) {
 		gbID = body.GbID
 	}
 	if err := h.svc.Add(&body.StreamProxy, gbID, body.Name); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, body.StreamProxy)
 }
 
 func (h *StreamProxyHandler) Update(c *gin.Context) {
-	var body model.StreamProxy
+	var body domainstreamproxy.StreamProxy
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, response.CodeBadReq, "参数错误")
 		return
 	}
 	if err := h.svc.Update(&body); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, body)
@@ -84,7 +84,7 @@ func (h *StreamProxyHandler) Save(c *gin.Context) {
 func (h *StreamProxyHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	if err := h.svc.Delete(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -96,7 +96,7 @@ func (h *StreamProxyHandler) Start(c *gin.Context) {
 	defer cancel()
 	content, err := h.svc.Start(ctx, id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -105,7 +105,7 @@ func (h *StreamProxyHandler) Start(c *gin.Context) {
 func (h *StreamProxyHandler) Stop(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	if err := h.svc.Stop(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

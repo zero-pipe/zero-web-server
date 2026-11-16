@@ -95,10 +95,10 @@ func (c MediaConfig) Configured() bool {
 }
 
 type LogConfig struct {
-	Level  string         `mapstructure:"level"`
-	Format string         `mapstructure:"format"`
-	Output string         `mapstructure:"output"`
-	File   LogFileConfig  `mapstructure:"file"`
+	Level  string        `mapstructure:"level"`
+	Format string        `mapstructure:"format"`
+	Output string        `mapstructure:"output"`
+	File   LogFileConfig `mapstructure:"file"`
 }
 
 type LogFileConfig struct {
@@ -110,9 +110,9 @@ type LogFileConfig struct {
 }
 
 type MediaRTPConfig struct {
-	Enable         bool   `mapstructure:"enable"`
-	PortRange      string `mapstructure:"port_range"`
-	SendPortRange  string `mapstructure:"send_port_range"`
+	Enable        bool   `mapstructure:"enable"`
+	PortRange     string `mapstructure:"port_range"`
+	SendPortRange string `mapstructure:"send_port_range"`
 }
 
 func (c MediaConfig) BaseURL() string {

@@ -21,7 +21,7 @@ func NewRoleHandler(auth *appauth.Service) *RoleHandler {
 func (h *RoleHandler) All(c *gin.Context) {
 	roles, err := h.auth.ListRoles()
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, roles)
@@ -49,7 +49,7 @@ func (h *RoleHandler) Add(c *gin.Context) {
 	}
 	role, err := h.auth.AddRole(req.Name, req.Menus)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, role)
@@ -62,7 +62,7 @@ func (h *RoleHandler) Update(c *gin.Context) {
 		return
 	}
 	if err := h.auth.UpdateRole(req.ID, req.Name, req.Menus); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -75,7 +75,7 @@ func (h *RoleHandler) Delete(c *gin.Context) {
 		return
 	}
 	if err := h.auth.DeleteRole(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

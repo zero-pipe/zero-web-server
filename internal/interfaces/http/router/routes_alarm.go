@@ -1,0 +1,14 @@
+package router
+
+import (
+	"github.com/gin-gonic/gin"
+
+	"zero-web-server/internal/interfaces/http/handler"
+)
+
+func registerAlarm(parent *gin.RouterGroup, alarmHandler *handler.AlarmHandler) {
+	g := parent.Group("/alarm")
+	g.GET("/list", alarmHandler.List)
+	g.DELETE("/delete", alarmHandler.Delete)
+	g.DELETE("/clear", alarmHandler.Clear)
+}

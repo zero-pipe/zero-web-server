@@ -7,21 +7,18 @@ import (
 	"sync"
 
 	objadapter "zero-web-server/internal/adapter/objectstore"
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
+	domainobjectstore "zero-web-server/internal/domain/objectstore"
 	"zero-web-server/internal/port"
-
-	"gorm.io/gorm"
 )
 
 type Service struct {
-	repo *persistence.ObjectStoreConfigRepository
+	repo domainobjectstore.Repository
 
 	mu    sync.RWMutex
 	store port.ObjectStore
 }
 
-func NewService(repo *persistence.ObjectStoreConfigRepository) *Service {
+func NewService(repo domainobjectstore.Repository) *Service {
 	s := &Service{repo: repo, store: objadapter.NewNoop()}
 	_ = s.reload()
 	return s
@@ -33,18 +30,18 @@ func (s *Service) Store() port.ObjectStore {
 	return s.store
 }
 
-func (s *Service) GetOrEmpty() (*model.ObjectStoreConfig, error) {
+func (s *Service) GetOrEmpty() (*domainobjectstore.Config, error) {
 	row, err := s.repo.Get()
 	if err == nil {
 		return row, nil
 	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return persistence.DefaultObjectStoreConfig(), nil
+	if errors.Is(err, domainobjectstore.ErrNotFound) {
+		return domainobjectstore.Default(), nil
 	}
 	return nil, err
 }
 
-func (s *Service) Save(row *model.ObjectStoreConfig) error {
+func (s *Service) Save(row *domainobjectstore.Config) error {
 	if row == nil {
 		return errors.New("参数错误")
 	}
@@ -82,8 +79,8 @@ func (s *Service) reload() error {
 	row, err := s.repo.Get()
 	cfg := port.ObjectStoreConfig{Provider: "noop"}
 	if err == nil {
-		cfg = s.repo.ToPortConfig(row)
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		cfg = row.ToPortConfig()
+	} else if !errors.Is(err, domainobjectstore.ErrNotFound) {
 		return err
 	}
 	store, ferr := objadapter.Factory(cfg)

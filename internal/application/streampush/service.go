@@ -6,28 +6,27 @@ import (
 	"sync"
 	"time"
 
-	"zero-web-server/internal/infrastructure/persistence"
-	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/internal/interfaces/http/dto"
+	domainstreampush "zero-web-server/internal/domain/streampush"
+	"zero-web-server/internal/dto"
 	"zero-web-server/internal/port"
 )
 
 type Service struct {
-	repo     *persistence.StreamPushRepository
+	repo     domainstreampush.Repository
 	media    port.MediaCluster
 	serverID string
 	sessions sync.Map
 }
 
-func NewService(repo *persistence.StreamPushRepository, media port.MediaCluster, serverID string) *Service {
+func NewService(repo domainstreampush.Repository, media port.MediaCluster, serverID string) *Service {
 	return &Service{repo: repo, media: media, serverID: serverID}
 }
 
-func (s *Service) List(page, count int, query string, pushing *bool, mediaServerID string) ([]persistence.StreamPushView, int64, error) {
+func (s *Service) List(page, count int, query string, pushing *bool, mediaServerID string) ([]domainstreampush.View, int64, error) {
 	return s.repo.List(page, count, query, pushing, mediaServerID)
 }
 
-func (s *Service) Add(m *model.StreamPush, gbDeviceID, gbName string) error {
+func (s *Service) Add(m *domainstreampush.StreamPush, gbDeviceID, gbName string) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	m.CreateTime = now
 	m.UpdateTime = now
@@ -48,7 +47,7 @@ func (s *Service) Add(m *model.StreamPush, gbDeviceID, gbName string) error {
 	return nil
 }
 
-func (s *Service) Update(m *model.StreamPush) error {
+func (s *Service) Update(m *domainstreampush.StreamPush) error {
 	m.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 	return s.repo.Update(m)
 }

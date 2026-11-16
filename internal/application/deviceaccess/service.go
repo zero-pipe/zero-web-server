@@ -27,28 +27,28 @@ const (
 )
 
 type DeviceView struct {
-	ID           string       `json:"id"`
-	InternalCode string       `json:"internalCode"`
-	Name         string       `json:"name"`
-	AccessMode   string       `json:"accessMode"`
-	Protocol     string       `json:"protocol"`
-	Vendor       string       `json:"vendor"`
-	DeviceType   string       `json:"deviceType,omitempty"`
-	Status       string       `json:"status"`
-	ChannelCount int          `json:"channelCount"`
-	AddressText  string       `json:"addressText"`
-	RawID        string       `json:"rawId"`
-	DBID         int          `json:"dbId,omitempty"` // 国标库内自增 id（订阅接口用）
-	Capabilities []string     `json:"capabilities"`
+	ID           string   `json:"id"`
+	InternalCode string   `json:"internalCode"`
+	Name         string   `json:"name"`
+	AccessMode   string   `json:"accessMode"`
+	Protocol     string   `json:"protocol"`
+	Vendor       string   `json:"vendor"`
+	DeviceType   string   `json:"deviceType,omitempty"`
+	Status       string   `json:"status"`
+	ChannelCount int      `json:"channelCount"`
+	AddressText  string   `json:"addressText"`
+	RawID        string   `json:"rawId"`
+	DBID         int      `json:"dbId,omitempty"` // 国标库内自增 id（订阅接口用）
+	Capabilities []string `json:"capabilities"`
 	// 国标能力列；其它协议为空
-	StreamMode                      string `json:"streamMode,omitempty"`
-	SubscribeCycleForCatalog        int    `json:"subscribeCycleForCatalog,omitempty"`
-	SubscribeCycleForMobilePosition int    `json:"subscribeCycleForMobilePosition,omitempty"`
-	SubscribeCycleForAlarm          int    `json:"subscribeCycleForAlarm,omitempty"`
-	GB           *GBConfig    `json:"gb,omitempty"`
-	Onvif        *OnvifConfig `json:"onvif,omitempty"`
-	CreateTime   string       `json:"createTime"`
-	UpdateTime   string       `json:"updateTime"`
+	StreamMode                      string       `json:"streamMode,omitempty"`
+	SubscribeCycleForCatalog        int          `json:"subscribeCycleForCatalog,omitempty"`
+	SubscribeCycleForMobilePosition int          `json:"subscribeCycleForMobilePosition,omitempty"`
+	SubscribeCycleForAlarm          int          `json:"subscribeCycleForAlarm,omitempty"`
+	GB                              *GBConfig    `json:"gb,omitempty"`
+	Onvif                           *OnvifConfig `json:"onvif,omitempty"`
+	CreateTime                      string       `json:"createTime"`
+	UpdateTime                      string       `json:"updateTime"`
 }
 
 type GBConfig struct {
@@ -95,12 +95,15 @@ type ListQuery struct {
 }
 
 type Service struct {
-	gb    *deviceapp.Service
-	onvif *onvifapp.Service
+	gb       *deviceapp.Service
+	onvif    *onvifapp.Service
+	registry *protocolRegistry
 }
 
 func NewService(gb *deviceapp.Service, onvif *onvifapp.Service) *Service {
-	return &Service{gb: gb, onvif: onvif}
+	s := &Service{gb: gb, onvif: onvif}
+	s.registry = newProtocolRegistry(gbAdapter{s: s}, onvifAdapter{s: s}, jt1078Adapter{})
+	return s
 }
 
 // GetByInternalCode 按平台内码查找统一设备视图（GB / ONVIF）。
@@ -109,20 +112,10 @@ func (s *Service) GetByInternalCode(ctx context.Context, code string) (*DeviceVi
 	if code == "" {
 		return nil, fmt.Errorf("内码为空")
 	}
-	if d, err := s.gb.GetByInternalCode(code); err == nil && d != nil {
-		v := viewFromGB(d)
-		return v, nil
-	}
-	list, _, err := s.onvif.ListDevices(ctx, 1, 5000, code)
-	if err != nil {
-		return nil, err
-	}
-	for _, d := range list {
-		if d != nil && strings.EqualFold(strings.TrimSpace(d.InternalCode), code) {
-			v := viewFromONVIF(d)
-			if n, err := s.onvif.ChannelCount(ctx, d.ID); err == nil {
-				v.ChannelCount = n
-			}
+	for _, a := range s.registry.all() {
+		if v, ok, err := a.GetByInternalCode(ctx, code); err != nil {
+			return nil, err
+		} else if ok {
 			return v, nil
 		}
 	}
@@ -137,53 +130,19 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]*DeviceView, int64, 
 		q.Count = 15
 	}
 
-	wantGB := q.Protocol == "" || q.Protocol == ProtocolGB28181
-	wantONVIF := q.Protocol == "" || q.Protocol == ProtocolONVIF
-	if q.AccessMode == AccessPassive {
-		wantONVIF = false
-	}
-	if q.AccessMode == AccessActive {
-		wantGB = false
-	}
-
 	var views []*DeviceView
-
-	if wantGB {
-		var online *bool
-		switch q.Status {
-		case StatusOnline:
-			v := true
-			online = &v
-		case StatusOffline, StatusPending:
-			v := false
-			online = &v
+	for _, a := range s.registry.all() {
+		if q.Protocol != "" && a.Protocol() != q.Protocol {
+			continue
 		}
-		list, _, err := s.gb.List(1, 5000, q.Query, online)
+		if q.AccessMode != "" && !a.Supports(q.AccessMode) {
+			continue
+		}
+		got, err := a.List(ctx, q)
 		if err != nil {
 			return nil, 0, err
 		}
-		for _, d := range list {
-			v := viewFromGB(d)
-			if matchStatus(v, q.Status) {
-				views = append(views, v)
-			}
-		}
-	}
-
-	if wantONVIF {
-		list, _, err := s.onvif.ListDevices(ctx, 1, 5000, q.Query)
-		if err != nil {
-			return nil, 0, err
-		}
-		for _, d := range list {
-			v := viewFromONVIF(d)
-			if n, err := s.onvif.ChannelCount(ctx, d.ID); err == nil {
-				v.ChannelCount = n
-			}
-			if matchStatus(v, q.Status) {
-				views = append(views, v)
-			}
-		}
+		views = append(views, got...)
 	}
 
 	sort.Slice(views, func(i, j int) bool {
@@ -213,14 +172,11 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (*DeviceView, e
 		return nil, err
 	}
 
-	switch {
-	case req.AccessMode == AccessPassive && req.Protocol == ProtocolGB28181:
-		return s.createGB(req)
-	case req.AccessMode == AccessActive && req.Protocol == ProtocolONVIF:
-		return s.createONVIF(ctx, req)
-	default:
-		return nil, fmt.Errorf("不支持的接入组合: mode=%s protocol=%s", req.AccessMode, req.Protocol)
+	adapter, err := s.registry.forCreate(req.AccessMode, req.Protocol)
+	if err != nil {
+		return nil, err
 	}
+	return adapter.Create(ctx, req)
 }
 
 func (s *Service) ensureNameUnique(ctx context.Context, name string) error {
@@ -277,18 +233,11 @@ func (s *Service) Update(ctx context.Context, id string, req UpdateRequest) (*De
 		return nil, err
 	}
 
-	switch protocol {
-	case ProtocolGB28181:
-		return s.updateGB(raw, req)
-	case ProtocolONVIF:
-		oid, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("无效的 ONVIF 设备ID")
-		}
-		return s.updateONVIF(ctx, oid, req)
-	default:
+	adapter, ok := s.registry.byProtocol(protocol)
+	if !ok {
 		return nil, fmt.Errorf("未知协议")
 	}
+	return adapter.Update(ctx, raw, req)
 }
 
 func (s *Service) updateGB(deviceID string, req UpdateRequest) (*DeviceView, error) {
@@ -339,18 +288,11 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	switch protocol {
-	case ProtocolGB28181:
-		return s.gb.Delete(raw)
-	case ProtocolONVIF:
-		oid, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			return fmt.Errorf("无效的 ONVIF 设备ID")
-		}
-		return s.onvif.DeleteDevice(ctx, oid)
-	default:
+	adapter, ok := s.registry.byProtocol(protocol)
+	if !ok {
 		return fmt.Errorf("未知协议")
 	}
+	return adapter.Delete(ctx, raw)
 }
 
 func (s *Service) Sync(ctx context.Context, id string) error {
@@ -358,19 +300,11 @@ func (s *Service) Sync(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	switch protocol {
-	case ProtocolGB28181:
-		return s.gb.SyncCatalog(raw)
-	case ProtocolONVIF:
-		oid, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			return fmt.Errorf("无效的 ONVIF 设备ID")
-		}
-		_, err = s.onvif.SyncChannels(ctx, oid)
-		return err
-	default:
+	adapter, ok := s.registry.byProtocol(protocol)
+	if !ok {
 		return fmt.Errorf("未知协议")
 	}
+	return adapter.Sync(ctx, raw)
 }
 
 func (s *Service) createGB(req CreateRequest) (*DeviceView, error) {

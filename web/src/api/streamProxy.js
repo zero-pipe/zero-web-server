@@ -5,7 +5,7 @@ import request from '@/utils/request'
 export function queryFfmpegCmdList(mediaServerId) {
   return request({
     method: 'get',
-    url: `/api/proxy/ffmpeg_cmd/list`,
+    url: `/api/v1/proxy/ffmpeg_cmd/list`,
     params: {
       mediaServerId: mediaServerId
     }
@@ -15,7 +15,7 @@ export function queryFfmpegCmdList(mediaServerId) {
 export function save(data) {
   return request({
     method: 'post',
-    url: `/api/proxy/save`,
+    url: `/api/v1/proxy/save`,
     data: data
 
   })
@@ -24,7 +24,7 @@ export function save(data) {
 export function update(data) {
   return request({
     method: 'post',
-    url: `/api/proxy/update`,
+    url: `/api/v1/proxy/update`,
     data: data
   })
 }
@@ -32,7 +32,7 @@ export function update(data) {
 export function add(data) {
   return request({
     method: 'post',
-    url: `/api/proxy/add`,
+    url: `/api/v1/proxy/add`,
     data: data
   })
 }
@@ -41,7 +41,7 @@ export function queryList(params) {
   const { page, count, query, pulling, mediaServerId } = params
   return request({
     method: 'get',
-    url: `/api/proxy/list`,
+    url: `/api/v1/proxy/list`,
     params: {
       page: page,
       count: count,
@@ -55,7 +55,7 @@ export function queryList(params) {
 export function play(id) {
   return request({
     method: 'get',
-    url: `/api/proxy/start`,
+    url: `/api/v1/proxy/start`,
     params: {
       id: id
     }
@@ -65,7 +65,7 @@ export function play(id) {
 export function stopPlay(id) {
   return request({
     method: 'get',
-    url: `/api/proxy/stop`,
+    url: `/api/v1/proxy/stop`,
     params: {
       id: id
     }
@@ -75,7 +75,7 @@ export function stopPlay(id) {
 export function remove(id) {
   return request({
     method: 'delete',
-    url: '/api/proxy/delete',
+    url: '/api/v1/proxy/delete',
     params: {
       id: id
     }

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	channelapp "zero-web-server/internal/application/channel"
-	"zero-web-server/internal/interfaces/http/dto"
+	"zero-web-server/internal/dto"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +23,7 @@ func (h *CommonChannelHandler) One(c *gin.Context) {
 	if code := strings.TrimSpace(c.Query("internalCode")); code != "" {
 		v, err := h.svc.GetByInternalCode(code)
 		if err != nil {
-			response.Error(c, response.CodeError, err.Error())
+			response.FromError(c, err)
 			return
 		}
 		response.OK(c, v)
@@ -32,7 +32,7 @@ func (h *CommonChannelHandler) One(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("id"))
 	v, err := h.svc.GetOne(id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, v)
@@ -56,7 +56,7 @@ func (h *CommonChannelHandler) List(c *gin.Context) {
 	}
 	list, total, err := h.svc.ListFiltered(page, count, c.Query("query"), channelType, online, hasRecordPlan, c.Query("civilCode"), c.Query("parentDeviceId"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -69,14 +69,14 @@ func (h *CommonChannelHandler) Update(c *gin.Context) {
 		return
 	}
 	if err := h.svc.Update(&body); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
 }
 
-func (h *CommonChannelHandler) Add(c *gin.Context)    { h.Update(c) }
-func (h *CommonChannelHandler) Reset(c *gin.Context)  { response.OK(c, nil) }
+func (h *CommonChannelHandler) Add(c *gin.Context)   { h.Update(c) }
+func (h *CommonChannelHandler) Reset(c *gin.Context) { response.OK(c, nil) }
 
 func (h *CommonChannelHandler) IndustryList(c *gin.Context) {
 	// GB/T 28181 行业编码，按 code 升序
@@ -180,7 +180,7 @@ func (h *CommonChannelHandler) Play(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	content, err := h.svc.Play(id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -189,14 +189,14 @@ func (h *CommonChannelHandler) Play(c *gin.Context) {
 func (h *CommonChannelHandler) PlayStop(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	if err := h.svc.StopPlay(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
 }
 
-func (h *CommonChannelHandler) TalkStart(c *gin.Context)   { h.broadcast(c, false) }
-func (h *CommonChannelHandler) TalkStop(c *gin.Context)    { h.broadcastStop(c) }
+func (h *CommonChannelHandler) TalkStart(c *gin.Context)      { h.broadcast(c, false) }
+func (h *CommonChannelHandler) TalkStop(c *gin.Context)       { h.broadcastStop(c) }
 func (h *CommonChannelHandler) BroadcastStart(c *gin.Context) { h.broadcast(c, true) }
 func (h *CommonChannelHandler) BroadcastStop(c *gin.Context)  { h.broadcastStop(c) }
 
@@ -204,7 +204,7 @@ func (h *CommonChannelHandler) broadcast(c *gin.Context, mode bool) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	result, err := h.svc.Broadcast(id, mode)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, result)
@@ -213,7 +213,7 @@ func (h *CommonChannelHandler) broadcast(c *gin.Context, mode bool) {
 func (h *CommonChannelHandler) broadcastStop(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	if err := h.svc.BroadcastStop(id); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -226,7 +226,7 @@ func (h *CommonChannelHandler) PTZ(c *gin.Context) {
 		parseIntQuery(c, "tiltSpeed", 50),
 		parseIntQuery(c, "zoomSpeed", 50),
 	); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -236,7 +236,7 @@ func (h *CommonChannelHandler) QueryPreset(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	list, err := h.svc.QueryPreset(c.Request.Context(), id)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)
@@ -250,7 +250,7 @@ func (h *CommonChannelHandler) AddPreset(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AddPreset(c.Request.Context(), id, presetID, c.Query("presetName")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -264,7 +264,7 @@ func (h *CommonChannelHandler) CallPreset(c *gin.Context) {
 		return
 	}
 	if err := h.svc.CallPreset(c.Request.Context(), id, presetID); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -278,7 +278,7 @@ func (h *CommonChannelHandler) DeletePreset(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeletePreset(c.Request.Context(), id, presetID); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -288,7 +288,7 @@ func (h *CommonChannelHandler) PlaybackQuery(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	data, err := h.svc.PlaybackQuery(id, c.Query("startTime"), c.Query("endTime"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, data)
@@ -298,7 +298,7 @@ func (h *CommonChannelHandler) Playback(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	content, err := h.svc.PlaybackStart(id, c.Query("startTime"), c.Query("endTime"))
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, content)
@@ -307,7 +307,7 @@ func (h *CommonChannelHandler) Playback(c *gin.Context) {
 func (h *CommonChannelHandler) PlaybackStop(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Query("channelId"))
 	if err := h.svc.PlaybackStop(id, c.Query("stream")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -315,7 +315,7 @@ func (h *CommonChannelHandler) PlaybackStop(c *gin.Context) {
 
 func (h *CommonChannelHandler) PlaybackPause(c *gin.Context) {
 	if err := h.svc.PlaybackPause(c.Query("stream")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -323,7 +323,7 @@ func (h *CommonChannelHandler) PlaybackPause(c *gin.Context) {
 
 func (h *CommonChannelHandler) PlaybackResume(c *gin.Context) {
 	if err := h.svc.PlaybackResume(c.Query("stream")); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -332,7 +332,7 @@ func (h *CommonChannelHandler) PlaybackResume(c *gin.Context) {
 func (h *CommonChannelHandler) PlaybackSpeed(c *gin.Context) {
 	speed, _ := strconv.ParseFloat(c.Query("speed"), 64)
 	if err := h.svc.PlaybackSpeed(c.Query("stream"), speed); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -341,7 +341,7 @@ func (h *CommonChannelHandler) PlaybackSpeed(c *gin.Context) {
 func (h *CommonChannelHandler) PlaybackSeek(c *gin.Context) {
 	seekTime, _ := strconv.ParseInt(c.Query("seekTime"), 10, 64)
 	if err := h.svc.PlaybackSeek(c.Query("stream"), seekTime); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -355,7 +355,7 @@ func (h *CommonChannelHandler) MapList(c *gin.Context) {
 	}
 	list, err := h.svc.MapList(c.Query("query"), channelType, nil, nil)
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, list)
@@ -419,7 +419,7 @@ func (h *CommonChannelHandler) listByAssociation(c *gin.Context, byCivilCode boo
 		list, total, err = h.svc.ListByGroupParent(page, count, query, channelType, online, c.Query("groupDeviceId"))
 	}
 	if err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
@@ -442,7 +442,7 @@ func (h *CommonChannelHandler) RegionAdd(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AddToRegion(body.CivilCode, body.ChannelIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -455,7 +455,7 @@ func (h *CommonChannelHandler) RegionDelete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteFromRegion(body.ChannelIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -468,7 +468,7 @@ func (h *CommonChannelHandler) RegionDeviceAdd(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AddToRegionByDevices(body.CivilCode, body.DeviceIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -481,7 +481,7 @@ func (h *CommonChannelHandler) RegionDeviceDelete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteFromRegionByDevices(body.DeviceIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -506,7 +506,7 @@ func (h *CommonChannelHandler) GroupAdd(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AddToGroup(body.ParentID, body.BusinessGroup, body.ChannelIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -519,7 +519,7 @@ func (h *CommonChannelHandler) GroupDelete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteFromGroup(body.ChannelIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -532,7 +532,7 @@ func (h *CommonChannelHandler) GroupDeviceAdd(c *gin.Context) {
 		return
 	}
 	if err := h.svc.AddToGroupByDevices(body.ParentID, body.BusinessGroup, body.DeviceIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)
@@ -545,7 +545,7 @@ func (h *CommonChannelHandler) GroupDeviceDelete(c *gin.Context) {
 		return
 	}
 	if err := h.svc.DeleteFromGroupByDevices(body.DeviceIDs); err != nil {
-		response.Error(c, response.CodeError, err.Error())
+		response.FromError(c, err)
 		return
 	}
 	response.OK(c, nil)

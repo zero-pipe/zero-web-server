@@ -18,10 +18,10 @@ const metricsHistory = 30
 type Metrics struct {
 	mu sync.RWMutex
 
-	cpu []map[string]any
-	mem []map[string]any
-	net []map[string]any
-	disk []map[string]any
+	cpu      []map[string]any
+	mem      []map[string]any
+	net      []map[string]any
+	disk     []map[string]any
 	netTotal float64
 
 	prevNetTime time.Time

@@ -1,16 +1,16 @@
 package auth
 
 import (
-	"errors"
 	"fmt"
 	"strings"
+	"zero-web-server/internal/apperr"
 
 	"zero-web-server/internal/application/rbac"
 	domainuser "zero-web-server/internal/domain/user"
 	jwtmgr "zero-web-server/pkg/jwt"
 )
 
-var ErrInvalidCredentials = errors.New("用户名或密码错误")
+var ErrInvalidCredentials = apperr.New(apperr.CodeUser+1, "用户名或密码错误")
 
 type Service struct {
 	userRepo domainuser.Repository

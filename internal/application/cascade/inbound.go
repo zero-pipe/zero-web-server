@@ -8,7 +8,7 @@ import (
 
 	playapp "zero-web-server/internal/application/play"
 	domaindevice "zero-web-server/internal/domain/device"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/port"
 	applog "zero-web-server/pkg/log"
 
 	"github.com/zero-pipe/gb28181-go/manscdp"
@@ -20,7 +20,7 @@ type InboundService struct {
 	resolver *Resolver
 	devices  domaindevice.Repository
 	play     *playapp.Service
-	sip      *sipinfra.Server
+	sip      port.GBDeviceControl
 
 	mu      sync.Mutex
 	callMap map[string]cascadeCall // callID -> leaf stream key
@@ -35,7 +35,7 @@ func NewInboundService(
 	resolver *Resolver,
 	devices domaindevice.Repository,
 	play *playapp.Service,
-	sipServer *sipinfra.Server,
+	sipServer port.GBDeviceControl,
 ) *InboundService {
 	return &InboundService{
 		resolver: resolver, devices: devices, play: play, sip: sipServer,

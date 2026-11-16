@@ -12,14 +12,14 @@ export function getAlarmList(params) {
   if (endTime) query.append('endTime', endTime)
   return request({
     method: 'get',
-    url: `/api/alarm/list?${query.toString()}`
+    url: `/api/v1/alarm/list?${query.toString()}`
   })
 }
 
 export function deleteAlarms(ids) {
   return request({
     method: 'delete',
-    url: '/api/alarm/delete',
+    url: '/api/v1/alarm/delete',
     data: ids
   })
 }
@@ -35,6 +35,6 @@ export function clearAlarms(params) {
   const qs = query.toString()
   return request({
     method: 'delete',
-    url: `/api/alarm/clear${qs ? '?' + qs : ''}`
+    url: `/api/v1/alarm/clear${qs ? '?' + qs : ''}`
   })
 }

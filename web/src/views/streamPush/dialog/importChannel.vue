@@ -53,7 +53,7 @@ export default {
       headers: {
         'access-token': this.$store.getters.token
       },
-      uploadUrl: process.env.NODE_ENV === 'development' ? `${process.env.VUE_APP_BASE_API}/api/push/upload` : (window.baseUrl ? window.baseUrl : '') + `/api/push/upload`
+      uploadUrl: process.env.NODE_ENV === 'development' ? `${process.env.VUE_APP_BASE_API}/api/push/upload` : (window.baseUrl ? window.baseUrl : '') + `/api/v1/push/upload`
     }
   },
   created() {},

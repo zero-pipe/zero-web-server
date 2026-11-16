@@ -4,7 +4,9 @@ import (
 	"net/url"
 	"strings"
 
-	"zero-web-server/internal/infrastructure/persistence"
+	domainstreamproxy "zero-web-server/internal/domain/streamproxy"
+	domainstreampush "zero-web-server/internal/domain/streampush"
+	domainuser "zero-web-server/internal/domain/user"
 )
 
 const (
@@ -23,18 +25,18 @@ func IsGBLiveApp(app string) bool {
 }
 
 type PublishAuth struct {
-	userRepo       *persistence.UserRepository
-	pushRepo       *persistence.StreamPushRepository
-	proxyRepo      *persistence.StreamProxyRepository
+	userRepo       domainuser.Repository
+	pushRepo       domainstreampush.Repository
+	proxyRepo      domainstreamproxy.Repository
 	pushAuthority  bool
 	recordPushLive bool
 	publish        *PublishRegistry
 }
 
 func NewPublishAuth(
-	userRepo *persistence.UserRepository,
-	pushRepo *persistence.StreamPushRepository,
-	proxyRepo *persistence.StreamProxyRepository,
+	userRepo domainuser.Repository,
+	pushRepo domainstreampush.Repository,
+	proxyRepo domainstreamproxy.Repository,
 	pushAuthority, recordPushLive bool,
 	publish *PublishRegistry,
 ) *PublishAuth {
@@ -46,8 +48,8 @@ func NewPublishAuth(
 }
 
 type PublishResult struct {
-	Allowed    bool
-	EnableMP4  bool
+	Allowed     bool
+	EnableMP4   bool
 	EnableAudio bool
 }
 

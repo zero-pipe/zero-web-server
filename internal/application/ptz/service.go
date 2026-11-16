@@ -9,7 +9,8 @@ import (
 
 	domaindevice "zero-web-server/internal/domain/device"
 	domainptz "zero-web-server/internal/domain/ptz"
-	sipinfra "zero-web-server/internal/infrastructure/sip"
+	"zero-web-server/internal/gbsip"
+	"zero-web-server/internal/port"
 )
 
 // GB/T 28181 front-end PTZCmd codes (annex A).
@@ -18,11 +19,11 @@ const (
 	presetCmdCall   = 0x82
 	presetCmdDelete = 0x83
 
-	cruiseAddPoint  = 0x84
-	cruiseDelPoint  = 0x85
-	cruiseSetSpeed  = 0x86
-	cruiseSetTime   = 0x87
-	cruiseStart     = 0x88
+	cruiseAddPoint = 0x84
+	cruiseDelPoint = 0x85
+	cruiseSetSpeed = 0x86
+	cruiseSetTime  = 0x87
+	cruiseStart    = 0x88
 
 	scanStart    = 0x89
 	scanSetLeft  = 0x8A
@@ -40,11 +41,11 @@ const (
 
 type Service struct {
 	devices       domaindevice.Repository
-	sip           *sipinfra.Server
+	sip           port.GBPTZNode
 	presetTimeout time.Duration
 }
 
-func NewService(devices domaindevice.Repository, sipServer *sipinfra.Server) *Service {
+func NewService(devices domaindevice.Repository, sipServer port.GBPTZNode) *Service {
 	return &Service{
 		devices:       devices,
 		sip:           sipServer,
@@ -84,7 +85,7 @@ func (s *Service) QueryPreset(ctx context.Context, deviceID, channelID string) (
 		return nil, ctx.Err()
 	case <-time.After(timeout):
 		s.sip.CancelPresetQuery(sn)
-		return nil, sipinfra.ErrPresetTimeout
+		return nil, gbsip.ErrPresetTimeout
 	}
 }
 

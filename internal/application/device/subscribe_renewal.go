@@ -11,8 +11,6 @@ type subscribeRenewal struct {
 	tasks sync.Map // deviceID -> *time.Timer
 }
 
-var renewal = &subscribeRenewal{}
-
 func (s *Service) AutoSubscribeOnOnline(device *domaindevice.Device) {
 	if device == nil || !device.OnLine {
 		return
@@ -43,7 +41,7 @@ func (s *Service) AutoSubscribeOnOnline(device *domaindevice.Device) {
 
 func (s *Service) scheduleRenewal(device *domaindevice.Device, kind string, cycleSec int, fn func()) {
 	key := device.DeviceID + ":" + kind
-	if v, ok := renewal.tasks.Load(key); ok {
+	if v, ok := s.renewal.tasks.Load(key); ok {
 		if t, ok := v.(*time.Timer); ok {
 			t.Stop()
 		}
@@ -58,5 +56,5 @@ func (s *Service) scheduleRenewal(device *domaindevice.Device, kind string, cycl
 			s.scheduleRenewal(d, kind, cycleSec, fn)
 		}
 	})
-	renewal.tasks.Store(key, timer)
+	s.renewal.tasks.Store(key, timer)
 }

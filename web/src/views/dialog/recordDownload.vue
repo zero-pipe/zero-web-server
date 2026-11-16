@@ -95,7 +95,7 @@ export default {
       //
       // this.$axios({
       //   method: 'get',
-      //   url: `/api/gb_record/download/progress/${this.deviceId}/${this.channelId}/${this.stream}`
+      //   url: `/api/v1/gb_record/download/progress/${this.deviceId}/${this.channelId}/${this.stream}`
       // }).then((res) => {
       //   if (res.data.code === 0) {
       //     this.streamInfo = res.data.data
@@ -147,7 +147,7 @@ export default {
       if (this.deviceId && this.channelId && this.stream) {
         this.$axios({
           method: 'get',
-          url: '/api/gb_record/download/stop/' + this.deviceId + '/' + this.channelId + '/' + this.stream
+          url: '/api/v1/gb_record/download/stop/' + this.deviceId + '/' + this.channelId + '/' + this.stream
         }).then((res) => {
           if (callback) callback(res)
         })
