@@ -1,74 +1,78 @@
-# hik-ipc-plugin（海康 HCNetSDK sidecar 骨架）
+# hik-ipc-plugin（海康 HCNetSDK sidecar）
 
-通过 HCNetSDK 登录海康设备、控制 PTZ，并以 **RTSP URL** 作为直播流源返回给平台。
-平台侧只需把它当作一个 IPC 插件（`protocol = hik.private.v5`）。
+通过 HCNetSDK 登录海康设备、读取设备信息、枚举通道、控制 PTZ，并以 **RTSP URL** 作为直播流源返回给平台。
 
-> 这是骨架实现：通道枚举固定为 `HIK_CHANNEL_COUNT` 个，取流走设备自带 RTSP；
-> 真正的 SDK 取流/回放/报警请在此基础上扩展。
+## 1. SDK
 
-## 1. 准备 SDK
-
-从海康开放平台下载 **HCNetSDK（设备网络 SDK）**，放到本目录：
+使用海康设备网络 SDK Linux64 包（例如 `HCNetSDKV6.1.11.30_build20260805_linux64`），目录包含：
 
 ```text
-tools/hik-ipc-plugin/sdk/
-├── include/        # HCNetSDK.h 等头文件
-└── lib/            # libhnetsdk.so / HCNetSDK.lib / HCNetSDK.dll 等
+HCNetSDK_linux64/
+├── 头文件/              # HCNetSDK.h 等
+└── 库文件/              # libhcnetsdk.so / libHCCore.so / libhpr.so / HCNetSDKCom/
 ```
 
-目录内容不入库（见 `sdk/.gitignore`）。运行时需要把动态库放在可执行文件同级或系统库路径：
+> SDK 不入库。构建脚本会把头文件/动态库复制到 `tools/hik-ipc-plugin/sdk/`（已在 `.gitignore`）。
 
-- Linux：`libhnetsdk.so`、`libhpr.so`、`libHCCore.so`
-- Windows：`HCNetSDK.dll`、`HCCore.dll`
+## 2. 构建（Linux + CGO）
 
-## 2. 构建
-
-Linux：
+必须在 Linux 环境构建（cgo 不能从 Windows 交叉编译到 Linux）：
 
 ```bash
-CGO_ENABLED=1 go build -tags hik -o bin/hik-ipc-plugin ./tools/hik-ipc-plugin
+./tools/hik-ipc-plugin/build-linux.sh /path/to/HCNetSDKV6.1.11.30_build20260805_linux64
 ```
 
-Windows（需 MinGW/MSVC 工具链）：
+产物：
 
-```powershell
-$env:CGO_ENABLED=1
-go build -tags hik -o bin/hik-ipc-plugin.exe ./tools/hik-ipc-plugin
-```
+- `bin/hik-ipc-plugin`
+- `bin/hik-lib/`（运行时动态库）
 
-未加 `-tags hik` 时会编译 `main_stub.go`，只打印提示，不影响主仓库 `go build ./...`。
+未加 `-tags hik` 时编译 `main_stub.go`，不影响主仓库 `go build ./...`。
 
 ## 3. 运行
 
 ```bash
 PLATFORM_URL=http://127.0.0.1:18080 \
-PLUGIN_ENDPOINT=http://127.0.0.1:19091 \
+PLUGIN_ENDPOINT=http://192.168.1.10:19091 \
 PLUGIN_LISTEN=:19091 \
-HIK_CHANNEL_COUNT=4 \
+HIK_SDK_LIB_PATH=$PWD/bin/hik-lib \
+LD_LIBRARY_PATH=$PWD/bin/hik-lib \
 ./bin/hik-ipc-plugin
 ```
-
-环境变量：
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `PLATFORM_URL` | `http://127.0.0.1:18080` | 平台地址 |
-| `PLUGIN_ENDPOINT` | `http://127.0.0.1:19091` | 平台回调本插件的地址（须平台可达） |
-| `PLUGIN_LISTEN` | `:19091` | 插件监听地址 |
+| `PLUGIN_ENDPOINT` | `http://127.0.0.1:19091` | 平台回调地址（须平台可达） |
+| `PLUGIN_LISTEN` | `:19091` | 插件监听 |
 | `PLUGIN_TOKEN` | 空 | 与平台 `ZWS_PLUGIN_TOKEN` 一致 |
-| `HIK_CHANNEL_COUNT` | `1` | 通道数（骨架用） |
-| `HIK_RTSP_TEMPLATE` | `rtsp://%s:%s@%s:554/Streaming/Channels/%d` | RTSP 模板，参数顺序 user/pass/ip/channel*100+1 |
+| `HIK_RTSP_PORT` | `554` | 设备 RTSP 端口 |
+| `HIK_SDK_LIB_PATH` | 空 | 动态库目录（含 `HCNetSDKCom`、`libcrypto.so.3`、`libssl.so.3`）；不设时依赖 `LD_LIBRARY_PATH` |
+| `HIK_RTSP_TEMPLATE` | 空 | 自定义 RTSP 模板：`rtsp://%s:%s@%s:554/Streaming/Channels/%d`（user/pass/ip/channelPath） |
+| `HIK_PTZ_TYPE` | `3` | 通道 PTZ 类型（0 表示不显示云台） |
+| `HIK_HAS_AUDIO` | `false` | 通道是否带音频 |
 
-## 4. 平台侧使用
+## 4. 平台侧验证
 
-1. 启动平台（`make run`），再启动本插件。
-2. “接入管理 → 插件接入”应出现 `hik-ipc-01`。
-3. 添加设备：IP、SDK 端口（默认 8000）、用户名、密码、默认通道。
-4. 添加成功后同步出通道；播放时插件返回海康 RTSP，平台交给 ZMS 拉流。
+1. 启动平台与插件，进入「接入管理 → 插件接入」，应出现 `hik-ipc-01`（协议 `hik.private.v5`）。
+2. 添加设备：IP、SDK 端口（默认 8000）、用户名、密码、默认通道。
+3. 成功后同步出真实通道（SDK `NET_DVR_GET_IPPARACFG_V40`，失败时回退到设备通道数）。
+4. 进入「设备资产」→ 对应设备 → 视频资源 → 播放：
+   - 插件返回 `rtsp://user:pass@ip:554/Streaming/Channels/<ch*100+1>`；
+   - 平台交给 ZMS 拉流并生成 flv/ws-flv 等地址；
+   - **需要平台已配置在线 ZMS 媒体节点**。
+5. PTZ：设备资产/插件页面调用 PTZ，插件通过 `NET_DVR_PTZControlWithSpeed_Other` 控制并自动停止。
 
-## 5. 后续扩展点
+## 5. 已知限制
 
-- `handleChannels`：改用 `NET_DVR_GetDVRConfig` + `NET_DVR_GET_IPPARACFG_V40` 获取真实 IP 通道。
-- `handleLiveStart`：改为 `NET_DVR_RealPlay_V40` 回调收 PS 流，按 `rtp_push` 推给平台。
-- 报警订阅：`NET_DVR_SetDVRMessageCallBack_V50` → 回调平台 `/api/v1/...`（待平台事件接口）。
-- 回放：`NET_DVR_FindFile_V40` / `NET_DVR_PlayBackByTime_V40`。
+- 直播走设备 RTSP，不走 SDK 私有码流；NVR 下挂通道若 RTSP 路径/凭据不同，需用 `HIK_RTSP_TEMPLATE` 调整。
+- 通道枚举依赖 `NET_DVR_GET_IPPARACFG_V40`；部分设备/权限下会回退为 1..N。
+- 回放、报警订阅、抓图尚未接入插件 RPC。
+- PTZ 速度取 `z` 或 `h`（1..7），方向映射见 `main.go`。
+
+## 6. 后续扩展点
+
+- `NET_DVR_RealPlay_V40` 回调收 PS 流，按 `rtp_push` 推给平台；
+- `NET_DVR_FindFile_V40` / `NET_DVR_PlayBackByTime_V40` 做回放；
+- `NET_DVR_SetDVRMessageCallBack_V50` 上报报警/AI 事件；
+- 抓图 `NET_DVR_CaptureJPEGPicture`。

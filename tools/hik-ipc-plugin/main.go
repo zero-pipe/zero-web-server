@@ -1,10 +1,9 @@
 //go:build hik && cgo
 
-// Command hik-ipc-plugin is a Hikvision HCNetSDK sidecar skeleton.
-// It registers with the platform, logs in devices through HCNetSDK, exposes
-// channels/PTZ, and returns a Hikvision RTSP URL as the live source.
+// Command hik-ipc-plugin is a Hikvision HCNetSDK sidecar.
 //
-// Build requires HCNetSDK headers/libs under ./sdk (see README.md).
+// It uses HCNetSDK for login / device info / channel enumeration / PTZ, and
+// returns a Hikvision RTSP URL as the live stream source (ZMS pulls it).
 package main
 
 import (
@@ -12,7 +11,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -43,17 +44,21 @@ type config struct {
 	endpoint    string
 	token       string
 	listen      string
-	channelNum  int
+	rtspPort    int
 	rtspTmpl    string
+	ptzType     int
+	hasAudio    bool
 }
 
 type session struct {
-	UserID  int64
-	IP      string
-	Port    int
-	User    string
-	Pass    string
-	Channel int
+	UserID   int64
+	IP       string
+	SDKPort  int
+	User     string
+	Pass     string
+	Info     *DeviceInfo
+	Channels map[string]int // display channel ID -> SDK channel number
+	Order    []string
 }
 
 var (
@@ -68,8 +73,10 @@ func main() {
 		endpoint:    env("PLUGIN_ENDPOINT", "http://127.0.0.1:19091"),
 		token:       env("PLUGIN_TOKEN", ""),
 		listen:      env("PLUGIN_LISTEN", ":19091"),
-		channelNum:  envInt("HIK_CHANNEL_COUNT", 1),
-		rtspTmpl:    env("HIK_RTSP_TEMPLATE", "rtsp://%s:%s@%s:554/Streaming/Channels/%d"),
+		rtspPort:    envInt("HIK_RTSP_PORT", 554),
+		rtspTmpl:    env("HIK_RTSP_TEMPLATE", ""),
+		ptzType:     envInt("HIK_PTZ_TYPE", 3),
+		hasAudio:    env("HIK_HAS_AUDIO", "false") == "true",
 	}
 	if err := sdk.Init(); err != nil {
 		log.Fatalf("HCNetSDK init: %v", err)
@@ -79,7 +86,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/login", handleLogin)
 	mux.HandleFunc("/v1/logout", handleLogout)
-	mux.HandleFunc("/v1/channels", handleChannels(cfg.channelNum))
+	mux.HandleFunc("/v1/channels", handleChannels(cfg))
 	mux.HandleFunc("/v1/live/start", handleLiveStart(cfg))
 	mux.HandleFunc("/v1/live/stop", okHandler)
 	mux.HandleFunc("/v1/ptz", handlePTZ)
@@ -108,26 +115,48 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	user := paramString(req.Params, "username")
 	pass := paramString(req.Params, "password")
 	port := paramInt(req.Params, "port", 8000)
-	channel := paramInt(req.Params, "channel", 1)
 	if ip == "" || user == "" {
 		writeErr(w, "INVALID_ARGUMENT", "missing ip/username")
 		return
 	}
-	uid, err := sdk.Login(ip, port, user, pass)
+	uid, info, err := sdk.Login(ip, port, user, pass)
 	if err != nil {
 		writeErr(w, "AUTH_FAILED", err.Error())
 		return
 	}
+	s := &session{
+		UserID: uid, IP: ip, SDKPort: port, User: user, Pass: pass, Info: info,
+		Channels: map[string]int{},
+	}
+	s.loadChannels()
 	sessionMu.Lock()
-	sessions[req.DeviceUID] = &session{UserID: uid, IP: ip, Port: port, User: user, Pass: pass, Channel: channel}
+	sessions[req.DeviceUID] = s
 	sessionMu.Unlock()
-	log.Printf("hik login device=%s ip=%s uid=%d", req.DeviceUID, ip, uid)
+	log.Printf("hik login device=%s ip=%s uid=%d channels=%d serial=%s model=%s",
+		req.DeviceUID, ip, uid, len(s.Order), info.Serial, info.Model)
 	writeOK(w, map[string]any{
 		"manufacturer": "Hikvision",
-		"model":        "IPC",
+		"model":        firstNonEmpty(info.Model, "IPC"),
 		"firmware":     "",
-		"serialNumber": req.DeviceUID,
+		"serialNumber": firstNonEmpty(info.Serial, req.DeviceUID),
 	})
+}
+
+func (s *session) loadChannels() {
+	ids := sdk.ListChannels(s.UserID, s.Info.StartChan, 64)
+	if len(ids) == 0 && s.Info.AnalogChans > 0 {
+		for i := 1; i <= s.Info.AnalogChans; i++ {
+			ids = append(ids, i)
+		}
+	}
+	if len(ids) == 0 {
+		ids = []int{1}
+	}
+	for i, ch := range ids {
+		display := strconv.Itoa(i + 1)
+		s.Channels[display] = ch
+		s.Order = append(s.Order, display)
+	}
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -144,21 +173,27 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, nil)
 }
 
-func handleChannels(count int) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		// Skeleton: fixed channel count. Replace with NET_DVR_GetDVRConfig
-		// (NET_DVR_GET_IPPARACFG_V40) for real channel enumeration.
-		if count <= 0 {
-			count = 1
+func handleChannels(cfg config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			DeviceUID string `json:"device_uid"`
 		}
-		list := make([]map[string]any, 0, count)
-		for i := 1; i <= count; i++ {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		sessionMu.Lock()
+		s := sessions[req.DeviceUID]
+		sessionMu.Unlock()
+		if s == nil {
+			writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
+			return
+		}
+		list := make([]map[string]any, 0, len(s.Order))
+		for _, id := range s.Order {
 			list = append(list, map[string]any{
-				"channelId": strconv.Itoa(i),
-				"name":      fmt.Sprintf("通道 %d", i),
+				"channelId": id,
+				"name":      fmt.Sprintf("通道 %s", id),
 				"status":    "ON",
-				"ptzType":   3,
-				"hasAudio":  true,
+				"ptzType":   cfg.ptzType,
+				"hasAudio":  cfg.hasAudio,
 			})
 		}
 		writeOK(w, map[string]any{"channels": list})
@@ -179,14 +214,28 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 			writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
 			return
 		}
-		ch := s.Channel
+		display := 1
 		if n, err := strconv.Atoi(req.ChannelID); err == nil && n > 0 {
-			ch = n
+			display = n
 		}
-		// Hikvision RTSP channel mapping: CH1 -> 101, CH2 -> 102 ...
-		rtsp := fmt.Sprintf(cfg.rtspTmpl, s.User, s.Pass, s.IP, ch*100+1)
+		rtsp := buildRTSPURL(cfg, s, display)
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtsp})
 	}
+}
+
+func buildRTSPURL(cfg config, s *session, displayChannel int) string {
+	// Hikvision channel mapping: CH1 -> 101, CH2 -> 102 ...
+	pathChannel := displayChannel*100 + 1
+	if cfg.rtspTmpl != "" {
+		return fmt.Sprintf(cfg.rtspTmpl, s.User, s.Pass, s.IP, pathChannel)
+	}
+	u := &url.URL{
+		Scheme: "rtsp",
+		User:   url.UserPassword(s.User, s.Pass),
+		Host:   net.JoinHostPort(s.IP, strconv.Itoa(cfg.rtspPort)),
+		Path:   fmt.Sprintf("/Streaming/Channels/%d", pathChannel),
+	}
+	return u.String()
 }
 
 var hikPTZCmd = map[string]int{
@@ -201,6 +250,9 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 		DeviceUID string `json:"device_uid"`
 		ChannelID string `json:"channel_id"`
 		Direction string `json:"direction"`
+		H         int    `json:"h"`
+		V         int    `json:"v"`
+		Z         int    `json:"z"`
 		Stop      bool   `json:"stop"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -219,23 +271,34 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "INVALID_ARGUMENT", "unknown direction")
 		return
 	}
-	ch, _ := strconv.Atoi(req.ChannelID)
-	if ch <= 0 {
-		ch = s.Channel
+	sdkCh, ok := s.Channels[req.ChannelID]
+	if !ok {
+		if n, err := strconv.Atoi(req.ChannelID); err == nil {
+			sdkCh = n
+		} else {
+			sdkCh = 1
+		}
+	}
+	speed := req.Z
+	if speed <= 0 {
+		speed = req.H
+	}
+	if speed <= 0 {
+		speed = 4
 	}
 	if req.Stop {
-		_ = sdk.PTZ(s.UserID, ch, cmd, true)
+		_ = sdk.PTZ(s.UserID, sdkCh, cmd, true, speed)
 		writeOK(w, nil)
 		return
 	}
-	if err := sdk.PTZ(s.UserID, ch, cmd, false); err != nil {
+	if err := sdk.PTZ(s.UserID, sdkCh, cmd, false, speed); err != nil {
 		writeErr(w, "INTERNAL", err.Error())
 		return
 	}
-	// Continuous move: stop shortly after; callers can send explicit stop.
+	// Continuous move: stop shortly after; callers may also send explicit stop.
 	go func() {
 		time.Sleep(300 * time.Millisecond)
-		_ = sdk.PTZ(s.UserID, ch, cmd, true)
+		_ = sdk.PTZ(s.UserID, sdkCh, cmd, true, speed)
 	}()
 	writeOK(w, nil)
 }
@@ -245,7 +308,7 @@ func register(cfg config) {
 		"id":               pluginInstanceID,
 		"pluginId":         pluginID,
 		"vendor":           "hikvision",
-		"version":          "0.1.0",
+		"version":          "0.2.0",
 		"protocols":        []string{protocol},
 		"capabilities":     []string{"live", "ptz"},
 		"streamTransports": []string{"rtsp_url"},
@@ -343,4 +406,13 @@ func paramInt(m map[string]any, key string, def int) int {
 		}
 	}
 	return def
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
