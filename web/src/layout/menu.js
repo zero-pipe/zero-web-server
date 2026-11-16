@@ -24,9 +24,9 @@ export const primaryMenus = [
     title: '接入管理',
     icon: 'menu-access',
     children: [
-      { title: '设备列表', path: '/devices', icon: 'devices' },
-      { title: '设备资产', path: '/assets', icon: 'menu-access' },
+      { title: '标准接入', path: '/devices', icon: 'devices' },
       { title: '插件接入', path: '/plugins', icon: 'el-icon-connection' },
+      { title: '设备资产', path: '/assets', icon: 'menu-access' },
       { title: '通道列表', path: '/channel', icon: 'channelManger' },
       { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
       { title: '国标级联', path: '/platform', icon: 'gbCascade' }

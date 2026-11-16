@@ -104,7 +104,7 @@ export const constantRoutes = [
         path: '/devices',
         name: 'Devices',
         component: () => import('@/views/devices/index'),
-        meta: { title: '设备列表', icon: 'device' }
+        meta: { title: '标准接入', icon: 'device' }
       }
     ]
   },
