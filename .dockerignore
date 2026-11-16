@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.github
+
+# Build outputs
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# Local data / runtime
+logs/
+tmp/
+temp/
+*.log
+
+# Local overrides (may contain secrets)
+configs/config.local.yaml
+configs/config.*.local.yaml
+
+# Frontend dependencies / caches
+web/node_modules/
+web/dist/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Vendored third-party test artifacts
+3rdpart/onvif-go/examples/*/onvif-server
+3rdpart/onvif-go/test-reports/
+
+# Docs / CI
+docs/
+*.md
+!README.md
