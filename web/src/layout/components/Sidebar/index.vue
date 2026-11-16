@@ -380,6 +380,7 @@ export default {
     margin: 0 !important;
     color: inherit;
     fill: currentColor;
+    stroke-width: 1.9;
     vertical-align: middle;
   }
 

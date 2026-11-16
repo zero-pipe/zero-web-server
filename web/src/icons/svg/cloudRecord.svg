@@ -1,4 +1,3 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <!-- 云端录像：云 + 播放 -->
-  <path fill="currentColor" d="M12.2 4a5.35 5.35 0 0 1 5.12 3.95A4.35 4.35 0 0 1 20.5 12.2 4.3 4.3 0 0 1 16.2 16.5H8.4A5.15 5.15 0 0 1 3.5 11.6 5.1 5.1 0 0 1 8.35 6.5c.55 0 1.08.08 1.58.23A5.35 5.35 0 0 1 12.2 4zm-.7 4.85a.9.9 0 0 0-1.35.78v4.74a.9.9 0 0 0 1.35.78l4.05-2.37a.9.9 0 0 0 0-1.56L11.5 8.85z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M7 18h10a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 6.7 12.3 3.5 3.5 0 0 0 7 18z"/><path d="M10.5 12l4 2.5-4 2.5v-5z"/>
 </svg>

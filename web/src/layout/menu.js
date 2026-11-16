@@ -16,7 +16,7 @@ export const primaryMenus = [
     children: [
       { title: '电子地图', path: '/map', icon: 'menu-map' },
       { title: '分屏监控', path: '/live', icon: 'live' },
-      { title: '报警管理', path: '/alarm', icon: 'el-icon-bell' }
+      { title: '报警管理', path: '/alarm', icon: 'alarm' }
     ]
   },
   {
@@ -25,7 +25,7 @@ export const primaryMenus = [
     icon: 'menu-access',
     children: [
       { title: '标准接入', path: '/devices', icon: 'devices' },
-      { title: '插件接入', path: '/plugins', icon: 'el-icon-connection' },
+      { title: '插件接入', path: '/plugins', icon: 'plugin' },
       { title: '设备资产', path: '/assets', icon: 'menu-access' },
       { title: '通道列表', path: '/channel', icon: 'channelManger' },
       { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
@@ -78,7 +78,7 @@ export const primaryMenus = [
     icon: 'menu-user',
     children: [
       { title: '用户列表', path: '/user', icon: 'user' },
-      { title: '角色管理', path: '/role', icon: 'el-icon-s-check' }
+      { title: '角色管理', path: '/role', icon: 'role' }
     ]
   }
 ]
