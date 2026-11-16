@@ -109,6 +109,18 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/plugins',
+    component: Layout,
+    children: [
+      {
+        path: '/plugins',
+        name: 'IpcPlugins',
+        component: () => import('@/views/plugins/index'),
+        meta: { title: '插件接入', icon: 'el-icon-connection' }
+      }
+    ]
+  },
+  {
     path: '/device',
     component: Layout,
     children: [

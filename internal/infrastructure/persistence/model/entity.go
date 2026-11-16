@@ -402,3 +402,58 @@ type SubordinatePlatform struct {
 }
 
 func (SubordinatePlatform) TableName() string { return "zws_subordinate_platform" }
+
+// Plugin 是 sidecar 插件实例注册信息。
+type Plugin struct {
+	ID           string `gorm:"column:id;primaryKey;size:128"`
+	PluginID     string `gorm:"column:plugin_id;size:128"`
+	Vendor       string `gorm:"column:vendor;size:128"`
+	Version      string `gorm:"column:version;size:64"`
+	Protocols    string `gorm:"column:protocols;type:text"`
+	Capabilities string `gorm:"column:capabilities;type:text"`
+	ConfigSchema string `gorm:"column:config_schema;type:longtext"`
+	Endpoint     string `gorm:"column:endpoint;size:255"`
+	Online       bool   `gorm:"column:online"`
+	LastSeen     int64  `gorm:"column:last_seen"`
+	CreateTime   string `gorm:"column:create_time;size:50"`
+	UpdateTime   string `gorm:"column:update_time;size:50"`
+}
+
+func (Plugin) TableName() string { return "zws_plugin" }
+
+// PluginDevice 是通过插件接入的设备。
+type PluginDevice struct {
+	ID           int    `gorm:"column:id;primaryKey;autoIncrement"`
+	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_plugin_device_code"`
+	PluginID     string `gorm:"column:plugin_id;size:128;uniqueIndex:uk_plugin_device_uid"`
+	Protocol     string `gorm:"column:protocol;size:64"`
+	DeviceUID    string `gorm:"column:device_uid;size:128;uniqueIndex:uk_plugin_device_uid"`
+	Name         string `gorm:"column:name;size:255"`
+	Enabled      bool   `gorm:"column:enabled;default:1"`
+	Online       bool   `gorm:"column:online"`
+	DriverParams string `gorm:"column:driver_params;type:longtext"`
+	Manufacturer string `gorm:"column:manufacturer;size:255"`
+	Model        string `gorm:"column:model;size:255"`
+	Firmware     string `gorm:"column:firmware;size:255"`
+	SerialNumber string `gorm:"column:serial_number;size:255"`
+	CreateTime   string `gorm:"column:create_time;size:50"`
+	UpdateTime   string `gorm:"column:update_time;size:50"`
+}
+
+func (PluginDevice) TableName() string { return "zws_plugin_device" }
+
+// PluginChannel 是插件设备的通道。
+type PluginChannel struct {
+	ID           int    `gorm:"column:id;primaryKey;autoIncrement"`
+	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_plugin_channel_code"`
+	DeviceDBID   int    `gorm:"column:device_db_id;index"`
+	ChannelID    string `gorm:"column:channel_id;size:128"`
+	Name         string `gorm:"column:name;size:255"`
+	Status       string `gorm:"column:status;size:32"`
+	PTZType      int    `gorm:"column:ptz_type"`
+	HasAudio     bool   `gorm:"column:has_audio"`
+	CreateTime   string `gorm:"column:create_time;size:50"`
+	UpdateTime   string `gorm:"column:update_time;size:50"`
+}
+
+func (PluginChannel) TableName() string { return "zws_plugin_channel" }

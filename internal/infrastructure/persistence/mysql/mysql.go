@@ -117,6 +117,9 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.CommonRegion{},
 		&model.GbSipConfig{},
 		&model.ObjectStoreConfig{},
+		&model.Plugin{},
+		&model.PluginDevice{},
+		&model.PluginChannel{},
 	}
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)

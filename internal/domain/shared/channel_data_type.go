@@ -18,9 +18,14 @@ func ChannelDataTypeDesc(dataType int) string {
 		return "拉流代理"
 	case ChannelDataTypeONVIF:
 		return "ONVIF设备"
+	case ChannelDataTypeIPCPlugin:
+		return "插件设备"
 	case ChannelDataTypeJT1078:
 		return "部标设备"
 	default:
 		return "未知"
 	}
 }
+
+// ChannelDataTypeIPCPlugin 通过 sidecar 插件接入的 IPC 设备。
+const ChannelDataTypeIPCPlugin = 5

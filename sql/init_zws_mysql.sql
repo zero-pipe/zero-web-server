@@ -656,3 +656,62 @@ CREATE TABLE IF NOT EXISTS zws_onvif_channel (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF通道';
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ---------------------------------------------------------------------------
+-- IPC 私有 SDK 插件（sidecar）注册与设备
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS zws_plugin;
+CREATE TABLE IF NOT EXISTS zws_plugin
+(
+    id            VARCHAR(128) NOT NULL PRIMARY KEY COMMENT '插件实例ID',
+    plugin_id     VARCHAR(128) COMMENT '插件标识',
+    vendor        VARCHAR(128) COMMENT '厂商',
+    version       VARCHAR(64) COMMENT '插件版本',
+    protocols     TEXT COMMENT '协议列表 JSON',
+    capabilities  TEXT COMMENT '能力列表 JSON',
+    config_schema LONGTEXT COMMENT '设备配置 JSON Schema',
+    endpoint      VARCHAR(255) COMMENT '插件 RPC 地址',
+    online        TINYINT NOT NULL DEFAULT 0 COMMENT '在线',
+    last_seen     BIGINT NOT NULL DEFAULT 0 COMMENT '最后心跳(ms)',
+    create_time   VARCHAR(50),
+    update_time   VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IPC 插件实例';
+
+DROP TABLE IF EXISTS zws_plugin_device;
+CREATE TABLE IF NOT EXISTS zws_plugin_device
+(
+    id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    internal_code VARCHAR(32) COMMENT '平台内码',
+    plugin_id     VARCHAR(128) NOT NULL COMMENT '插件实例ID',
+    protocol      VARCHAR(64) NOT NULL COMMENT '协议',
+    device_uid    VARCHAR(128) NOT NULL COMMENT '插件侧设备ID',
+    name          VARCHAR(255) COMMENT '设备名称',
+    enabled       TINYINT NOT NULL DEFAULT 1,
+    online        TINYINT NOT NULL DEFAULT 0,
+    driver_params LONGTEXT COMMENT '厂商参数 JSON（含凭据）',
+    manufacturer  VARCHAR(255),
+    model         VARCHAR(255),
+    firmware      VARCHAR(255),
+    serial_number VARCHAR(255),
+    create_time   VARCHAR(50),
+    update_time   VARCHAR(50),
+    UNIQUE KEY uk_plugin_device_code (internal_code),
+    UNIQUE KEY uk_plugin_device_uid (plugin_id, device_uid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备';
+
+DROP TABLE IF EXISTS zws_plugin_channel;
+CREATE TABLE IF NOT EXISTS zws_plugin_channel
+(
+    id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    internal_code VARCHAR(32) COMMENT '平台内码',
+    device_db_id  INT NOT NULL COMMENT '插件设备ID',
+    channel_id    VARCHAR(128) NOT NULL COMMENT '插件侧通道ID',
+    name          VARCHAR(255) COMMENT '通道名称',
+    status        VARCHAR(32) COMMENT '状态',
+    ptz_type      INT NOT NULL DEFAULT 0,
+    has_audio     TINYINT NOT NULL DEFAULT 0,
+    create_time   VARCHAR(50),
+    update_time   VARCHAR(50),
+    KEY idx_plugin_channel_device (device_db_id),
+    UNIQUE KEY uk_plugin_channel_code (internal_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备通道';

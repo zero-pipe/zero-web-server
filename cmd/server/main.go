@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	ipcplugin "zero-web-server/internal/adapter/ipcplugin"
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	alarmapp "zero-web-server/internal/application/alarm"
 	appauth "zero-web-server/internal/application/auth"
@@ -21,12 +22,14 @@ import (
 	downstreamapp "zero-web-server/internal/application/downstream"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	groupapp "zero-web-server/internal/application/group"
+	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	onvifapp "zero-web-server/internal/application/onvif"
 	"zero-web-server/internal/application/ops"
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
+	pluginapp "zero-web-server/internal/application/plugin"
 	positionapp "zero-web-server/internal/application/position"
 	ptzapp "zero-web-server/internal/application/ptz"
 	publishauth "zero-web-server/internal/application/publishauth"
@@ -139,6 +142,11 @@ func main() {
 	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加
 	mediaServerService := mediaserverapp.NewService(mediaServerRepo, cfg.UserSettings.ServerID)
 	mediaCluster := mediacluster.New(mediaServerService)
+
+	pluginRepo := persistence.NewPluginRepository(db)
+	pluginService := pluginapp.NewService(pluginRepo)
+	pluginToken := os.Getenv("ZWS_PLUGIN_TOKEN")
+	ipcService := ipcdevice.NewService(pluginService, pluginRepo, mediaCluster, ipcplugin.NewFactory(pluginToken), cfg.UserSettings.ServerID)
 
 	objectStoreRepo := persistence.NewObjectStoreConfigRepository(db)
 	objectStoreService := objectstoreapp.NewService(objectStoreRepo)
@@ -272,6 +280,9 @@ func main() {
 		LogDir:              applog.LogDir(cfg.Log.File),
 		Metrics:             ops.DefaultMetrics,
 		Dashboard:           dashboard,
+		PluginService:       pluginService,
+		IPCService:          ipcService,
+		PluginToken:         pluginToken,
 	})
 
 	go func() {

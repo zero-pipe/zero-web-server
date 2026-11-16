@@ -384,3 +384,75 @@ CREATE TABLE zws_plugin_channel (
 | 日期 | 说明 |
 | --- | --- |
 | 2026-11-16 | 初稿：sidecar + RPC 架构、方法集、海康 MVP |
+
+---
+
+## 17. MVP 实现说明（当前代码）
+
+当前已实现一版可跑通的 MVP，采用 **JSON-RPC over HTTP**（设计中的推荐传输之一，便于先行验证；后续可平滑替换为 gRPC）。
+
+### 17.1 平台侧
+
+| 能力 | 位置 |
+| --- | --- |
+| 插件注册表 | `internal/application/plugin` |
+| 插件/设备/通道实体 | `internal/domain/plugin` |
+| JSON-RPC 客户端 | `internal/adapter/ipcplugin` |
+| 插件设备编排/取流 | `internal/application/ipcdevice` |
+| HTTP 接口 | `internal/interfaces/http/handler/plugin_handler.go`、`routes_plugin.go` |
+| 表结构 | `zws_plugin` / `zws_plugin_device` / `zws_plugin_channel` |
+
+接口：
+
+| 方法 | 路径 | 鉴权 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/plugins/hello` | `X-Plugin-Token` | 插件注册 |
+| POST | `/api/v1/plugins/heartbeat` | `X-Plugin-Token` | 心跳 |
+| GET | `/api/v1/plugins` | JWT | 插件列表 |
+| GET | `/api/v1/ipc/devices` | JWT | 插件设备列表 |
+| POST | `/api/v1/ipc/devices` | JWT | 添加设备（登录+同步通道） |
+| DELETE | `/api/v1/ipc/devices?id=` | JWT | 删除设备 |
+| POST | `/api/v1/ipc/devices/sync?id=` | JWT | 同步通道 |
+| GET | `/api/v1/ipc/channels?deviceId=` | JWT | 通道列表 |
+| GET | `/api/v1/ipc/play/start?deviceId=&channelId=` | JWT | 开始直播 |
+| GET | `/api/v1/ipc/play/stop?deviceId=&channelId=` | JWT | 停止直播 |
+| POST | `/api/v1/ipc/ptz` | JWT | PTZ |
+
+`ZWS_PLUGIN_TOKEN` 环境变量可启用插件注册令牌校验（为空则不校验）。
+
+### 17.2 插件侧协议（v1）
+
+- `POST /v1/login` `{device_uid, params}` → `{manufacturer,model,firmware,serialNumber}`
+- `POST /v1/logout` `{device_uid}`
+- `POST /v1/channels` `{device_uid}` → `{channels:[{channelId,name,status,ptzType,hasAudio}]}`
+- `POST /v1/live/start` `{device_uid,channel_id,stream_key}` → `{transport,rtspUrl}`
+- `POST /v1/live/stop` / `POST /v1/ptz`
+- 统一响应：`{code:"OK"|错误码, message, data}`
+
+### 17.3 Mock 插件与验证
+
+```bash
+# 终端 A：平台
+make run
+
+# 终端 B：mock 插件（默认连 http://127.0.0.1:18080，监听 :19090）
+make mock-plugin
+
+# 可选：指定真实 RTSP
+MOCK_RTSP_URL='rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101' make mock-plugin
+```
+
+打开前端“接入管理 → 插件接入”：
+
+1. 插件列表出现 `mock-ipc-01`（在线）。
+2. “添加设备”按 Schema 渲染表单（IP/端口/账号/密码/通道），提交后设备与 2 个通道入库。
+3. 展开“通道”可看到通道列表；点“播放”会调用 `StartLive`。
+
+> 注意：`StartLive` 需要平台已配置**在线媒体节点**（媒体管理 → 媒体节点，指向 ZMS）。未配置时会返回“无可用媒体节点”类错误，这是预期行为；插件注册、设备添加、通道同步与列表不受影响。
+
+### 17.4 已知限制（MVP）
+
+- 仅支持 `transport=rtsp_url`；`rtp_push` 待实现。
+- 回放/录像/报警事件未接入。
+- `driver_params` 中的凭据为明文（接口返回已脱敏），后续接入加密存储。
+- 插件离线仅由 RPC 失败被动标记，尚无后台心跳巡检任务。

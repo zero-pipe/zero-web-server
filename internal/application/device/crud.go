@@ -41,7 +41,6 @@ func (s *Service) ChangeChannelAudio(channelID int, audio bool) error {
 func (s *Service) AddDevice(device *domaindevice.Device) error {
 	device.CreateTime = nowStr()
 	device.UpdateTime = device.CreateTime
-	device.ServerID = device.ServerID
 	return s.devices.Create(device)
 }
 

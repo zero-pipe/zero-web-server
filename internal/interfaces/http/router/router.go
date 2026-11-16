@@ -10,12 +10,14 @@ import (
 	downstreamapp "zero-web-server/internal/application/downstream"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	groupapp "zero-web-server/internal/application/group"
+	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	onvifapp "zero-web-server/internal/application/onvif"
 	"zero-web-server/internal/application/ops"
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
+	pluginapp "zero-web-server/internal/application/plugin"
 	positionapp "zero-web-server/internal/application/position"
 	ptzapp "zero-web-server/internal/application/ptz"
 	publishauth "zero-web-server/internal/application/publishauth"
@@ -74,6 +76,9 @@ type Deps struct {
 	LogDir              string
 	Metrics             *ops.Metrics
 	Dashboard           *ops.Dashboard
+	PluginService       *pluginapp.Service
+	IPCService          *ipcdevice.Service
+	PluginToken         string
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -124,6 +129,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	regionHandler := handler.NewRegionHandler(deps.RegionService)
 	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
+	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.PluginToken)
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
@@ -137,6 +143,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	{
 		registerUser(api, userHandler)
 		registerServer(api, healthHandler, serverHandler)
+		registerPluginPublic(api, pluginHandler)
 	}
 
 	hookGroup := r.Group("/index/hook")
@@ -147,6 +154,8 @@ func Setup(r *gin.Engine, deps Deps) {
 	{
 		auth.POST("/user/userInfo", userHandler.UserInfo)
 		auth.POST("/user/changePassword", userHandler.ChangePassword)
+
+		registerPlugin(auth, pluginHandler)
 
 		registerUserMgmt(auth, userHandler, roleHandler)
 
