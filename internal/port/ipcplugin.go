@@ -26,12 +26,19 @@ type IPCDeviceInfo struct {
 	SerialNumber string `json:"serialNumber"`
 }
 
+// IPCPushParams 是平台为 rtp_push 分配的收流参数。
+type IPCPushParams struct {
+	SDPIP   string `json:"sdpIp"`
+	RTPPort int    `json:"rtpPort"`
+	Mode    string `json:"mode"` // UDP / TCP
+}
+
 // IPCClient 是平台调用 sidecar 插件的 RPC 客户端端口。
 type IPCClient interface {
 	Login(ctx context.Context, deviceUID string, params map[string]any) (*IPCDeviceInfo, error)
 	Logout(ctx context.Context, deviceUID string) error
 	ListChannels(ctx context.Context, deviceUID string) ([]IPCChannel, error)
-	StartLive(ctx context.Context, deviceUID, channelID, streamKey string) (*IPCStreamSource, error)
+	StartLive(ctx context.Context, deviceUID, channelID, streamKey, preferTransport string, push *IPCPushParams) (*IPCStreamSource, error)
 	StopLive(ctx context.Context, deviceUID, channelID, streamKey string) error
 	PTZ(ctx context.Context, deviceUID, channelID, direction string, h, v, z int) error
 }

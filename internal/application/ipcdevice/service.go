@@ -134,20 +134,40 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 	if s.getActive(stream) != nil {
 		return s.buildContent(ctx, stream)
 	}
-	src, err := client.StartLive(ctx, dev.DeviceUID, channelID, stream)
-	if err != nil {
-		s.plugins.MarkOffline(p.ID)
-		return nil, fmt.Errorf("插件开始取流失败: %w", err)
-	}
-	if src == nil || strings.TrimSpace(src.RTSPURL) == "" {
-		return nil, fmt.Errorf("插件未返回可用的 RTSP 流源（transport=%s）", srcTransport(src))
-	}
 	node, err := s.media.ResolveForStream(ctx, streamApp, stream, "")
 	if err != nil {
 		return nil, err
 	}
-	if _, err := node.AddStreamProxy(ctx, "__defaultVhost__", streamApp, stream, src.RTSPURL, "1", false, false, true); err != nil {
-		return nil, fmt.Errorf("创建拉流代理失败: %w", err)
+	transport := pickTransport(p.StreamTransports)
+	var push *port.IPCPushParams
+	if transport == "rtp_push" {
+		rtpPort, perr := node.OpenRtpServer(ctx, streamApp, stream, 0, 0)
+		if perr != nil {
+			return nil, fmt.Errorf("打开 RTP 端口失败: %w", perr)
+		}
+		push = &port.IPCPushParams{SDPIP: node.SDPIP(), RTPPort: rtpPort, Mode: "UDP"}
+	}
+	src, err := client.StartLive(ctx, dev.DeviceUID, channelID, stream, transport, push)
+	if err != nil {
+		s.plugins.MarkOffline(p.ID)
+		return nil, fmt.Errorf("插件开始取流失败: %w", err)
+	}
+	actual := transport
+	if src != nil && strings.TrimSpace(src.Transport) != "" {
+		actual = src.Transport
+	}
+	switch actual {
+	case "rtp_push":
+		// ZMS 已在 OpenRtpServer 时开始收流，无需拉流代理。
+	case "rtsp_url", "":
+		if src == nil || strings.TrimSpace(src.RTSPURL) == "" {
+			return nil, fmt.Errorf("插件未返回可用的 RTSP 流源")
+		}
+		if _, err := node.AddStreamProxy(ctx, "__defaultVhost__", streamApp, stream, src.RTSPURL, "1", false, false, true); err != nil {
+			return nil, fmt.Errorf("创建拉流代理失败: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("不支持的流传输方式: %s", actual)
 	}
 	s.media.BindStream(node.ID(), streamApp, stream)
 	s.setActive(stream, &activeStream{
@@ -155,6 +175,21 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 		PluginID: dev.PluginID, DeviceUID: dev.DeviceUID, ChannelID: channelID,
 	})
 	return s.buildContent(ctx, stream)
+}
+
+// pickTransport 优先 rtsp_url（平台侧更简单），其次 rtp_push，默认 rtsp_url。
+func pickTransport(transports []string) string {
+	for _, t := range transports {
+		if t == "rtsp_url" {
+			return "rtsp_url"
+		}
+	}
+	for _, t := range transports {
+		if t == "rtp_push" {
+			return "rtp_push"
+		}
+	}
+	return "rtsp_url"
 }
 
 func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) error {
@@ -298,11 +333,4 @@ func firstString(vals []string) string {
 		return ""
 	}
 	return vals[0]
-}
-
-func srcTransport(src *port.IPCStreamSource) string {
-	if src == nil {
-		return ""
-	}
-	return src.Transport
 }

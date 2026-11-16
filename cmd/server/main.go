@@ -227,6 +227,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ops.DefaultMetrics.Start(ctx, 2*time.Second)
+	pluginService.Start(ctx, 10*time.Second, 30*time.Second)
 	if err := sipServer.Start(ctx); err != nil {
 		applog.Fatalf("start sip: %v", err)
 	}

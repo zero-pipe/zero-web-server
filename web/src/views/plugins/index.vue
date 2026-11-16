@@ -20,6 +20,11 @@
             <el-tag v-for="c in row.capabilities" :key="c" size="mini" type="info" style="margin-right:4px">{{ c }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="流传输" min-width="120">
+          <template slot-scope="{ row }">
+            <el-tag v-for="t in row.streamTransports" :key="t" size="mini" type="warning" style="margin-right:4px">{{ t }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="90">
           <template slot-scope="{ row }">
             <el-tag :type="row.online ? 'success' : 'info'" size="mini">{{ row.online ? '在线' : '离线' }}</el-tag>

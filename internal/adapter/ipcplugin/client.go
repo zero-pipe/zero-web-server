@@ -99,11 +99,18 @@ func (c *Client) ListChannels(ctx context.Context, deviceUID string) ([]port.IPC
 	return out.Channels, nil
 }
 
-func (c *Client) StartLive(ctx context.Context, deviceUID, channelID, streamKey string) (*port.IPCStreamSource, error) {
-	var out port.IPCStreamSource
-	if err := c.post(ctx, "/v1/live/start", map[string]any{
+func (c *Client) StartLive(ctx context.Context, deviceUID, channelID, streamKey, preferTransport string, push *port.IPCPushParams) (*port.IPCStreamSource, error) {
+	body := map[string]any{
 		"device_uid": deviceUID, "channel_id": channelID, "stream_key": streamKey,
-	}, &out); err != nil {
+		"prefer_transport": preferTransport,
+	}
+	if push != nil {
+		body["rtp"] = map[string]any{
+			"sdp_ip": push.SDPIP, "rtp_port": push.RTPPort, "mode": push.Mode,
+		}
+	}
+	var out port.IPCStreamSource
+	if err := c.post(ctx, "/v1/live/start", body, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

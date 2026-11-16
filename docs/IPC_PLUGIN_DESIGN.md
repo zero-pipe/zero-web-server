@@ -425,7 +425,7 @@ CREATE TABLE zws_plugin_channel (
 - `POST /v1/login` `{device_uid, params}` → `{manufacturer,model,firmware,serialNumber}`
 - `POST /v1/logout` `{device_uid}`
 - `POST /v1/channels` `{device_uid}` → `{channels:[{channelId,name,status,ptzType,hasAudio}]}`
-- `POST /v1/live/start` `{device_uid,channel_id,stream_key}` → `{transport,rtspUrl}`
+- `POST /v1/live/start` `{device_uid,channel_id,stream_key,prefer_transport,rtp?}` → `{transport,rtspUrl}`（`rtp={sdp_ip,rtp_port,mode}`）
 - `POST /v1/live/stop` / `POST /v1/ptz`
 - 统一响应：`{code:"OK"|错误码, message, data}`
 
@@ -450,9 +450,17 @@ MOCK_RTSP_URL='rtsp://user:pass@192.168.1.64:554/Streaming/Channels/101' make mo
 
 > 注意：`StartLive` 需要平台已配置**在线媒体节点**（媒体管理 → 媒体节点，指向 ZMS）。未配置时会返回“无可用媒体节点”类错误，这是预期行为；插件注册、设备添加、通道同步与列表不受影响。
 
-### 17.4 已知限制（MVP）
+### 17.4 已支持
 
-- 仅支持 `transport=rtsp_url`；`rtp_push` 待实现。
+- **流源**：`rtsp_url`（ZMS 拉流）与 `rtp_push`（平台 `OpenRtpServer` 分配端口，插件推 RTP/PS）。
+  平台按插件 `streamTransports` 选择：优先 `rtsp_url`，否则 `rtp_push`；插件可在响应中覆盖。
+- **心跳巡检**：平台每 10s 检查一次，超过 30s 未心跳的插件标记离线，其设备一并置离线。
+- **海康骨架**：`tools/hik-ipc-plugin` 提供 HCNetSDK cgo 插件骨架（登录/登出/PTZ + RTSP 取流），
+  未安装 SDK 时以 stub 编译，不影响主仓库构建。
+
+### 17.5 已知限制（MVP）
+
 - 回放/录像/报警事件未接入。
 - `driver_params` 中的凭据为明文（接口返回已脱敏），后续接入加密存储。
-- 插件离线仅由 RPC 失败被动标记，尚无后台心跳巡检任务。
+- 海康骨架的通道枚举为固定数量（`HIK_CHANNEL_COUNT`），真实枚举需接 `NET_DVR_GET_IPPARACFG_V40`。
+- `rtp_push` 已打通平台侧流程，插件侧需要自行编码推送 RTP/PS（mock 仅返回协议字段）。

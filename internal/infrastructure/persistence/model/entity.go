@@ -405,18 +405,19 @@ func (SubordinatePlatform) TableName() string { return "zws_subordinate_platform
 
 // Plugin 是 sidecar 插件实例注册信息。
 type Plugin struct {
-	ID           string `gorm:"column:id;primaryKey;size:128"`
-	PluginID     string `gorm:"column:plugin_id;size:128"`
-	Vendor       string `gorm:"column:vendor;size:128"`
-	Version      string `gorm:"column:version;size:64"`
-	Protocols    string `gorm:"column:protocols;type:text"`
-	Capabilities string `gorm:"column:capabilities;type:text"`
-	ConfigSchema string `gorm:"column:config_schema;type:longtext"`
-	Endpoint     string `gorm:"column:endpoint;size:255"`
-	Online       bool   `gorm:"column:online"`
-	LastSeen     int64  `gorm:"column:last_seen"`
-	CreateTime   string `gorm:"column:create_time;size:50"`
-	UpdateTime   string `gorm:"column:update_time;size:50"`
+	ID               string `gorm:"column:id;primaryKey;size:128"`
+	PluginID         string `gorm:"column:plugin_id;size:128"`
+	Vendor           string `gorm:"column:vendor;size:128"`
+	Version          string `gorm:"column:version;size:64"`
+	Protocols        string `gorm:"column:protocols;type:text"`
+	Capabilities     string `gorm:"column:capabilities;type:text"`
+	StreamTransports string `gorm:"column:stream_transports;type:text"`
+	ConfigSchema     string `gorm:"column:config_schema;type:longtext"`
+	Endpoint         string `gorm:"column:endpoint;size:255"`
+	Online           bool   `gorm:"column:online"`
+	LastSeen         int64  `gorm:"column:last_seen"`
+	CreateTime       string `gorm:"column:create_time;size:50"`
+	UpdateTime       string `gorm:"column:update_time;size:50"`
 }
 
 func (Plugin) TableName() string { return "zws_plugin" }

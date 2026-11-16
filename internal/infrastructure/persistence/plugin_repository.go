@@ -22,12 +22,13 @@ func (r *PluginRepository) UpsertPlugin(p *domainplugin.Plugin) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	protocols, _ := json.Marshal(p.Protocols)
 	caps, _ := json.Marshal(p.Capabilities)
+	transports, _ := json.Marshal(p.StreamTransports)
 	var existing model.Plugin
 	err := r.db.Where("id = ?", p.ID).First(&existing).Error
 	if err == gorm.ErrRecordNotFound {
 		m := &model.Plugin{
 			ID: p.ID, PluginID: p.PluginID, Vendor: p.Vendor, Version: p.Version,
-			Protocols: string(protocols), Capabilities: string(caps),
+			Protocols: string(protocols), Capabilities: string(caps), StreamTransports: string(transports),
 			ConfigSchema: p.ConfigSchema, Endpoint: p.Endpoint, Online: true,
 			LastSeen: time.Now().UnixMilli(), CreateTime: now, UpdateTime: now,
 		}
@@ -38,16 +39,17 @@ func (r *PluginRepository) UpsertPlugin(p *domainplugin.Plugin) error {
 		return err
 	} else {
 		if err := r.db.Model(&model.Plugin{}).Where("id = ?", p.ID).Updates(map[string]any{
-			"plugin_id":     p.PluginID,
-			"vendor":        p.Vendor,
-			"version":       p.Version,
-			"protocols":     string(protocols),
-			"capabilities":  string(caps),
-			"config_schema": p.ConfigSchema,
-			"endpoint":      p.Endpoint,
-			"online":        true,
-			"last_seen":     time.Now().UnixMilli(),
-			"update_time":   now,
+			"plugin_id":         p.PluginID,
+			"vendor":            p.Vendor,
+			"version":           p.Version,
+			"protocols":         string(protocols),
+			"capabilities":      string(caps),
+			"stream_transports": string(transports),
+			"config_schema":     p.ConfigSchema,
+			"endpoint":          p.Endpoint,
+			"online":            true,
+			"last_seen":         time.Now().UnixMilli(),
+			"update_time":       now,
 		}).Error; err != nil {
 			return err
 		}
@@ -58,6 +60,15 @@ func (r *PluginRepository) UpsertPlugin(p *domainplugin.Plugin) error {
 func (r *PluginRepository) UpdatePluginSeen(id string, ts int64, online bool) error {
 	return r.db.Model(&model.Plugin{}).Where("id = ?", id).
 		Updates(map[string]any{"last_seen": ts, "online": online}).Error
+}
+
+func (r *PluginRepository) MarkPluginOffline(id string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Plugin{}).Where("id = ?", id).Update("online", false).Error; err != nil {
+			return err
+		}
+		return tx.Model(&model.PluginDevice{}).Where("plugin_id = ?", id).Update("online", false).Error
+	})
 }
 
 func (r *PluginRepository) ListPlugins() ([]*domainplugin.Plugin, error) {
@@ -241,7 +252,8 @@ func toDomainPlugin(m *model.Plugin) *domainplugin.Plugin {
 	return &domainplugin.Plugin{
 		ID: m.ID, PluginID: m.PluginID, Vendor: m.Vendor, Version: m.Version,
 		Protocols: decodeStrings(m.Protocols), Capabilities: decodeStrings(m.Capabilities),
-		ConfigSchema: m.ConfigSchema, Endpoint: m.Endpoint, Online: m.Online,
+		StreamTransports: decodeStrings(m.StreamTransports),
+		ConfigSchema:     m.ConfigSchema, Endpoint: m.Endpoint, Online: m.Online,
 		LastSeen: m.LastSeen, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }

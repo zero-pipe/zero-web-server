@@ -2,18 +2,19 @@ package plugin
 
 // Plugin 是向平台注册的 sidecar 插件实例。
 type Plugin struct {
-	ID           string   `json:"id"` // 插件实例 ID（Hello 上报）
-	PluginID     string   `json:"pluginId"`
-	Vendor       string   `json:"vendor"`
-	Version      string   `json:"version"`
-	Protocols    []string `json:"protocols"`
-	Capabilities []string `json:"capabilities"`
-	ConfigSchema string   `json:"configSchema"` // JSON Schema 文本
-	Endpoint     string   `json:"endpoint"`
-	Online       bool     `json:"online"`
-	LastSeen     int64    `json:"lastSeen"`
-	CreateTime   string   `json:"createTime"`
-	UpdateTime   string   `json:"updateTime"`
+	ID               string   `json:"id"` // 插件实例 ID（Hello 上报）
+	PluginID         string   `json:"pluginId"`
+	Vendor           string   `json:"vendor"`
+	Version          string   `json:"version"`
+	Protocols        []string `json:"protocols"`
+	Capabilities     []string `json:"capabilities"`
+	StreamTransports []string `json:"streamTransports"`
+	ConfigSchema     string   `json:"configSchema"` // JSON Schema 文本
+	Endpoint         string   `json:"endpoint"`
+	Online           bool     `json:"online"`
+	LastSeen         int64    `json:"lastSeen"`
+	CreateTime       string   `json:"createTime"`
+	UpdateTime       string   `json:"updateTime"`
 }
 
 // Device 是通过插件接入的设备。
@@ -53,6 +54,7 @@ type Channel struct {
 type Repository interface {
 	UpsertPlugin(p *Plugin) error
 	UpdatePluginSeen(id string, ts int64, online bool) error
+	MarkPluginOffline(id string) error
 	ListPlugins() ([]*Plugin, error)
 	GetPlugin(id string) (*Plugin, error)
 	ResolvePlugin(protocol string) (*Plugin, error)

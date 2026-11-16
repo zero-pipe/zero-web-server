@@ -669,6 +669,7 @@ CREATE TABLE IF NOT EXISTS zws_plugin
     version       VARCHAR(64) COMMENT '插件版本',
     protocols     TEXT COMMENT '协议列表 JSON',
     capabilities  TEXT COMMENT '能力列表 JSON',
+    stream_transports TEXT COMMENT '支持的流传输方式 JSON',
     config_schema LONGTEXT COMMENT '设备配置 JSON Schema',
     endpoint      VARCHAR(255) COMMENT '插件 RPC 地址',
     online        TINYINT NOT NULL DEFAULT 0 COMMENT '在线',

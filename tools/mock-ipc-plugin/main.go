@@ -19,6 +19,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -90,14 +91,15 @@ func env(key, def string) string {
 
 func register(cfg pluginConfig) {
 	body := map[string]any{
-		"id":           pluginInstanceID,
-		"pluginId":     pluginID,
-		"vendor":       "mock",
-		"version":      "0.1.0",
-		"protocols":    []string{protocol},
-		"capabilities": []string{"live", "ptz"},
-		"configSchema": configSchema,
-		"endpoint":     cfg.endpoint,
+		"id":               pluginInstanceID,
+		"pluginId":         pluginID,
+		"vendor":           "mock",
+		"version":          "0.1.0",
+		"protocols":        []string{protocol},
+		"capabilities":     []string{"live", "ptz"},
+		"streamTransports": transportsFromEnv(),
+		"configSchema":     configSchema,
+		"endpoint":         cfg.endpoint,
 	}
 	for {
 		if err := post(cfg, "/api/v1/plugins/hello", body, nil); err != nil {
@@ -164,14 +166,40 @@ func handleChannels(w http.ResponseWriter, r *http.Request) {
 func handleLiveStart(rtspURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			DeviceUID string `json:"device_uid"`
-			ChannelID string `json:"channel_id"`
-			StreamKey string `json:"stream_key"`
+			DeviceUID       string `json:"device_uid"`
+			ChannelID       string `json:"channel_id"`
+			StreamKey       string `json:"stream_key"`
+			PreferTransport string `json:"prefer_transport"`
+			RTP             *struct {
+				SDPIP   string `json:"sdp_ip"`
+				RTPPort int    `json:"rtp_port"`
+				Mode    string `json:"mode"`
+			} `json:"rtp"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		log.Printf("live start device=%s channel=%s stream=%s", req.DeviceUID, req.ChannelID, req.StreamKey)
+		log.Printf("live start device=%s channel=%s stream=%s prefer=%s rtp=%v",
+			req.DeviceUID, req.ChannelID, req.StreamKey, req.PreferTransport, req.RTP)
+		if req.PreferTransport == "rtp_push" || req.RTP != nil {
+			writeOK(w, map[string]any{"transport": "rtp_push"})
+			return
+		}
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtspURL})
 	}
+}
+
+func transportsFromEnv() []string {
+	raw := env("MOCK_TRANSPORTS", "rtsp_url")
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		out = []string{"rtsp_url"}
+	}
+	return out
 }
 
 func okHandler(w http.ResponseWriter, _ *http.Request) { writeOK(w, nil) }
