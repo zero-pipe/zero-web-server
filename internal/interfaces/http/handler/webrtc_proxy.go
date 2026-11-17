@@ -17,27 +17,29 @@ import (
 )
 
 // WebRTCProxyHandler 将 WebRTC 信令转发到 ZMS，供前端 rtc 字段走平台同源地址。
-
 type WebRTCProxyHandler struct {
-	mediaBaseURL string
-
-	client *http.Client
+	// resolve 每请求解析当前在线媒体节点基址（媒体节点可能在平台启动后自注册，不能启动时定死）。
+	resolve func() string
+	client  *http.Client
 }
 
-func NewWebRTCProxyHandler(mediaBaseURL string) *WebRTCProxyHandler {
-
+func NewWebRTCProxyHandler(resolve func() string) *WebRTCProxyHandler {
 	return &WebRTCProxyHandler{
-
-		mediaBaseURL: strings.TrimRight(mediaBaseURL, "/"),
-
-		client: &http.Client{Timeout: 30 * time.Second},
+		resolve: resolve,
+		client:  &http.Client{Timeout: 30 * time.Second},
 	}
-
 }
 
 func (h *WebRTCProxyHandler) Proxy(c *gin.Context) {
-
-	target := h.mediaBaseURL + c.Request.URL.Path
+	base := ""
+	if h.resolve != nil {
+		base = strings.TrimRight(h.resolve(), "/")
+	}
+	if base == "" {
+		c.JSON(http.StatusBadGateway, gin.H{"code": -1, "msg": "无可用媒体节点，无法转发 WebRTC"})
+		return
+	}
+	target := base + c.Request.URL.Path
 
 	if raw := c.Request.URL.RawQuery; raw != "" {
 

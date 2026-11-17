@@ -87,12 +87,20 @@ func Setup(r *gin.Engine, deps Deps) {
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())
 
-	if deps.MediaBaseURL != "" {
-		webrtcProxy := handler.NewWebRTCProxyHandler(deps.MediaBaseURL)
-		r.Any("/index/api/webrtc", webrtcProxy.Proxy)
-		r.Any("/index/api/whep", webrtcProxy.Proxy)
-		r.Any("/index/api/whep/*path", webrtcProxy.Proxy)
+	// WebRTC 信令反代：始终挂载，上游基址按请求动态解析（媒体节点可能在平台启动后才自注册）。
+	resolveMediaBase := func() string {
+		if deps.MediaServerService != nil {
+			if u := deps.MediaServerService.FirstOnlineBaseURL(); u != "" {
+				return u
+			}
+		}
+		return deps.MediaBaseURL
 	}
+	webrtcProxy := handler.NewWebRTCProxyHandler(resolveMediaBase)
+	r.Any("/index/api/webrtc", webrtcProxy.Proxy)
+	r.Any("/index/api/whep", webrtcProxy.Proxy)
+	r.Any("/index/api/whep/*path", webrtcProxy.Proxy)
+	r.Any("/index/api/whip", webrtcProxy.Proxy)
 
 	userHandler := handler.NewUserHandler(deps.AuthService)
 	healthHandler := handler.NewHealthHandler(deps.Version)
