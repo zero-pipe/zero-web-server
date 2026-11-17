@@ -165,6 +165,9 @@ func (f *fakeChannelRepo) ResetByDevice(deviceID string, dataDeviceID int, chann
 func (f *fakeChannelRepo) DeleteByDevice(deviceID string) error   { delete(f.rows, deviceID); return nil }
 func (f *fakeChannelRepo) ChangeAudio(id int, audio bool) error   { return nil }
 func (f *fakeChannelRepo) Update(ch *domainchannel.Channel) error { return nil }
+func (f *fakeChannelRepo) UpdateStreamIdentification(id int, deviceID, value string) error {
+	return nil
+}
 func (f *fakeChannelRepo) ListCommon(page, count int, query string, channelType *int, online *bool, hasRecordPlan *bool) ([]*domainchannel.Channel, int64, error) {
 	return nil, 0, nil
 }

@@ -19,8 +19,11 @@ type Channel struct {
 	Latitude        float64 `json:"latitude"`
 	HasAudio        bool    `json:"hasAudio"`
 	SubCount        int     `json:"subCount"`
-	CreateTime      string  `json:"createTime"`
-	UpdateTime      string  `json:"updateTime"`
+	// StreamIdentification 主/子码流选择（如 stream:0/stream:1、streamnumber:0/1）。
+	// GB28181 目录不上报设备侧选择，平台默认主码流(stream:0)，可由用户覆盖并随点播 SDP 下发。
+	StreamIdentification string `json:"streamIdentification"`
+	CreateTime           string `json:"createTime"`
+	UpdateTime           string `json:"updateTime"`
 }
 
 type Repository interface {
@@ -32,6 +35,8 @@ type Repository interface {
 	DeleteByDevice(deviceID string) error
 	ChangeAudio(channelID int, audio bool) error
 	Update(ch *Channel) error
+	// UpdateStreamIdentification 单通道设置码流类型；deviceID 非空时按设备批量设置（id<=0 时）。
+	UpdateStreamIdentification(id int, deviceID string, value string) error
 
 	// 业务分组 / 行政区划 / 通用检索相关（channel、group、region 应用服务使用）
 	ListCommon(page, count int, query string, channelType *int, online *bool, hasRecordPlan *bool) ([]*Channel, int64, error)

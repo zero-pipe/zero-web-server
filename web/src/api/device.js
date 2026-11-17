@@ -235,7 +235,7 @@ export function updateChannelStreamIdentification(params) {
   const { deviceDbId, streamIdentification, id } = params
   return request({
     method: 'post',
-    url: `/api/v1/device/query/channel/stream/identification/update/`,
+    url: `/api/v1/device/query/channel/stream/identification/update`,
     params: {
       deviceDbId: deviceDbId,
       id: id,

@@ -42,26 +42,31 @@ func NewChannelView(ch *domainchannel.Channel) ChannelView {
 	if channelGBID == "" {
 		channelGBID = ch.DeviceID
 	}
+	streamID := ch.StreamIdentification
+	if streamID == "" {
+		streamID = "stream:0" // GB28181 目录不上报设备侧码流选择，默认主码流
+	}
 	return ChannelView{
-		ID:             ch.ID,
-		InternalCode:   ch.InternalCode,
-		ChannelID:      ch.ID,
-		DeviceID:       channelGBID,
-		ParentDeviceID: ch.DeviceID,
-		Name:           ch.Name,
-		Manufacturer:   ch.Manufacturer,
-		Model:          ch.Model,
-		Status:         ch.Status,
-		PTZType:        ch.PTZType,
-		PTZTypeText:    ptzText,
-		HasAudio:       ch.HasAudio,
-		SubCount:       ch.SubCount,
-		Parental:       ch.Parental,
-		ParentID:       ch.ParentID,
-		Longitude:      ch.Longitude,
-		Latitude:       ch.Latitude,
-		CreateTime:     ch.CreateTime,
-		UpdateTime:     ch.UpdateTime,
+		ID:                   ch.ID,
+		InternalCode:         ch.InternalCode,
+		ChannelID:            ch.ID,
+		DeviceID:             channelGBID,
+		ParentDeviceID:       ch.DeviceID,
+		Name:                 ch.Name,
+		Manufacturer:         ch.Manufacturer,
+		Model:                ch.Model,
+		Status:               ch.Status,
+		PTZType:              ch.PTZType,
+		PTZTypeText:          ptzText,
+		HasAudio:             ch.HasAudio,
+		SubCount:             ch.SubCount,
+		Parental:             ch.Parental,
+		ParentID:             ch.ParentID,
+		Longitude:            ch.Longitude,
+		Latitude:             ch.Latitude,
+		CreateTime:           ch.CreateTime,
+		UpdateTime:           ch.UpdateTime,
+		StreamIdentification: streamID,
 	}
 }
 

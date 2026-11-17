@@ -247,26 +247,27 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 			}
 			ch.InternalCode = code
 			models = append(models, model.GBDeviceChannel{
-				InternalCode: code,
-				DeviceID:     deviceID,
-				DataType:     shared.ChannelDataTypeGB28181,
-				DataDeviceID: dataDeviceID,
-				GBDeviceID:   ch.GBDeviceID,
-				Name:         ch.Name,
-				GBName:       ch.Name,
-				Manufacturer: ch.Manufacturer,
-				Model:        ch.Model,
-				Parental:     ch.Parental,
-				ParentID:     ch.ParentID,
-				Status:       ch.Status,
-				GBStatus:     ch.Status,
-				Longitude:    ch.Longitude,
-				Latitude:     ch.Latitude,
-				PTZType:      ch.PTZType,
-				HasAudio:     ch.HasAudio,
-				SubCount:     ch.SubCount,
-				CreateTime:   ch.CreateTime,
-				UpdateTime:   ch.UpdateTime,
+				InternalCode:         code,
+				DeviceID:             deviceID,
+				DataType:             shared.ChannelDataTypeGB28181,
+				DataDeviceID:         dataDeviceID,
+				GBDeviceID:           ch.GBDeviceID,
+				Name:                 ch.Name,
+				GBName:               ch.Name,
+				Manufacturer:         ch.Manufacturer,
+				Model:                ch.Model,
+				Parental:             ch.Parental,
+				ParentID:             ch.ParentID,
+				Status:               ch.Status,
+				GBStatus:             ch.Status,
+				Longitude:            ch.Longitude,
+				Latitude:             ch.Latitude,
+				PTZType:              ch.PTZType,
+				HasAudio:             ch.HasAudio,
+				SubCount:             ch.SubCount,
+				CreateTime:           ch.CreateTime,
+				UpdateTime:           ch.UpdateTime,
+				StreamIdentification: streamIdentificationOrDefault(ch.StreamIdentification),
 			})
 		}
 		return tx.Create(&models).Error
@@ -397,6 +398,27 @@ func (r *ChannelRepository) DeleteByDevice(deviceID string) error {
 func (r *ChannelRepository) ChangeAudio(channelID int, audio bool) error {
 	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", channelID).
 		Update("has_audio", audio).Error
+}
+
+// UpdateStreamIdentification 单通道(id>0)按主键更新；否则按设备(deviceID)批量更新。
+func (r *ChannelRepository) UpdateStreamIdentification(id int, deviceID string, value string) error {
+	q := r.db.Model(&model.GBDeviceChannel{})
+	if id > 0 {
+		q = q.Where("id = ?", id)
+	} else if deviceID != "" {
+		q = q.Where("device_id = ?", deviceID)
+	} else {
+		return nil
+	}
+	return q.Update("stream_identification", value).Error
+}
+
+// streamIdentificationOrDefault 目录同步建通道时的默认码流类型：默认主码流。
+func streamIdentificationOrDefault(v string) string {
+	if strings.TrimSpace(v) == "" {
+		return "stream:0"
+	}
+	return strings.TrimSpace(v)
 }
 
 func (r *ChannelRepository) CountCommonByIDs(channelIDs []int) (int64, error) {
@@ -667,25 +689,26 @@ func toDomainChannel(m *model.GBDeviceChannel) *domainchannel.Channel {
 		bizGroup = strings.TrimSpace(m.BusinessGroupID)
 	}
 	return &domainchannel.Channel{
-		ID:              m.ID,
-		InternalCode:    m.InternalCode,
-		DeviceID:        m.DeviceID,
-		DataType:        m.DataType,
-		DataDeviceID:    m.DataDeviceID,
-		GBDeviceID:      strings.TrimSpace(m.GBDeviceID),
-		Name:            name,
-		Manufacturer:    m.Manufacturer,
-		Model:           m.Model,
-		Status:          status,
-		PTZType:         ptz,
-		Parental:        m.Parental,
-		ParentID:        parentID,
-		BusinessGroupID: bizGroup,
-		Longitude:       lon,
-		Latitude:        lat,
-		HasAudio:        m.HasAudio,
-		SubCount:        m.SubCount,
-		CreateTime:      m.CreateTime,
-		UpdateTime:      m.UpdateTime,
+		ID:                   m.ID,
+		InternalCode:         m.InternalCode,
+		DeviceID:             m.DeviceID,
+		DataType:             m.DataType,
+		DataDeviceID:         m.DataDeviceID,
+		GBDeviceID:           strings.TrimSpace(m.GBDeviceID),
+		Name:                 name,
+		Manufacturer:         m.Manufacturer,
+		Model:                m.Model,
+		Status:               status,
+		PTZType:              ptz,
+		Parental:             m.Parental,
+		ParentID:             parentID,
+		BusinessGroupID:      bizGroup,
+		Longitude:            lon,
+		Latitude:             lat,
+		HasAudio:             m.HasAudio,
+		SubCount:             m.SubCount,
+		StreamIdentification: strings.TrimSpace(m.StreamIdentification),
+		CreateTime:           m.CreateTime,
+		UpdateTime:           m.UpdateTime,
 	}
 }

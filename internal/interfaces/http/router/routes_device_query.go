@@ -24,6 +24,7 @@ func registerDeviceQuery(parent *gin.RouterGroup, deviceHandler *handler.DeviceH
 	g.GET("/statistics/keepalive", deviceHandler.KeepaliveStatistics)
 	g.GET("/statistics/register", deviceHandler.RegisterStatistics)
 	g.POST("/channel/audio", deviceHandler.ChangeChannelAudio)
+	g.POST("/channel/stream/identification/update", deviceHandler.ChangeChannelStreamIdentification)
 	g.GET("/snap/:deviceId/:channelId", snapHandler.GetChannelSnap)
 	g.POST("/snap/:deviceId/:channelId", snapHandler.UploadChannelSnap)
 }

@@ -53,10 +53,6 @@
             <el-option label="stream:1(子码流)" value="stream:1" />
             <el-option label="streamnumber:0(主码流-2022)" value="streamnumber:0" />
             <el-option label="streamnumber:1(子码流-2022)" value="streamnumber:1" />
-            <el-option label="streamprofile:0(主码流-大华)" value="streamprofile:0" />
-            <el-option label="streamprofile:1(子码流-大华)" value="streamprofile:1" />
-            <el-option label="streamMode:MAIN(主码流-水星+TP-LINK)" value="streamMode:MAIN" />
-            <el-option label="streamMode:SUB(子码流-水星+TP-LINK)" value="streamMode:SUB" />
           </el-select>
         </el-form-item>
         <el-form-item style="float: right;">
@@ -91,10 +87,6 @@
               <el-option label="stream:1(子码流)" value="stream:1" />
               <el-option label="streamnumber:0(主码流-2022)" value="streamnumber:0" />
               <el-option label="streamnumber:1(子码流-2022)" value="streamnumber:1" />
-              <el-option label="streamprofile:0(主码流-大华)" value="streamprofile:0" />
-              <el-option label="streamprofile:1(子码流-大华)" value="streamprofile:1" />
-              <el-option label="streamMode:MAIN(主码流-水星+TP-LINK)" value="streamMode:MAIN" />
-              <el-option label="streamMode:SUB(子码流-水星+TP-LINK)" value="streamMode:SUB" />
             </el-select>
           </template>
         </el-table-column>

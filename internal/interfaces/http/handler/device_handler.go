@@ -328,6 +328,27 @@ func (h *DeviceHandler) ChangeChannelAudio(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// ChangeChannelStreamIdentification 设置/重置通道码流类型（主/子码流）。
+func (h *DeviceHandler) ChangeChannelStreamIdentification(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Query("id"))
+	if id == 0 {
+		id, _ = strconv.Atoi(c.PostForm("id"))
+	}
+	value := c.Query("streamIdentification")
+	if value == "" {
+		value = c.PostForm("streamIdentification")
+	}
+	deviceKey := c.Query("deviceDbId")
+	if deviceKey == "" {
+		deviceKey = c.PostForm("deviceDbId")
+	}
+	if err := h.svc.ChangeChannelStreamIdentification(id, deviceKey, value); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
 func parseIntQuery(c *gin.Context, key string, def int) int {
 	v, err := strconv.Atoi(c.DefaultQuery(key, strconv.Itoa(def)))
 	if err != nil {

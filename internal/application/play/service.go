@@ -3,6 +3,7 @@ package playapp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -160,8 +161,8 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 	s.media.BindStream(node.ID(), app, stream)
 
 	ssrc := gbsip.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
-	sdp := gbsip.BuildPlaySDP(device.DeviceID, sdpIP, rtpPort, ssrc, streamMode, "")
-	applog.Debugf("[GB28181 play 3/6] SDP ready ssrc=%s streamMode=%s port=%d", ssrc, streamMode, rtpPort)
+	sdp := gbsip.BuildPlaySDP(device.DeviceID, sdpIP, rtpPort, ssrc, streamMode, streamIdentificationForSDP(channel.StreamIdentification))
+	applog.Debugf("[GB28181 play 3/6] SDP ready ssrc=%s streamMode=%s port=%d streamIdent=%s", ssrc, streamMode, rtpPort, channel.StreamIdentification)
 
 	go func() {
 		applog.Debugf("[GB28181 play 4/6] SIP INVITE -> %s:%d channel=%s Subject SSRC=%s streamMode=%s",
@@ -275,6 +276,17 @@ func (s *Service) nextSSRCSeq() int {
 
 func streamKey(app, stream string) string {
 	return app + "/" + stream
+}
+
+// streamIdentificationForSDP 把通道码流类型映射为点播 SDP 的 a= 属性值。
+// 主码流(stream:0/streamnumber:0)是设备默认，不下发属性以保持原有行为；
+// 仅当选择子码流等非主码流时才下发 a=<ident>。
+func streamIdentificationForSDP(v string) string {
+	switch strings.TrimSpace(v) {
+	case "", "stream:0", "streamnumber:0":
+		return ""
+	}
+	return strings.TrimSpace(v)
 }
 
 func streamModeToTCP(mode string) int {
