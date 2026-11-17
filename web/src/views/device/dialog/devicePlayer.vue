@@ -16,9 +16,7 @@
         <span class="vms-player-select">
           播放器:
           <el-select v-model="selectedPlayer" size="mini" style="width: 120px" @change="onPlayerChange">
-            <el-option label="Jessibuca" value="jessibuca" />
-            <el-option label="WebRTC" value="webRTC" />
-            <el-option label="H265web" value="h265web" />
+            <el-option v-for="p in availablePlayers" :key="p.key" :label="p.label" :value="p.key" />
           </el-select>
         </span>
       </div>
@@ -82,6 +80,7 @@
               :app="app"
               :stream="streamId"
               :media-server-id="mediaServerId"
+              @info="onMediaInfo"
             />
           </div>
 
@@ -106,6 +105,7 @@ import devicePtzPanel from '../common/devicePtzPanel.vue'
 import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
 import streamMediaPanel from '../../common/streamMediaPanel.vue'
+import { resolvePlayerStrategy, PLAYER_LABELS } from '@/utils/playerStrategy'
 
 function isDomeCamera(ptzType) {
   const t = Number(ptzType)
@@ -151,6 +151,26 @@ export default {
     },
     isStreaming() {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
+    },
+    /** 当前码流/能力下可用的播放器（用户可见文案），用于顶部播放器下拉过滤 */
+    availablePlayers() {
+      const s = this.streamInfo
+      const strategy = resolvePlayerStrategy({
+        videoCodec: s && s.videoCodec,
+        audioCodec: s && s.audioCodec,
+        hasAudio: this.hasAudio,
+        rtcAvailable: !!(s && (s.rtc || s.rtcs))
+      })
+      return strategy.allowedPlayers.map(key => ({ key, label: PLAYER_LABELS[key] || key }))
+    }
+  },
+  watch: {
+    // 可用播放器随码流能力变化：若当前选择已不可用，切到列表首个
+    availablePlayers(list) {
+      if (!list || !list.length) return
+      if (!list.some(p => p.key === this.selectedPlayer)) {
+        this.selectedPlayer = list[0].key
+      }
     }
   },
   methods: {
@@ -164,6 +184,19 @@ export default {
     extraTabClick() {},
     refreshMediaInfo() {
       this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo()
+    },
+    /** media_info 轮询到编码后，交给播放器做“纠正式”切换（如发现 H265 自动切到高清播放器） */
+    onMediaInfo(info) {
+      if (!info) return
+      if (this.streamInfo && (info.videoCodec || info.audioCodec)) {
+        this.streamInfo = Object.assign({}, this.streamInfo, {
+          videoCodec: info.videoCodec || this.streamInfo.videoCodec,
+          audioCodec: info.audioCodec || this.streamInfo.audioCodec
+        })
+      }
+      if (this.$refs.playerTabs && this.$refs.playerTabs.updateCodec) {
+        this.$refs.playerTabs.updateCodec({ videoCodec: info.videoCodec, audioCodec: info.audioCodec })
+      }
     },
     openDialog(tab, deviceId, channelId, param) {
       if (this.showVideoDialog) return

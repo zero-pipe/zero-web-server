@@ -42,6 +42,13 @@
 import jessibucaPlayer from './jessibuca.vue'
 import rtcPlayer from './rtcPlayer.vue'
 import h265web from './h265web.vue'
+import { resolvePlayerStrategy, PLAYER_LABELS, normalizeVideoCodec } from '@/utils/playerStrategy'
+
+const URL_KEYS = {
+  jessibuca: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
+  h265web: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
+  webRTC: ['rtc', 'rtcs']
+}
 
 export default {
   name: 'PlayerTabs',
@@ -50,35 +57,41 @@ export default {
     hasAudio: { type: Boolean, default: false },
     showButton: { type: Boolean, default: true },
     showTab: { type: Boolean, default: true },
-    /** 限定可用播放器，如 ['jessibuca'] 或 ['h265web'] */
+    /** 限定可用播放器（覆盖策略），如 ['jessibuca'] */
     allowedPlayers: { type: Array, default: null },
     /** 覆盖默认 URL 优先级，如 ['flv','ws_flv'] */
     urlPriority: { type: Array, default: null },
-    /** 首选播放器，如 jessibuca / h265web / webRTC */
+    /** 首选播放器（覆盖策略），如 jessibuca / h265web / webRTC */
     preferredPlayer: { type: String, default: '' }
   },
   data() {
     return {
       streamInfo: null,
-      activePlayer: 'jessibuca',
-      player: {
-        jessibuca: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
-        webRTC: ['rtc', 'rtcs'],
-        h265web: ['flv', 'https_flv', 'ws_flv', 'wss_flv']
-      },
-      allPlayerList: [
-        { key: 'jessibuca', label: 'Jessibuca' },
-        { key: 'webRTC', label: 'WebRTC' },
-        { key: 'h265web', label: 'H265web' }
-      ]
+      activePlayer: 'jessibuca'
     }
   },
   computed: {
-    playerList() {
+    /** ZMS 是否具备 WebRTC 能力：点播结果带 rtc/rtcs 即代表可用 */
+    rtcAvailable() {
+      const s = this.streamInfo
+      return !!(s && (s.rtc || s.rtcs))
+    },
+    strategy() {
+      return resolvePlayerStrategy({
+        videoCodec: this.resolveVideoCodec(this.streamInfo),
+        audioCodec: this.resolveAudioCodec(this.streamInfo),
+        hasAudio: this.hasAudio,
+        rtcAvailable: this.rtcAvailable
+      })
+    },
+    allowedKeys() {
       if (this.allowedPlayers && this.allowedPlayers.length) {
-        return this.allPlayerList.filter(p => this.allowedPlayers.includes(p.key))
+        return this.allowedPlayers
       }
-      return this.allPlayerList
+      return this.strategy.allowedPlayers
+    },
+    playerList() {
+      return this.allowedKeys.map(key => ({ key, label: PLAYER_LABELS[key] || key }))
     },
     playerCount() {
       return this.playerList.length
@@ -103,37 +116,6 @@ export default {
         this.play()
       }
     },
-    getUrlByStreamInfo() {
-      if (!this.streamInfo) return ''
-      // WebRTC 只用 rtc/rtcs，避免 urlPriority 把 FLV 塞进来导致「ZMS 看不到 webrtc 请求」
-      if (this.activePlayer === 'webRTC') {
-        const keys = this.player.webRTC
-        const secure = location.protocol === 'https:'
-        const ordered = secure ? [keys[1], keys[0]].filter(Boolean) : keys
-        for (let i = 0; i < ordered.length; i++) {
-          const url = this.streamInfo[ordered[i]]
-          if (url) return url
-        }
-        return ''
-      }
-      if (this.urlPriority && this.urlPriority.length) {
-        for (let i = 0; i < this.urlPriority.length; i++) {
-          const url = this.streamInfo[this.urlPriority[i]]
-          if (url) return url
-        }
-      }
-      const keys = this.player[this.activePlayer]
-      if (!keys || !keys.length) return ''
-      const secure = location.protocol === 'https:'
-      const ordered = secure
-        ? [keys[1], keys[0], keys[3], keys[2]].filter(Boolean)
-        : keys
-      for (let i = 0; i < ordered.length; i++) {
-        const url = this.streamInfo[ordered[i]]
-        if (url) return url
-      }
-      return ''
-    },
     resolveVideoCodec(streamInfo) {
       if (!streamInfo) return ''
       const direct = streamInfo.videoCodec || ''
@@ -141,16 +123,44 @@ export default {
       const nested = streamInfo.mediaInfo && streamInfo.mediaInfo.videoCodec
       return nested ? String(nested).toUpperCase() : ''
     },
-    isH265Codec(codec) {
-      return codec === 'H265' || codec === 'HEVC' || codec.indexOf('265') >= 0
+    resolveAudioCodec(streamInfo) {
+      if (!streamInfo) return ''
+      const direct = streamInfo.audioCodec || ''
+      if (direct) return String(direct).toUpperCase()
+      const nested = streamInfo.mediaInfo && streamInfo.mediaInfo.audioCodec
+      return nested ? String(nested).toUpperCase() : ''
     },
-    warnIfPlayerMismatch(playerKey) {
-      const codec = this.resolveVideoCodec(this.streamInfo)
-      if (playerKey === 'jessibuca' && this.isH265Codec(codec)) {
-        this.$message.warning('当前为 H265 编码，Jessibuca 无法播放，请使用 H265web')
-        return true
+    isH265Codec(codec) {
+      return normalizeVideoCodec(codec) === 'H265'
+    },
+    /** 依据策略决定当前播放器：优先策略首选，其次默认第一个可用 */
+    ensureActivePlayer() {
+      const pref = this.preferredPlayer && this.allowedKeys.includes(this.preferredPlayer)
+        ? this.preferredPlayer
+        : (this.allowedKeys.includes(this.strategy.preferredPlayer)
+          ? this.strategy.preferredPlayer
+          : this.allowedKeys[0])
+      this.activePlayer = pref || 'jessibuca'
+    },
+    /** URL 优先级：props 覆盖 > 策略（RTC 播放器强制只用 rtc） */
+    resolveUrlKeyOrder() {
+      if (this.activePlayer === 'webRTC') {
+        const secure = location.protocol === 'https:'
+        return secure ? ['rtcs', 'rtc'].filter(Boolean) : ['rtc']
       }
-      return false
+      if (this.urlPriority && this.urlPriority.length) {
+        return this.urlPriority
+      }
+      return URL_KEYS[this.activePlayer] || URL_KEYS.jessibuca
+    },
+    getUrlByStreamInfo() {
+      if (!this.streamInfo) return ''
+      const keys = this.resolveUrlKeyOrder()
+      for (let i = 0; i < keys.length; i++) {
+        const url = this.streamInfo[keys[i]]
+        if (url) return url
+      }
+      return ''
     },
     invokePlayerPlay(playUrl, retries) {
       const player = this.$refs[this.activePlayer]
@@ -162,30 +172,12 @@ export default {
         setTimeout(() => this.invokePlayerPlay(playUrl, retries - 1), 80)
       }
     },
-    applyPreferredPlayer() {
-      if (this.preferredPlayer && this.playerList.some(p => p.key === this.preferredPlayer)) {
-        this.activePlayer = this.preferredPlayer
-        return
-      }
-      this.selectPlayerForStream(this.streamInfo)
-    },
-    selectPlayerForStream(streamInfo) {
-      const codec = this.resolveVideoCodec(streamInfo)
-      if (this.isH265Codec(codec)) {
-        this.activePlayer = 'h265web'
-        return
-      }
-      if (codec === 'H264' || codec === 'AVC') {
-        this.activePlayer = 'jessibuca'
-      }
-    },
     changePlayer(tab) {
       const prev = this.activePlayer
       this.activePlayer = tab.name
       if (prev !== tab.name && this.$refs[prev] && this.$refs[prev].pause) {
         this.$refs[prev].pause()
       }
-      this.warnIfPlayerMismatch(tab.name)
       this.$nextTick(() => {
         this.play()
         this.syncPlayerSize()
@@ -203,7 +195,7 @@ export default {
     },
     setStreamInfo(streamInfo) {
       this.streamInfo = streamInfo
-      this.applyPreferredPlayer()
+      this.ensureActivePlayer()
       // 分屏首次从「无信号」切到播放器时，等 DOM/布局完成再播，避免 Jessibuca 黑屏
       this.$nextTick(() => {
         requestAnimationFrame(() => {
@@ -213,13 +205,40 @@ export default {
         })
       })
     },
+    /**
+     * 编码信息到达（如 media_info 轮询）：合并进 streamInfo，并做“纠正式”切换——
+     * 仅当当前播放器已不在可用列表（例如发现是 H265 而正在用 Jessibuca）才自动切换，避免打扰。
+     * @param {{videoCodec?:string, audioCodec?:string}} info
+     */
+    updateCodec(info) {
+      if (!info) return
+      const v = info.videoCodec || ''
+      const a = info.audioCodec || ''
+      if (!v && !a) return
+      this.streamInfo = Object.assign({}, this.streamInfo || {}, {
+        videoCodec: v || (this.streamInfo && this.streamInfo.videoCodec),
+        audioCodec: a || (this.streamInfo && this.streamInfo.audioCodec)
+      })
+      if (!this.allowedKeys.includes(this.activePlayer)) {
+        const next = this.allowedKeys.includes(this.strategy.preferredPlayer)
+          ? this.strategy.preferredPlayer
+          : this.allowedKeys[0]
+        if (next && next !== this.activePlayer) {
+          const prev = this.activePlayer
+          this.activePlayer = next
+          if (this.$refs[prev] && this.$refs[prev].pause) this.$refs[prev].pause()
+          this.$nextTick(() => {
+            this.play()
+            this.syncPlayerSize()
+          })
+          this.$emit('player-changed', this.activePlayer)
+        }
+      }
+    },
     play() {
       const playUrl = this.getUrlByStreamInfo()
       if (!playUrl) {
         console.warn('[PlayerTabs] empty play url, activePlayer=', this.activePlayer)
-        if (this.activePlayer === 'webRTC') {
-          this.$message.error('WebRTC 播放地址为空，请确认点播接口返回 rtc 字段')
-        }
         return
       }
       setTimeout(() => {

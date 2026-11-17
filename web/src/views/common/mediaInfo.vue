@@ -96,6 +96,7 @@ export default {
       })
         .then(data => {
           this.info = data || {}
+          this.$emit('info', this.info)
         })
         .catch(() => {})
     },
