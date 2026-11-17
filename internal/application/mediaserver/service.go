@@ -10,6 +10,7 @@ import (
 	domainmediaserver "zero-web-server/internal/domain/mediaserver"
 	"zero-web-server/internal/infrastructure/config"
 	"zero-web-server/internal/mediakit"
+	applog "zero-web-server/pkg/log"
 )
 
 // View 媒体节点列表/详情视图。
@@ -22,13 +23,28 @@ type View struct {
 	HTTPPort      int    `json:"httpPort"`
 	HTTPSSLPort   int    `json:"httpSSlPort"`
 	RTMPPort      int    `json:"rtmpPort"`
+	RTMPSSLPort   int    `json:"rtmpSslPort"`
 	RTSPPort      int    `json:"rtspPort"`
+	RTSPSSLPort   int    `json:"rtspSslPort"`
+	SRTPort       int    `json:"srtPort"`
 	RTPProxyPort  int    `json:"rtpProxyPort"`
+	WebRTCPortMin int    `json:"webrtcPortMin"`
+	WebRTCPortMax int    `json:"webrtcPortMax"`
+
+	CapabilitiesReported bool `json:"capabilitiesReported"`
+	EnableRTSP           bool `json:"enableRtsp"`
+	EnableRTMP           bool `json:"enableRtmp"`
+	EnableHLS            bool `json:"enableHls"`
+	EnableSRT            bool `json:"enableSrt"`
+	EnableWebRTC         bool `json:"enableWebrtc"`
+
 	Secret        string `json:"secret"`
 	Type          string `json:"type"`
+	Version       string `json:"version,omitempty"`
 	DefaultServer bool   `json:"defaultServer"`
 	Online        bool   `json:"status"`
 	Load          int64  `json:"load"`
+	LastSeen      int64  `json:"lastSeen"`
 	CreateTime    string `json:"createTime"`
 }
 
@@ -63,11 +79,25 @@ func (n *Node) MediaConfig() config.MediaConfig {
 
 func ToMediaConfig(m domainmediaserver.MediaServer) config.MediaConfig {
 	return config.MediaConfig{
-		ID:       m.ID,
-		Type:     m.Type,
-		IP:       firstNonEmpty(m.StreamIP, m.IP),
-		HTTPPort: m.HTTPPort,
-		Secret:   m.Secret,
+		ID:                   m.ID,
+		Type:                 m.Type,
+		IP:                   firstNonEmpty(m.StreamIP, m.IP),
+		HTTPPort:             m.HTTPPort,
+		HTTPSSLPort:          m.HTTPSSLPort,
+		RTSPPort:             m.RTSPPort,
+		RTSPSSLPort:          m.RTSPSSLPort,
+		RTMPPort:             m.RTMPPort,
+		RTMPSSLPort:          m.RTMPSSLPort,
+		SRTPort:              m.SRTPort,
+		WebRTCPortMin:        m.WebRTCPortMin,
+		WebRTCPortMax:        m.WebRTCPortMax,
+		CapabilitiesReported: m.CapabilitiesReported,
+		EnableRTSP:           m.EnableRTSP,
+		EnableRTMP:           m.EnableRTMP,
+		EnableHLS:            m.EnableHLS,
+		EnableSRT:            m.EnableSRT,
+		EnableWebRTC:         m.EnableWebRTC,
+		Secret:               m.Secret,
 	}
 }
 
@@ -167,6 +197,119 @@ func (s *Service) Check(ip string, port int, secret string) (*View, error) {
 		Type:         "zms",
 		Online:       true,
 	}, nil
+}
+
+// RegisterRequest 是 ZMS 启动/心跳时上报的自注册信息（含端口与协议能力）。
+type RegisterRequest struct {
+	MediaServerID string `json:"mediaServerId"`
+	Version       string `json:"version"`
+	IP            string `json:"ip"`
+	HookIP        string `json:"hookIp"`
+	SDPIP         string `json:"sdpIp"`
+	StreamIP      string `json:"streamIp"`
+	Secret        string `json:"secret"`
+
+	HTTPPort      int `json:"httpPort"`
+	HTTPSSLPort   int `json:"httpSslPort"`
+	RTSPPort      int `json:"rtspPort"`
+	RTSPSSLPort   int `json:"rtspSslPort"`
+	RTMPPort      int `json:"rtmpPort"`
+	RTMPSSLPort   int `json:"rtmpSslPort"`
+	SRTPort       int `json:"srtPort"`
+	WebRTCPortMin int `json:"webrtcPortMin"`
+	WebRTCPortMax int `json:"webrtcPortMax"`
+
+	EnableRTSP   bool `json:"enableRtsp"`
+	EnableRTMP   bool `json:"enableRtmp"`
+	EnableHLS    bool `json:"enableHls"`
+	EnableSRT    bool `json:"enableSrt"`
+	EnableWebRTC bool `json:"enableWebrtc"`
+}
+
+// Register 由媒体服务器自注册（/index/hook/on_server_started|on_server_keepalive）：
+// 幂等 upsert 节点，记录上报端口与协议能力，并立即标记在线。不要求节点可 Ping——
+// 该请求本就来自节点进程。返回规范化后的节点 ID。
+func (s *Service) Register(ctx context.Context, req RegisterRequest) (string, error) {
+	ip := strings.TrimSpace(firstNonEmpty(req.StreamIP, req.IP))
+	if ip == "" {
+		return "", fmt.Errorf("自注册缺少 ip")
+	}
+	if req.HTTPPort <= 0 {
+		return "", fmt.Errorf("自注册缺少 httpPort")
+	}
+	id := fmt.Sprintf("%s:%d", ip, req.HTTPPort)
+
+	m := &domainmediaserver.MediaServer{
+		ID:                   id,
+		IP:                   ip,
+		HookIP:               firstNonEmpty(req.HookIP, ip),
+		SDPIP:                firstNonEmpty(req.SDPIP, ip),
+		StreamIP:             firstNonEmpty(req.StreamIP, ip),
+		HTTPPort:             req.HTTPPort,
+		HTTPSSLPort:          req.HTTPSSLPort,
+		RTSPPort:             req.RTSPPort,
+		RTSPSSLPort:          req.RTSPSSLPort,
+		RTMPPort:             req.RTMPPort,
+		RTMPSSLPort:          req.RTMPSSLPort,
+		SRTPort:              req.SRTPort,
+		WebRTCPortMin:        req.WebRTCPortMin,
+		WebRTCPortMax:        req.WebRTCPortMax,
+		CapabilitiesReported: true,
+		EnableRTSP:           req.EnableRTSP,
+		EnableRTMP:           req.EnableRTMP,
+		EnableHLS:            req.EnableHLS,
+		EnableSRT:            req.EnableSRT,
+		EnableWebRTC:         req.EnableWebRTC,
+		Secret:               req.Secret,
+		Type:                 "zms",
+		Version:              req.Version,
+		LastSeen:             time.Now().UnixMilli(),
+	}
+	if m.RTSPPort <= 0 {
+		m.RTSPPort = 8554
+	}
+	if m.RTMPPort <= 0 {
+		m.RTMPPort = 1935
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	m.UpdateTime = now
+	if existing, err := s.repo.GetByID(id); err == nil && existing != nil {
+		m.CreateTime = existing.CreateTime
+		if m.ServerID == "" {
+			m.ServerID = existing.ServerID
+		}
+	} else {
+		m.CreateTime = now
+	}
+	if m.ServerID == "" {
+		m.ServerID = s.serverID
+	}
+
+	if err := s.repo.Save(m); err != nil {
+		return "", err
+	}
+	s.mu.Lock()
+	s.onlineAt[id] = time.Now()
+	s.onlineOK[id] = true
+	s.mu.Unlock()
+	applog.Infof("[media] %s 自注册成功 ip=%s http=%d rtsp=%d(%v) rtmp=%d(%v) hls=%v webrtc=%v",
+		id, ip, m.HTTPPort, m.RTSPPort, m.EnableRTSP, m.RTMPPort, m.EnableRTMP, m.EnableHLS, m.EnableWebRTC)
+	return id, nil
+}
+
+// Touch 心跳：刷新节点的 LastSeen 与在线状态（不重写配置）。
+func (s *Service) Touch(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil
+	}
+	s.mu.Lock()
+	s.onlineAt[id] = time.Now()
+	s.onlineOK[id] = true
+	s.mu.Unlock()
+	_ = s.repo.UpdateLastSeen(id, time.Now().UnixMilli())
+	return nil
 }
 
 func (s *Service) Save(m *domainmediaserver.MediaServer) error {
@@ -473,9 +616,15 @@ func (s *Service) toView(m domainmediaserver.MediaServer, online bool) View {
 	return View{
 		ID: m.ID, IP: m.IP, HookIP: m.HookIP, SDPIP: m.SDPIP, StreamIP: m.StreamIP,
 		HTTPPort: m.HTTPPort, HTTPSSLPort: m.HTTPSSLPort,
-		RTMPPort: m.RTMPPort, RTSPPort: m.RTSPPort, RTPProxyPort: m.RTPProxyPort,
-		Secret: m.Secret, Type: m.Type, DefaultServer: m.DefaultServer,
-		Online: online, Load: s.GetLoad(m.ID), CreateTime: m.CreateTime,
+		RTMPPort: m.RTMPPort, RTMPSSLPort: m.RTMPSSLPort,
+		RTSPPort: m.RTSPPort, RTSPSSLPort: m.RTSPSSLPort,
+		SRTPort: m.SRTPort, RTPProxyPort: m.RTPProxyPort,
+		WebRTCPortMin: m.WebRTCPortMin, WebRTCPortMax: m.WebRTCPortMax,
+		CapabilitiesReported: m.CapabilitiesReported,
+		EnableRTSP:           m.EnableRTSP, EnableRTMP: m.EnableRTMP, EnableHLS: m.EnableHLS,
+		EnableSRT: m.EnableSRT, EnableWebRTC: m.EnableWebRTC,
+		Secret: m.Secret, Type: m.Type, Version: m.Version, DefaultServer: m.DefaultServer,
+		Online: online, Load: s.GetLoad(m.ID), LastSeen: m.LastSeen, CreateTime: m.CreateTime,
 	}
 }
 

@@ -78,6 +78,59 @@ type MediaConfig struct {
 	HTTPPort int            `mapstructure:"http_port"`
 	Secret   string         `mapstructure:"secret"`
 	RTP      MediaRTPConfig `mapstructure:"rtp"`
+
+	// 以下为节点自注册（ZMS 上报）的端口与能力；旧手工节点只填 IP+HTTPPort 时保持全开、端口走默认。
+	HTTPSSLPort   int `mapstructure:"http_ssl_port"`
+	RTSPPort      int `mapstructure:"rtsp_port"`
+	RTSPSSLPort   int `mapstructure:"rtsp_ssl_port"`
+	RTMPPort      int `mapstructure:"rtmp_port"`
+	RTMPSSLPort   int `mapstructure:"rtmp_ssl_port"`
+	SRTPort       int `mapstructure:"srt_port"`
+	WebRTCPortMin int `mapstructure:"webrtc_port_min"`
+	WebRTCPortMax int `mapstructure:"webrtc_port_max"`
+	// CapabilitiesReported 为 true 时，Enable* 才具备权威性；否则视为「全开」以兼容旧数据。
+	CapabilitiesReported bool `mapstructure:"capabilities_reported"`
+	EnableRTSP           bool `mapstructure:"enable_rtsp"`
+	EnableRTMP           bool `mapstructure:"enable_rtmp"`
+	EnableHLS            bool `mapstructure:"enable_hls"`
+	EnableSRT            bool `mapstructure:"enable_srt"`
+	EnableWebRTC         bool `mapstructure:"enable_webrtc"`
+}
+
+// RTSPAvailable 该节点是否提供 RTSP 播放（旧节点默认可用）。
+func (c MediaConfig) RTSPAvailable() bool {
+	return !c.CapabilitiesReported || c.EnableRTSP
+}
+
+// RTMPAvailable 该节点是否提供 RTMP 播放（旧节点默认可用）。
+func (c MediaConfig) RTMPAvailable() bool {
+	return !c.CapabilitiesReported || c.EnableRTMP
+}
+
+// HLSAvailable 该节点是否提供 HLS（旧节点默认可用）。
+func (c MediaConfig) HLSAvailable() bool {
+	return !c.CapabilitiesReported || c.EnableHLS
+}
+
+// WebRTCAvailable 该节点是否提供 WebRTC（旧节点默认可用）。
+func (c MediaConfig) WebRTCAvailable() bool {
+	return !c.CapabilitiesReported || c.EnableWebRTC
+}
+
+// RTSPPlayPort RTSP 播放端口（未上报时回退 8554）。
+func (c MediaConfig) RTSPPlayPort() int {
+	if c.RTSPPort > 0 {
+		return c.RTSPPort
+	}
+	return 8554
+}
+
+// RTMPPlayPort RTMP 播放端口（未上报时回退 1935）。
+func (c MediaConfig) RTMPPlayPort() int {
+	if c.RTMPPort > 0 {
+		return c.RTMPPort
+	}
+	return 1935
 }
 
 func (c MediaConfig) BackendType() string {

@@ -46,6 +46,11 @@ func (r *MediaServerRepository) Delete(id string) error {
 	return r.db.Delete(&model.MediaServer{}, "id = ?", id).Error
 }
 
+func (r *MediaServerRepository) UpdateLastSeen(id string, ts int64) error {
+	return r.db.Model(&model.MediaServer{}).Where("id = ?", id).
+		Update("last_seen", ts).Error
+}
+
 func (r *MediaServerRepository) ClearDefaultExcept(id string) error {
 	return r.db.Model(&model.MediaServer{}).Where("id <> ?", id).
 		Update("default_server", false).Error
@@ -71,20 +76,36 @@ func (r *MediaServerRepository) GetDefault() (*model.MediaServer, error) {
 func toModelMediaServer(d *domainmediaserver.MediaServer) *model.MediaServer {
 	return &model.MediaServer{
 		ID: d.ID, IP: d.IP, HookIP: d.HookIP, SDPIP: d.SDPIP, StreamIP: d.StreamIP,
-		HTTPPort: d.HTTPPort, HTTPSSLPort: d.HTTPSSLPort, RTMPPort: d.RTMPPort,
-		RTSPPort: d.RTSPPort, RTPProxyPort: d.RTPProxyPort, Secret: d.Secret,
-		Type: d.Type, DefaultServer: d.DefaultServer, HookAliveInterval: d.HookAliveInterval,
-		CreateTime: d.CreateTime, UpdateTime: d.UpdateTime, ServerID: d.ServerID,
+		HTTPPort: d.HTTPPort, HTTPSSLPort: d.HTTPSSLPort,
+		RTMPPort: d.RTMPPort, RTMPSSLPort: d.RTMPSSLPort,
+		RTSPPort: d.RTSPPort, RTSPSSLPort: d.RTSPSSLPort,
+		SRTPort: d.SRTPort, RTPProxyPort: d.RTPProxyPort,
+		WebRTCPortMin: d.WebRTCPortMin, WebRTCPortMax: d.WebRTCPortMax,
+		CapabilitiesReported: d.CapabilitiesReported,
+		EnableRTSP:           d.EnableRTSP, EnableRTMP: d.EnableRTMP, EnableHLS: d.EnableHLS,
+		EnableSRT: d.EnableSRT, EnableWebRTC: d.EnableWebRTC,
+		Secret: d.Secret, Type: d.Type, Version: d.Version,
+		DefaultServer: d.DefaultServer, HookAliveInterval: d.HookAliveInterval,
+		LastSeen: d.LastSeen, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
+		ServerID: d.ServerID,
 	}
 }
 
 func toDomainMediaServer(m *model.MediaServer) *domainmediaserver.MediaServer {
 	return &domainmediaserver.MediaServer{
 		ID: m.ID, IP: m.IP, HookIP: m.HookIP, SDPIP: m.SDPIP, StreamIP: m.StreamIP,
-		HTTPPort: m.HTTPPort, HTTPSSLPort: m.HTTPSSLPort, RTMPPort: m.RTMPPort,
-		RTSPPort: m.RTSPPort, RTPProxyPort: m.RTPProxyPort, Secret: m.Secret,
-		Type: m.Type, DefaultServer: m.DefaultServer, HookAliveInterval: m.HookAliveInterval,
-		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime, ServerID: m.ServerID,
+		HTTPPort: m.HTTPPort, HTTPSSLPort: m.HTTPSSLPort,
+		RTMPPort: m.RTMPPort, RTMPSSLPort: m.RTMPSSLPort,
+		RTSPPort: m.RTSPPort, RTSPSSLPort: m.RTSPSSLPort,
+		SRTPort: m.SRTPort, RTPProxyPort: m.RTPProxyPort,
+		WebRTCPortMin: m.WebRTCPortMin, WebRTCPortMax: m.WebRTCPortMax,
+		CapabilitiesReported: m.CapabilitiesReported,
+		EnableRTSP:           m.EnableRTSP, EnableRTMP: m.EnableRTMP, EnableHLS: m.EnableHLS,
+		EnableSRT: m.EnableSRT, EnableWebRTC: m.EnableWebRTC,
+		Secret: m.Secret, Type: m.Type, Version: m.Version,
+		DefaultServer: m.DefaultServer, HookAliveInterval: m.HookAliveInterval,
+		LastSeen: m.LastSeen, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+		ServerID: m.ServerID,
 	}
 }
 

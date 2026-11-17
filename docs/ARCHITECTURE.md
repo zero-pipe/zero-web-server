@@ -44,6 +44,8 @@ sql/                  建表脚本
 
 ZMS 通过 `/index/hook/*` 回调平台（`on_publish`、`on_stream_changed`、`on_record_mp4` 等）。`interfaces/hook` 将事件分发给 `StreamNotifier` 列表（点播/回放/云录/推流/代理/录像计划）。
 
+**媒体节点自注册**：ZMS 启动时向 `/index/hook/on_server_started` 上报本节点地址、各协议实际监听端口、协议能力（`rtsp/rtmp/hls/srt/webrtc`）与 `[api] secret`；平台 `mediaserver.Service.Register` 幂等 upsert `zws_media_server`（`CapabilitiesReported=true`），无需页面手工添加。此后每 `keepalive_interval_sec` 秒向 `/index/hook/on_server_keepalive` 重发同样的注册体（自愈式补注册并刷新在线）。播放地址由 `mediakit.BuildPlayURLsForMedia` 依据上报端口与能力生成——关闭的协议不再产出对应 URL，RTSP/RTMP 使用真实端口而非硬编码。
+
 ## 错误处理
 
 应用服务返回 `internal/apperr.AppError{Code,Msg}`，handler 统一用 `response.FromError` 映射。码段：`10xxx` 通用、`11xxx` 设备、`12xxx` 媒体、`13xxx` 流、`14xxx` 存储、`15xxx` 用户、`16xxx` 级联、`17xxx` 分组；`401/403` 语义保持不变。

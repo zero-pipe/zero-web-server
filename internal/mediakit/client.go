@@ -365,7 +365,49 @@ func BuildPlayURLsForBackend(backend, mediaIP string, httpPort int, app, stream 
 }
 
 func BuildPlayURLsFromConfig(cfg config.MediaConfig, app, stream string) map[string]string {
-	return BuildPlayURLsForBackend(cfg.BackendType(), cfg.IP, cfg.HTTPPort, app, stream)
+	return BuildPlayURLsForMedia(cfg, app, stream)
+}
+
+// BuildPlayURLsForMedia 依据节点上报的端口与协议能力拼装播放地址：
+//   - 端口取节点实际上报值（RTSP/RTMP 未上报时回退 8554/1935）；
+//   - 未上报能力的旧节点视为全开；
+//   - 已上报且关闭的协议不生成对应 URL（如未开 HLS / RTSP 则不返回该键）。
+func BuildPlayURLsForMedia(cfg config.MediaConfig, app, stream string) map[string]string {
+	ip := cfg.IP
+	httpPort := cfg.HTTPPort
+	base := fmt.Sprintf("http://%s:%d", ip, httpPort)
+	out := make(map[string]string, 5)
+	if cfg.BackendType() == "zms" {
+		out["flv"] = fmt.Sprintf("%s/%s/%s.flv", base, app, stream)
+		out["ws"] = fmt.Sprintf("ws://%s:%d/%s/%s.flv", ip, httpPort, app, stream)
+		if cfg.HLSAvailable() {
+			out["hls"] = fmt.Sprintf("%s/%s/%s.m3u8", base, app, stream)
+		}
+		if cfg.RTSPAvailable() {
+			out["rtsp"] = fmt.Sprintf("rtsp://%s:%d/%s/%s", ip, cfg.RTSPPlayPort(), app, stream)
+		}
+		if cfg.RTMPAvailable() {
+			out["rtmp"] = fmt.Sprintf("rtmp://%s:%d/%s/%s", ip, cfg.RTMPPlayPort(), app, stream)
+		}
+		return out
+	}
+	// 非 zms 后端：保留历史路径形态，端口仍尽量用上报值。
+	out["flv"] = fmt.Sprintf("%s/%s/%s.live.flv", base, app, stream)
+	if cfg.HLSAvailable() {
+		out["hls"] = fmt.Sprintf("%s/%s/%s/hls.m3u8", base, app, stream)
+	}
+	out["ws"] = fmt.Sprintf("ws://%s:%d/%s/%s.live.flv", ip, httpPort, app, stream)
+	if cfg.RTSPAvailable() {
+		rtspPort := cfg.RTSPPort
+		if rtspPort <= 0 {
+			rtspPort = 554
+		}
+		out["rtsp"] = fmt.Sprintf("rtsp://%s:%d/%s/%s", ip, rtspPort, app, stream)
+	}
+	if cfg.RTMPAvailable() {
+		out["rtmp"] = fmt.Sprintf("rtmp://%s:%d/%s/%s", ip, cfg.RTMPPlayPort(), app, stream)
+	}
+	return out
 }
 
 // StreamPlayURLs 平台层播放地址（对齐 ZWS StreamContent 常用字段）。
@@ -377,11 +419,14 @@ type StreamPlayURLs struct {
 // WebRTC 的 host 使用媒体节点 streamIp（cfg.IP），切勿配置成 127.0.0.1，否则浏览器 ICE/画面会异常。
 func BuildStreamPlayURLs(cfg config.MediaConfig, app, stream string, webrtcPush bool, signalingPort int) StreamPlayURLs {
 	urls := BuildPlayURLsFromConfig(cfg, app, stream)
-	rtcBase := cfg.SignalingBaseURL(signalingPort)
-	if config.IsLoopbackHost(cfg.IP) {
-		applog.Warnf("[webrtc] media streamIp=%q is loopback; set 媒体节点「流IP」to LAN IP, and ZMS [webrtc] advertise_host", cfg.IP)
+	var rtc, rtcs string
+	if cfg.WebRTCAvailable() {
+		rtcBase := cfg.SignalingBaseURL(signalingPort)
+		if config.IsLoopbackHost(cfg.IP) {
+			applog.Warnf("[webrtc] media streamIp=%q is loopback; set 媒体节点「流IP」to LAN IP, and ZMS [webrtc] advertise_host", cfg.IP)
+		}
+		rtc, rtcs = BuildWebRTCURLs(rtcBase, app, stream, webrtcPush)
 	}
-	rtc, rtcs := BuildWebRTCURLs(rtcBase, app, stream, webrtcPush)
 	return StreamPlayURLs{
 		Flv:   urls["flv"],
 		WsFlv: urls["ws"],

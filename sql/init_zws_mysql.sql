@@ -196,7 +196,18 @@ CREATE TABLE IF NOT EXISTS zws_media_server
     record_path         VARCHAR(255) COMMENT '录像目录',
     record_day          INT               default 7 COMMENT '录像保留天数',
     transcode_suffix    VARCHAR(255) COMMENT '转码指令后缀',
-    server_id           VARCHAR(50) COMMENT '对应信令服务器ID'
+    server_id           VARCHAR(50) COMMENT '对应信令服务器ID',
+    srt_port            INT COMMENT 'SRT端口',
+    webrtc_port_min     INT COMMENT 'WebRTC ICE UDP 起始端口',
+    webrtc_port_max     INT COMMENT 'WebRTC ICE UDP 结束端口',
+    capabilities_reported TINYINT(1) DEFAULT 0 COMMENT '端口与能力是否由节点自注册上报',
+    enable_rtsp         TINYINT(1) DEFAULT 0 COMMENT '是否开启RTSP',
+    enable_rtmp         TINYINT(1) DEFAULT 0 COMMENT '是否开启RTMP',
+    enable_hls          TINYINT(1) DEFAULT 0 COMMENT '是否开启HLS',
+    enable_srt          TINYINT(1) DEFAULT 0 COMMENT '是否开启SRT',
+    enable_webrtc       TINYINT(1) DEFAULT 0 COMMENT '是否开启WebRTC',
+    version             VARCHAR(50) COMMENT '节点版本',
+    last_seen           BIGINT DEFAULT 0 COMMENT '最近一次注册/心跳时间(unix ms)'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 上级国标平台注册信息

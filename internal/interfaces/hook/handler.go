@@ -2,6 +2,7 @@ package hook
 
 import (
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
+	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
 	publishauth "zero-web-server/internal/application/publishauth"
@@ -26,6 +27,7 @@ type Handler struct {
 	streamProxy    *streamproxyapp.Service
 	recordPlan     *recordplanapp.Service
 	publishAuth    *publishauth.PublishAuth
+	mediaServer    *mediaserverapp.Service
 	streamOnDemand bool
 }
 
@@ -36,6 +38,7 @@ func NewHandler(
 	push *streampushapp.Service,
 	proxy *streamproxyapp.Service,
 	plan *recordplanapp.Service,
+	mediaServer *mediaserverapp.Service,
 	publishAuth *publishauth.PublishAuth,
 	streamOnDemand bool,
 ) *Handler {
@@ -48,6 +51,7 @@ func NewHandler(
 	return &Handler{
 		notifiers: notifiers, play: play, cloudRecord: cloud,
 		streamPush: push, streamProxy: proxy, recordPlan: plan,
+		mediaServer: mediaServer,
 		publishAuth: publishAuth, streamOnDemand: streamOnDemand,
 	}
 }
@@ -59,12 +63,53 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	r.POST("/on_stream_not_found", h.onStreamNotFound)
 	r.POST("/on_stream_none_reader", h.onStreamNoneReader)
 	r.POST("/on_record_mp4", h.onRecordMp4)
-	r.POST("/on_server_started", h.onOK)
-	r.POST("/on_server_keepalive", h.onOK)
+	r.POST("/on_server_started", h.onServerStarted)
+	r.POST("/on_server_keepalive", h.onServerKeepalive)
 }
 
+// onOK 应答媒体服务器期望的标准成功包。
 func (h *Handler) onOK(c *gin.Context) {
 	c.JSON(200, gin.H{"code": 0, "msg": "success"})
+}
+
+// onServerStarted 媒体服务器启动自注册：解析上报的端口/能力并 upsert 节点，
+// 免去页面手工添加媒体节点。payload 见 RegisterRequest。
+func (h *Handler) onServerStarted(c *gin.Context) {
+	if h.mediaServer == nil {
+		h.onOK(c)
+		return
+	}
+	var req mediaserverapp.RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		applog.Warnf("[media] on_server_started 解析失败 remote=%s err=%v", c.ClientIP(), err)
+		h.onOK(c)
+		return
+	}
+	id, err := h.mediaServer.Register(c.Request.Context(), req)
+	if err != nil {
+		applog.Warnf("[media] on_server_started 注册失败 remote=%s err=%v", c.ClientIP(), err)
+		h.onOK(c)
+		return
+	}
+	c.JSON(200, gin.H{"code": 0, "msg": "success", "mediaServerId": id})
+}
+
+// onServerKeepalive 媒体服务器心跳：刷新在线与 LastSeen；并可携带完整注册信息以便续注册。
+func (h *Handler) onServerKeepalive(c *gin.Context) {
+	if h.mediaServer == nil {
+		h.onOK(c)
+		return
+	}
+	var req mediaserverapp.RegisterRequest
+	if err := c.ShouldBindJSON(&req); err == nil && req.HTTPPort > 0 && (req.IP != "" || req.StreamIP != "") {
+		if id, err := h.mediaServer.Register(c.Request.Context(), req); err == nil {
+			c.JSON(200, gin.H{"code": 0, "msg": "success", "mediaServerId": id})
+			return
+		}
+	}
+	// 精简心跳：仅刷新 id（ZMS 正常会带完整注册体走上面的 Register 分支）。
+	_ = h.mediaServer.Touch(req.MediaServerID)
+	h.onOK(c)
 }
 
 func (h *Handler) onPublish(c *gin.Context) {

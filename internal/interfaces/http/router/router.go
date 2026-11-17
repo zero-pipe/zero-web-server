@@ -136,7 +136,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
-		deps.PublishAuth, deps.StreamOnDemand,
+		deps.MediaServerService, deps.PublishAuth, deps.StreamOnDemand,
 	)
 
 	r.GET("/health", healthHandler.Health)

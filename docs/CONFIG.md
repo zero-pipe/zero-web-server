@@ -73,7 +73,9 @@ Redis 不可用时服务仍可启动（设备缓存退化为空实现）。
 
 ## media（可选）
 
-媒体节点以数据库为准（页面“媒体节点”动态添加）；如需兼容旧部署，可取消 `media:` 段注释并填写 `ip` + `http_port` 作为兜底节点。
+媒体节点以数据库为准。ZMS 启动时会向平台自注册（`/index/hook/on_server_started`，随后周期心跳 `on_server_keepalive`），自动写入 `zws_media_server` 并上报端口与协议能力，无需页面手工添加；页面「媒体管理 → 媒体节点」仍可编辑/删除。如需兼容旧部署，可取消 `media:` 段注释并填写 `ip` + `http_port` 作为兜底节点。
+
+> 自注册依赖 ZMS `[hook] enable=1` 且配置 `on_server_started` / `on_server_keepalive` 地址；远程调用 ZMS API 需两端 `secret` 一致（ZMS `[api] secret` 随注册上报）。
 
 ## onvif
 

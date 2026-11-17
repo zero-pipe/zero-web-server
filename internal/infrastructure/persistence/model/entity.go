@@ -74,20 +74,35 @@ type OnvifChannel struct {
 func (OnvifChannel) TableName() string { return "zws_onvif_channel" }
 
 type MediaServer struct {
-	ID                string `gorm:"column:id;primaryKey;size:255" json:"id"`
-	IP                string `gorm:"column:ip;size:50" json:"ip"`
-	HookIP            string `gorm:"column:hook_ip;size:50" json:"hookIp"`
-	SDPIP             string `gorm:"column:sdp_ip;size:50" json:"sdpIp"`
-	StreamIP          string `gorm:"column:stream_ip;size:50" json:"streamIp"`
-	HTTPPort          int    `gorm:"column:http_port" json:"httpPort"`
-	HTTPSSLPort       int    `gorm:"column:http_ssl_port" json:"httpSSlPort"`
-	RTMPPort          int    `gorm:"column:rtmp_port" json:"rtmpPort"`
-	RTSPPort          int    `gorm:"column:rtsp_port" json:"rtspPort"`
-	RTPProxyPort      int    `gorm:"column:rtp_proxy_port" json:"rtpProxyPort"`
+	ID            string `gorm:"column:id;primaryKey;size:255" json:"id"`
+	IP            string `gorm:"column:ip;size:50" json:"ip"`
+	HookIP        string `gorm:"column:hook_ip;size:50" json:"hookIp"`
+	SDPIP         string `gorm:"column:sdp_ip;size:50" json:"sdpIp"`
+	StreamIP      string `gorm:"column:stream_ip;size:50" json:"streamIp"`
+	HTTPPort      int    `gorm:"column:http_port" json:"httpPort"`
+	HTTPSSLPort   int    `gorm:"column:http_ssl_port" json:"httpSSlPort"`
+	RTMPPort      int    `gorm:"column:rtmp_port" json:"rtmpPort"`
+	RTMPSSLPort   int    `gorm:"column:rtmp_ssl_port" json:"rtmpSslPort"`
+	RTSPPort      int    `gorm:"column:rtsp_port" json:"rtspPort"`
+	RTSPSSLPort   int    `gorm:"column:rtsp_ssl_port" json:"rtspSslPort"`
+	SRTPort       int    `gorm:"column:srt_port" json:"srtPort"`
+	RTPProxyPort  int    `gorm:"column:rtp_proxy_port" json:"rtpProxyPort"`
+	WebRTCPortMin int    `gorm:"column:webrtc_port_min" json:"webrtcPortMin"`
+	WebRTCPortMax int    `gorm:"column:webrtc_port_max" json:"webrtcPortMax"`
+
+	CapabilitiesReported bool `gorm:"column:capabilities_reported" json:"capabilitiesReported"`
+	EnableRTSP           bool `gorm:"column:enable_rtsp" json:"enableRtsp"`
+	EnableRTMP           bool `gorm:"column:enable_rtmp" json:"enableRtmp"`
+	EnableHLS            bool `gorm:"column:enable_hls" json:"enableHls"`
+	EnableSRT            bool `gorm:"column:enable_srt" json:"enableSrt"`
+	EnableWebRTC         bool `gorm:"column:enable_webrtc" json:"enableWebrtc"`
+
 	Secret            string `gorm:"column:secret;size:50" json:"secret"`
 	Type              string `gorm:"column:type;size:50" json:"type"`
+	Version           string `gorm:"column:version;size:50" json:"version"`
 	DefaultServer     bool   `gorm:"column:default_server" json:"defaultServer"`
 	HookAliveInterval int    `gorm:"column:hook_alive_interval" json:"hookAliveInterval"`
+	LastSeen          int64  `gorm:"column:last_seen" json:"lastSeen"`
 	CreateTime        string `gorm:"column:create_time;size:50" json:"createTime"`
 	UpdateTime        string `gorm:"column:update_time;size:50" json:"updateTime"`
 	ServerID          string `gorm:"column:server_id;size:50" json:"serverId"`
