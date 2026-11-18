@@ -5,6 +5,7 @@ go 1.25.4
 require (
 	github.com/0x524a/onvif-go v0.0.0
 	github.com/emiago/sipgo v1.4.0
+	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
@@ -15,6 +16,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/zero-pipe/gb28181-go v0.0.0-20260715082048-ce20157207cf
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.12
 )
@@ -85,7 +87,6 @@ require (
 	golang.org/x/text v0.28.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/0x524a/onvif-go => ./3rdpart/onvif-go

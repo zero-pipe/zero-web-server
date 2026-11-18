@@ -47,6 +47,7 @@ export const primaryMenus = [
     title: '存储管理',
     icon: 'menu-storage',
     children: [
+      { title: '基础设施', path: '/infra', icon: 'menu-storage' },
       { title: '对象存储', path: '/objectStore', icon: 'objectStore' },
       { title: '录制计划', path: '/recordPlan', icon: 'recordPlan' },
       { title: '云端录像', path: '/cloudRecord', icon: 'cloudRecord' }

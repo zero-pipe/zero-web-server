@@ -269,6 +269,19 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/infra',
+    component: Layout,
+    redirect: '/infra',
+    children: [
+      {
+        path: '',
+        name: 'Infrastructure',
+        component: () => import('@/views/infra/index'),
+        meta: { title: '基础设施', icon: 'menu-storage' }
+      }
+    ]
+  },
+  {
     path: '/objectStore',
     component: Layout,
     redirect: '/objectStore',

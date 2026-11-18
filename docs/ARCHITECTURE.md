@@ -74,3 +74,16 @@ UnifiedRef (zws_unified_ref)            旧表主键 → 统一 UUID 的映射
 - 新 API：`/api/v1/assets`、`/api/v1/assets/:id`、`/api/v1/assets/:id/sync`、`/api/v1/resources/:id`、`/api/v1/resources/:id/live/start|stop`。
 - 播放路由：按绑定协议翻译为 GB（设备号+通道号）、ONVIF（channelID+profileToken）、插件（deviceId+channelId），媒体仍由 ZMS 输出。
 - 旧 API/页面保持可用；录像计划/分组/级联/告警尚未迁移到统一 Resource，属于后续阶段。
+
+## 基础设施配置
+
+「存储管理 → 基础设施」统一管理四类依赖：
+
+| 项 | 来源 | 生效方式 |
+| --- | --- | --- |
+| MySQL | `configs/config.yaml` | 页面写回 YAML，需重启 |
+| Redis | `configs/config.yaml` | 页面写回 YAML，需重启 |
+| MQTT | `zws_mqtt_config` | 保存后热重载消费者 |
+| 对象存储 | `zws_object_store_config` | 保存后热重载适配器 |
+
+MySQL/Redis 是启动引导配置，运行中写回文件并保留 `.bak`；MQTT 消费者使用共享订阅 `$share/zws/<topic>/#`。

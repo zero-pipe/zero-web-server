@@ -398,6 +398,46 @@ type ObjectStoreConfig struct {
 
 func (ObjectStoreConfig) TableName() string { return "zws_object_store_config" }
 
+// MQTTConfig 消息队列对接配置（平台消费者与插件发布共用，单行）。
+type MQTTConfig struct {
+	ID             int    `gorm:"column:id;primaryKey" json:"id"`
+	Enabled        bool   `gorm:"column:enabled;not null;default:0" json:"enabled"`
+	Broker         string `gorm:"column:broker;size:255" json:"broker"`
+	ClientIDPrefix string `gorm:"column:client_id_prefix;size:64" json:"clientIdPrefix"`
+	Username       string `gorm:"column:username;size:128" json:"username"`
+	Password       string `gorm:"column:password;size:256" json:"password"`
+	TopicPrefix    string `gorm:"column:topic_prefix;size:128;default:zws/events" json:"topicPrefix"`
+	QoS            int    `gorm:"column:qos;default:1" json:"qos"`
+	KeepAliveSec   int    `gorm:"column:keepalive_sec;default:30" json:"keepAliveSec"`
+	TLSEnabled     bool   `gorm:"column:tls_enabled;not null;default:0" json:"tlsEnabled"`
+	CACert         string `gorm:"column:ca_cert;type:text" json:"caCert"`
+	ClientCert     string `gorm:"column:client_cert;type:text" json:"clientCert"`
+	ClientKey      string `gorm:"column:client_key;type:text" json:"clientKey"`
+	CreateTime     string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime     string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (MQTTConfig) TableName() string { return "zws_mqtt_config" }
+
+// EventSubscription 插件设备事件订阅/布防状态。
+type EventSubscription struct {
+	ID                 int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	DeviceID           int    `gorm:"column:device_id;uniqueIndex:uk_event_sub_device" json:"deviceId"`
+	PluginID           string `gorm:"column:plugin_instance_id;size:128;index" json:"pluginId"`
+	DeviceUID          string `gorm:"column:device_uid;size:128" json:"deviceUid"`
+	DeviceInternalCode string `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
+	EventTypesJSON     string `gorm:"column:event_types;type:text" json:"-"`
+	Armed              bool   `gorm:"column:armed;not null;default:0" json:"armed"`
+	Status             string `gorm:"column:status;size:16" json:"status"`
+	LastError          string `gorm:"column:last_error;size:500" json:"lastError"`
+	RemoteID           string `gorm:"column:remote_id;size:128" json:"remoteId"`
+	LastArmedAt        int64  `gorm:"column:last_armed_at" json:"lastArmedAt"`
+	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime         string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (EventSubscription) TableName() string { return "zws_event_subscription" }
+
 // SubordinatePlatform 下级国标平台（向本级 REGISTER，与摄像机设备表分离）。
 type SubordinatePlatform struct {
 	ID           int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`

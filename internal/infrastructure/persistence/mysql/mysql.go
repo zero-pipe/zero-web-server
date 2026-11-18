@@ -117,6 +117,8 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.CommonRegion{},
 		&model.GbSipConfig{},
 		&model.ObjectStoreConfig{},
+		&model.MQTTConfig{},
+		&model.EventSubscription{},
 		&model.Plugin{},
 		&model.PluginDevice{},
 		&model.PluginChannel{},

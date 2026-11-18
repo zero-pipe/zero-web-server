@@ -44,6 +44,11 @@ func (c *Client) Close() error {
 	return c.rdb.Close()
 }
 
+// Ping 探测 Redis 连通性。
+func (c *Client) Ping(ctx context.Context) error {
+	return c.rdb.Ping(ctx).Err()
+}
+
 func (c *Client) Set(ctx context.Context, key string, value any) error {
 	return c.rdb.Set(ctx, key, value, 0).Err()
 }

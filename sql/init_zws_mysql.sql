@@ -838,3 +838,43 @@ CREATE TABLE IF NOT EXISTS zws_unified_ref
     unified_id   VARCHAR(36),
     UNIQUE KEY uk_legacy_ref (legacy_table, legacy_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='旧对象到统一对象映射';
+
+DROP TABLE IF EXISTS zws_mqtt_config;
+CREATE TABLE IF NOT EXISTS zws_mqtt_config
+(
+    id               INT NOT NULL PRIMARY KEY,
+    enabled          TINYINT NOT NULL DEFAULT 0,
+    broker           VARCHAR(255),
+    client_id_prefix VARCHAR(64) DEFAULT 'zws',
+    username         VARCHAR(128),
+    password         VARCHAR(256),
+    topic_prefix     VARCHAR(128) DEFAULT 'zws/events',
+    qos              TINYINT DEFAULT 1,
+    keepalive_sec    INT DEFAULT 30,
+    tls_enabled      TINYINT NOT NULL DEFAULT 0,
+    ca_cert          TEXT,
+    client_cert      TEXT,
+    client_key       TEXT,
+    create_time      VARCHAR(50),
+    update_time      VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQTT消息队列配置(单行)';
+
+DROP TABLE IF EXISTS zws_event_subscription;
+CREATE TABLE IF NOT EXISTS zws_event_subscription
+(
+    id                   INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_id            INT NOT NULL,
+    plugin_instance_id   VARCHAR(128),
+    device_uid           VARCHAR(128),
+    device_internal_code VARCHAR(64),
+    event_types          TEXT,
+    armed                TINYINT NOT NULL DEFAULT 0,
+    status               VARCHAR(16),
+    last_error           VARCHAR(500),
+    remote_id            VARCHAR(128),
+    last_armed_at        BIGINT NOT NULL DEFAULT 0,
+    create_time          VARCHAR(50),
+    update_time          VARCHAR(50),
+    UNIQUE KEY uk_event_sub_device (device_id),
+    KEY idx_event_sub_plugin (plugin_instance_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备事件订阅/布防状态';
