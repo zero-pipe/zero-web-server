@@ -4,8 +4,9 @@ package main
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/sdk/include
+#cgo CXXFLAGS: -I${SRCDIR}/sdk/include
 #cgo linux LDFLAGS: -L${SRCDIR}/sdk/lib -lhnetsdk -lhpr -lHCCore -lstdc++ -lm -lpthread -ldl -Wl,-rpath,$ORIGIN/hik-lib
-#cgo windows LDFLAGS: -L${SRCDIR}/sdk/lib -lHCNetSDK -lHCCore
+#cgo windows LDFLAGS: -L${SRCDIR}/sdk/lib -lHCNetSDK -lHCCore -lstdc++ -static-libgcc -static-libstdc++
 #include <stdlib.h>
 #include "shim.h"
 */

@@ -9,6 +9,7 @@
 #include "HCNetSDK.h"
 
 int hik_init(void) {
+#if defined(__linux__)
     /* Optional: HIK_SDK_LIB_PATH points to the directory containing
      * HCNetSDKCom/, libcrypto.so.3 and libssl.so.3. */
     const char *libPath = getenv("HIK_SDK_LIB_PATH");
@@ -24,6 +25,7 @@ int hik_init(void) {
         snprintf(buf, sizeof(buf), "%s/libssl.so.3", libPath);
         NET_DVR_SetSDKInitCfg(NET_SDK_INIT_CFG_SSLEAY_PATH, buf);
     }
+#endif
     if (!NET_DVR_Init()) {
         return -1;
     }

@@ -3,6 +3,10 @@
 
 /* Minimal C shim so Go only deals with primitive types, not SDK structs. */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int  hik_init(void);
 void hik_cleanup(void);
 long hik_last_error(void);
@@ -32,5 +36,9 @@ int hik_list_channels(long user_id, int start_dchan, int *out_ids, int max);
 
 /* PTZ with speed (1..7). stop=1 stops movement. */
 int hik_ptz_speed(long user_id, long channel, unsigned int cmd, unsigned int stop, unsigned int speed);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
