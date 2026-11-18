@@ -16,11 +16,12 @@ import (
 type PluginHandler struct {
 	plugins *pluginapp.Service
 	ipc     *ipcdevice.Service
+	assets  assetPruner
 	token   string
 }
 
-func NewPluginHandler(plugins *pluginapp.Service, ipc *ipcdevice.Service, token string) *PluginHandler {
-	return &PluginHandler{plugins: plugins, ipc: ipc, token: token}
+func NewPluginHandler(plugins *pluginapp.Service, ipc *ipcdevice.Service, assets assetPruner, token string) *PluginHandler {
+	return &PluginHandler{plugins: plugins, ipc: ipc, assets: assets, token: token}
 }
 
 func (h *PluginHandler) checkToken(c *gin.Context) bool {
@@ -150,6 +151,9 @@ func (h *PluginHandler) DeleteDevice(c *gin.Context) {
 	if err := h.ipc.DeleteDevice(c.Request.Context(), id); err != nil {
 		response.FromError(c, err)
 		return
+	}
+	if h.assets != nil {
+		_ = h.assets.Prune()
 	}
 	response.OK(c, nil)
 }

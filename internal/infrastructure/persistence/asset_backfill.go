@@ -27,7 +27,126 @@ func (p *AssetProjector) Backfill() error {
 	if err := p.backfillONVIF(); err != nil {
 		return err
 	}
-	return p.backfillPlugin()
+	if err := p.backfillPlugin(); err != nil {
+		return err
+	}
+	// 投影只做 upsert；旧表中已删除、但统一资产残留的行在此清理。
+	return p.Prune()
+}
+
+// Prune 回收孤儿：legacy 行已不存在、但统一资产仍存在的，按 zws_unified_ref 映射级联删除。
+// 幂等、可反复调用（启动 Backfill 与删除设备后都会调用）。
+func (p *AssetProjector) Prune() error {
+	sets := map[string]map[string]bool{}
+	for _, t := range []struct {
+		table string
+		model any
+	}{
+		{"zws_device", &model.GBDevice{}},
+		{"zws_device_channel", &model.GBDeviceChannel{}},
+		{"zws_onvif_device", &model.OnvifDevice{}},
+		{"zws_onvif_channel", &model.OnvifChannel{}},
+		{"zws_plugin_device", &model.PluginDevice{}},
+		{"zws_plugin_channel", &model.PluginChannel{}},
+	} {
+		set, err := p.idSet(t.model)
+		if err != nil {
+			return err
+		}
+		sets[t.table] = set
+	}
+
+	var refs []model.UnifiedRef
+	if err := p.db.Find(&refs).Error; err != nil {
+		return err
+	}
+	for i := range refs {
+		r := &refs[i]
+		set, tracked := sets[r.LegacyTable]
+		if !tracked {
+			continue
+		}
+		if set[r.LegacyID] {
+			continue // legacy 仍存在
+		}
+		// 孤儿：按实体类型级联删除统一资产
+		switch r.EntityType {
+		case "physical_device":
+			if err := p.deleteDeviceTree(r.UnifiedID); err != nil {
+				return err
+			}
+		case "resource":
+			if err := p.deleteResourceTree(r.UnifiedID); err != nil {
+				return err
+			}
+		}
+		if err := p.db.Where("legacy_table = ? AND legacy_id = ?", r.LegacyTable, r.LegacyID).
+			Delete(&model.UnifiedRef{}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *AssetProjector) idSet(m any) (map[string]bool, error) {
+	var ids []int64
+	if err := p.db.Model(m).Pluck("id", &ids).Error; err != nil {
+		return nil, err
+	}
+	set := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		set[strconv.FormatInt(id, 10)] = true
+	}
+	return set, nil
+}
+
+func (p *AssetProjector) deleteDeviceTree(deviceUID string) error {
+	if deviceUID == "" {
+		return nil
+	}
+	var resIDs []string
+	if err := p.db.Model(&model.AssetResource{}).Where("device_id = ?", deviceUID).
+		Pluck("id", &resIDs).Error; err != nil {
+		return err
+	}
+	if len(resIDs) > 0 {
+		if err := p.db.Where("resource_id IN ?", resIDs).Delete(&model.AssetStreamProfile{}).Error; err != nil {
+			return err
+		}
+		if err := p.db.Where("scope_type = ? AND scope_id IN ?", "resource", resIDs).
+			Delete(&model.AssetCapability{}).Error; err != nil {
+			return err
+		}
+	}
+	steps := []func() *gorm.DB{
+		func() *gorm.DB { return p.db.Where("device_id = ?", deviceUID).Delete(&model.AssetResource{}) },
+		func() *gorm.DB { return p.db.Where("device_id = ?", deviceUID).Delete(&model.AccessBinding{}) },
+		func() *gorm.DB {
+			return p.db.Where("scope_type = ? AND scope_id = ?", "device", deviceUID).Delete(&model.AssetCapability{})
+		},
+		func() *gorm.DB { return p.db.Where("device_id = ?", deviceUID).Delete(&model.AssetEventSource{}) },
+		func() *gorm.DB { return p.db.Where("id = ?", deviceUID).Delete(&model.PhysicalDevice{}) },
+	}
+	for _, fn := range steps {
+		if err := fn().Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *AssetProjector) deleteResourceTree(resourceUID string) error {
+	if resourceUID == "" {
+		return nil
+	}
+	if err := p.db.Where("resource_id = ?", resourceUID).Delete(&model.AssetStreamProfile{}).Error; err != nil {
+		return err
+	}
+	if err := p.db.Where("scope_type = ? AND scope_id = ?", "resource", resourceUID).
+		Delete(&model.AssetCapability{}).Error; err != nil {
+		return err
+	}
+	return p.db.Where("id = ?", resourceUID).Delete(&model.AssetResource{}).Error
 }
 
 func (p *AssetProjector) backfillGB() error {

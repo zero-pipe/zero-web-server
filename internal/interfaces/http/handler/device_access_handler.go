@@ -8,12 +8,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type DeviceAccessHandler struct {
-	svc *deviceaccess.Service
+// assetPruner 删除设备后清理统一资产孤儿（由 asset.Service 实现）。
+type assetPruner interface {
+	Prune() error
 }
 
-func NewDeviceAccessHandler(svc *deviceaccess.Service) *DeviceAccessHandler {
-	return &DeviceAccessHandler{svc: svc}
+type DeviceAccessHandler struct {
+	svc    *deviceaccess.Service
+	assets assetPruner
+}
+
+func NewDeviceAccessHandler(svc *deviceaccess.Service, assets assetPruner) *DeviceAccessHandler {
+	return &DeviceAccessHandler{svc: svc, assets: assets}
 }
 
 func (h *DeviceAccessHandler) List(c *gin.Context) {
@@ -98,6 +104,9 @@ func (h *DeviceAccessHandler) Delete(c *gin.Context) {
 	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
 		response.FromError(c, err)
 		return
+	}
+	if h.assets != nil {
+		_ = h.assets.Prune() // 清理该设备在统一资产中的残留
 	}
 	response.OK(c, nil)
 }

@@ -105,9 +105,9 @@ func Setup(r *gin.Engine, deps Deps) {
 	userHandler := handler.NewUserHandler(deps.AuthService)
 	healthHandler := handler.NewHealthHandler(deps.Version)
 	serverHandler := handler.NewServerHandler(deps.ServerID, deps.Metrics)
-	onvifHandler := handler.NewONVIFHandler(deps.ONVIFService)
+	onvifHandler := handler.NewONVIFHandler(deps.ONVIFService, deps.AssetService)
 	deviceHandler := handler.NewDeviceHandler(deps.DeviceService)
-	deviceAccessHandler := handler.NewDeviceAccessHandler(deps.DeviceAccessService)
+	deviceAccessHandler := handler.NewDeviceAccessHandler(deps.DeviceAccessService, deps.AssetService)
 	playHandler := handler.NewPlayHandler(deps.PlayService, deps.PlayTimeoutMs)
 	playbackHandler := handler.NewPlaybackHandler(deps.PlaybackService, deps.PlayTimeoutMs)
 	gbRecordHandler := handler.NewGBRecordHandler(deps.PlaybackService, deps.RecordInfoTimeoutMs)
@@ -139,7 +139,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	regionHandler := handler.NewRegionHandler(deps.RegionService)
 	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
-	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.PluginToken)
+	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.AssetService, deps.PluginToken)
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,

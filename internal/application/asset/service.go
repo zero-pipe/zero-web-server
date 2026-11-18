@@ -18,6 +18,8 @@ import (
 // Projector 触发统一资产投影（由持久化层实现）。
 type Projector interface {
 	Backfill() error
+	// Prune 清理 legacy 已删除、统一资产仍残留的孤儿数据。
+	Prune() error
 }
 
 type Service struct {
@@ -47,6 +49,14 @@ func NewService(repo domainasset.Repository, projector Projector, play *playapp.
 		repo: repo, projector: projector, play: play, onvif: onvif,
 		ipc: ipc, device: device, sessions: map[string]*liveSession{},
 	}
+}
+
+// Prune 清理 legacy 已删除、统一资产仍残留的孤儿数据（删除设备后调用）。
+func (s *Service) Prune() error {
+	if s == nil || s.projector == nil {
+		return nil
+	}
+	return s.projector.Prune()
 }
 
 func (s *Service) List(page, count int, query, protocol, status string) ([]*domainasset.DeviceSummary, int64, error) {

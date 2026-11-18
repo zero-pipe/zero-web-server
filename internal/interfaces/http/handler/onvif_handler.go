@@ -11,11 +11,12 @@ import (
 )
 
 type ONVIFHandler struct {
-	svc *onvifapp.Service
+	svc    *onvifapp.Service
+	assets assetPruner
 }
 
-func NewONVIFHandler(svc *onvifapp.Service) *ONVIFHandler {
-	return &ONVIFHandler{svc: svc}
+func NewONVIFHandler(svc *onvifapp.Service, assets assetPruner) *ONVIFHandler {
+	return &ONVIFHandler{svc: svc, assets: assets}
 }
 
 func (h *ONVIFHandler) Discover(c *gin.Context) {
@@ -73,6 +74,9 @@ func (h *ONVIFHandler) DeleteDevice(c *gin.Context) {
 	if err := h.svc.DeleteDevice(c.Request.Context(), id); err != nil {
 		response.FromError(c, err)
 		return
+	}
+	if h.assets != nil {
+		_ = h.assets.Prune()
 	}
 	response.OK(c, nil)
 }
