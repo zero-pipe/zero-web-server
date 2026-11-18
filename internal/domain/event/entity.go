@@ -41,4 +41,5 @@ type Repository interface {
 	Exists(eventID string) (bool, error)
 	Get(id string) (*Event, error)
 	List(page, count int, f ListFilter) ([]*Event, int64, error)
+	DeleteBefore(before int64) (int64, error)
 }

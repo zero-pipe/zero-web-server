@@ -8,5 +8,7 @@ import (
 
 func registerEvents(g *gin.RouterGroup, h *handler.EventHandler) {
 	g.GET("/events", h.List)
+	g.GET("/events/stats", h.Stats)
+	g.POST("/events/clear", h.Clear)
 	g.GET("/events/:id", h.Get)
 }

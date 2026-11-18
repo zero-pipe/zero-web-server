@@ -172,6 +172,22 @@ func (b *Bus) LastError() string {
 	return b.lastErr
 }
 
+func (b *Bus) Publish(ctx context.Context, topic string, payload []byte, qos byte) error {
+	_ = ctx
+	b.mu.RLock()
+	client := b.client
+	connected := b.connected
+	b.mu.RUnlock()
+	if client == nil || !connected {
+		return errors.New("mqtt not connected")
+	}
+	token := client.Publish(topic, qos, false, payload)
+	if !token.WaitTimeout(5 * time.Second) {
+		return errors.New("mqtt publish timeout")
+	}
+	return token.Error()
+}
+
 func (b *Bus) Topic() string {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

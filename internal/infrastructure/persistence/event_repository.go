@@ -107,6 +107,11 @@ func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*do
 	return out, total, nil
 }
 
+func (r *EventRepository) DeleteBefore(before int64) (int64, error) {
+	res := r.db.Where("occurred_at < ?", before).Delete(&model.Event{})
+	return res.RowsAffected, res.Error
+}
+
 func toDomainEvent(m *model.Event, deviceName string) *domainevent.Event {
 	return &domainevent.Event{
 		ID: m.ID, EventID: m.EventID, SchemaVersion: m.SchemaVersion, SourceID: m.SourceID,

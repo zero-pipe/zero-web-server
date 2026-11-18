@@ -369,6 +369,18 @@ func normalizeEventType(raw string) string {
 		return "tamper"
 	case "facedetection", "face":
 		return "face"
+	case "loitering", "loiteringdetection":
+		return "loitering"
+	case "plate", "anpr", "vehicledetection":
+		return "plate"
+	case "audioexception", "soundabnormal":
+		return "audio_abnormal"
+	case "defocus":
+		return "defocus"
+	case "scenechange":
+		return "scene_change"
+	case "alarminput", "alarmin":
+		return "alarm_input"
 	}
 	return strings.ToLower(strings.TrimSpace(raw))
 }

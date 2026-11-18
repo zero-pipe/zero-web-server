@@ -39,6 +39,26 @@ func (h *EventHandler) List(c *gin.Context) {
 	response.OK(c, gin.H{"list": list, "total": total, "pageNum": page, "pageSize": count})
 }
 
+func (h *EventHandler) Stats(c *gin.Context) {
+	response.OK(c, h.svc.Stats())
+}
+
+func (h *EventHandler) Clear(c *gin.Context) {
+	var body struct {
+		BeforeTime int64 `json:"beforeTime"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.BeforeTime <= 0 {
+		response.Error(c, response.CodeBadReq, "beforeTime 无效")
+		return
+	}
+	n, err := h.svc.ClearBefore(c.Request.Context(), body.BeforeTime)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"deleted": n})
+}
+
 func (h *EventHandler) Get(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()

@@ -29,11 +29,13 @@ type Service struct {
 
 	mu              sync.Mutex
 	restartRequired bool
-	onMessage       func(topic string, payload []byte)
+	onMessage       func(topic string, payload []byte) error
+	dlqTopic        string
+	qos             byte
 }
 
 // SetMessageHandler 注入 MQTT 消息处理函数（事件入库）。
-func (s *Service) SetMessageHandler(h func(topic string, payload []byte)) { s.onMessage = h }
+func (s *Service) SetMessageHandler(h func(topic string, payload []byte) error) { s.onMessage = h }
 
 func NewService(
 	repo domaininfra.Repository,
@@ -93,20 +95,59 @@ func (s *Service) startMQTT(ctx context.Context) error {
 	if err := s.bus.Start(ctx, cfg, s.handleMessage); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	s.dlqTopic = strings.Trim(strings.TrimSpace(row.TopicPrefix), "/")
+	if s.dlqTopic == "" {
+		s.dlqTopic = "zws/events"
+	}
+	s.dlqTopic += "-dlq"
+	s.qos = byte(row.QoS)
+	s.mu.Unlock()
 	applog.Info("mqtt consumer started", "broker", row.Broker, "topic", s.bus.Topic())
 	return nil
 }
 
 // handleMessage 目前在 Step 1 只做日志；Step 4 接入事件持久化。
 func (s *Service) handleMessage(topic string, payload []byte) {
+	// Never consume our own dead-letter topics.
+	if strings.HasSuffix(topic, "/dlq") || strings.HasSuffix(topic, "-dlq") {
+		return
+	}
 	if s.onMessage != nil {
-		s.onMessage(topic, payload)
+		var err error
+		for i := 0; i < 3; i++ {
+			if err = s.onMessage(topic, payload); err == nil {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		s.publishDLQ(topic, payload, err)
 		return
 	}
 	if len(payload) > 512 {
 		payload = payload[:512]
 	}
 	applog.Info("mqtt event received", "topic", topic, "bytes", len(payload), "payload", string(payload))
+}
+
+func (s *Service) publishDLQ(topic string, payload []byte, cause error) {
+	if s.bus == nil {
+		return
+	}
+	s.mu.Lock()
+	dlq := s.dlqTopic
+	qos := s.qos
+	s.mu.Unlock()
+	if dlq == "" {
+		dlq = "zws/events-dlq"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := s.bus.Publish(ctx, dlq, payload, qos); err != nil {
+		applog.Warn("mqtt dlq publish failed", "topic", topic, "dlq", dlq, "cause", cause, "err", err)
+		return
+	}
+	applog.Warn("mqtt event moved to dlq", "topic", topic, "dlq", dlq, "cause", cause)
 }
 
 func (s *Service) getMQTT() (*domaininfra.MQTTConfig, error) {

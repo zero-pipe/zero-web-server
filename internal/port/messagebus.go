@@ -28,4 +28,5 @@ type MessageBus interface {
 	Connected() bool
 	LastError() string
 	Topic() string
+	Publish(ctx context.Context, topic string, payload []byte, qos byte) error
 }

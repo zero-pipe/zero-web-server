@@ -12,6 +12,10 @@
           <el-option label="video_loss" value="video_loss" />
           <el-option label="tamper" value="tamper" />
           <el-option label="face" value="face" />
+          <el-option label="loitering" value="loitering" />
+          <el-option label="plate" value="plate" />
+          <el-option label="audio_abnormal" value="audio_abnormal" />
+          <el-option label="alarm_input" value="alarm_input" />
         </el-select>
       </el-form-item>
       <el-form-item label="关联状态">
@@ -33,8 +37,18 @@
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" @click="reload">查询</el-button>
         <el-button icon="el-icon-refresh" circle :loading="loading" @click="load" />
+        <el-button type="text" style="color:#f56c6c" @click="clearOld">清理 90 天前</el-button>
       </el-form-item>
     </el-form>
+
+    <div class="stats-row">
+      <el-tag size="mini" type="info">接收 {{ stats.received || 0 }}</el-tag>
+      <el-tag size="mini" type="success">入库 {{ stats.stored || 0 }}</el-tag>
+      <el-tag size="mini">重复 {{ stats.duplicate || 0 }}</el-tag>
+      <el-tag size="mini" type="warning">未关联 {{ stats.unmapped || 0 }}</el-tag>
+      <el-tag size="mini" type="danger">失败 {{ stats.failed || 0 }}</el-tag>
+      <el-tag size="mini" type="danger">非法 {{ stats.invalid || 0 }}</el-tag>
+    </div>
 
     <el-table v-loading="loading" :data="list" size="small" border height="calc(100vh - 220px)">
       <el-table-column label="时间" width="170">
@@ -115,7 +129,7 @@
 </template>
 
 <script>
-import { queryEvents, getEvent } from '@/api/event'
+import { queryEvents, getEvent, getEventStats, clearEvents } from '@/api/event'
 
 export default {
   name: 'EventCenter',
@@ -128,10 +142,11 @@ export default {
       count: 20,
       filters: { deviceInternalCode: '', eventType: '', status: '', range: [] },
       detailVisible: false,
-      detail: null
+      detail: null,
+      stats: {}
     }
   },
-  created() { this.load() },
+  created() { this.load(); this.loadStats() },
   methods: {
     reload() { this.page = 1; this.load() },
     onSize(n) { this.count = n; this.page = 1; this.load() },
@@ -151,8 +166,21 @@ export default {
         const d = (res && res.data) || {}
         this.list = d.list || []
         this.total = d.total || 0
+        this.loadStats()
       }).catch(e => this.$message.error(e || '查询失败'))
         .finally(() => { this.loading = false })
+    },
+    loadStats() {
+      getEventStats().then(res => { this.stats = (res && res.data) || {} }).catch(() => {})
+    },
+    clearOld() {
+      const before = Date.now() - 90 * 24 * 3600 * 1000
+      this.$confirm('确认清理 90 天前的事件记录？', '提示', { type: 'warning' }).then(() => {
+        clearEvents(before).then(res => {
+          this.$message.success(`已清理 ${((res && res.data) || {}).deleted || 0} 条`)
+          this.load(); this.loadStats()
+        })
+      }).catch(() => {})
     },
     openDetail(row) {
       getEvent(row.id).then(res => {
@@ -175,6 +203,7 @@ export default {
 
 <style scoped>
 .sub { color: #909399; font-size: 12px; }
+.stats-row { margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 .section { margin-top: 14px; }
 .section-title { font-weight: 600; margin-bottom: 6px; }
 .json { background: #f5f7fa; padding: 10px; border-radius: 6px; max-height: 260px; overflow: auto; font-size: 12px; }
