@@ -9,6 +9,7 @@ import (
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
+	eventingest "zero-web-server/internal/application/eventingest"
 	eventsubapp "zero-web-server/internal/application/eventsub"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	groupapp "zero-web-server/internal/application/group"
@@ -85,6 +86,7 @@ type Deps struct {
 	AssetService        *assetapp.Service
 	InfraService        *infraconfigapp.Service
 	EventSubService     *eventsubapp.Service
+	EventService        *eventingest.Service
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -146,6 +148,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.AssetService, deps.PluginToken)
 	pluginHandler.SetRearmer(deps.EventSubService)
 	eventSubHandler := handler.NewEventSubHandler(deps.EventSubService, deps.InfraService)
+	eventHandler := handler.NewEventHandler(deps.EventService)
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
 	infraHandler := handler.NewInfraHandler(deps.InfraService)
 	mediaHook := hook.NewHandler(
@@ -175,6 +178,7 @@ func Setup(r *gin.Engine, deps Deps) {
 
 		registerPlugin(auth, pluginHandler)
 		registerEventSub(auth, eventSubHandler)
+		registerEvents(auth, eventHandler)
 		registerAssets(auth, assetHandler)
 		registerInfra(auth, infraHandler)
 

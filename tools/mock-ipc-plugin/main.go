@@ -201,6 +201,8 @@ func handleMockEvent(w http.ResponseWriter, r *http.Request) {
 		DeviceUID string `json:"device_uid"`
 		EventType string `json:"event_type"`
 		ChannelID string `json:"channel_id"`
+		ImageKey  string `json:"image_key"`
+		ImageURL  string `json:"image_url"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	sessionMu.Lock()
@@ -224,6 +226,9 @@ func handleMockEvent(w http.ResponseWriter, r *http.Request) {
 		"channelId": body.ChannelID, "eventType": body.EventType, "severity": "warning",
 		"occurredAt": now, "receivedAt": now,
 		"raw": map[string]any{"vendor": "mock", "eventType": body.EventType},
+	}
+	if body.ImageKey != "" {
+		event["image"] = map[string]any{"key": body.ImageKey, "url": body.ImageURL}
 	}
 	payload, _ := json.Marshal(event)
 	token := cli.Publish(cfg.MQTT.Topic, byte(cfg.MQTT.QoS), false, payload)

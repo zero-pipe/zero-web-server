@@ -438,6 +438,34 @@ type EventSubscription struct {
 
 func (EventSubscription) TableName() string { return "zws_event_subscription" }
 
+// Event 平台事件记录（来自 MQTT 等）。
+type Event struct {
+	ID                 string `gorm:"column:id;primaryKey;size:36" json:"id"`
+	EventID            string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
+	SchemaVersion      string `gorm:"column:schema_version;size:16" json:"schemaVersion"`
+	SourceID           string `gorm:"column:source_id;size:36" json:"sourceId"`
+	DeviceID           string `gorm:"column:device_id;size:36;index" json:"deviceId"`
+	BindingID          string `gorm:"column:binding_id;size:36" json:"bindingId"`
+	ResourceID         string `gorm:"column:resource_id;size:36" json:"resourceId"`
+	DeviceInternalCode string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
+	DeviceUID          string `gorm:"column:device_uid;size:128" json:"deviceUid"`
+	ChannelExternalKey string `gorm:"column:channel_external_key;size:128" json:"channelExternalKey"`
+	EventType          string `gorm:"column:event_type;size:64;index" json:"eventType"`
+	Severity           string `gorm:"column:severity;size:16" json:"severity"`
+	OccurredAt         int64  `gorm:"column:occurred_at;index" json:"occurredAt"`
+	ReceivedAt         int64  `gorm:"column:received_at" json:"receivedAt"`
+	ImageKey           string `gorm:"column:image_key;size:512" json:"imageKey"`
+	ImageURL           string `gorm:"column:image_url;size:1024" json:"imageUrl"`
+	ImageExpiresAt     int64  `gorm:"column:image_expires_at" json:"imageExpiresAt"`
+	BBoxJSON           string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
+	RawJSON            string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
+	Status             string `gorm:"column:status;size:16" json:"status"`
+	AlarmID            int    `gorm:"column:alarm_id;default:0" json:"alarmId"`
+	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
+}
+
+func (Event) TableName() string { return "zws_event" }
+
 // SubordinatePlatform 下级国标平台（向本级 REGISTER，与摄像机设备表分离）。
 type SubordinatePlatform struct {
 	ID           int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`

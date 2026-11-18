@@ -119,6 +119,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.ObjectStoreConfig{},
 		&model.MQTTConfig{},
 		&model.EventSubscription{},
+		&model.Event{},
 		&model.Plugin{},
 		&model.PluginDevice{},
 		&model.PluginChannel{},

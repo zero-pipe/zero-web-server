@@ -130,6 +130,7 @@ type Repository interface {
 	CreateDevice(d *PhysicalDevice) error
 	UpsertDevice(d *PhysicalDevice) error
 	GetDevice(id string) (*PhysicalDevice, error)
+	GetDeviceByInternalCode(code string) (*PhysicalDevice, error)
 	ListDevices(page, count int, query, protocol, status string) ([]*DeviceSummary, int64, error)
 
 	CreateBinding(b *AccessBinding) error

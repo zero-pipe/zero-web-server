@@ -197,6 +197,18 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/events',
+    component: Layout,
+    children: [
+      {
+        path: '',
+        name: 'EventCenter',
+        component: () => import('@/views/events/index'),
+        meta: { title: '事件中心', icon: 'menu-record' }
+      }
+    ]
+  },
+  {
     path: '/alarm',
     component: Layout,
     redirect: '/alarm',

@@ -22,6 +22,7 @@ import (
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
+	eventingestapp "zero-web-server/internal/application/eventingest"
 	eventsubapp "zero-web-server/internal/application/eventsub"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	groupapp "zero-web-server/internal/application/group"
@@ -176,6 +177,10 @@ func main() {
 		func(ctx context.Context) error { return sqlDB.PingContext(ctx) },
 		redisPing, objectStoreService, cfg.UserSettings.ServerID,
 	)
+	eventRepo := persistence.NewEventRepository(db)
+	eventIngest := eventingestapp.NewService(eventRepo, assetRepo, objectStoreService)
+	infraService.SetMessageHandler(eventIngest.HandleMessage)
+
 	eventSubRepo := persistence.NewEventSubscriptionRepository(db)
 	eventSubService := eventsubapp.NewService(eventSubRepo, ipcService, pluginRepo, objectStoreService, infraService)
 
@@ -317,6 +322,7 @@ func main() {
 		AssetService:        assetService,
 		InfraService:        infraService,
 		EventSubService:     eventSubService,
+		EventService:        eventIngest,
 	})
 
 	go func() {

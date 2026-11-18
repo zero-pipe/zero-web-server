@@ -1,0 +1,121 @@
+package persistence
+
+import (
+	"time"
+
+	domainevent "zero-web-server/internal/domain/event"
+	"zero-web-server/internal/infrastructure/persistence/model"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type EventRepository struct{ db *gorm.DB }
+
+func NewEventRepository(db *gorm.DB) *EventRepository { return &EventRepository{db: db} }
+
+var _ domainevent.Repository = (*EventRepository)(nil)
+
+func (r *EventRepository) Create(e *domainevent.Event) error {
+	if e.ID == "" {
+		e.ID = uuid.NewString()
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	return r.db.Create(&model.Event{
+		ID: e.ID, EventID: e.EventID, SchemaVersion: e.SchemaVersion, SourceID: e.SourceID,
+		DeviceID: e.DeviceID, BindingID: e.BindingID, ResourceID: e.ResourceID,
+		DeviceInternalCode: e.DeviceInternalCode, DeviceUID: e.DeviceUID,
+		ChannelExternalKey: e.ChannelExternalKey, EventType: e.EventType, Severity: e.Severity,
+		OccurredAt: e.OccurredAt, ReceivedAt: e.ReceivedAt,
+		ImageKey: e.ImageKey, ImageURL: e.ImageURL, ImageExpiresAt: e.ImageExpiresAt,
+		BBoxJSON: e.BBoxJSON, RawJSON: e.RawJSON, Status: e.Status, AlarmID: e.AlarmID,
+		CreateTime: now,
+	}).Error
+}
+
+func (r *EventRepository) Exists(eventID string) (bool, error) {
+	var n int64
+	if err := r.db.Model(&model.Event{}).Where("event_id = ?", eventID).Count(&n).Error; err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (r *EventRepository) Get(id string) (*domainevent.Event, error) {
+	var row struct {
+		model.Event
+		DeviceName string `gorm:"column:device_name"`
+	}
+	err := r.db.Table("zws_event e").
+		Select("e.*, d.name AS device_name").
+		Joins("LEFT JOIN zws_physical_device d ON d.id = e.device_id").
+		Where("e.id = ?", id).Scan(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	if row.ID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return toDomainEvent(&row.Event, row.DeviceName), nil
+}
+
+func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*domainevent.Event, int64, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if count <= 0 {
+		count = 20
+	}
+	q := r.db.Table("zws_event e").
+		Joins("LEFT JOIN zws_physical_device d ON d.id = e.device_id")
+	if f.DeviceID != "" {
+		q = q.Where("e.device_id = ?", f.DeviceID)
+	}
+	if f.DeviceInternalCode != "" {
+		q = q.Where("e.device_internal_code = ?", f.DeviceInternalCode)
+	}
+	if f.EventType != "" {
+		q = q.Where("e.event_type = ?", f.EventType)
+	}
+	if f.Status != "" {
+		q = q.Where("e.status = ?", f.Status)
+	}
+	if f.Begin > 0 {
+		q = q.Where("e.occurred_at >= ?", f.Begin)
+	}
+	if f.End > 0 {
+		q = q.Where("e.occurred_at <= ?", f.End)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []struct {
+		model.Event
+		DeviceName string `gorm:"column:device_name"`
+	}
+	err := q.Select("e.*, d.name AS device_name").
+		Order("e.occurred_at DESC, e.id DESC").
+		Offset((page - 1) * count).Limit(count).Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*domainevent.Event, 0, len(rows))
+	for i := range rows {
+		out = append(out, toDomainEvent(&rows[i].Event, rows[i].DeviceName))
+	}
+	return out, total, nil
+}
+
+func toDomainEvent(m *model.Event, deviceName string) *domainevent.Event {
+	return &domainevent.Event{
+		ID: m.ID, EventID: m.EventID, SchemaVersion: m.SchemaVersion, SourceID: m.SourceID,
+		DeviceID: m.DeviceID, DeviceName: deviceName, BindingID: m.BindingID, ResourceID: m.ResourceID,
+		DeviceInternalCode: m.DeviceInternalCode, DeviceUID: m.DeviceUID,
+		ChannelExternalKey: m.ChannelExternalKey, EventType: m.EventType, Severity: m.Severity,
+		OccurredAt: m.OccurredAt, ReceivedAt: m.ReceivedAt,
+		ImageKey: m.ImageKey, ImageURL: m.ImageURL, ImageExpiresAt: m.ImageExpiresAt,
+		BBoxJSON: m.BBoxJSON, RawJSON: m.RawJSON, Status: m.Status, AlarmID: m.AlarmID,
+		CreateTime: m.CreateTime,
+	}
+}

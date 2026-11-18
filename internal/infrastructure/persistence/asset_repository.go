@@ -49,6 +49,14 @@ func (r *AssetRepository) GetDevice(id string) (*domainasset.PhysicalDevice, err
 	return toDomainAssetDevice(&m), nil
 }
 
+func (r *AssetRepository) GetDeviceByInternalCode(code string) (*domainasset.PhysicalDevice, error) {
+	var m model.PhysicalDevice
+	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return toDomainAssetDevice(&m), nil
+}
+
 func (r *AssetRepository) ListDevices(page, count int, query, protocol, status string) ([]*domainasset.DeviceSummary, int64, error) {
 	if page <= 0 {
 		page = 1

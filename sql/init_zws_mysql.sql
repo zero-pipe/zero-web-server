@@ -878,3 +878,34 @@ CREATE TABLE IF NOT EXISTS zws_event_subscription
     UNIQUE KEY uk_event_sub_device (device_id),
     KEY idx_event_sub_plugin (plugin_instance_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备事件订阅/布防状态';
+
+DROP TABLE IF EXISTS zws_event;
+CREATE TABLE IF NOT EXISTS zws_event
+(
+    id                   VARCHAR(36) NOT NULL PRIMARY KEY,
+    event_id             VARCHAR(64) NOT NULL,
+    schema_version       VARCHAR(16),
+    source_id            VARCHAR(36),
+    device_id            VARCHAR(36),
+    binding_id           VARCHAR(36),
+    resource_id          VARCHAR(36),
+    device_internal_code VARCHAR(64),
+    device_uid           VARCHAR(128),
+    channel_external_key VARCHAR(128),
+    event_type           VARCHAR(64),
+    severity             VARCHAR(16),
+    occurred_at          BIGINT NOT NULL DEFAULT 0,
+    received_at          BIGINT NOT NULL DEFAULT 0,
+    image_key            VARCHAR(512),
+    image_url            VARCHAR(1024),
+    image_expires_at     BIGINT NOT NULL DEFAULT 0,
+    bbox_json            TEXT,
+    raw_json             LONGTEXT,
+    status               VARCHAR(16),
+    alarm_id             INT NOT NULL DEFAULT 0,
+    create_time          VARCHAR(50),
+    UNIQUE KEY uk_event_id (event_id),
+    KEY idx_event_device_time (device_id, occurred_at),
+    KEY idx_event_internal (device_internal_code),
+    KEY idx_event_type_time (event_type, occurred_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台事件记录';

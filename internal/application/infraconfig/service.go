@@ -29,7 +29,11 @@ type Service struct {
 
 	mu              sync.Mutex
 	restartRequired bool
+	onMessage       func(topic string, payload []byte)
 }
+
+// SetMessageHandler 注入 MQTT 消息处理函数（事件入库）。
+func (s *Service) SetMessageHandler(h func(topic string, payload []byte)) { s.onMessage = h }
 
 func NewService(
 	repo domaininfra.Repository,
@@ -95,6 +99,10 @@ func (s *Service) startMQTT(ctx context.Context) error {
 
 // handleMessage 目前在 Step 1 只做日志；Step 4 接入事件持久化。
 func (s *Service) handleMessage(topic string, payload []byte) {
+	if s.onMessage != nil {
+		s.onMessage(topic, payload)
+		return
+	}
 	if len(payload) > 512 {
 		payload = payload[:512]
 	}
