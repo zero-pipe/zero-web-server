@@ -1,6 +1,6 @@
 # 事件管道设计（布防 / 抓图 / MQTT / 事件入库）
 
-> 状态：设计稿。目标是把「插件布防 → 抓图上传 → MQTT 事件 → 平台消费入库 → 资产关联」做成一条可扩展的标准链路。
+> 状态：设计稿。Step 1（基础设施/MQTT）、Step 2（布防订阅）、Step 3（ISAPI 事件/抓图/上传/发布）已落地；Step 4 消费入库待做。目标是把「插件布防 → 抓图上传 → MQTT 事件 → 平台消费入库 → 资产关联」做成一条可扩展的标准链路。
 > 关联：[ARCHITECTURE.md](ARCHITECTURE.md)、[IPC_PLUGIN_DESIGN.md](IPC_PLUGIN_DESIGN.md)。
 
 ## 1. 目标与原则

@@ -8,9 +8,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -41,15 +41,20 @@ var configSchema = `{
 }`
 
 type config struct {
-	platformURL string
-	endpoint    string
-	token       string
-	listen      string
-	rtspPort    int
-	rtspTmpl    string
-	ptzType     int
-	hasAudio    bool
+	platformURL   string
+	endpoint      string
+	token         string
+	listen        string
+	rtspPort      int
+	rtspTmpl      string
+	ptzType       int
+	hasAudio      bool
+	isapiPort     int
+	isapiHTTPS    bool
+	isapiInsecure bool
 }
+
+var hikConfig config
 
 type session struct {
 	UserID   int64
@@ -66,7 +71,7 @@ type session struct {
 	SubscriptionID string
 	InternalCode   string
 	EventTypes     []string
-	ArmConfig      map[string]any // 保存 MQTT / ObjectStore 配置，Step 3 使用
+	Pipeline       *pipeline
 }
 
 var (
@@ -77,15 +82,19 @@ var (
 
 func main() {
 	cfg := config{
-		platformURL: env("PLATFORM_URL", "http://127.0.0.1:18080"),
-		endpoint:    env("PLUGIN_ENDPOINT", "http://127.0.0.1:19091"),
-		token:       env("PLUGIN_TOKEN", ""),
-		listen:      env("PLUGIN_LISTEN", ":19091"),
-		rtspPort:    envInt("HIK_RTSP_PORT", 554),
-		rtspTmpl:    env("HIK_RTSP_TEMPLATE", ""),
-		ptzType:     envInt("HIK_PTZ_TYPE", 3),
-		hasAudio:    env("HIK_HAS_AUDIO", "false") == "true",
+		platformURL:   env("PLATFORM_URL", "http://127.0.0.1:18080"),
+		endpoint:      env("PLUGIN_ENDPOINT", "http://127.0.0.1:19091"),
+		token:         env("PLUGIN_TOKEN", ""),
+		listen:        env("PLUGIN_LISTEN", ":19091"),
+		rtspPort:      envInt("HIK_RTSP_PORT", 554),
+		rtspTmpl:      env("HIK_RTSP_TEMPLATE", ""),
+		ptzType:       envInt("HIK_PTZ_TYPE", 3),
+		hasAudio:      env("HIK_HAS_AUDIO", "false") == "true",
+		isapiPort:     envInt("HIK_ISAPI_PORT", 80),
+		isapiHTTPS:    env("HIK_ISAPI_HTTPS", "false") == "true",
+		isapiInsecure: env("HIK_ISAPI_INSECURE", "true") == "true",
 	}
+	hikConfig = cfg
 	if err := sdk.Init(); err != nil {
 		log.Fatalf("HCNetSDK init: %v", err)
 	}
@@ -147,6 +156,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		if old.Armed && old.AlarmHandle >= 0 {
 			_ = sdk.CloseAlarm(old.AlarmHandle)
 		}
+		old.Pipeline.stop()
 		sdk.Logout(old.UserID)
 	}
 	log.Printf("hik login device=%s ip=%s uid=%d channels=%d serial=%s model=%s",
@@ -186,6 +196,7 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 		if s.Armed && s.AlarmHandle >= 0 {
 			_ = sdk.CloseAlarm(s.AlarmHandle)
 		}
+		s.Pipeline.stop()
 		sdk.Logout(s.UserID)
 		delete(sessions, req.DeviceUID)
 	}
@@ -244,26 +255,13 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 }
 
 func handleArm(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		DeviceUID          string   `json:"device_uid"`
-		DeviceInternalCode string   `json:"device_internal_code"`
-		EventTypes         []string `json:"event_types"`
-		MQTT               any      `json:"mqtt"`
-		ObjectStore        any      `json:"object_store"`
-	}
-	var raw map[string]any
-	body, _ := io.ReadAll(r.Body)
-	_ = json.Unmarshal(body, &raw)
-	if err := json.Unmarshal(body, &req); err != nil {
+	var req armRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, "INVALID_ARGUMENT", err.Error())
 		return
 	}
 	if req.DeviceUID == "" || req.DeviceInternalCode == "" {
 		writeErr(w, "INVALID_ARGUMENT", "missing device_uid/device_internal_code")
-		return
-	}
-	if req.MQTT == nil || req.ObjectStore == nil {
-		writeErr(w, "INVALID_ARGUMENT", "missing mqtt/object_store config")
 		return
 	}
 	sessionMu.Lock()
@@ -273,11 +271,21 @@ func handleArm(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
 		return
 	}
+
+	// Build and validate the whole event pipeline before touching the alarm channel.
+	pipe, err := startPipeline(context.Background(), s, req)
+	if err != nil {
+		writeErr(w, "INTERNAL", err.Error())
+		return
+	}
+
 	if s.Armed && s.AlarmHandle >= 0 {
 		_ = sdk.CloseAlarm(s.AlarmHandle)
 	}
+	s.Pipeline.stop()
 	handle, err := sdk.SetupAlarm(s.UserID)
 	if err != nil {
+		pipe.stop()
 		writeErr(w, "INTERNAL", err.Error())
 		return
 	}
@@ -288,10 +296,10 @@ func handleArm(w http.ResponseWriter, r *http.Request) {
 	s.SubscriptionID = subID
 	s.InternalCode = req.DeviceInternalCode
 	s.EventTypes = req.EventTypes
-	s.ArmConfig = raw
+	s.Pipeline = pipe
 	sessionMu.Unlock()
-	log.Printf("arm device=%s internal=%s events=%v subscription=%s alarmHandle=%d",
-		req.DeviceUID, req.DeviceInternalCode, req.EventTypes, subID, handle)
+	log.Printf("arm device=%s internal=%s events=%v subscription=%s alarmHandle=%d topic=%s",
+		req.DeviceUID, req.DeviceInternalCode, req.EventTypes, subID, handle, req.MQTT.Topic)
 	writeOK(w, map[string]any{"armed": true, "subscriptionId": subID})
 }
 
@@ -307,10 +315,11 @@ func handleDisarm(w http.ResponseWriter, r *http.Request) {
 		if s.AlarmHandle >= 0 {
 			_ = sdk.CloseAlarm(s.AlarmHandle)
 		}
+		s.Pipeline.stop()
 		s.Armed = false
 		s.AlarmHandle = 0
 		s.SubscriptionID = ""
-		s.ArmConfig = nil
+		s.Pipeline = nil
 	}
 	sessionMu.Unlock()
 	log.Printf("disarm device=%s subscription=%s", req.DeviceUID, req.SubscriptionID)
@@ -404,7 +413,7 @@ func register(cfg config) {
 		"vendor":           "hikvision",
 		"version":          "0.2.0",
 		"protocols":        []string{protocol},
-		"capabilities":     []string{"live", "ptz", "alarm", "arming"},
+		"capabilities":     []string{"live", "ptz", "alarm", "arming", "snapshot", "mqtt"},
 		"streamTransports": []string{"rtsp_url"},
 		"configSchema":     configSchema,
 		"endpoint":         cfg.endpoint,

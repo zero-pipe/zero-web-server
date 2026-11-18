@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 const (
@@ -66,6 +68,7 @@ func main() {
 	mux.HandleFunc("/v1/ptz", okHandler)
 	mux.HandleFunc("/v1/arm", handleArm)
 	mux.HandleFunc("/v1/disarm", handleDisarm)
+	mux.HandleFunc("/v1/mock/event", handleMockEvent)
 
 	go func() {
 		addr := ":19090"
@@ -125,18 +128,31 @@ func heartbeatLoop(cfg pluginConfig) {
 	}
 }
 
+type mockArmConfig struct {
+	DeviceUID          string   `json:"device_uid"`
+	DeviceInternalCode string   `json:"device_internal_code"`
+	EventTypes         []string `json:"event_types"`
+	MQTT               struct {
+		Broker    string `json:"broker"`
+		ClientID  string `json:"clientId"`
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+		Topic     string `json:"topic"`
+		QoS       int    `json:"qos"`
+		KeepAlive int    `json:"keepAlive"`
+	} `json:"mqtt"`
+}
+
 var (
 	sessionMu sync.Mutex
 	sessions  = map[string]bool{}
 	armed     = map[string]string{}
+	armConfig = map[string]*mockArmConfig{}
+	mqttConns = map[string]mqtt.Client{}
 )
 
 func handleArm(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		DeviceUID          string   `json:"device_uid"`
-		DeviceInternalCode string   `json:"device_internal_code"`
-		EventTypes         []string `json:"event_types"`
-	}
+	var req mockArmConfig
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, "INVALID_ARGUMENT", err.Error())
 		return
@@ -145,12 +161,77 @@ func handleArm(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "INVALID_ARGUMENT", "missing device_uid/device_internal_code")
 		return
 	}
+	if req.MQTT.Broker == "" || req.MQTT.Topic == "" {
+		writeErr(w, "INVALID_ARGUMENT", "missing mqtt config")
+		return
+	}
+	opts := mqtt.NewClientOptions().AddBroker(req.MQTT.Broker).SetClientID(req.MQTT.ClientID)
+	if req.MQTT.Username != "" {
+		opts.SetUsername(req.MQTT.Username)
+	}
+	if req.MQTT.Password != "" {
+		opts.SetPassword(req.MQTT.Password)
+	}
+	ka := req.MQTT.KeepAlive
+	if ka <= 0 {
+		ka = 30
+	}
+	opts.SetKeepAlive(time.Duration(ka) * time.Second).SetAutoReconnect(true).SetConnectTimeout(6 * time.Second)
+	cli := mqtt.NewClient(opts)
+	token := cli.Connect()
+	if !token.WaitTimeout(8*time.Second) || token.Error() != nil {
+		writeErr(w, "INTERNAL", "mqtt connect failed")
+		return
+	}
 	subID := fmt.Sprintf("mock-%s-%d", req.DeviceUID, time.Now().UnixNano())
 	sessionMu.Lock()
+	if old := mqttConns[req.DeviceUID]; old != nil && old.IsConnectionOpen() {
+		old.Disconnect(250)
+	}
 	armed[req.DeviceUID] = subID
+	armConfig[req.DeviceUID] = &req
+	mqttConns[req.DeviceUID] = cli
 	sessionMu.Unlock()
 	log.Printf("arm device=%s internal=%s events=%v subscription=%s", req.DeviceUID, req.DeviceInternalCode, req.EventTypes, subID)
 	writeOK(w, map[string]any{"armed": true, "subscriptionId": subID})
+}
+
+func handleMockEvent(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		DeviceUID string `json:"device_uid"`
+		EventType string `json:"event_type"`
+		ChannelID string `json:"channel_id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	sessionMu.Lock()
+	cfg := armConfig[body.DeviceUID]
+	cli := mqttConns[body.DeviceUID]
+	sessionMu.Unlock()
+	if cfg == nil || cli == nil {
+		writeErr(w, "DEVICE_UNREACHABLE", "device not armed")
+		return
+	}
+	if body.EventType == "" {
+		body.EventType = "motion"
+	}
+	if body.ChannelID == "" {
+		body.ChannelID = "1"
+	}
+	now := time.Now().UnixMilli()
+	event := map[string]any{
+		"schema": "zws.event.v1", "eventId": fmt.Sprintf("mock-%d", now),
+		"deviceInternalCode": cfg.DeviceInternalCode, "deviceUid": cfg.DeviceUID,
+		"channelId": body.ChannelID, "eventType": body.EventType, "severity": "warning",
+		"occurredAt": now, "receivedAt": now,
+		"raw": map[string]any{"vendor": "mock", "eventType": body.EventType},
+	}
+	payload, _ := json.Marshal(event)
+	token := cli.Publish(cfg.MQTT.Topic, byte(cfg.MQTT.QoS), false, payload)
+	if !token.WaitTimeout(5*time.Second) || token.Error() != nil {
+		writeErr(w, "INTERNAL", "mqtt publish failed")
+		return
+	}
+	writeOK(w, map[string]any{"eventId": event["eventId"]})
 }
 
 func handleDisarm(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +242,11 @@ func handleDisarm(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	sessionMu.Lock()
 	delete(armed, req.DeviceUID)
+	delete(armConfig, req.DeviceUID)
+	if cli := mqttConns[req.DeviceUID]; cli != nil {
+		cli.Disconnect(250)
+		delete(mqttConns, req.DeviceUID)
+	}
 	sessionMu.Unlock()
 	log.Printf("disarm device=%s subscription=%s", req.DeviceUID, req.SubscriptionID)
 	writeOK(w, nil)

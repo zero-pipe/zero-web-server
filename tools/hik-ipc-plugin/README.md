@@ -76,6 +76,9 @@ DLL 与 `HCNetSDKCom` 必须和 exe 同目录（`bin/hik-win/` 已按此布局�
 | `PLUGIN_LISTEN` | `:19091` | 插件监听 |
 | `PLUGIN_TOKEN` | 空 | 与平台 `ZWS_PLUGIN_TOKEN` 一致 |
 | `HIK_RTSP_PORT` | `554` | 设备 RTSP 端口 |
+| `HIK_ISAPI_PORT` | `80` | ISAPI 端口（事件流/抓图，不是 SDK 8000） |
+| `HIK_ISAPI_HTTPS` | `false` | ISAPI 是否使用 HTTPS |
+| `HIK_ISAPI_INSECURE` | `true` | 跳过 ISAPI 证书校验（自签名设备） |
 | `HIK_SDK_LIB_PATH` | 空 | 仅 Linux：动态库目录（含 `HCNetSDKCom`、`libcrypto.so.3`、`libssl.so.3`） |
 | `HIK_RTSP_TEMPLATE` | 空 | 自定义 RTSP 模板：`rtsp://%s:%s@%s:554/Streaming/Channels/%d`（user/pass/ip/channelPath） |
 | `HIK_PTZ_TYPE` | `3` | 通道 PTZ 类型（0 表示不显示云台） |
@@ -91,13 +94,19 @@ DLL 与 `HCNetSDKCom` 必须和 exe 同目录（`bin/hik-win/` 已按此布局�
    - 平台交给 ZMS 拉流并生成 flv/ws-flv 等地址；
    - **需要平台已配置在线 ZMS 媒体节点**。
 5. PTZ：设备资产/插件页面调用 PTZ，插件通过 `NET_DVR_PTZControlWithSpeed_Other` 控制并自动停止。
-6. 布防：插件页面点击「布防」，平台把 MQTT + 对象存储 + 设备内码下发；插件通过 `NET_DVR_SetupAlarmChan_V41` 打开报警通道。当前回调只保活，抓图/上传/MQTT 发布在 Step 3 接入。
+6. 布防：插件页面点击「布防」，平台把 MQTT + 对象存储 + 设备内码下发。插件会：
+   - 校验对象存储 Bucket 可访问、MQTT 可连接、ISAPI 可登录；
+   - 打开 SDK 报警通道（`NET_DVR_SetupAlarmChan_V41`）；
+   - 启动 ISAPI `alertStream` 事件流。
+7. 事件：收到事件后抓图（`/ISAPI/Streaming/channels/<ch*100+1>/picture`），上传对象存储（`events/<内码>/YYYY/MM/DD/<eventId>.jpg`），再发布 MQTT 事件（`<topicPrefix>/<内码>`），平台消费者订阅并记录日志（Step 4 持久化）。
 
 ## 5. 已知限制
 
 - 直播走设备 RTSP，不走 SDK 私有码流；NVR 下挂通道若 RTSP 路径/凭据不同，需用 `HIK_RTSP_TEMPLATE` 调整。
 - 通道枚举依赖 `NET_DVR_GET_IPPARACFG_V40`；部分设备/权限下会回退为 1..N。
-- 回放、抓图、MQTT 事件发布尚未接入；报警通道已打开但回调暂不产生事件（Step 3）。
+- 事件来源目前仅 ISAPI `alertStream`；HCNetSDK 报警回调作为后续增强。
+- 事件只发布到 MQTT，平台尚未持久化（Step 4）。
+- 回放/预置位/对讲尚未接入。
 - PTZ 速度取 `z` 或 `h`（1..7），方向映射见 `main.go`。
 
 ## 6. 后续扩展点
