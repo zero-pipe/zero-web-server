@@ -213,6 +213,46 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 	return nil
 }
 
+func (s *Service) GetDevice(deviceID int) (*domainplugin.Device, error) {
+	return s.repo.GetDevice(deviceID)
+}
+
+// EnsureLogin 确保插件侧已登录该设备（插件重启后补登录）。
+func (s *Service) EnsureLogin(ctx context.Context, deviceID int) error {
+	dev, p, client, err := s.deviceClient(deviceID)
+	if err != nil {
+		return err
+	}
+	var params map[string]any
+	if strings.TrimSpace(dev.DriverParams) != "" {
+		_ = json.Unmarshal([]byte(dev.DriverParams), &params)
+	}
+	if _, err := client.Login(ctx, dev.DeviceUID, params); err != nil {
+		s.plugins.MarkOffline(p.ID)
+		return fmt.Errorf("插件重新登录设备失败: %w", err)
+	}
+	dev.Online = true
+	_ = s.repo.UpdateDevice(dev)
+	return nil
+}
+
+func (s *Service) Arm(ctx context.Context, deviceID int, cfg port.IPCArmConfig) (*port.IPCArmResult, error) {
+	dev, _, client, err := s.deviceClient(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DeviceUID = dev.DeviceUID
+	return client.Arm(ctx, cfg)
+}
+
+func (s *Service) Disarm(ctx context.Context, deviceID int, subscriptionID string) error {
+	dev, _, client, err := s.deviceClient(deviceID)
+	if err != nil {
+		return err
+	}
+	return client.Disarm(ctx, dev.DeviceUID, subscriptionID)
+}
+
 func (s *Service) PTZ(ctx context.Context, deviceID int, channelID, direction string, h, v, z int) error {
 	dev, _, client, err := s.deviceClient(deviceID)
 	if err != nil {

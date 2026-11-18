@@ -9,8 +9,10 @@ import (
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
+	eventsubapp "zero-web-server/internal/application/eventsub"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	groupapp "zero-web-server/internal/application/group"
+	infraconfigapp "zero-web-server/internal/application/infraconfig"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
@@ -81,6 +83,8 @@ type Deps struct {
 	IPCService          *ipcdevice.Service
 	PluginToken         string
 	AssetService        *assetapp.Service
+	InfraService        *infraconfigapp.Service
+	EventSubService     *eventsubapp.Service
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -140,7 +144,10 @@ func Setup(r *gin.Engine, deps Deps) {
 	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
 	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.AssetService, deps.PluginToken)
+	pluginHandler.SetRearmer(deps.EventSubService)
+	eventSubHandler := handler.NewEventSubHandler(deps.EventSubService, deps.InfraService)
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
+	infraHandler := handler.NewInfraHandler(deps.InfraService)
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
@@ -167,7 +174,9 @@ func Setup(r *gin.Engine, deps Deps) {
 		auth.POST("/user/changePassword", userHandler.ChangePassword)
 
 		registerPlugin(auth, pluginHandler)
+		registerEventSub(auth, eventSubHandler)
 		registerAssets(auth, assetHandler)
+		registerInfra(auth, infraHandler)
 
 		registerUserMgmt(auth, userHandler, roleHandler)
 

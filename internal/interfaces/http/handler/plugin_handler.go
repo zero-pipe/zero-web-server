@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	pluginapp "zero-web-server/internal/application/plugin"
@@ -18,7 +20,15 @@ type PluginHandler struct {
 	ipc     *ipcdevice.Service
 	assets  assetPruner
 	token   string
+	rearm   pluginRearmer
 }
+
+type pluginRearmer interface {
+	RearmForPlugin(ctx context.Context, pluginID string)
+}
+
+// SetRearmer 注入插件重启后的自动补布防能力。
+func (h *PluginHandler) SetRearmer(r pluginRearmer) { h.rearm = r }
 
 func NewPluginHandler(plugins *pluginapp.Service, ipc *ipcdevice.Service, assets assetPruner, token string) *PluginHandler {
 	return &PluginHandler{plugins: plugins, ipc: ipc, assets: assets, token: token}
@@ -49,6 +59,14 @@ func (h *PluginHandler) Hello(c *gin.Context) {
 	if err != nil {
 		response.FromError(c, err)
 		return
+	}
+	if h.rearm != nil {
+		pluginID := p.ID
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			h.rearm.RearmForPlugin(ctx, pluginID)
+		}()
 	}
 	response.OK(c, p)
 }

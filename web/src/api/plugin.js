@@ -38,3 +38,16 @@ export function stopIpcLive(deviceId, channelId) {
 export function ipcPtz(data) {
   return request({ url: '/api/v1/ipc/ptz', method: 'post', data })
 }
+
+// 布防 / 撤防
+export function armIpcDevice(deviceId, eventTypes) {
+  return request({ url: '/api/v1/ipc/devices/arm', method: 'post', data: { deviceId, eventTypes } })
+}
+
+export function disarmIpcDevice(deviceId) {
+  return request({ url: '/api/v1/ipc/devices/disarm', method: 'post', data: { deviceId } })
+}
+
+export function getIpcArmStatus(deviceId) {
+  return request({ url: '/api/v1/ipc/devices/arm/status', method: 'get', params: { deviceId } })
+}

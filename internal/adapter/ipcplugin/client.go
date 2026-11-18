@@ -129,6 +129,20 @@ func (c *Client) PTZ(ctx context.Context, deviceUID, channelID, direction string
 	}, nil)
 }
 
+func (c *Client) Arm(ctx context.Context, cfg port.IPCArmConfig) (*port.IPCArmResult, error) {
+	var out port.IPCArmResult
+	if err := c.post(ctx, "/v1/arm", cfg, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *Client) Disarm(ctx context.Context, deviceUID, subscriptionID string) error {
+	return c.post(ctx, "/v1/disarm", map[string]any{
+		"device_uid": deviceUID, "subscription_id": subscriptionID,
+	}, nil)
+}
+
 var _ port.IPCClient = (*Client)(nil)
 
 type Factory struct{ token string }

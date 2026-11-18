@@ -12,6 +12,7 @@ import (
 
 	ipcplugin "zero-web-server/internal/adapter/ipcplugin"
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
+	"zero-web-server/internal/adapter/mqttbus"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
@@ -21,8 +22,10 @@ import (
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
+	eventsubapp "zero-web-server/internal/application/eventsub"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
 	groupapp "zero-web-server/internal/application/group"
+	infraconfigapp "zero-web-server/internal/application/infraconfig"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
@@ -159,6 +162,23 @@ func main() {
 	objectStoreService := objectstoreapp.NewService(objectStoreRepo)
 	snapService := snapapp.NewService(objectStoreService)
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		applog.Fatalf("get mysql pool: %v", err)
+	}
+	var redisPing port.PingFunc
+	if redisClient != nil {
+		redisPing = redisClient.Ping
+	}
+	mqttRepo := persistence.NewMQTTConfigRepository(db)
+	infraService := infraconfigapp.NewService(
+		mqttRepo, mqttbus.New(), cfg, *configPath,
+		func(ctx context.Context) error { return sqlDB.PingContext(ctx) },
+		redisPing, objectStoreService, cfg.UserSettings.ServerID,
+	)
+	eventSubRepo := persistence.NewEventSubscriptionRepository(db)
+	eventSubService := eventsubapp.NewService(eventSubRepo, ipcService, pluginRepo, objectStoreService, infraService)
+
 	sipServer, err := sipinfra.NewServer(sipCfg, cfg.UserSettings.ServerID, sipCfg.Password, deviceService, redisClient)
 	if err != nil {
 		applog.Fatalf("init sip: %v", err)
@@ -235,6 +255,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ops.DefaultMetrics.Start(ctx, 2*time.Second)
+	infraService.Start(ctx)
+	defer infraService.Stop()
 	pluginService.Start(ctx, 10*time.Second, 30*time.Second)
 	if err := sipServer.Start(ctx); err != nil {
 		applog.Fatalf("start sip: %v", err)
@@ -293,6 +315,8 @@ func main() {
 		IPCService:          ipcService,
 		PluginToken:         pluginToken,
 		AssetService:        assetService,
+		InfraService:        infraService,
+		EventSubService:     eventSubService,
 	})
 
 	go func() {

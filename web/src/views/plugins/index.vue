@@ -55,10 +55,19 @@
           </template>
         </el-table-column>
         <el-table-column prop="channelCount" label="通道数" width="80" />
-        <el-table-column label="操作" width="260">
+        <el-table-column label="布防" width="90">
+          <template slot-scope="{ row }">
+            <el-tag v-if="row._armed" size="mini" type="success">已布防</el-tag>
+            <el-tag v-else size="mini" type="info">未布防</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="330">
           <template slot-scope="{ row }">
             <el-button type="text" size="mini" @click="openChannels(row)">通道</el-button>
             <el-button type="text" size="mini" @click="syncDevice(row)">同步</el-button>
+            <el-button type="text" size="mini" :disabled="!row.online" @click="toggleArm(row)">
+              {{ row._armed ? '撤防' : '布防' }}
+            </el-button>
             <el-button type="text" size="mini" style="color:#f56c6c" @click="removeDevice(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -124,8 +133,10 @@
 import jessibuca from '@/views/common/jessibuca'
 import {
   queryPlugins, queryIpcDevices, addIpcDevice, deleteIpcDevice,
-  syncIpcDevice, queryIpcChannels, startIpcLive, stopIpcLive
+  syncIpcDevice, queryIpcChannels, startIpcLive, stopIpcLive,
+  armIpcDevice, disarmIpcDevice, getIpcArmStatus
 } from '@/api/plugin'
+import { getPipelineStatus } from '@/api/infra'
 
 export default {
   name: 'IpcPlugins',
@@ -147,7 +158,10 @@ export default {
       playerDevice: null,
       playingChannel: null,
       streamInfo: null,
-      videoUrl: ''
+      videoUrl: '',
+      pipelineReady: false,
+      pipelineMsg: '',
+      armStatuses: {}
     }
   },
   computed: {
@@ -164,10 +178,50 @@ export default {
   methods: {
     loadAll() {
       this.loading = true
-      Promise.all([queryPlugins(), queryIpcDevices()]).then(([p, d]) => {
+      Promise.all([queryPlugins(), queryIpcDevices(), getPipelineStatus()]).then(([p, d, ps]) => {
         this.plugins = p.data || []
         this.devices = (d.data && d.data.list) || []
+        this.applyPipeline((ps && ps.data) || {})
+        this.loadArmStatuses()
       }).finally(() => { this.loading = false })
+    },
+    applyPipeline(p) {
+      this.pipelineReady = !!p.ready
+      const missing = []
+      if (!p.objectStore || !p.objectStore.enabled || !p.objectStore.healthy) missing.push('对象存储')
+      if (!p.mqtt || !p.mqtt.enabled || !p.mqtt.connected) missing.push('MQTT')
+      this.pipelineMsg = missing.length ? ('事件管道未就绪：请先配置 ' + missing.join(' / ')) : ''
+    },
+    loadArmStatuses() {
+      this.devices.forEach(row => {
+        this.$set(row, '_armed', false)
+        getIpcArmStatus(row.id).then(res => {
+          const d = (res && res.data) || {}
+          const sub = d.subscription
+          this.$set(row, '_armed', !!(sub && sub.armed))
+          this.$set(row, '_armStatus', sub || null)
+        }).catch(() => {})
+      })
+    },
+    toggleArm(row) {
+      if (row._armed) {
+        this.$confirm(`确认对设备 ${row.name} 撤防？`, '提示', { type: 'warning' }).then(() => {
+          disarmIpcDevice(row.id).then(() => {
+            this.$message.success('已撤防')
+            this.loadArmStatuses()
+          })
+        }).catch(() => {})
+        return
+      }
+      if (!this.pipelineReady) {
+        this.$message.warning(this.pipelineMsg || '事件管道未就绪，请先配置对象存储与 MQTT')
+        return
+      }
+      armIpcDevice(row.id, ['motion', 'line_crossing', 'intrusion']).then(res => {
+        const d = (res && res.data) || {}
+        if (d.armed) this.$message.success('布防成功')
+        this.loadArmStatuses()
+      }).catch(e => this.$message.error(e || '布防失败'))
     },
     formatTime(ms) {
       if (!ms) return '-'
