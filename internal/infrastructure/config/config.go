@@ -19,6 +19,13 @@ type Config struct {
 	Log          LogConfig          `mapstructure:"log"`
 	UserSettings UserSettingsConfig `mapstructure:"user_settings"`
 	ONVIF        ONVIFConfig        `mapstructure:"onvif"`
+	Event        EventConfig        `mapstructure:"event"`
+}
+
+// EventConfig 事件中心行为。
+type EventConfig struct {
+	// RetentionDays 事件保留天数；0 使用默认 30 天，<0 关闭自动清理。
+	RetentionDays int `mapstructure:"retention_days"`
 }
 
 // GBConfig 国标接入行为（与 sip 信令配置分离）

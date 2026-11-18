@@ -42,4 +42,5 @@ type Repository interface {
 	Get(id string) (*Event, error)
 	List(page, count int, f ListFilter) ([]*Event, int64, error)
 	DeleteBefore(before int64) (int64, error)
+	UpdateAlarmID(id string, alarmID int) error
 }

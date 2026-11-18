@@ -178,7 +178,7 @@ func main() {
 		redisPing, objectStoreService, cfg.UserSettings.ServerID,
 	)
 	eventRepo := persistence.NewEventRepository(db)
-	eventIngest := eventingestapp.NewService(eventRepo, assetRepo, objectStoreService)
+	eventIngest := eventingestapp.NewService(eventRepo, assetRepo, alarmRepo, objectStoreService)
 	infraService.SetMessageHandler(eventIngest.HandleMessage)
 
 	eventSubRepo := persistence.NewEventSubscriptionRepository(db)
@@ -262,6 +262,11 @@ func main() {
 	ops.DefaultMetrics.Start(ctx, 2*time.Second)
 	infraService.Start(ctx)
 	defer infraService.Stop()
+	retentionDays := cfg.Event.RetentionDays
+	if retentionDays == 0 {
+		retentionDays = 30
+	}
+	eventIngest.StartRetention(ctx, retentionDays)
 	pluginService.Start(ctx, 10*time.Second, 30*time.Second)
 	if err := sipServer.Start(ctx); err != nil {
 		applog.Fatalf("start sip: %v", err)

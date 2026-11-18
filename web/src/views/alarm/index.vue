@@ -211,6 +211,19 @@ const ALARM_TYPE_OPTIONS = [
   { value: 'Other', label: '其他报警' }
 ]
 
+const EVENT_ALARM_TYPES = {
+  1: '视频丢失报警', 2: '设备防拆报警', 3: '存储设备磁盘满报警',
+  4: '设备高温报警', 5: '设备低温报警', 6: '人工视频报警',
+  7: '运动目标检测报警', 8: '遗留物检测报警', 9: '物体移除检测报警',
+  10: '绊线检测报警', 11: '入侵检测报警', 12: '移动侦测报警',
+  13: '视频遮挡报警', 14: '逆行检测报警', 15: '徘徊检测报警',
+  16: '流量统计报警', 17: '密度检测报警', 18: '视频异常检测报警',
+  19: '快速移动报警', 20: '存储设备磁盘故障报警', 21: '存储设备风扇故障报警',
+  22: '声音异常报警', 23: '信号量异常报警', 24: '非法访问报警',
+  25: '虚焦报警', 26: '场景变更报警', 27: '人员聚集报警',
+  28: '停车侦测报警', 99: '其他报警'
+}
+
 function formatDatetime(ts) {
   if (!ts) return null
   const date = new Date(ts)
@@ -404,10 +417,18 @@ export default {
       }).catch(() => {})
     },
     getAlarmTypeLabel(value) {
+      if (typeof value === 'number') {
+        return EVENT_ALARM_TYPES[value] || `类型 ${value}`
+      }
       const option = ALARM_TYPE_OPTIONS.find(o => o.value === value)
       return option ? option.label : value
     },
     getAlarmTypeTagType(value) {
+      if (typeof value === 'number') {
+        if ([1, 2, 10, 11, 24].includes(value)) return 'danger'
+        if ([7, 12, 14, 27, 19].includes(value)) return 'warning'
+        return 'info'
+      }
       const dangerTypes = ['VideoLoss', 'IntrusionDetection', 'IllegalAccess', 'ManualVideo', 'TripwireDetection']
       const warningTypes = ['MotionDetection', 'MobileDetection', 'ReverseDetection', 'CrowdGathering', 'RapidMovement']
       if (dangerTypes.includes(value)) return 'danger'

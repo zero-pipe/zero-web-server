@@ -107,6 +107,10 @@ func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*do
 	return out, total, nil
 }
 
+func (r *EventRepository) UpdateAlarmID(id string, alarmID int) error {
+	return r.db.Model(&model.Event{}).Where("id = ?", id).Update("alarm_id", alarmID).Error
+}
+
 func (r *EventRepository) DeleteBefore(before int64) (int64, error) {
 	res := r.db.Where("occurred_at < ?", before).Delete(&model.Event{})
 	return res.RowsAffected, res.Error

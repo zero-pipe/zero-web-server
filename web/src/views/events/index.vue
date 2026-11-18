@@ -111,6 +111,7 @@
           <el-descriptions-item label="时间">{{ formatTime(detail.occurredAt) }}</el-descriptions-item>
           <el-descriptions-item label="关联状态">{{ detail.status }}</el-descriptions-item>
           <el-descriptions-item label="资源 ID">{{ detail.resourceId || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="报警投影">{{ detail.alarmId ? ('#' + detail.alarmId) : '未投影' }}</el-descriptions-item>
         </el-descriptions>
         <div v-if="detail.imageUrl" class="section">
           <el-image :src="detail.imageUrl" :preview-src-list="[detail.imageUrl]" fit="contain" style="max-width:100%;max-height:360px" />

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	objectstoreapp "zero-web-server/internal/application/objectstore"
+	domainalarm "zero-web-server/internal/domain/alarm"
 	domainasset "zero-web-server/internal/domain/asset"
 	domainevent "zero-web-server/internal/domain/event"
 	applog "zero-web-server/pkg/log"
@@ -18,6 +19,7 @@ import (
 type Service struct {
 	repo        domainevent.Repository
 	assets      domainasset.Repository
+	alarms      domainalarm.Repository
 	objectStore *objectstoreapp.Service
 
 	received  atomic.Uint64
@@ -28,8 +30,8 @@ type Service struct {
 	unmapped  atomic.Uint64
 }
 
-func NewService(repo domainevent.Repository, assets domainasset.Repository, objectStore *objectstoreapp.Service) *Service {
-	return &Service{repo: repo, assets: assets, objectStore: objectStore}
+func NewService(repo domainevent.Repository, assets domainasset.Repository, alarms domainalarm.Repository, objectStore *objectstoreapp.Service) *Service {
+	return &Service{repo: repo, assets: assets, alarms: alarms, objectStore: objectStore}
 }
 
 type payload struct {
@@ -102,6 +104,7 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 	}
 
 	// deviceInternalCode → 物理设备 → 资源 / 事件源
+	var legacyChannelID int
 	if s.assets != nil {
 		if dev, err := s.assets.GetDeviceByInternalCode(p.DeviceInternalCode); err == nil && dev != nil {
 			e.DeviceID = dev.ID
@@ -110,7 +113,10 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 				e.BindingID = binding.ID
 			}
 			if resources, err := s.assets.ListResources(dev.ID); err == nil {
-				e.ResourceID = matchResource(resources, p.ChannelID)
+				if r := findResource(resources, p.ChannelID); r != nil {
+					e.ResourceID = r.ID
+					legacyChannelID = r.LegacyChannelID
+				}
 			}
 			if sources, err := s.assets.ListEventSources(dev.ID); err == nil {
 				for _, src := range sources {
@@ -127,6 +133,21 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 		s.failed.Add(1)
 		applog.Warn("event persist failed", "event", p.EventID, "err", err)
 		return fmt.Errorf("persist event: %w", err)
+	}
+	if s.alarms != nil && legacyChannelID > 0 {
+		alarm := &domainalarm.Alarm{
+			ChannelID:   legacyChannelID,
+			Description: fmt.Sprintf("[事件] %s %s", e.EventType, e.DeviceInternalCode),
+			SnapPath:    e.ImageKey,
+			AlarmType:   alarmTypeForEvent(e.EventType),
+			AlarmTime:   e.OccurredAt,
+		}
+		if err := s.alarms.Create(alarm); err != nil {
+			applog.Warn("event alarm projection failed", "event", e.EventID, "err", err)
+		} else {
+			e.AlarmID = alarm.ID
+			_ = s.repo.UpdateAlarmID(e.ID, alarm.ID)
+		}
 	}
 	s.stored.Add(1)
 	if e.Status == "unmapped" {
@@ -191,15 +212,15 @@ func (s *Service) refreshImageURL(ctx context.Context, e *domainevent.Event) {
 	}
 }
 
-// matchResource 兼顾插件通道号(1)与 ISAPI 通道号(101)两种写法。
-func matchResource(resources []*domainasset.Resource, channel string) string {
+// findResource 兼顾插件通道号(1)与 ISAPI 通道号(101)两种写法。
+func findResource(resources []*domainasset.Resource, channel string) *domainasset.Resource {
 	channel = strings.TrimSpace(channel)
 	if channel == "" {
-		return ""
+		return nil
 	}
 	for _, r := range resources {
 		if strings.TrimSpace(r.ExternalKey) == channel {
-			return r.ID
+			return r
 		}
 	}
 	candidates := map[string]bool{}
@@ -210,12 +231,69 @@ func matchResource(resources []*domainasset.Resource, channel string) string {
 		}
 	}
 	for _, r := range resources {
-		key := strings.TrimSpace(r.ExternalKey)
-		if candidates[key] {
-			return r.ID
+		if candidates[strings.TrimSpace(r.ExternalKey)] {
+			return r
 		}
 	}
-	return ""
+	return nil
+}
+
+// alarmTypeForEvent 映射到国标报警类型码（同时用于前端标签展示）。
+func alarmTypeForEvent(eventType string) int {
+	switch eventType {
+	case "video_loss":
+		return 1
+	case "tamper":
+		return 2
+	case "motion":
+		return 7
+	case "line_crossing":
+		return 10
+	case "intrusion":
+		return 11
+	case "loitering":
+		return 15
+	case "audio_abnormal":
+		return 22
+	case "defocus":
+		return 25
+	case "scene_change":
+		return 26
+	default:
+		return 99
+	}
+}
+
+func (s *Service) StartRetention(ctx context.Context, days int) {
+	if days <= 0 {
+		applog.Info("event retention disabled")
+		return
+	}
+	applog.Info("event retention enabled", "days", days)
+	go func() {
+		clean := func() {
+			before := time.Now().AddDate(0, 0, -days).UnixMilli()
+			n, err := s.repo.DeleteBefore(before)
+			if err != nil {
+				applog.Warn("event retention cleanup failed", "err", err)
+				return
+			}
+			if n > 0 {
+				applog.Info("event retention cleanup", "deleted", n, "days", days)
+			}
+		}
+		clean()
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				clean()
+			}
+		}
+	}()
 }
 
 func firstNonEmpty(vals ...string) string {
