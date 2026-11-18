@@ -110,10 +110,16 @@ func main() {
 	mux.HandleFunc("/v1/arm", handleArm)
 	mux.HandleFunc("/v1/disarm", handleDisarm)
 
+	ln, err := net.Listen("tcp", cfg.listen)
+	if err != nil {
+		log.Fatalf("listen: %v", err)
+	}
+	// 先绑定监听再注册：平台收到 hello 后可能立刻回调 /v1/login（补布防），
+	// 监听必须已经就绪，否则会因连接被拒把插件标记离线。
 	go func() {
 		log.Printf("hik plugin listening on %s, endpoint=%s", cfg.listen, cfg.endpoint)
-		if err := http.ListenAndServe(cfg.listen, mux); err != nil {
-			log.Fatalf("listen: %v", err)
+		if err := http.Serve(ln, mux); err != nil {
+			log.Fatalf("serve: %v", err)
 		}
 	}()
 

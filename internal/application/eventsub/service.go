@@ -100,9 +100,19 @@ func (s *Service) Arm(ctx context.Context, deviceID int, eventTypes []string) (*
 	if topicPrefix == "" {
 		topicPrefix = "zws/events"
 	}
+	armChannels := []port.IPCArmChannel{}
+	if chs, cerr := s.ipc.ListChannels(deviceID); cerr == nil {
+		for _, ch := range chs {
+			if strings.TrimSpace(ch.InternalCode) == "" {
+				continue
+			}
+			armChannels = append(armChannels, port.IPCArmChannel{ChannelID: ch.ChannelID, InternalCode: ch.InternalCode})
+		}
+	}
 	cfg := port.IPCArmConfig{
 		DeviceUID:          dev.DeviceUID,
 		DeviceInternalCode: dev.InternalCode,
+		Channels:           armChannels,
 		EventTypes:         eventTypes,
 		MQTT: port.IPCArmMQTT{
 			Broker: mqttCfg.Broker, ClientID: publisherClientID(p.ID, dev.DeviceUID),
@@ -172,22 +182,39 @@ func (s *Service) Disarm(ctx context.Context, deviceID int) error {
 }
 
 // RearmForPlugin 插件重启/重连后，自动补登录并补布防。
+// 插件刚启动时监听端口可能尚未就绪，这里对每个订阅做有限重试。
 func (s *Service) RearmForPlugin(ctx context.Context, pluginID string) {
 	list, err := s.repo.ListArmedByPlugin(pluginID)
 	if err != nil || len(list) == 0 {
 		return
 	}
 	for _, sub := range list {
-		if err := s.ipc.EnsureLogin(ctx, sub.DeviceID); err != nil {
-			applog.Warn("rearm ensure login failed", "device", sub.DeviceID, "err", err)
-			continue
+		if s.rearmOne(ctx, sub) {
+			applog.Info("rearmed after plugin hello", "device", sub.DeviceID, "plugin", pluginID)
 		}
-		if _, err := s.Arm(ctx, sub.DeviceID, sub.EventTypes); err != nil {
-			applog.Warn("rearm failed", "device", sub.DeviceID, "err", err)
-			continue
-		}
-		applog.Info("rearmed after plugin hello", "device", sub.DeviceID, "plugin", pluginID)
 	}
+}
+
+// rearmOne 重试补登录 + 补布防，最多 10 次（约 20s，覆盖插件心跳把状态刷回在线的时间）。
+func (s *Service) rearmOne(ctx context.Context, sub *domainevent.Subscription) bool {
+	var lastErr error
+	for attempt := 1; attempt <= 10; attempt++ {
+		if ctx.Err() != nil {
+			return false
+		}
+		if lastErr = s.ipc.EnsureLogin(ctx, sub.DeviceID); lastErr == nil {
+			if _, lastErr = s.Arm(ctx, sub.DeviceID, sub.EventTypes); lastErr == nil {
+				return true
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(2 * time.Second):
+		}
+	}
+	applog.Warn("rearm failed after retries", "device", sub.DeviceID, "err", lastErr)
+	return false
 }
 
 func supportsAlarm(p *domainplugin.Plugin) bool {

@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	domainasset "zero-web-server/internal/domain/asset"
@@ -329,9 +330,77 @@ func toDomainAssetBinding(m *model.AccessBinding) *domainasset.AccessBinding {
 	}
 }
 
+func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceInternalCode string) ([]*domainasset.ChannelView, int64, error) {
+	if page <= 0 {
+		page = 1
+	}
+	if count <= 0 {
+		count = 15
+	}
+	q := r.db.Table("zws_resource r").
+		Joins("JOIN zws_physical_device d ON d.id = r.device_id").
+		Joins("LEFT JOIN zws_access_binding b ON b.device_id = d.id")
+	if query != "" {
+		like := fmt.Sprintf("%%%s%%", query)
+		q = q.Where("r.name LIKE ? OR r.internal_code LIKE ? OR r.external_key LIKE ? OR d.name LIKE ?",
+			like, like, like, like)
+	}
+	if protocol != "" {
+		q = q.Where("b.protocol = ?", protocol)
+	}
+	if deviceInternalCode != "" {
+		q = q.Where("d.internal_code = ?", deviceInternalCode)
+	}
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	type row struct {
+		ResourceID         string `gorm:"column:resource_id"`
+		InternalCode       string `gorm:"column:internal_code"`
+		DeviceID           string `gorm:"column:device_id"`
+		DeviceInternalCode string `gorm:"column:device_internal_code"`
+		DeviceName         string `gorm:"column:device_name"`
+		Protocol           string `gorm:"column:protocol"`
+		Name               string `gorm:"column:name"`
+		Kind               string `gorm:"column:kind"`
+		ExternalKey        string `gorm:"column:external_key"`
+		Status             string `gorm:"column:status"`
+		Online             bool   `gorm:"column:online"`
+		PTZType            int    `gorm:"column:ptz_type"`
+		HasAudio           bool   `gorm:"column:has_audio"`
+	}
+	var rows []row
+	err := q.Select(`r.id AS resource_id, r.internal_code, r.device_id, d.internal_code AS device_internal_code,
+			d.name AS device_name, b.protocol, r.name, r.kind, r.external_key, r.status, d.online,
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.ptzType') AS SIGNED), 0) AS ptz_type,
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.hasAudio') AS SIGNED), 0) AS has_audio`).
+		Order("d.internal_code ASC, r.id ASC").
+		Offset((page - 1) * count).Limit(count).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*domainasset.ChannelView, 0, len(rows))
+	for i := range rows {
+		x := &rows[i]
+		view := &domainasset.ChannelView{
+			ResourceID: x.ResourceID, InternalCode: x.InternalCode, DeviceID: x.DeviceID,
+			DeviceInternalCode: x.DeviceInternalCode, DeviceName: x.DeviceName, Protocol: x.Protocol,
+			Name: x.Name, Kind: x.Kind, ExternalKey: x.ExternalKey, Status: x.Status,
+			Online: x.Online, PTZType: x.PTZType, HasAudio: x.HasAudio,
+		}
+		if strings.EqualFold(x.Protocol, "gb28181") {
+			view.GBCode = x.ExternalKey
+		}
+		out = append(out, view)
+	}
+	return out, total, nil
+}
+
 func toDomainAssetResource(m *model.AssetResource) *domainasset.Resource {
 	return &domainasset.Resource{
-		ID: m.ID, DeviceID: m.DeviceID, BindingID: m.BindingID, Kind: m.Kind,
+		ID: m.ID, InternalCode: m.InternalCode, DeviceID: m.DeviceID, BindingID: m.BindingID, Kind: m.Kind,
 		ExternalKey: m.ExternalKey, Name: m.Name, Status: m.Status,
 		LegacyChannelID: m.LegacyChannelID, AttrsJSON: m.AttrsJSON,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,

@@ -450,6 +450,7 @@ type Event struct {
 	DeviceInternalCode string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
 	DeviceUID          string `gorm:"column:device_uid;size:128" json:"deviceUid"`
 	ChannelExternalKey string `gorm:"column:channel_external_key;size:128" json:"channelExternalKey"`
+	ChannelInternalCode string `gorm:"column:channel_internal_code;size:32;index" json:"channelInternalCode"`
 	EventType          string `gorm:"column:event_type;size:64;index" json:"eventType"`
 	Severity           string `gorm:"column:severity;size:16" json:"severity"`
 	OccurredAt         int64  `gorm:"column:occurred_at;index" json:"occurredAt"`
@@ -581,6 +582,7 @@ func (AccessBinding) TableName() string { return "zws_access_binding" }
 // AssetResource 统一设备资源。
 type AssetResource struct {
 	ID              string `gorm:"column:id;primaryKey;size:36"`
+	InternalCode    string `gorm:"column:internal_code;size:32;index" json:"internalCode"`
 	DeviceID        string `gorm:"column:device_id;size:36;index"`
 	BindingID       string `gorm:"column:binding_id;size:36"`
 	Kind            string `gorm:"column:kind;size:32"`

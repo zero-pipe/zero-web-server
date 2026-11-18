@@ -8,6 +8,24 @@ import (
 	applog "zero-web-server/pkg/log"
 )
 
+// LiveApp 统一直播 app：所有接入协议（GB28181 / ONVIF / 插件）的直播流都落在 live/<设备内码>_<通道内码>。
+const LiveApp = "live"
+
+// LiveStream 统一流标识：<设备内码>_<通道内码>。
+// 设备内码/通道内码是平台归一化身份；协议侧标识（国标码、通道号、ProfileToken）不参与流命名。
+func LiveStream(deviceInternalCode, channelInternalCode string) string {
+	d := strings.TrimSpace(deviceInternalCode)
+	c := strings.TrimSpace(channelInternalCode)
+	switch {
+	case d != "" && c != "":
+		return d + "_" + c
+	case d != "":
+		return d
+	default:
+		return c
+	}
+}
+
 // BuildGB28181PushURL 国标收流地址摘要（UDP 或 TCP 被动 listen 端口）。
 func BuildGB28181PushURL(sdpIP string, port int, tcpMode int) string {
 	switch tcpMode {

@@ -35,16 +35,17 @@ func NewService(repo domainevent.Repository, assets domainasset.Repository, alar
 }
 
 type payload struct {
-	Schema             string `json:"schema"`
-	EventID            string `json:"eventId"`
-	DeviceInternalCode string `json:"deviceInternalCode"`
-	DeviceUID          string `json:"deviceUid"`
-	ChannelID          string `json:"channelId"`
-	EventType          string `json:"eventType"`
-	Severity           string `json:"severity"`
-	OccurredAt         int64  `json:"occurredAt"`
-	ReceivedAt         int64  `json:"receivedAt"`
-	Image              *struct {
+	Schema              string `json:"schema"`
+	EventID             string `json:"eventId"`
+	DeviceInternalCode  string `json:"deviceInternalCode"`
+	DeviceUID           string `json:"deviceUid"`
+	ChannelID           string `json:"channelId"`
+	ChannelInternalCode string `json:"channelInternalCode"`
+	EventType           string `json:"eventType"`
+	Severity            string `json:"severity"`
+	OccurredAt          int64  `json:"occurredAt"`
+	ReceivedAt          int64  `json:"receivedAt"`
+	Image               *struct {
 		Key       string `json:"key"`
 		URL       string `json:"url"`
 		ExpiresAt int64  `json:"expiresAt"`
@@ -86,7 +87,8 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 
 	e := &domainevent.Event{
 		EventID: p.EventID, SchemaVersion: p.Schema, DeviceInternalCode: p.DeviceInternalCode,
-		DeviceUID: p.DeviceUID, ChannelExternalKey: p.ChannelID, EventType: p.EventType,
+		DeviceUID: p.DeviceUID, ChannelExternalKey: p.ChannelID,
+		ChannelInternalCode: strings.TrimSpace(p.ChannelInternalCode), EventType: p.EventType,
 		Severity:   firstNonEmpty(p.Severity, "warning"),
 		OccurredAt: p.OccurredAt, ReceivedAt: p.ReceivedAt,
 		BBoxJSON: string(p.BBox), RawJSON: string(body), Status: "unmapped",
@@ -113,8 +115,14 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 				e.BindingID = binding.ID
 			}
 			if resources, err := s.assets.ListResources(dev.ID); err == nil {
-				if r := findResource(resources, p.ChannelID); r != nil {
+				// 通道内码优先；没有内码时按协议侧通道号匹配（兼容旧插件事件）。
+				r := findResourceByCode(resources, e.ChannelInternalCode)
+				if r == nil {
+					r = findResource(resources, p.ChannelID)
+				}
+				if r != nil {
 					e.ResourceID = r.ID
+					e.ChannelInternalCode = r.InternalCode
 					legacyChannelID = r.LegacyChannelID
 				}
 			}
@@ -210,6 +218,20 @@ func (s *Service) refreshImageURL(ctx context.Context, e *domainevent.Event) {
 	if u, perr := s.objectStore.Store().PresignGet(c, e.ImageKey, time.Hour); perr == nil && u != "" {
 		e.ImageURL = u
 	}
+}
+
+// findResourceByCode 按通道内码精确匹配。
+func findResourceByCode(resources []*domainasset.Resource, code string) *domainasset.Resource {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil
+	}
+	for _, r := range resources {
+		if strings.EqualFold(strings.TrimSpace(r.InternalCode), code) {
+			return r
+		}
+	}
+	return nil
 }
 
 // findResource 兼顾插件通道号(1)与 ISAPI 通道号(101)两种写法。

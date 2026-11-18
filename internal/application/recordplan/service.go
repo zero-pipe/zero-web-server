@@ -10,6 +10,7 @@ import (
 	publishauth "zero-web-server/internal/application/publishauth"
 	domainrecordplan "zero-web-server/internal/domain/recordplan"
 	"zero-web-server/internal/domain/shared"
+	"zero-web-server/internal/mediaurl"
 	applog "zero-web-server/pkg/log"
 )
 
@@ -107,8 +108,11 @@ func (s *Service) tick() {
 }
 
 func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
-	app := publishauth.LiveApp
-	stream := fmt.Sprintf("%s_%s", ch.DeviceID, ch.GBDeviceID)
+	app := mediaurl.LiveApp
+	stream := mediaurl.LiveStream(ch.DeviceInternalCode, ch.InternalCode)
+	if stream == "" {
+		stream = fmt.Sprintf("%s_%s", ch.DeviceID, ch.GBDeviceID)
+	}
 	s.publish.EnableMP4(app, stream)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

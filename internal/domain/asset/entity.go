@@ -44,6 +44,7 @@ const (
 // Resource 是设备提供的稳定子资源（视频源、音频、告警输入、AI 元数据等）。
 type Resource struct {
 	ID              string `json:"id"`
+	InternalCode    string `json:"internalCode"`
 	DeviceID        string `json:"deviceId"`
 	BindingID       string `json:"bindingId"`
 	Kind            string `json:"kind"`
@@ -119,6 +120,24 @@ type DeviceDetail struct {
 	EventSources []*EventSource  `json:"eventSources"`
 }
 
+// ChannelView 是跨协议统一的通道列表视图（通道内码为主键）。
+type ChannelView struct {
+	ResourceID         string `json:"resourceId"`
+	InternalCode       string `json:"internalCode"`
+	DeviceID           string `json:"deviceId"`
+	DeviceInternalCode string `json:"deviceInternalCode"`
+	DeviceName         string `json:"deviceName"`
+	Protocol           string `json:"protocol"`
+	Name               string `json:"name"`
+	Kind               string `json:"kind"`
+	ExternalKey        string `json:"externalKey"` // GB 通道编码 / ONVIF ProfileToken / 插件通道号
+	GBCode             string `json:"gbCode"`
+	Status             string `json:"status"`
+	Online             bool   `json:"online"`
+	PTZType            int    `json:"ptzType"`
+	HasAudio           bool   `json:"hasAudio"`
+}
+
 // ResourceDetail 包含资源、码流与能力。
 type ResourceDetail struct {
 	Resource     *Resource        `json:"resource"`
@@ -139,6 +158,7 @@ type Repository interface {
 
 	UpsertResource(r *Resource) error
 	ListResources(deviceID string) ([]*Resource, error)
+	ListChannels(page, count int, query, protocol, deviceInternalCode string) ([]*ChannelView, int64, error)
 	GetResource(id string) (*Resource, error)
 
 	UpsertProfile(p *StreamProfile) error

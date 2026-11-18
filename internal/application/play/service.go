@@ -7,7 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	publishauth "zero-web-server/internal/application/publishauth"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
 	"zero-web-server/internal/dto"
@@ -70,8 +69,8 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 	if err != nil {
 		return "", "", fmt.Errorf("channel not found")
 	}
-	app := publishauth.LiveApp
-	stream = fmt.Sprintf("%s_%s", device.DeviceID, channel.GBDeviceID)
+	app := mediaurl.LiveApp
+	stream = mediaurl.LiveStream(device.InternalCode, channel.InternalCode)
 
 	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
 	if err != nil {
@@ -118,8 +117,8 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 }
 
 func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, channel *domainchannel.Channel) (*dto.StreamContent, error) {
-	app := publishauth.LiveApp
-	stream := fmt.Sprintf("%s_%s", device.DeviceID, channel.GBDeviceID)
+	app := mediaurl.LiveApp
+	stream := mediaurl.LiveStream(device.InternalCode, channel.InternalCode)
 
 	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
 	if err != nil {
@@ -203,12 +202,30 @@ func gbLiveStreamReady(info *port.StreamProbe) bool {
 }
 
 func (s *Service) StopPlay(deviceID, channelDeviceID string) error {
-	app := publishauth.LiveApp
-	stream := fmt.Sprintf("%s_%s", deviceID, channelDeviceID)
+	app := mediaurl.LiveApp
+	stream := s.liveStreamName(deviceID, channelDeviceID)
 	_ = s.sip.CloseInviteSession(stream)
 	err := s.closeStream(app, stream)
 	s.media.UnbindStream(app, stream)
+	// 兼容旧命名（协议标识拼接）：内码切换后仍能清理历史流。
+	if legacy := fmt.Sprintf("%s_%s", deviceID, channelDeviceID); legacy != stream {
+		_ = s.sip.CloseInviteSession(legacy)
+		_ = s.closeStream(app, legacy)
+		s.media.UnbindStream(app, legacy)
+	}
 	return err
+}
+
+// liveStreamName 统一流名：优先内码，查不到时回退协议标识拼接（兼容期）。
+func (s *Service) liveStreamName(deviceID, channelDeviceID string) string {
+	if dev, err := s.devices.GetByDeviceID(deviceID); err == nil {
+		if ch, cerr := s.channels.GetOne(deviceID, channelDeviceID); cerr == nil {
+			if name := mediaurl.LiveStream(dev.InternalCode, ch.InternalCode); name != "" {
+				return name
+			}
+		}
+	}
+	return fmt.Sprintf("%s_%s", deviceID, channelDeviceID)
 }
 
 func (s *Service) OnStreamStarted(app, stream string) {

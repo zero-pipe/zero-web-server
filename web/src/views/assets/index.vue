@@ -145,7 +145,13 @@ export default {
       videoUrl: ''
     }
   },
-  created() { this.loadList() },
+  created() {
+    // 支持从统一通道页携带设备内码直达。
+    const q = this.$route && this.$route.query ? this.$route.query : {}
+    if (q.query) this.query = q.query
+    if (q.protocol) this.protocol = q.protocol
+    this.loadList()
+  },
   beforeDestroy() { this.stopLive() },
   methods: {
     reload() { this.page = 1; this.loadList() },

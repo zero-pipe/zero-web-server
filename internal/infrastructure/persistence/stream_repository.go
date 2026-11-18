@@ -585,10 +585,14 @@ func (r *RecordPlanRepository) CountChannels(planID int) int64 {
 }
 
 func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) ([]domainrecordplan.ChannelRecord, error) {
-	var rows []model.GBDeviceChannel
+	var rows []struct {
+		model.GBDeviceChannel
+		DeviceInternalCode string `gorm:"column:device_internal_code"`
+	}
 	err := r.db.Table("zws_device_channel wdc").
-		Select("wdc.*").
+		Select("wdc.*, MAX(wd.internal_code) AS device_internal_code").
 		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = wdc.record_plan_id").
+		Joins("LEFT JOIN zws_device wd ON wd.device_id = wdc.device_id").
 		Where("wrpi.week_day = ? AND wrpi.start <= ? AND wrpi.stop >= ?", weekDay, minuteIndex, minuteIndex).
 		Group("wdc.id").
 		Find(&rows).Error
@@ -597,7 +601,9 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 	}
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
-		out = append(out, *toDomainChannelRecord(&rows[i]))
+		rec := toDomainChannelRecord(&rows[i].GBDeviceChannel)
+		rec.DeviceInternalCode = rows[i].DeviceInternalCode
+		out = append(out, *rec)
 	}
 	return out, nil
 }

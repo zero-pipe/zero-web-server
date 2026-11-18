@@ -770,6 +770,7 @@ DROP TABLE IF EXISTS zws_resource;
 CREATE TABLE IF NOT EXISTS zws_resource
 (
     id                VARCHAR(36) NOT NULL PRIMARY KEY,
+    internal_code     VARCHAR(32) NOT NULL DEFAULT '',
     device_id         VARCHAR(36) NOT NULL,
     binding_id        VARCHAR(36),
     kind              VARCHAR(32) NOT NULL,
@@ -780,6 +781,7 @@ CREATE TABLE IF NOT EXISTS zws_resource
     attrs_json        LONGTEXT,
     create_time       VARCHAR(50),
     update_time       VARCHAR(50),
+    KEY idx_resource_internal (internal_code),
     KEY idx_resource_device (device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备资源';
 
@@ -892,6 +894,7 @@ CREATE TABLE IF NOT EXISTS zws_event
     device_internal_code VARCHAR(64),
     device_uid           VARCHAR(128),
     channel_external_key VARCHAR(128),
+    channel_internal_code VARCHAR(32),
     event_type           VARCHAR(64),
     severity             VARCHAR(16),
     occurred_at          BIGINT NOT NULL DEFAULT 0,
@@ -907,5 +910,6 @@ CREATE TABLE IF NOT EXISTS zws_event
     UNIQUE KEY uk_event_id (event_id),
     KEY idx_event_device_time (device_id, occurred_at),
     KEY idx_event_internal (device_internal_code),
+    KEY idx_event_channel_internal (channel_internal_code),
     KEY idx_event_type_time (event_type, occurred_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台事件记录';

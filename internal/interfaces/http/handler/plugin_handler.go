@@ -10,18 +10,26 @@ import (
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	pluginapp "zero-web-server/internal/application/plugin"
 	domainplugin "zero-web-server/internal/domain/plugin"
+	applog "zero-web-server/pkg/log"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 type PluginHandler struct {
-	plugins *pluginapp.Service
-	ipc     *ipcdevice.Service
-	assets  assetPruner
-	token   string
-	rearm   pluginRearmer
+	plugins  *pluginapp.Service
+	ipc      *ipcdevice.Service
+	assets   assetPruner
+	project  assetProjector
+	token    string
+	rearm    pluginRearmer
 }
+
+// assetProjector 把 legacy 插件设备/通道投影到统一资产模型（由 asset.Service 实现）。
+type assetProjector interface {
+	Backfill() error
+}
+
 
 type pluginRearmer interface {
 	RearmForPlugin(ctx context.Context, pluginID string)
@@ -31,7 +39,11 @@ type pluginRearmer interface {
 func (h *PluginHandler) SetRearmer(r pluginRearmer) { h.rearm = r }
 
 func NewPluginHandler(plugins *pluginapp.Service, ipc *ipcdevice.Service, assets assetPruner, token string) *PluginHandler {
-	return &PluginHandler{plugins: plugins, ipc: ipc, assets: assets, token: token}
+	h := &PluginHandler{plugins: plugins, ipc: ipc, assets: assets, token: token}
+	if p, ok := assets.(assetProjector); ok {
+		h.project = p
+	}
+	return h
 }
 
 func (h *PluginHandler) checkToken(c *gin.Context) bool {
@@ -66,6 +78,10 @@ func (h *PluginHandler) Hello(c *gin.Context) {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			h.rearm.RearmForPlugin(ctx, pluginID)
+			// 补布防会重新登录设备，在线状态可能在启动投影之后才更新。
+			if err := h.projectAssets(); err != nil {
+				applog.Warn("plugin asset projection failed after rearm", "err", err)
+			}
 		}()
 	}
 	response.OK(c, p)
@@ -157,6 +173,9 @@ func (h *PluginHandler) CreateDevice(c *gin.Context) {
 		response.FromError(c, err)
 		return
 	}
+	if err := h.projectAssets(); err != nil {
+		applog.Warn("plugin asset projection failed after add device", "err", err)
+	}
 	response.OK(c, gin.H{"device": newPluginDeviceView(dev), "channels": channels})
 }
 
@@ -187,7 +206,18 @@ func (h *PluginHandler) SyncDevice(c *gin.Context) {
 		response.FromError(c, err)
 		return
 	}
+	if err := h.projectAssets(); err != nil {
+		applog.Warn("plugin asset projection failed after sync device", "err", err)
+	}
 	response.OK(c, gin.H{"channels": channels})
+}
+
+// projectAssets 把插件设备/通道同步到统一资产（设备资产、事件映射、播放都依赖它）。
+func (h *PluginHandler) projectAssets() error {
+	if h.project == nil {
+		return nil
+	}
+	return h.project.Backfill()
 }
 
 func (h *PluginHandler) StartLive(c *gin.Context) {

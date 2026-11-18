@@ -59,11 +59,27 @@ func (s *Service) Prune() error {
 	return s.projector.Prune()
 }
 
+// Backfill 触发一次全量资产投影（插件/ONVIF/GB 设备增删改后调用，幂等）。
+func (s *Service) Backfill() error {
+	if s == nil || s.projector == nil {
+		return nil
+	}
+	return s.projector.Backfill()
+}
+
 func (s *Service) List(page, count int, query, protocol, status string) ([]*domainasset.DeviceSummary, int64, error) {
 	if s.repo == nil {
 		return nil, 0, fmt.Errorf("资产仓储未初始化")
 	}
 	return s.repo.ListDevices(page, count, query, protocol, status)
+}
+
+// ListChannels 跨协议统一通道列表（以通道内码为对外身份）。
+func (s *Service) ListChannels(page, count int, query, protocol, deviceInternalCode string) ([]*domainasset.ChannelView, int64, error) {
+	if s.repo == nil {
+		return nil, 0, fmt.Errorf("资产仓储未初始化")
+	}
+	return s.repo.ListChannels(page, count, query, protocol, deviceInternalCode)
 }
 
 func (s *Service) GetDetail(deviceID string) (*domainasset.DeviceDetail, error) {

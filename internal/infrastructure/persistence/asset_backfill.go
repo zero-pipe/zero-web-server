@@ -206,7 +206,7 @@ func (p *AssetProjector) backfillGB() error {
 			attrs, _ := json.Marshal(map[string]any{
 				"gbDeviceId": ch.GBDeviceID, "ptzType": ch.PTZType, "hasAudio": ch.HasAudio,
 			})
-			if err := p.upsertResource(chUID, uid, bindingID, domainasset.ResourceVideoSensor,
+			if err := p.upsertResource(chUID, ch.InternalCode, uid, bindingID, domainasset.ResourceVideoSensor,
 				ch.GBDeviceID, firstNonEmpty(ch.GBName, ch.Name), firstNonEmpty(ch.GBStatus, ch.Status, "OFF"),
 				ch.ID, string(attrs)); err != nil {
 				return err
@@ -281,7 +281,7 @@ func (p *AssetProjector) backfillONVIF() error {
 				"profileToken": ch.ProfileToken, "videoSource": ch.VideoSource,
 				"resolution": ch.Resolution, "codec": ch.Codec, "hasPtz": ch.HasPTZ,
 			})
-			if err := p.upsertResource(chUID, uid, bindingID, domainasset.ResourceVideoSensor,
+			if err := p.upsertResource(chUID, ch.InternalCode, uid, bindingID, domainasset.ResourceVideoSensor,
 				external, ch.Name, firstNonEmpty(ch.Status, "OFF"), int(ch.ID), string(attrs)); err != nil {
 				return err
 			}
@@ -347,7 +347,7 @@ func (p *AssetProjector) backfillPlugin() error {
 				return err
 			}
 			attrs, _ := json.Marshal(map[string]any{"channelId": ch.ChannelID, "ptzType": ch.PTZType, "hasAudio": ch.HasAudio})
-			if err := p.upsertResource(chUID, uid, bindingID, domainasset.ResourceVideoSensor,
+			if err := p.upsertResource(chUID, ch.InternalCode, uid, bindingID, domainasset.ResourceVideoSensor,
 				ch.ChannelID, ch.Name, firstNonEmpty(ch.Status, "OFF"), ch.ID, string(attrs)); err != nil {
 				return err
 			}
@@ -445,13 +445,26 @@ func (p *AssetProjector) upsertBinding(deviceID, protocol, mode, externalID, end
 	}).Error
 }
 
-func (p *AssetProjector) upsertResource(id, deviceID, bindingID, kind, externalKey, name, status string, legacyChannelID int, attrs string) error {
+func (p *AssetProjector) upsertResource(id, internalCode, deviceID, bindingID, kind, externalKey, name, status string, legacyChannelID int, attrs string) error {
 	var existing model.AssetResource
 	err := p.db.Where("id = ?", id).First(&existing).Error
 	now := nowText()
+	// 通道内码以 legacy 通道表为准（它按协议侧通道稳定生成/保留）；
+	// legacy 为空时才沿用统一资产已有内码，最后兜底新生成，保证两边一致。
+	code := strings.TrimSpace(internalCode)
+	if code == "" {
+		if strings.TrimSpace(existing.InternalCode) != "" {
+			code = existing.InternalCode
+		} else {
+			code, err = idcode.Channel()
+			if err != nil {
+				return err
+			}
+		}
+	}
 	if err == gorm.ErrRecordNotFound {
 		return p.db.Create(&model.AssetResource{
-			ID: id, DeviceID: deviceID, BindingID: bindingID, Kind: kind,
+			ID: id, InternalCode: code, DeviceID: deviceID, BindingID: bindingID, Kind: kind,
 			ExternalKey: externalKey, Name: name, Status: status,
 			LegacyChannelID: legacyChannelID, AttrsJSON: attrs,
 			CreateTime: now, UpdateTime: now,
@@ -465,7 +478,8 @@ func (p *AssetProjector) upsertResource(id, deviceID, bindingID, kind, externalK
 		nameUpdate = name
 	}
 	return p.db.Model(&model.AssetResource{}).Where("id = ?", id).Updates(map[string]any{
-		"binding_id": bindingID, "external_key": externalKey, "name": nameUpdate,
+		"internal_code": code,
+		"binding_id":    bindingID, "external_key": externalKey, "name": nameUpdate,
 		"status": status, "legacy_channel_id": legacyChannelID, "attrs_json": attrs,
 		"update_time": now,
 	}).Error

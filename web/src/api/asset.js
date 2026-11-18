@@ -1,5 +1,9 @@
 import request from '@/utils/request'
 
+export function queryChannels(params) {
+  return request({ url: '/api/v1/channels', method: 'get', params })
+}
+
 export function queryAssets(params) {
   return request({ url: '/api/v1/assets', method: 'get', params })
 }

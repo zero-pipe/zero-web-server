@@ -61,10 +61,17 @@ type IPCArmObjectStore struct {
 	PublicBase string `json:"publicBase"`
 }
 
+// IPCArmChannel 是布防时下发的通道内码映射（协议侧通道号 → 通道内码）。
+type IPCArmChannel struct {
+	ChannelID    string `json:"channel_id"`
+	InternalCode string `json:"internal_code"`
+}
+
 // IPCArmConfig 是布防请求。
 type IPCArmConfig struct {
 	DeviceUID          string            `json:"device_uid"`
 	DeviceInternalCode string            `json:"device_internal_code"`
+	Channels           []IPCArmChannel   `json:"channels"`
 	EventTypes         []string          `json:"event_types"`
 	MQTT               IPCArmMQTT        `json:"mqtt"`
 	ObjectStore        IPCArmObjectStore `json:"object_store"`

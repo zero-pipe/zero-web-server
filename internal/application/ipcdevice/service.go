@@ -11,10 +11,11 @@ import (
 	pluginapp "zero-web-server/internal/application/plugin"
 	domainplugin "zero-web-server/internal/domain/plugin"
 	"zero-web-server/internal/dto"
+	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/port"
 )
 
-const streamApp = "ipc"
+var streamApp = mediaurl.LiveApp
 
 type Service struct {
 	plugins  *pluginapp.Service
@@ -130,7 +131,10 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 	if !dev.Enabled {
 		return nil, fmt.Errorf("设备已禁用")
 	}
-	stream := streamKey(dev.PluginID, dev.DeviceUID, channelID)
+	stream := s.streamName(dev, channelID)
+	if stream == "" {
+		stream = legacyStreamName(dev.PluginID, dev.DeviceUID, channelID)
+	}
 	if s.getActive(stream) != nil {
 		return s.buildContent(ctx, stream)
 	}
@@ -197,7 +201,10 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 	if err != nil {
 		return err
 	}
-	stream := streamKey(dev.PluginID, dev.DeviceUID, channelID)
+	stream := s.streamName(dev, channelID)
+	if stream == "" {
+		stream = legacyStreamName(dev.PluginID, dev.DeviceUID, channelID)
+	}
 	act := s.getActive(stream)
 	if act == nil {
 		return nil
@@ -210,6 +217,13 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 	}
 	s.media.UnbindStream(act.App, act.Stream)
 	s.setActive(stream, nil)
+	// 兼容期：清理旧命名（pluginID_deviceUID_channelID）的历史拉流。
+	if legacy := legacyStreamName(dev.PluginID, dev.DeviceUID, channelID); legacy != stream {
+		if node, nerr := s.media.Resolve(ctx, act.NodeID); nerr == nil {
+			_ = node.CloseStreams(ctx, "__defaultVhost__", act.App, legacy)
+		}
+		s.media.UnbindStream(act.App, legacy)
+	}
 	return nil
 }
 
@@ -331,12 +345,32 @@ func toDomainChannels(in []port.IPCChannel) []*domainplugin.Channel {
 	return out
 }
 
-var unsafeStream = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
-
-func streamKey(pluginID, deviceUID, channelID string) string {
-	raw := fmt.Sprintf("%s_%s_%s", pluginID, deviceUID, channelID)
-	return unsafeStream.ReplaceAllString(raw, "-")
+// streamName 统一流名：<设备内码>_<通道内码>；查不到内码时回退旧命名（兼容期）。
+func (s *Service) streamName(dev *domainplugin.Device, channelID string) string {
+	if dev != nil {
+		chCode := ""
+		if list, err := s.repo.ListChannels(dev.ID); err == nil {
+			for _, c := range list {
+				if c.ChannelID == channelID {
+					chCode = c.InternalCode
+					break
+				}
+			}
+		}
+		if name := mediaurl.LiveStream(dev.InternalCode, chCode); name != "" {
+			return name
+		}
+		return strings.TrimSpace(chCode)
+	}
+	return ""
 }
+
+// legacyStreamName 旧命名（pluginID_deviceUID_channelID），仅用于清理历史流。
+func legacyStreamName(pluginID, deviceUID, channelID string) string {
+	return unsafeStream.ReplaceAllString(fmt.Sprintf("%s_%s_%s", pluginID, deviceUID, channelID), "-")
+}
+
+var unsafeStream = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
 func deriveUID(pluginID string, params map[string]any) string {
 	ip := stringParam(params, "ip")

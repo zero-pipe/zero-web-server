@@ -31,6 +31,17 @@ func (h *AssetHandler) List(c *gin.Context) {
 	response.OK(c, gin.H{"list": list, "total": total, "pageNum": page, "pageSize": count})
 }
 
+func (h *AssetHandler) Channels(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	count, _ := strconv.Atoi(c.DefaultQuery("count", "15"))
+	list, total, err := h.svc.ListChannels(page, count, c.Query("query"), c.Query("protocol"), c.Query("deviceInternalCode"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"list": list, "total": total, "pageNum": page, "pageSize": count})
+}
+
 func (h *AssetHandler) Detail(c *gin.Context) {
 	detail, err := h.svc.GetDetail(c.Param("id"))
 	if err != nil {

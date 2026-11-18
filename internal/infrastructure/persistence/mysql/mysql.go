@@ -190,6 +190,63 @@ func ensureInternalCodes(db *gorm.DB) error {
 	if err := backfill("zws_onvif_channel", idcode.Channel); err != nil {
 		return err
 	}
+	// 统一资产通道（zws_resource）用字符串主键，单独回填通道内码。
+	if err := backfillResourceCodes(db); err != nil {
+		return err
+	}
+	return nil
+}
+
+// legacyChannelCode 通过 zws_unified_ref 找到资源对应的 legacy 通道内码。
+func legacyChannelCode(db *gorm.DB, resourceID string) string {
+	for _, table := range []string{"zws_device_channel", "zws_onvif_channel", "zws_plugin_channel"} {
+		var code string
+		_ = db.Raw(
+			"SELECT c.internal_code FROM zws_unified_ref u JOIN `"+table+"` c ON CAST(u.legacy_id AS UNSIGNED) = c.id "+
+				"WHERE u.entity_type = 'resource' AND u.legacy_table = ? AND u.unified_id = ? LIMIT 1",
+			table, resourceID,
+		).Scan(&code).Error
+		if strings.TrimSpace(code) != "" {
+			return code
+		}
+	}
+	return ""
+}
+
+// backfillResourceCodes 为 zws_resource 空内码补通道内码（开发期 AutoMigrate 补列后用）。
+func backfillResourceCodes(db *gorm.DB) error {
+	type rowID struct {
+		ID string `gorm:"column:id"`
+	}
+	var rows []rowID
+	if err := db.Raw(
+		"SELECT id FROM zws_resource WHERE internal_code IS NULL OR TRIM(internal_code) = ''",
+	).Scan(&rows).Error; err != nil {
+		if strings.Contains(err.Error(), "doesn't exist") {
+			return nil
+		}
+		return fmt.Errorf("list empty internal_code on zws_resource: %w", err)
+	}
+	for _, row := range rows {
+		// 优先继承 legacy 通道表已有内码，保持与协议侧身份一致。
+		code := legacyChannelCode(db, row.ID)
+		if code == "" {
+			var err error
+			code, err = idcode.Channel()
+			if err != nil {
+				return err
+			}
+		}
+		if err := db.Exec(
+			"UPDATE zws_resource SET internal_code = ? WHERE id = ? AND (internal_code IS NULL OR TRIM(internal_code) = '')",
+			code, row.ID,
+		).Error; err != nil {
+			return fmt.Errorf("backfill zws_resource id=%s: %w", row.ID, err)
+		}
+	}
+	if len(rows) > 0 {
+		applog.Info("backfilled internal codes", "table", "zws_resource", "count", len(rows))
+	}
 	return nil
 }
 

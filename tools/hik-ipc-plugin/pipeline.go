@@ -51,9 +51,16 @@ type armObjectStoreConfig struct {
 	PublicBase string `json:"publicBase"`
 }
 
+// armChannel 是平台下发的通道内码映射（协议通道号 -> 通道内码）。
+type armChannel struct {
+	ChannelID    string `json:"channel_id"`
+	InternalCode string `json:"internal_code"`
+}
+
 type armRequest struct {
 	DeviceUID          string               `json:"device_uid"`
 	DeviceInternalCode string               `json:"device_internal_code"`
+	Channels           []armChannel         `json:"channels"`
 	EventTypes         []string             `json:"event_types"`
 	MQTT               armMQTTConfig        `json:"mqtt"`
 	ObjectStore        armObjectStoreConfig `json:"object_store"`
@@ -80,6 +87,7 @@ type pipeline struct {
 	isapiHTTPS    bool
 	isapiInsecure bool
 	eventTypes    map[string]bool
+	channelCodes  map[string]string
 }
 
 func startPipeline(parent context.Context, s *session, cfg armRequest) (*pipeline, error) {
@@ -168,7 +176,12 @@ func startPipeline(parent context.Context, s *session, cfg armRequest) (*pipelin
 
 	types := map[string]bool{}
 	for _, t := range cfg.EventTypes {
-		types[strings.ToLower(strings.TrimSpace(t))] = true
+		t = strings.ToLower(strings.TrimSpace(t))
+		if t == "" {
+			continue
+		}
+		types[t] = true
+		types[normalizeEventType(t)] = true
 	}
 	ctx, cancelFn := context.WithCancel(parent)
 	p := &pipeline{
@@ -176,10 +189,27 @@ func startPipeline(parent context.Context, s *session, cfg armRequest) (*pipelin
 		store: store, bucket: cfg.ObjectStore.Bucket, publicBase: strings.TrimRight(cfg.ObjectStore.PublicBase, "/"),
 		deviceUID: cfg.DeviceUID, internal: cfg.DeviceInternalCode, ip: s.IP, user: s.User, pass: s.Pass,
 		isapiPort: hikConfig.isapiPort, isapiHTTPS: hikConfig.isapiHTTPS, isapiInsecure: hikConfig.isapiInsecure,
-		eventTypes: types,
+		eventTypes: types, channelCodes: channelCodes(cfg.Channels),
 	}
 	go p.run()
 	return p, nil
+}
+
+// channelCodes 建立协议通道号（含 ISAPI 101 形式）到通道内码的映射。
+func channelCodes(chs []armChannel) map[string]string {
+	out := make(map[string]string, len(chs)*2)
+	for _, ch := range chs {
+		id := strings.TrimSpace(ch.ChannelID)
+		if id == "" || strings.TrimSpace(ch.InternalCode) == "" {
+			continue
+		}
+		out[id] = ch.InternalCode
+		// 兼容 ISAPI 通道号（1 -> 101）。
+		if n, err := strconv.Atoi(id); err == nil && n > 0 && n < 100 {
+			out[strconv.Itoa(n*100+1)] = ch.InternalCode
+		}
+	}
+	return out
 }
 
 func (p *pipeline) stop() {
@@ -244,19 +274,32 @@ func (p *pipeline) streamOnce() error {
 			return err
 		}
 		if alert.EventType != "" {
-			p.handleAlert([]byte(fmt.Sprintf(`<EventNotificationAlert><eventType>%s</eventType><eventState>%s</eventState><channelID>%s</channelID><dateTime>%s</dateTime><eventDescription>%s</eventDescription></EventNotificationAlert>`,
-				escapeXML(alert.EventType), escapeXML(alert.EventState), escapeXML(alert.ChannelID), escapeXML(alert.DateTime), escapeXML(alert.EventDescription))))
+			p.handleAlert(alert.rawXML())
 		}
 	}
 }
 
+// eventAlert 保留事件原始 XML（innerxml），区域入侵等 AI 事件的
+// 规则/区域/目标分类等字段都在这里，不能丢。
 type eventAlert struct {
 	EventType        string `xml:"eventType" json:"eventType"`
 	EventState       string `xml:"eventState" json:"eventState"`
 	ChannelID        string `xml:"channelID" json:"channelID"`
 	DateTime         string `xml:"dateTime" json:"dateTime"`
 	EventDescription string `xml:"eventDescription" json:"eventDescription"`
+	InnerXML         string `xml:",innerxml" json:"-"`
 }
+
+// rawXML 还原完整事件 XML，供平台 raw_json 存档（含区域/目标等 AI 字段）。
+func (a *eventAlert) rawXML() []byte {
+	if strings.TrimSpace(a.InnerXML) == "" {
+		return []byte(fmt.Sprintf(`<EventNotificationAlert><eventType>%s</eventType><eventState>%s</eventState><channelID>%s</channelID><dateTime>%s</dateTime><eventDescription>%s</eventDescription></EventNotificationAlert>`,
+			escapeXML(a.EventType), escapeXML(a.EventState), escapeXML(a.ChannelID), escapeXML(a.DateTime), escapeXML(a.EventDescription)))
+	}
+	return []byte("<EventNotificationAlert>" + a.InnerXML + "</EventNotificationAlert>")
+}
+
+const maxAlertRawBytes = 16 << 10
 
 func (p *pipeline) handleAlert(data []byte) {
 	var alert eventAlert
@@ -281,7 +324,18 @@ func (p *pipeline) handleAlert(data []byte) {
 	eventID := fmt.Sprintf("%s-%d-%s", sanitizeKey(p.internal), time.Now().UnixNano(), randomHex(4))
 
 	image := p.captureAndUpload(channel, eventID)
-	event := map[string]any{
+	raw := map[string]any{
+		"vendor": "hikvision", "eventType": alert.EventType, "eventState": alert.EventState,
+		"eventDescription": alert.EventDescription, "dateTime": alert.DateTime,
+	}
+	if xml := alert.rawXML(); len(xml) > 0 {
+		// 平台 raw_json 需要完整报文：AI 事件会带规则号、区域、目标分类等。
+		if len(xml) > maxAlertRawBytes {
+			xml = xml[:maxAlertRawBytes]
+		}
+		raw["alertXml"] = string(xml)
+	}
+	payload := map[string]any{
 		"schema":             "zws.event.v1",
 		"eventId":            eventID,
 		"deviceInternalCode": p.internal,
@@ -291,16 +345,17 @@ func (p *pipeline) handleAlert(data []byte) {
 		"severity":           "warning",
 		"occurredAt":         occurred,
 		"receivedAt":         time.Now().UnixMilli(),
-		"raw": map[string]any{
-			"vendor": "hikvision", "eventType": alert.EventType, "eventState": alert.EventState,
-			"eventDescription": alert.EventDescription, "dateTime": alert.DateTime,
-		},
+		"raw":                raw,
 	}
+	if code := p.channelCodes[channel]; code != "" {
+		payload["channelInternalCode"] = code
+	}
+	event := payload
 	if image != nil {
 		event["image"] = image
 	}
-	payload, _ := json.Marshal(event)
-	token := p.mqtt.Publish(p.topic, p.qos, false, payload)
+	body, _ := json.Marshal(event)
+	token := p.mqtt.Publish(p.topic, p.qos, false, body)
 	if !token.WaitTimeout(5*time.Second) || token.Error() != nil {
 		log.Printf("hik event publish failed device=%s event=%s err=%v", p.deviceUID, eventID, token.Error())
 		return
@@ -359,9 +414,10 @@ func normalizeEventType(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "vmd", "motion", "motiondetection":
 		return "motion"
-	case "linedetection", "linecrossing", "line_crossing":
+	case "linedetection", "linecrossing", "line_crossing", "crosslinedetection":
 		return "line_crossing"
-	case "fielddetection", "intrusion", "regionentrance", "regionexiting":
+	case "fielddetection", "intrusion", "intrusiondetection", "regionintrusion",
+		"regionentrance", "regionexiting":
 		return "intrusion"
 	case "videoloss", "video_loss":
 		return "video_loss"

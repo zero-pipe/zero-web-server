@@ -13,6 +13,7 @@ type Event struct {
 	DeviceInternalCode string `json:"deviceInternalCode"`
 	DeviceUID          string `json:"deviceUid"`
 	ChannelExternalKey string `json:"channelExternalKey"`
+	ChannelInternalCode string `json:"channelInternalCode"`
 	EventType          string `json:"eventType"`
 	Severity           string `json:"severity"`
 	OccurredAt         int64  `json:"occurredAt"`

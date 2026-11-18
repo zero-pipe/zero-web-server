@@ -11,6 +11,7 @@ import (
 
 	domainonvif "zero-web-server/internal/domain/onvif"
 	domainptz "zero-web-server/internal/domain/ptz"
+	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/onvifcli"
 	"zero-web-server/internal/port"
 
@@ -416,9 +417,12 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken s
 	}
 	enrichChannelDisplay(ch)
 
-	app := "onvif"
+	app := mediaurl.LiveApp
 	vhost := "__defaultVhost__"
-	stream := fmt.Sprintf("%d_%s", device.ID, sanitizeStream(ch.ProfileToken))
+	stream := mediaurl.LiveStream(device.InternalCode, ch.InternalCode)
+	if stream == "" {
+		stream = fmt.Sprintf("%d_%s", device.ID, sanitizeStream(ch.ProfileToken))
+	}
 
 	prefer := device.MediaServerID
 	if prefer == "" {
@@ -567,13 +571,26 @@ func (s *Service) StopPlay(ctx context.Context, channelID int64, profileToken st
 		return err
 	}
 	_ = applyStreamProfile(ch, profileToken)
-	app := "onvif"
+	app := mediaurl.LiveApp
 	vhost := "__defaultVhost__"
-	stream := fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken))
+	stream := ""
+	if dev, derr := s.devices.GetByID(ctx, ch.DeviceID); derr == nil && dev != nil {
+		stream = mediaurl.LiveStream(dev.InternalCode, ch.InternalCode)
+	}
+	if stream == "" {
+		stream = fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken))
+	}
 	if node, err := s.media.ResolveForStream(ctx, app, stream, "auto"); err == nil {
 		s.resetONVIFStream(ctx, vhost, app, stream, node)
 	}
 	s.media.UnbindStream(app, stream)
+	// 兼容旧命名（数字设备 ID + ProfileToken）。
+	if legacy := fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken)); legacy != stream {
+		if node, err := s.media.ResolveForStream(ctx, mediaurl.LiveApp, legacy, "auto"); err == nil {
+			s.resetONVIFStream(ctx, vhost, mediaurl.LiveApp, legacy, node)
+		}
+		s.media.UnbindStream(mediaurl.LiveApp, legacy)
+	}
 	return nil
 }
 

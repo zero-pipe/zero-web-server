@@ -89,6 +89,12 @@ export const constantRoutes = [
       meta: { title: '通道列表', icon: 'channelManger' }
     },
     {
+      path: '/channel/unified',
+      name: 'UnifiedChannel',
+      component: () => import('@/views/channel/unified'),
+      meta: { title: '统一通道' }
+    },
+    {
       path: '/channel/record/:channelId',
       name: 'CommonRecord',
       component: () => import('@/views/channel/record'),

@@ -63,7 +63,7 @@
         </el-table-column>
         <el-table-column label="操作" width="330">
           <template slot-scope="{ row }">
-            <el-button type="text" size="mini" @click="openChannels(row)">通道</el-button>
+            <el-button type="text" size="mini" @click="goChannels(row)">通道</el-button>
             <el-button type="text" size="mini" @click="syncDevice(row)">同步</el-button>
             <el-button type="text" size="mini" :disabled="!row.online" @click="toggleArm(row)">
               {{ row._armed ? '撤防' : '布防' }}
@@ -103,44 +103,18 @@
       </div>
     </el-dialog>
 
-    <!-- 通道 -->
-    <el-dialog :title="'通道 - ' + (currentDevice && currentDevice.name)" :visible.sync="channelsVisible" width="640px">
-      <el-table :data="channels" size="small" border>
-        <el-table-column prop="channelId" label="通道 ID" width="120" />
-        <el-table-column prop="name" label="名称" min-width="140" />
-        <el-table-column prop="status" label="状态" width="80" />
-        <el-table-column prop="ptzType" label="PTZ" width="70" />
-        <el-table-column label="操作" width="100">
-          <template slot-scope="{ row }">
-            <el-button type="text" size="mini" @click="playChannel(row)">播放</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-dialog>
-
-    <!-- 播放 -->
-    <el-dialog :title="'播放 - ' + (playingChannel && playingChannel.name)" :visible.sync="playerVisible" width="820px" @closed="stopPlay">
-      <jessibuca v-if="playerVisible && videoUrl" :video-url="videoUrl" height="440px" />
-      <div v-if="streamInfo" class="stream-links">
-        <div v-if="streamInfo.flv">FLV: {{ streamInfo.flv }}</div>
-        <div v-if="streamInfo.wsFlv">WS-FLV: {{ streamInfo.wsFlv }}</div>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
 <script>
-import jessibuca from '@/views/common/jessibuca'
 import {
   queryPlugins, queryIpcDevices, addIpcDevice, deleteIpcDevice,
-  syncIpcDevice, queryIpcChannels, startIpcLive, stopIpcLive,
-  armIpcDevice, disarmIpcDevice, getIpcArmStatus
+  syncIpcDevice, armIpcDevice, disarmIpcDevice, getIpcArmStatus
 } from '@/api/plugin'
 import { getPipelineStatus } from '@/api/infra'
 
 export default {
   name: 'IpcPlugins',
-  components: { jessibuca },
   data() {
     return {
       loading: false,
@@ -151,14 +125,6 @@ export default {
       addForm: { pluginId: '', protocol: '', name: '', params: {} },
       schemaProps: {},
       protocolOptions: [],
-      channelsVisible: false,
-      currentDevice: null,
-      channels: [],
-      playerVisible: false,
-      playerDevice: null,
-      playingChannel: null,
-      streamInfo: null,
-      videoUrl: '',
       pipelineReady: false,
       pipelineMsg: '',
       armStatuses: {}
@@ -293,35 +259,9 @@ export default {
         this.loadAll()
       })
     },
-    openChannels(row) {
-      this.currentDevice = row
-      queryIpcChannels(row.id).then(res => {
-        this.channels = (res.data && res.data.list) || []
-        this.channelsVisible = true
-      })
-    },
-    playChannel(channel) {
-      if (!this.currentDevice) return
-      this.playingChannel = channel
-      startIpcLive(this.currentDevice.id, channel.channelId).then(res => {
-        const content = res.data
-        if (!content) {
-          this.$message.error('未返回播放地址')
-          return
-        }
-        this.streamInfo = content
-        this.videoUrl = content.wsFlv || content.flv || ''
-        this.playerVisible = true
-      })
-    },
-    stopPlay() {
-      if (this.currentDevice && this.playingChannel) {
-        stopIpcLive(this.currentDevice.id, this.playingChannel.channelId).catch(() => {})
-      }
-      this.playerVisible = false
-      this.videoUrl = ''
-      this.streamInfo = null
-      this.playingChannel = null
+    // 通道入口统一到「统一通道」页：按设备内码过滤，与标准接入一致。
+    goChannels(row) {
+      this.$router.push({ path: '/channel/unified', query: { deviceInternalCode: row.internalCode, protocol: row.protocol } })
     }
   }
 }
