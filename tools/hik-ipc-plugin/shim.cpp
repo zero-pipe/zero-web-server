@@ -152,6 +152,31 @@ int hik_list_channels(long user_id, int start_dchan, int *out_ids, int max) {
     return count;
 }
 
+static void CALLBACK zws_alarm_cb(LONG lCommand, NET_DVR_ALARMER *pAlarmer,
+                                  char *pAlarmInfo, DWORD dwBufLen, void *pUser) {
+    /* Step 3 will parse and publish events. For now the callback only keeps
+     * the alarm channel alive. */
+    (void)lCommand; (void)pAlarmer; (void)pAlarmInfo; (void)dwBufLen; (void)pUser;
+}
+
+long hik_setup_alarm(long user_id) {
+    NET_DVR_SetDVRMessageCallBack_V50(0, zws_alarm_cb, NULL);
+    NET_DVR_SETUPALARM_PARAM param;
+    memset(&param, 0, sizeof(param));
+    param.dwSize = sizeof(param);
+    param.byLevel = 1;           /* medium */
+    param.byAlarmInfoType = 1;   /* new alarm info (V40) */
+    param.byRetAlarmTypeV40 = 1;
+    param.byDeployType = 0;      /* client deployment */
+    LONG handle = NET_DVR_SetupAlarmChan_V41((LONG)user_id, &param);
+    return (long)handle;
+}
+
+int hik_close_alarm(long alarm_handle) {
+    if (alarm_handle < 0) return 0;
+    return NET_DVR_CloseAlarmChan_V30((LONG)alarm_handle) ? 0 : -1;
+}
+
 int hik_ptz_speed(long user_id, long channel, unsigned int cmd, unsigned int stop, unsigned int speed) {
     if (speed < 1) speed = 1;
     if (speed > 7) speed = 7;

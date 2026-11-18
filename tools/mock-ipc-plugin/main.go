@@ -64,6 +64,8 @@ func main() {
 	mux.HandleFunc("/v1/live/start", handleLiveStart(cfg.rtspURL))
 	mux.HandleFunc("/v1/live/stop", okHandler)
 	mux.HandleFunc("/v1/ptz", okHandler)
+	mux.HandleFunc("/v1/arm", handleArm)
+	mux.HandleFunc("/v1/disarm", handleDisarm)
 
 	go func() {
 		addr := ":19090"
@@ -96,7 +98,7 @@ func register(cfg pluginConfig) {
 		"vendor":           "mock",
 		"version":          "0.1.0",
 		"protocols":        []string{protocol},
-		"capabilities":     []string{"live", "ptz"},
+		"capabilities":     []string{"live", "ptz", "alarm", "arming"},
 		"streamTransports": transportsFromEnv(),
 		"configSchema":     configSchema,
 		"endpoint":         cfg.endpoint,
@@ -126,7 +128,43 @@ func heartbeatLoop(cfg pluginConfig) {
 var (
 	sessionMu sync.Mutex
 	sessions  = map[string]bool{}
+	armed     = map[string]string{}
 )
+
+func handleArm(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID          string   `json:"device_uid"`
+		DeviceInternalCode string   `json:"device_internal_code"`
+		EventTypes         []string `json:"event_types"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	if req.DeviceUID == "" || req.DeviceInternalCode == "" {
+		writeErr(w, "INVALID_ARGUMENT", "missing device_uid/device_internal_code")
+		return
+	}
+	subID := fmt.Sprintf("mock-%s-%d", req.DeviceUID, time.Now().UnixNano())
+	sessionMu.Lock()
+	armed[req.DeviceUID] = subID
+	sessionMu.Unlock()
+	log.Printf("arm device=%s internal=%s events=%v subscription=%s", req.DeviceUID, req.DeviceInternalCode, req.EventTypes, subID)
+	writeOK(w, map[string]any{"armed": true, "subscriptionId": subID})
+}
+
+func handleDisarm(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID      string `json:"device_uid"`
+		SubscriptionID string `json:"subscription_id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	sessionMu.Lock()
+	delete(armed, req.DeviceUID)
+	sessionMu.Unlock()
+	log.Printf("disarm device=%s subscription=%s", req.DeviceUID, req.SubscriptionID)
+	writeOK(w, nil)
+}
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {

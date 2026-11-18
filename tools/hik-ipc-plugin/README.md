@@ -91,12 +91,13 @@ DLL 与 `HCNetSDKCom` 必须和 exe 同目录（`bin/hik-win/` 已按此布局�
    - 平台交给 ZMS 拉流并生成 flv/ws-flv 等地址；
    - **需要平台已配置在线 ZMS 媒体节点**。
 5. PTZ：设备资产/插件页面调用 PTZ，插件通过 `NET_DVR_PTZControlWithSpeed_Other` 控制并自动停止。
+6. 布防：插件页面点击「布防」，平台把 MQTT + 对象存储 + 设备内码下发；插件通过 `NET_DVR_SetupAlarmChan_V41` 打开报警通道。当前回调只保活，抓图/上传/MQTT 发布在 Step 3 接入。
 
 ## 5. 已知限制
 
 - 直播走设备 RTSP，不走 SDK 私有码流；NVR 下挂通道若 RTSP 路径/凭据不同，需用 `HIK_RTSP_TEMPLATE` 调整。
 - 通道枚举依赖 `NET_DVR_GET_IPPARACFG_V40`；部分设备/权限下会回退为 1..N。
-- 回放、报警订阅、抓图尚未接入插件 RPC。
+- 回放、抓图、MQTT 事件发布尚未接入；报警通道已打开但回调暂不产生事件（Step 3）。
 - PTZ 速度取 `z` 或 `h`（1..7），方向映射见 `main.go`。
 
 ## 6. 后续扩展点

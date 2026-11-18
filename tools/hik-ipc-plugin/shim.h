@@ -37,6 +37,10 @@ int hik_list_channels(long user_id, int start_dchan, int *out_ids, int max);
 /* PTZ with speed (1..7). stop=1 stops movement. */
 int hik_ptz_speed(long user_id, long channel, unsigned int cmd, unsigned int stop, unsigned int speed);
 
+/* Open/close the device alarm channel. Returns alarm handle (>=0) or -1. */
+long hik_setup_alarm(long user_id);
+int  hik_close_alarm(long alarm_handle);
+
 #ifdef __cplusplus
 }
 #endif

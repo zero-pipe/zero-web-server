@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -59,6 +60,13 @@ type session struct {
 	Info     *DeviceInfo
 	Channels map[string]int // display channel ID -> SDK channel number
 	Order    []string
+
+	AlarmHandle    int64
+	Armed          bool
+	SubscriptionID string
+	InternalCode   string
+	EventTypes     []string
+	ArmConfig      map[string]any // 保存 MQTT / ObjectStore 配置，Step 3 使用
 }
 
 var (
@@ -90,6 +98,8 @@ func main() {
 	mux.HandleFunc("/v1/live/start", handleLiveStart(cfg))
 	mux.HandleFunc("/v1/live/stop", okHandler)
 	mux.HandleFunc("/v1/ptz", handlePTZ)
+	mux.HandleFunc("/v1/arm", handleArm)
+	mux.HandleFunc("/v1/disarm", handleDisarm)
 
 	go func() {
 		log.Printf("hik plugin listening on %s, endpoint=%s", cfg.listen, cfg.endpoint)
@@ -130,8 +140,15 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	s.loadChannels()
 	sessionMu.Lock()
+	old := sessions[req.DeviceUID]
 	sessions[req.DeviceUID] = s
 	sessionMu.Unlock()
+	if old != nil {
+		if old.Armed && old.AlarmHandle >= 0 {
+			_ = sdk.CloseAlarm(old.AlarmHandle)
+		}
+		sdk.Logout(old.UserID)
+	}
 	log.Printf("hik login device=%s ip=%s uid=%d channels=%d serial=%s model=%s",
 		req.DeviceUID, ip, uid, len(s.Order), info.Serial, info.Model)
 	writeOK(w, map[string]any{
@@ -166,6 +183,9 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	sessionMu.Lock()
 	if s, ok := sessions[req.DeviceUID]; ok {
+		if s.Armed && s.AlarmHandle >= 0 {
+			_ = sdk.CloseAlarm(s.AlarmHandle)
+		}
 		sdk.Logout(s.UserID)
 		delete(sessions, req.DeviceUID)
 	}
@@ -221,6 +241,80 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 		rtsp := buildRTSPURL(cfg, s, display)
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtsp})
 	}
+}
+
+func handleArm(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID          string   `json:"device_uid"`
+		DeviceInternalCode string   `json:"device_internal_code"`
+		EventTypes         []string `json:"event_types"`
+		MQTT               any      `json:"mqtt"`
+		ObjectStore        any      `json:"object_store"`
+	}
+	var raw map[string]any
+	body, _ := io.ReadAll(r.Body)
+	_ = json.Unmarshal(body, &raw)
+	if err := json.Unmarshal(body, &req); err != nil {
+		writeErr(w, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	if req.DeviceUID == "" || req.DeviceInternalCode == "" {
+		writeErr(w, "INVALID_ARGUMENT", "missing device_uid/device_internal_code")
+		return
+	}
+	if req.MQTT == nil || req.ObjectStore == nil {
+		writeErr(w, "INVALID_ARGUMENT", "missing mqtt/object_store config")
+		return
+	}
+	sessionMu.Lock()
+	s := sessions[req.DeviceUID]
+	sessionMu.Unlock()
+	if s == nil {
+		writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
+		return
+	}
+	if s.Armed && s.AlarmHandle >= 0 {
+		_ = sdk.CloseAlarm(s.AlarmHandle)
+	}
+	handle, err := sdk.SetupAlarm(s.UserID)
+	if err != nil {
+		writeErr(w, "INTERNAL", err.Error())
+		return
+	}
+	subID := fmt.Sprintf("hik-%s-%d", req.DeviceUID, time.Now().UnixNano())
+	sessionMu.Lock()
+	s.AlarmHandle = handle
+	s.Armed = true
+	s.SubscriptionID = subID
+	s.InternalCode = req.DeviceInternalCode
+	s.EventTypes = req.EventTypes
+	s.ArmConfig = raw
+	sessionMu.Unlock()
+	log.Printf("arm device=%s internal=%s events=%v subscription=%s alarmHandle=%d",
+		req.DeviceUID, req.DeviceInternalCode, req.EventTypes, subID, handle)
+	writeOK(w, map[string]any{"armed": true, "subscriptionId": subID})
+}
+
+func handleDisarm(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID      string `json:"device_uid"`
+		SubscriptionID string `json:"subscription_id"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	sessionMu.Lock()
+	s := sessions[req.DeviceUID]
+	if s != nil && s.Armed {
+		if s.AlarmHandle >= 0 {
+			_ = sdk.CloseAlarm(s.AlarmHandle)
+		}
+		s.Armed = false
+		s.AlarmHandle = 0
+		s.SubscriptionID = ""
+		s.ArmConfig = nil
+	}
+	sessionMu.Unlock()
+	log.Printf("disarm device=%s subscription=%s", req.DeviceUID, req.SubscriptionID)
+	writeOK(w, nil)
 }
 
 func buildRTSPURL(cfg config, s *session, displayChannel int) string {
@@ -310,7 +404,7 @@ func register(cfg config) {
 		"vendor":           "hikvision",
 		"version":          "0.2.0",
 		"protocols":        []string{protocol},
-		"capabilities":     []string{"live", "ptz"},
+		"capabilities":     []string{"live", "ptz", "alarm", "arming"},
 		"streamTransports": []string{"rtsp_url"},
 		"configSchema":     configSchema,
 		"endpoint":         cfg.endpoint,

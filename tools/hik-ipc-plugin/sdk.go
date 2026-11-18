@@ -110,6 +110,21 @@ func (HikSDK) ListChannels(userID int64, startDChan, max int) []int {
 
 func (HikSDK) Logout(userID int64) { C.hik_logout(C.long(userID)) }
 
+func (HikSDK) SetupAlarm(userID int64) (int64, error) {
+	handle := int64(C.hik_setup_alarm(C.long(userID)))
+	if handle < 0 {
+		return 0, fmt.Errorf("NET_DVR_SetupAlarmChan_V41 failed: %d", int(C.hik_last_error()))
+	}
+	return handle, nil
+}
+
+func (HikSDK) CloseAlarm(handle int64) error {
+	if C.hik_close_alarm(C.long(handle)) != 0 {
+		return fmt.Errorf("NET_DVR_CloseAlarmChan_V30 failed: %d", int(C.hik_last_error()))
+	}
+	return nil
+}
+
 func (HikSDK) PTZ(userID int64, channel int, cmd int, stop bool, speed int) error {
 	stopped := 0
 	if stop {
