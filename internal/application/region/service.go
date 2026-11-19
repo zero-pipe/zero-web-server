@@ -127,15 +127,19 @@ func (s *Service) GetDescription(code string) string {
 }
 
 func (s *Service) Add(region *domaingroupregion.RegionRecord) error {
-	if strings.TrimSpace(region.Name) == "" {
+	region.Name = strings.TrimSpace(region.Name)
+	region.DeviceID = strings.TrimSpace(region.DeviceID)
+	if region.Name == "" {
 		return ErrRegionNameRequired
 	}
-	if strings.TrimSpace(region.DeviceID) == "" {
+	if region.DeviceID == "" {
 		return ErrRegionDeviceIDRequired
 	}
-	if strings.TrimSpace(region.ParentDeviceID) == "" {
-		region.ParentDeviceID = ""
+	// 显式去重：不能只依赖库表唯一键（AutoMigrate 建出的旧库可能没有该索引）。
+	if node, err := s.repo.GetRegionByDeviceID(region.DeviceID); err == nil && node != nil {
+		return ErrRegionDuplicate
 	}
+	region.ParentDeviceID = strings.TrimSpace(region.ParentDeviceID)
 	if err := s.repo.AddRegion(region); err != nil {
 		if isDuplicateKey(err) {
 			return ErrRegionDuplicate
@@ -149,12 +153,18 @@ func (s *Service) Update(region *domaingroupregion.RegionRecord) error {
 	if region.ID <= 0 {
 		return errors.New("无效的区划ID")
 	}
-	if strings.TrimSpace(region.Name) == "" {
+	region.Name = strings.TrimSpace(region.Name)
+	region.DeviceID = strings.TrimSpace(region.DeviceID)
+	if region.Name == "" {
 		return ErrRegionNameRequired
 	}
-	if strings.TrimSpace(region.DeviceID) == "" {
+	if region.DeviceID == "" {
 		return ErrRegionDeviceIDRequired
 	}
+	if node, err := s.repo.GetRegionByDeviceID(region.DeviceID); err == nil && node != nil && node.ID != region.ID {
+		return ErrRegionDuplicate
+	}
+	region.ParentDeviceID = strings.TrimSpace(region.ParentDeviceID)
 	if err := s.repo.UpdateRegion(region); err != nil {
 		if isDuplicateKey(err) {
 			return ErrRegionDuplicate
@@ -162,6 +172,47 @@ func (s *Service) Update(region *domaingroupregion.RegionRecord) error {
 		return err
 	}
 	return nil
+}
+
+// Delete 删除区划节点及其全部子节点，同时解除通道挂载并清理编码映射。
+func (s *Service) Delete(id int) error {
+	if id <= 0 {
+		return errors.New("无效的区划ID")
+	}
+	root, err := s.repo.GetRegionByID(id)
+	if err != nil {
+		return fmt.Errorf("行政区划不存在: %d", id)
+	}
+	ids := []int{id}
+	codes := []string{root.DeviceID}
+	visited := map[int]bool{id: true}
+	queue := []int{id}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		children, err := s.repo.ListRegionChildren(cur)
+		if err != nil {
+			return err
+		}
+		for i := range children {
+			if visited[children[i].ID] {
+				continue
+			}
+			visited[children[i].ID] = true
+			ids = append(ids, children[i].ID)
+			codes = append(codes, children[i].DeviceID)
+			queue = append(queue, children[i].ID)
+		}
+	}
+	if err := s.repo.ClearChannelsByCivilCodes(codes); err != nil {
+		return err
+	}
+	for _, code := range codes {
+		if err := s.repo.DeleteRegionCodeMapping(code); err != nil {
+			return err
+		}
+	}
+	return s.repo.DeleteRegionsByIDs(ids)
 }
 
 func isDuplicateKey(err error) bool {

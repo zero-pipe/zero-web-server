@@ -180,8 +180,35 @@ WHERE id = ?`,
 	).Error
 }
 
-func (r *GroupRegionRepository) GetGroupRecordByID(id int) (*domaingroupregion.GroupRecord, error) {
-	var row domaingroupregion.GroupRecord
+func (r *GroupRegionRepository) ListRegionChildren(parentID int) ([]domaingroupregion.RegionRecord, error) {
+	var rows []domaingroupregion.RegionRecord
+	err := r.db.Raw(`
+SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id
+FROM zws_common_region WHERE parent_id = ?`, parentID).Scan(&rows).Error
+	if rows == nil {
+		rows = []domaingroupregion.RegionRecord{}
+	}
+	return rows, err
+}
+
+func (r *GroupRegionRepository) DeleteRegionsByIDs(ids []int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.Exec(`DELETE FROM zws_common_region WHERE id IN ?`, ids).Error
+}
+
+func (r *GroupRegionRepository) ClearChannelsByCivilCodes(civilCodes []string) error {
+	if len(civilCodes) == 0 {
+		return nil
+	}
+	return r.db.Exec(`
+UPDATE zws_device_channel
+SET gb_civil_code = NULL, civil_code = NULL, update_time = ?
+WHERE channel_type = 0 AND gb_civil_code IN ?`, nowTimeStr(), civilCodes).Error
+}
+
+func (r *GroupRegionRepository) GetGroupRecordByID(id int) (*domaingroupregion.GroupRecord, error) {	var row domaingroupregion.GroupRecord
 	if err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id,
        business_group, COALESCE(civil_code, '') AS civil_code, COALESCE(alias, '') AS alias

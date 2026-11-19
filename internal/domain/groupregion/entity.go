@@ -42,6 +42,12 @@ type Repository interface {
 	AddRegion(region *RegionRecord) error
 	// GetRegionByDeviceID 按国标/区划编号查节点（一键建树去重用）。
 	GetRegionByDeviceID(deviceID string) (*domaintree.Node, error)
+	// ListRegionChildren 返回直接子区划（删除子树时逐层收集）。
+	ListRegionChildren(parentID int) ([]RegionRecord, error)
+	// DeleteRegionsByIDs 删除区划节点（调用方负责先删子后删父）。
+	DeleteRegionsByIDs(ids []int) error
+	// ClearChannelsByCivilCodes 解除通道对区划的挂载（gb_civil_code 置空）。
+	ClearChannelsByCivilCodes(civilCodes []string) error
 	// 区划节点对外编码映射（公安等场景上级指定编码）。
 	ListRegionCodeMappings() ([]*RegionCodeMapping, error)
 	UpsertRegionCodeMapping(m *RegionCodeMapping) error

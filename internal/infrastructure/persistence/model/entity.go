@@ -362,7 +362,7 @@ func (CommonGroup) TableName() string { return "zws_common_group" }
 // CommonRegion 行政区划。
 type CommonRegion struct {
 	ID             int    `gorm:"column:id;primaryKey;autoIncrement"`
-	DeviceID       string `gorm:"column:device_id;size:50;not null"`
+	DeviceID       string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_common_region_device_id"`
 	Name           string `gorm:"column:name;size:255;not null"`
 	ParentID       *int   `gorm:"column:parent_id"`
 	ParentDeviceID string `gorm:"column:parent_device_id;size:50"`

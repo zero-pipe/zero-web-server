@@ -143,6 +143,12 @@ func autoMigrateAll(db *gorm.DB) error {
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)
 		if err := db.AutoMigrate(m); err != nil {
+			// 旧库可能已存在重复区划编号，唯一索引创建失败不应阻塞启动；
+			// 清理重复数据（见 sql/migrate_region_dedupe.sql）后重启即自动补索引。
+			if _, ok := m.(*model.CommonRegion); ok && isDuplicateEntryErr(err) {
+				applog.Warn("zws_common_region 存在重复区划编号，跳过唯一索引创建；请清理重复数据后重启", "err", err)
+				continue
+			}
 			return fmt.Errorf("%T: %w", m, err)
 		}
 		if !exists {
@@ -156,6 +162,15 @@ func autoMigrateAll(db *gorm.DB) error {
 		return err
 	}
 	return nil
+}
+
+// isDuplicateEntryErr 判断是否为 MySQL 唯一键冲突（1062）。
+func isDuplicateEntryErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate entry") || strings.Contains(msg, "error 1062") || strings.Contains(msg, "1062")
 }
 
 // seedEventTypes 写入内置事件类型；已存在的类型不覆盖，便于后续页面定制。

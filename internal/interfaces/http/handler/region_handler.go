@@ -60,8 +60,20 @@ func (h *RegionHandler) Update(c *gin.Context) {
 	response.OK(c, nil)
 }
 
-func (h *RegionHandler) Delete(c *gin.Context)         { response.OK(c, nil) }
-func (h *RegionHandler) Path(c *gin.Context)           { response.OK(c, []any{}) }
+func (h *RegionHandler) Delete(c *gin.Context) {
+	id := parseOptionalIntQuery(c, "id")
+	if id == nil || *id <= 0 {
+		response.Error(c, response.CodeBadReq, "id 不能为空")
+		return
+	}
+	if err := h.svc.Delete(*id); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+func (h *RegionHandler) Path(c *gin.Context) { response.OK(c, []any{}) }
 // AddByCivilCode GET /api/v1/region/addByCivilCode?civilCode=530102 —— 一键建树。
 func (h *RegionHandler) AddByCivilCode(c *gin.Context) {
 	code := strings.TrimSpace(c.Query("civilCode"))
