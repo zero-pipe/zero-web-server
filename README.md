@@ -67,10 +67,10 @@ cd web && npm install && npm run dev
 
 更多：
 
-- 部署（Docker / 端口 / 升级）：[docs/DEPLOY.md](docs/DEPLOY.md)
-- 配置项说明：[docs/CONFIG.md](docs/CONFIG.md)
-- 架构与依赖规则：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- IPC 私有 SDK 插件化接入设计：[docs/IPC_PLUGIN_DESIGN.md](docs/IPC_PLUGIN_DESIGN.md)
+- 部署（Docker / 端口 / 升级）：[DEPLOY.md](DEPLOY.md)
+- 配置项说明：[CONFIG.md](CONFIG.md)
+- 物联设备统一接入模型：[docs/UNIFIED_ACCESS_MODEL.md](docs/UNIFIED_ACCESS_MODEL.md)
+- GB/T 28181 场景规划与使用示例：[docs/GB28181_SCENARIOS.md](docs/GB28181_SCENARIOS.md)
 
 ## 目录结构
 
@@ -82,7 +82,8 @@ zero-web-server/
 ├── cmd/server/              # 程序入口与依赖装配
 ├── configs/                 # config.yaml、civilCode.csv；config.local.yaml（本地覆盖，不入库）
 ├── docker/                  # MySQL + Redis Compose
-├── docs/                    # 部署 / 配置 / 架构文档
+├── docs/                    # 统一接入模型 / 国标场景规划
+├── reference/               # 标准原文与参考资料（本地，不入库）
 ├── internal/
 │   ├── adapter/             # 端口适配器（媒体集群、对象存储）
 │   ├── apperr/              # 带业务码的应用错误

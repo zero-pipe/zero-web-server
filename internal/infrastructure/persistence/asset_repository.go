@@ -533,3 +533,10 @@ func toDomainAssetProfile(m *model.AssetStreamProfile) *domainasset.StreamProfil
 		IsDefault: m.IsDefault, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }
+
+// SetCapabilityAvailable 运行时更新能力可用性。
+func (r *AssetRepository) SetCapabilityAvailable(scopeType, scopeID, operation string, available bool) error {
+	return r.db.Model(&model.AssetCapability{}).
+		Where("scope_type = ? AND scope_id = ? AND operation = ?", scopeType, scopeID, operation).
+		Updates(map[string]any{"available": available, "update_time": nowText()}).Error
+}

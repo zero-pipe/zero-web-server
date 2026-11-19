@@ -1,6 +1,7 @@
 package asset
 
 import (
+	"log"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -218,6 +219,21 @@ func (s *Service) StartLive(ctx context.Context, resourceID, profileID string) (
 	}
 	profile, _ := s.pickProfile(resourceID, profileID)
 
+	// 能力声明 + 运行时熔断：明确不支持的直接拒绝；调用失败则把可用性置 false。
+	if supported, exists := s.capabilitySupported("resource", resourceID, "play"); exists && !supported {
+		return nil, fmt.Errorf("该通道不支持实时播放")
+	}
+	content, err := s.startLiveByProtocol(ctx, res, binding, profile)
+	if err != nil {
+		s.markCapability("resource", resourceID, "play", false)
+		return nil, err
+	}
+	s.markCapability("resource", resourceID, "play", true)
+	return content, nil
+}
+
+func (s *Service) startLiveByProtocol(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, profile *domainasset.StreamProfile) (*dto.StreamContent, error) {
+
 	switch binding.Protocol {
 	case "gb28181":
 		if s.play == nil {
@@ -230,7 +246,7 @@ func (s *Service) StartLive(ctx context.Context, resourceID, profileID string) (
 		if err != nil {
 			return nil, err
 		}
-		s.setSession(resourceID, &liveSession{
+		s.setSession(res.ID, &liveSession{
 			Protocol: binding.Protocol, LegacyChannelID: int64(res.LegacyChannelID), ProfileToken: token,
 		})
 		return &dto.StreamContent{
@@ -247,7 +263,7 @@ func (s *Service) StartLive(ctx context.Context, resourceID, profileID string) (
 		if err != nil {
 			return nil, err
 		}
-		s.setSession(resourceID, &liveSession{
+		s.setSession(res.ID, &liveSession{
 			Protocol: binding.Protocol, LegacyDeviceID: binding.LegacyDeviceID, ChannelKey: res.ExternalKey,
 		})
 		return content, nil
@@ -341,4 +357,26 @@ func (s *Service) getSession(resourceID string) *liveSession {
 		delete(s.sessions, resourceID)
 	}
 	return sess
+}
+
+// capabilitySupported 查某能力是否声明支持；exists=false 表示没有声明（不拦截）。
+func (s *Service) capabilitySupported(scopeType, scopeID, operation string) (supported bool, exists bool) {
+	caps, err := s.repo.ListCapabilities(scopeType, scopeID)
+	if err != nil {
+		return true, false
+	}
+	for _, c := range caps {
+		if c.Operation == operation {
+			return c.Supported, true
+		}
+	}
+	return true, false
+}
+
+// markCapability 运行时更新能力可用性（首次失败降级，恢复后置回 true）。
+func (s *Service) markCapability(scopeType, scopeID, operation string, available bool) {
+	if err := s.repo.SetCapabilityAvailable(scopeType, scopeID, operation, available); err != nil {
+		log.Printf("[asset] 更新能力状态失败 scope=%s/%s op=%s available=%v err=%v",
+			scopeType, scopeID, operation, available, err)
+	}
 }

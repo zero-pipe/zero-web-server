@@ -217,6 +217,8 @@ type Repository interface {
 
 	ReplaceCapabilities(scopeType, scopeID string, caps []*Capability) error
 	ListCapabilities(scopeType, scopeID string) ([]*Capability, error)
+	// SetCapabilityAvailable 运行时降级/恢复某一能力（首次调用失败即熔断）。
+	SetCapabilityAvailable(scopeType, scopeID, operation string, available bool) error
 
 	UpsertEventSource(e *EventSource) error
 	ListEventSources(deviceID string) ([]*EventSource, error)

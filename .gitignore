@@ -62,3 +62,6 @@ temp/
 # Go test artifacts
 *.test
 *.out
+
+# 标准原文/参考资料（本地）
+reference/
