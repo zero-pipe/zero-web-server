@@ -1,5 +1,15 @@
 <template>
   <div class="app-container">
+    <!-- 设备列表 / 通道列表：与标准接入一致的页内下钻 -->
+    <channel-panel
+      v-if="channelCtx"
+      embedded
+      device-locked
+      protocol="plugin"
+      :device-internal-code="channelCtx.internalCode"
+      @back="channelCtx = null"
+    />
+    <div v-show="!channelCtx">
     <el-card shadow="never">
       <div slot="header" class="card-header">
         <span>插件实例</span>
@@ -102,7 +112,7 @@
         <el-button size="small" type="primary" :loading="submitting" @click="submitAdd">确定</el-button>
       </div>
     </el-dialog>
-
+    </div>
   </div>
 </template>
 
@@ -112,9 +122,11 @@ import {
   syncIpcDevice, armIpcDevice, disarmIpcDevice, getIpcArmStatus
 } from '@/api/plugin'
 import { getPipelineStatus } from '@/api/infra'
+import ChannelPanel from '@/views/channel/unified-panel'
 
 export default {
   name: 'IpcPlugins',
+  components: { ChannelPanel },
   data() {
     return {
       loading: false,
@@ -127,7 +139,8 @@ export default {
       protocolOptions: [],
       pipelineReady: false,
       pipelineMsg: '',
-      armStatuses: {}
+      armStatuses: {},
+      channelCtx: null
     }
   },
   computed: {
@@ -259,9 +272,9 @@ export default {
         this.loadAll()
       })
     },
-    // 通道入口统一到「统一通道」页：按设备内码过滤，与标准接入一致。
+    // 与标准接入一致的通道下钻：页内切换通道列表，返回时回到设备列表。
     goChannels(row) {
-      this.$router.push({ path: '/channel/unified', query: { deviceInternalCode: row.internalCode, protocol: row.protocol } })
+      this.channelCtx = { internalCode: row.internalCode, name: row.name }
     }
   }
 }

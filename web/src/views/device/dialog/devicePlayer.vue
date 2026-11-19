@@ -9,6 +9,7 @@
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
+      @closed="$emit('closed')"
     >
       <div slot="title" class="vms-player-header">
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
@@ -53,7 +54,7 @@
                   :stream-info="streamInfo"
                 />
               </el-tab-pane>
-              <el-tab-pane label="预置位" name="preset">
+              <el-tab-pane v-if="showPtz" label="预置位" name="preset">
                 <ptzPreset
                   v-if="extraTab === 'preset'"
                   :device-id="deviceId"
@@ -84,7 +85,7 @@
             />
           </div>
 
-          <div class="panel-block is-ptz">
+          <div v-if="showPtz" class="panel-block is-ptz">
             <div class="panel-block-title">云台控制</div>
             <devicePtzPanel
               :device-id="deviceId"
@@ -125,6 +126,7 @@ export default {
       deviceId: '',
       channelId: '',
       ptzType: 0,
+      showPtz: true,
       extraTab: 'media',
       hasAudio: false,
       isLoging: false,
@@ -203,7 +205,8 @@ export default {
       this.deviceId = deviceId
       this.channelId = channelId
       this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
-      this.extraTab = tab === 'preset' ? 'preset' : 'media'
+      this.showPtz = !(param && param.showPtz === false)
+      this.extraTab = (tab === 'preset' && this.showPtz) ? 'preset' : 'media'
       this.streamId = ''
       this.mediaServerId = ''
       this.app = ''
@@ -268,6 +271,7 @@ export default {
       this.streamInfo = null
       this.videoUrl = ''
       this.ptzType = 0
+      this.showPtz = true
       this.extraTab = 'media'
       this.showVideoDialog = false
     },
