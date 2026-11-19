@@ -241,7 +241,7 @@ func main() {
 	playService := playapp.NewService(deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
 	ptzService := ptzapp.NewService(deviceRepo, sessionAdapter)
 	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)
-	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sessionAdapter)
+	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sessionAdapter, playbackService, sessionAdapter, sipCfg.ID, cfg.UserSettings.ServerID, platformChannelSvc)
 	sipServer.SetCascadeInbound(cascadeInbound)
 	onvifFactory := onvifinfra.NewClientFactory(30)
 	onvifService := onvifapp.NewService(

@@ -129,6 +129,73 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 	return content, nil
 }
 
+// PrepareCascadePlayback serves a superior's Playback/Download INVITE: it opens
+// the media server stream, INVITEs the leaf device and returns our answer SDP.
+func (s *Service) PrepareCascadePlayback(ctx context.Context, deviceID, channelGBID, startTime, endTime string, download bool, preferSSRC string) ([]byte, string, error) {
+	device, channel, err := s.loadDeviceChannel(deviceID, channelGBID)
+	if err != nil {
+		return nil, "", err
+	}
+	app := publishauth.LiveApp
+	stream := mediaurl.PlaybackStream(device.InternalCode, channel.InternalCode)
+	if download {
+		stream = mediaurl.DownloadStream(device.InternalCode, channel.InternalCode)
+	}
+	if stream == "" {
+		return nil, "", fmt.Errorf("设备或通道内码缺失")
+	}
+	node, err := s.media.ResolveForStream(ctx, app, stream, device.MediaServerID)
+	if err != nil {
+		return nil, "", err
+	}
+	if _, has := s.sip.InviteManager().Get(stream); has {
+		_ = s.sip.CloseInviteSession(stream)
+		_ = node.CloseStreams(ctx, "__defaultVhost__", app, stream)
+		s.media.UnbindStream(app, stream)
+	}
+	sdpIP := node.SDPIP()
+	streamMode := gbsip.NormalizeStreamMode(device.StreamMode)
+	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(streamMode))
+	if err != nil {
+		return nil, "", fmt.Errorf("打开RTP端口失败: %w", err)
+	}
+	s.media.BindStream(node.ID(), app, stream)
+
+	ssrc := preferSSRC
+	if ssrc == "" {
+		ssrc = gbsip.PlaybackSSRC(s.sip.Domain(), s.nextSSRCSeq())
+	}
+	var answer string
+	if download {
+		answer = gbsip.BuildDownloadSDP(device.DeviceID, channel.GBDeviceID, sdpIP, rtpPort, ssrc, streamMode, startTime, endTime, 4)
+	} else {
+		answer = gbsip.BuildPlaybackSDP(device.DeviceID, channel.GBDeviceID, sdpIP, rtpPort, ssrc, streamMode, startTime, endTime)
+	}
+
+	sessionType := gbsip.SessionPlayback
+	if download {
+		sessionType = gbsip.SessionDownload
+	}
+	deviceSDP := answer
+	go func() {
+		_ = s.sip.SendInviteSession(device, channel, deviceSDP, ssrc, stream, sessionType, startTime, endTime, 4)
+	}()
+	return []byte(answer), stream, nil
+}
+
+// StopCascade tears down a stream started for a superior's INVITE.
+func (s *Service) StopCascade(stream string) error {
+	if stream == "" {
+		return nil
+	}
+	_ = s.sip.CloseInviteSession(stream)
+	if node, err := s.media.ResolveForStream(context.Background(), publishauth.LiveApp, stream, "auto"); err == nil {
+		_ = node.CloseStreams(context.Background(), "__defaultVhost__", publishauth.LiveApp, stream)
+	}
+	s.media.UnbindStream(publishauth.LiveApp, stream)
+	return nil
+}
+
 func (s *Service) StopPlayback(deviceID, channelDeviceID, stream string) error {
 	if stream == "" {
 		device, channel, err := s.loadDeviceChannel(deviceID, channelDeviceID)

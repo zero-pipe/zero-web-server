@@ -161,6 +161,27 @@ func (b *bridge) OnInvite(ctx context.Context, ev gbserver.InboundInviteEvent) (
 	return b.cascade.OnInvite(ctx, ev)
 }
 
+func (b *bridge) OnSubscribe(ctx context.Context, ev gbserver.InboundSubscribeEvent) (int, bool, error) {
+	if b.cascade == nil {
+		return 0, false, nil
+	}
+	return b.cascade.OnSubscribe(ctx, ev)
+}
+
+func (b *bridge) OnQuery(ctx context.Context, ev gbserver.InboundQueryEvent) ([]byte, bool) {
+	if b.cascade == nil {
+		return nil, false
+	}
+	return b.cascade.OnQuery(ctx, ev)
+}
+
+func (b *bridge) OnInfo(ctx context.Context, ev gbserver.InboundInfoEvent) error {
+	if b.cascade == nil {
+		return nil
+	}
+	return b.cascade.OnInfo(ctx, ev)
+}
+
 func (b *bridge) OnInviteEnd(ctx context.Context, callID string) error {
 	if b.cascade == nil {
 		return nil
