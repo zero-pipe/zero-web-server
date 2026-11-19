@@ -9,10 +9,13 @@ import (
 // registerAssets 统一设备资产与资源 API。
 func registerAssets(g *gin.RouterGroup, h *handler.AssetHandler) {
 	g.GET("/assets", h.List)
+	g.GET("/assets/tree", h.Tree)
 	g.GET("/channels", h.Channels)
 	g.GET("/assets/:id", h.Detail)
+	g.PUT("/assets/:id", h.UpdateDevice)
 	g.GET("/assets/:id/resources", h.Resources)
 	g.POST("/assets/:id/sync", h.Sync)
+	g.PUT("/channels/:code", h.UpdateChannel)
 
 	g.GET("/resources/:id", h.ResourceDetail)
 	g.GET("/resources/:id/profiles", h.Profiles)

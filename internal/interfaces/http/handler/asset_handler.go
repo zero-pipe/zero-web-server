@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	assetapp "zero-web-server/internal/application/asset"
+	domainasset "zero-web-server/internal/domain/asset"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -52,6 +53,48 @@ func (h *AssetHandler) Detail(c *gin.Context) {
 		detail.Binding.ConfigJSON = maskSecrets(detail.Binding.ConfigJSON)
 	}
 	response.OK(c, detail)
+}
+
+func (h *AssetHandler) Tree(c *gin.Context) {
+	list, err := h.svc.Tree(c.Query("query"), c.Query("protocol"), c.Query("status"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	for _, node := range list {
+		if node.Binding != nil {
+			node.Binding.ConfigJSON = maskSecrets(node.Binding.ConfigJSON)
+		}
+	}
+	response.OK(c, gin.H{"list": list, "total": len(list)})
+}
+
+func (h *AssetHandler) UpdateDevice(c *gin.Context) {
+	var patch domainasset.DevicePatch
+	if err := c.ShouldBindJSON(&patch); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
+		return
+	}
+	dev, err := h.svc.UpdateDevice(c.Param("id"), patch)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, dev)
+}
+
+func (h *AssetHandler) UpdateChannel(c *gin.Context) {
+	var patch domainasset.ResourcePatch
+	if err := c.ShouldBindJSON(&patch); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
+		return
+	}
+	res, err := h.svc.UpdateChannel(c.Param("code"), patch)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, res)
 }
 
 func (h *AssetHandler) Resources(c *gin.Context) {

@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -202,6 +203,86 @@ func (r *AssetRepository) GetResource(id string) (*domainasset.Resource, error) 
 	return toDomainAssetResource(&m), nil
 }
 
+func (r *AssetRepository) GetResourceByInternalCode(code string) (*domainasset.Resource, error) {
+	var m model.AssetResource
+	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return toDomainAssetResource(&m), nil
+}
+
+func (r *AssetRepository) UpdateDeviceFields(id string, patch domainasset.DevicePatch) error {
+	fields := map[string]any{"update_time": nowText()}
+	if patch.Name != nil {
+		fields["name"] = strings.TrimSpace(*patch.Name)
+	}
+	if patch.Vendor != nil {
+		fields["vendor"] = strings.TrimSpace(*patch.Vendor)
+	}
+	if patch.Model != nil {
+		fields["model"] = strings.TrimSpace(*patch.Model)
+	}
+	if patch.SerialNumber != nil {
+		fields["serial_number"] = strings.TrimSpace(*patch.SerialNumber)
+	}
+	if patch.Enabled != nil {
+		fields["enabled"] = *patch.Enabled
+	}
+	return r.db.Model(&model.PhysicalDevice{}).Where("id = ?", id).Updates(fields).Error
+}
+
+func (r *AssetRepository) UpdateResourceFields(id string, patch domainasset.ResourcePatch) error {
+	var m model.AssetResource
+	if err := r.db.Where("id = ?", id).First(&m).Error; err != nil {
+		return err
+	}
+	attrs := map[string]any{}
+	if strings.TrimSpace(m.AttrsJSON) != "" {
+		_ = json.Unmarshal([]byte(m.AttrsJSON), &attrs)
+	}
+	edited := false
+	if patch.Longitude != nil {
+		attrs["longitude"] = *patch.Longitude
+		edited = true
+	}
+	if patch.Latitude != nil {
+		attrs["latitude"] = *patch.Latitude
+		edited = true
+	}
+	if patch.MapLevel != nil {
+		attrs["mapLevel"] = *patch.MapLevel
+		edited = true
+	}
+	if patch.PTZType != nil {
+		attrs["ptzType"] = *patch.PTZType
+		edited = true
+	}
+	if patch.HasAudio != nil {
+		attrs["hasAudio"] = *patch.HasAudio
+		edited = true
+	}
+	if patch.Tags != nil {
+		attrs["tags"] = strings.TrimSpace(*patch.Tags)
+		edited = true
+	}
+	if patch.Enabled != nil {
+		attrs["enabled"] = *patch.Enabled
+		edited = true
+	}
+	if edited {
+		attrs["userEdited"] = true
+	}
+	raw, err := json.Marshal(attrs)
+	if err != nil {
+		return err
+	}
+	updates := map[string]any{"attrs_json": string(raw), "update_time": nowText()}
+	if patch.Name != nil {
+		updates["name"] = strings.TrimSpace(*patch.Name)
+	}
+	return r.db.Model(&model.AssetResource{}).Where("id = ?", id).Updates(updates).Error
+}
+
 func (r *AssetRepository) UpsertProfile(p *domainasset.StreamProfile) error {
 	now := nowText()
 	return r.db.Save(&model.AssetStreamProfile{
@@ -356,25 +437,35 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		return nil, 0, err
 	}
 	type row struct {
-		ResourceID         string `gorm:"column:resource_id"`
-		InternalCode       string `gorm:"column:internal_code"`
-		DeviceID           string `gorm:"column:device_id"`
-		DeviceInternalCode string `gorm:"column:device_internal_code"`
-		DeviceName         string `gorm:"column:device_name"`
-		Protocol           string `gorm:"column:protocol"`
-		Name               string `gorm:"column:name"`
-		Kind               string `gorm:"column:kind"`
-		ExternalKey        string `gorm:"column:external_key"`
-		Status             string `gorm:"column:status"`
-		Online             bool   `gorm:"column:online"`
-		PTZType            int    `gorm:"column:ptz_type"`
-		HasAudio           bool   `gorm:"column:has_audio"`
+		ResourceID         string  `gorm:"column:resource_id"`
+		InternalCode       string  `gorm:"column:internal_code"`
+		DeviceID           string  `gorm:"column:device_id"`
+		DeviceInternalCode string  `gorm:"column:device_internal_code"`
+		DeviceName         string  `gorm:"column:device_name"`
+		Protocol           string  `gorm:"column:protocol"`
+		Name               string  `gorm:"column:name"`
+		Kind               string  `gorm:"column:kind"`
+		ExternalKey        string  `gorm:"column:external_key"`
+		Status             string  `gorm:"column:status"`
+		Online             bool    `gorm:"column:online"`
+		PTZType            int     `gorm:"column:ptz_type"`
+		HasAudio           bool    `gorm:"column:has_audio"`
+		Longitude          float64 `gorm:"column:longitude"`
+		Latitude           float64 `gorm:"column:latitude"`
+		MapLevel           int     `gorm:"column:map_level"`
+		Tags               string  `gorm:"column:tags"`
+		Enabled            int     `gorm:"column:enabled"`
 	}
 	var rows []row
 	err := q.Select(`r.id AS resource_id, r.internal_code, r.device_id, d.internal_code AS device_internal_code,
 			d.name AS device_name, b.protocol, r.name, r.kind, r.external_key, r.status, d.online,
 			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.ptzType') AS SIGNED), 0) AS ptz_type,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.hasAudio') AS SIGNED), 0) AS has_audio`).
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.hasAudio') AS SIGNED), 0) AS has_audio,
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.longitude') AS DOUBLE), 0) AS longitude,
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.latitude') AS DOUBLE), 0) AS latitude,
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.mapLevel') AS SIGNED), 0) AS map_level,
+			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.attrs_json, '$.tags')), '') AS tags,
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.enabled') AS SIGNED), 1) AS enabled`).
 		Order("d.internal_code ASC, r.id ASC").
 		Offset((page - 1) * count).Limit(count).
 		Scan(&rows).Error
@@ -389,6 +480,8 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 			DeviceInternalCode: x.DeviceInternalCode, DeviceName: x.DeviceName, Protocol: x.Protocol,
 			Name: x.Name, Kind: x.Kind, ExternalKey: x.ExternalKey, Status: x.Status,
 			Online: x.Online, PTZType: x.PTZType, HasAudio: x.HasAudio,
+			Longitude: x.Longitude, Latitude: x.Latitude, MapLevel: x.MapLevel,
+			Tags: x.Tags, Enabled: x.Enabled == 1,
 		}
 		if strings.EqualFold(x.Protocol, "gb28181") {
 			view.GBCode = x.ExternalKey
@@ -399,12 +492,38 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 }
 
 func toDomainAssetResource(m *model.AssetResource) *domainasset.Resource {
-	return &domainasset.Resource{
+	res := &domainasset.Resource{
 		ID: m.ID, InternalCode: m.InternalCode, DeviceID: m.DeviceID, BindingID: m.BindingID, Kind: m.Kind,
 		ExternalKey: m.ExternalKey, Name: m.Name, Status: m.Status,
 		LegacyChannelID: m.LegacyChannelID, AttrsJSON: m.AttrsJSON,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+		Enabled: true,
 	}
+	var attrs map[string]any
+	if json.Unmarshal([]byte(m.AttrsJSON), &attrs) == nil {
+		if v, ok := attrs["longitude"].(float64); ok {
+			res.Longitude = v
+		}
+		if v, ok := attrs["latitude"].(float64); ok {
+			res.Latitude = v
+		}
+		if v, ok := attrs["mapLevel"].(float64); ok {
+			res.MapLevel = int(v)
+		}
+		if v, ok := attrs["ptzType"].(float64); ok {
+			res.PTZType = int(v)
+		}
+		if v, ok := attrs["hasAudio"].(bool); ok {
+			res.HasAudio = v
+		}
+		if v, ok := attrs["tags"].(string); ok {
+			res.Tags = v
+		}
+		if v, ok := attrs["enabled"].(bool); ok {
+			res.Enabled = v
+		}
+	}
+	return res
 }
 
 func toDomainAssetProfile(m *model.AssetStreamProfile) *domainasset.StreamProfile {

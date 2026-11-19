@@ -8,6 +8,18 @@ export function queryAssets(params) {
   return request({ url: '/api/v1/assets', method: 'get', params })
 }
 
+export function queryAssetTree(params) {
+  return request({ url: '/api/v1/assets/tree', method: 'get', params })
+}
+
+export function updateAsset(id, data) {
+  return request({ url: `/api/v1/assets/${id}`, method: 'put', data })
+}
+
+export function updateChannel(code, data) {
+  return request({ url: `/api/v1/channels/${code}`, method: 'put', data })
+}
+
 export function getAssetDetail(id) {
   return request({ url: `/api/v1/assets/${id}`, method: 'get' })
 }

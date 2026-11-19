@@ -43,18 +43,25 @@ const (
 
 // Resource 是设备提供的稳定子资源（视频源、音频、告警输入、AI 元数据等）。
 type Resource struct {
-	ID              string `json:"id"`
-	InternalCode    string `json:"internalCode"`
-	DeviceID        string `json:"deviceId"`
-	BindingID       string `json:"bindingId"`
-	Kind            string `json:"kind"`
-	ExternalKey     string `json:"externalKey"`
-	Name            string `json:"name"`
-	Status          string `json:"status"`
-	LegacyChannelID int    `json:"-"`
-	AttrsJSON       string `json:"attrsJson"`
-	CreateTime      string `json:"createTime"`
-	UpdateTime      string `json:"updateTime"`
+	ID              string  `json:"id"`
+	InternalCode    string  `json:"internalCode"`
+	DeviceID        string  `json:"deviceId"`
+	BindingID       string  `json:"bindingId"`
+	Kind            string  `json:"kind"`
+	ExternalKey     string  `json:"externalKey"`
+	Name            string  `json:"name"`
+	Status          string  `json:"status"`
+	LegacyChannelID int     `json:"-"`
+	AttrsJSON       string  `json:"attrsJson"`
+	Longitude       float64 `json:"longitude"`
+	Latitude        float64 `json:"latitude"`
+	MapLevel        int     `json:"mapLevel"`
+	PTZType         int     `json:"ptzType"`
+	HasAudio        bool    `json:"hasAudio"`
+	Tags            string  `json:"tags"`
+	Enabled         bool    `json:"enabled"`
+	CreateTime      string  `json:"createTime"`
+	UpdateTime      string  `json:"updateTime"`
 }
 
 // 码流角色。
@@ -120,22 +127,62 @@ type DeviceDetail struct {
 	EventSources []*EventSource  `json:"eventSources"`
 }
 
+// DevicePatch 是设备可编辑字段（nil 表示不修改）。
+type DevicePatch struct {
+	Name         *string `json:"name"`
+	Vendor       *string `json:"vendor"`
+	Model        *string `json:"model"`
+	SerialNumber *string `json:"serialNumber"`
+	Enabled      *bool   `json:"enabled"`
+}
+
+// ResourcePatch 是通道可编辑字段（nil 表示不修改）。
+type ResourcePatch struct {
+	Name      *string  `json:"name"`
+	Longitude *float64 `json:"longitude"`
+	Latitude  *float64 `json:"latitude"`
+	MapLevel  *int     `json:"mapLevel"`
+	PTZType   *int     `json:"ptzType"`
+	HasAudio  *bool    `json:"hasAudio"`
+	Tags      *string  `json:"tags"`
+	Enabled   *bool    `json:"enabled"`
+}
+
+// DeviceNode 是设备→通道树节点。
+type DeviceNode struct {
+	Device    *PhysicalDevice `json:"device"`
+	Binding   *AccessBinding  `json:"binding"`
+	Resources []*ResourceNode `json:"resources"`
+}
+
+// ResourceNode 是树中的通道/资源节点。
+type ResourceNode struct {
+	Resource     *Resource        `json:"resource"`
+	Profiles     []*StreamProfile `json:"profiles"`
+	Capabilities []*Capability    `json:"capabilities"`
+}
+
 // ChannelView 是跨协议统一的通道列表视图（通道内码为主键）。
 type ChannelView struct {
-	ResourceID         string `json:"resourceId"`
-	InternalCode       string `json:"internalCode"`
-	DeviceID           string `json:"deviceId"`
-	DeviceInternalCode string `json:"deviceInternalCode"`
-	DeviceName         string `json:"deviceName"`
-	Protocol           string `json:"protocol"`
-	Name               string `json:"name"`
-	Kind               string `json:"kind"`
-	ExternalKey        string `json:"externalKey"` // GB 通道编码 / ONVIF ProfileToken / 插件通道号
-	GBCode             string `json:"gbCode"`
-	Status             string `json:"status"`
-	Online             bool   `json:"online"`
-	PTZType            int    `json:"ptzType"`
-	HasAudio           bool   `json:"hasAudio"`
+	ResourceID         string  `json:"resourceId"`
+	InternalCode       string  `json:"internalCode"`
+	DeviceID           string  `json:"deviceId"`
+	DeviceInternalCode string  `json:"deviceInternalCode"`
+	DeviceName         string  `json:"deviceName"`
+	Protocol           string  `json:"protocol"`
+	Name               string  `json:"name"`
+	Kind               string  `json:"kind"`
+	ExternalKey        string  `json:"externalKey"` // GB 通道编码 / ONVIF ProfileToken / 插件通道号
+	GBCode             string  `json:"gbCode"`
+	Status             string  `json:"status"`
+	Online             bool    `json:"online"`
+	PTZType            int     `json:"ptzType"`
+	HasAudio           bool    `json:"hasAudio"`
+	Longitude          float64 `json:"longitude"`
+	Latitude           float64 `json:"latitude"`
+	MapLevel           int     `json:"mapLevel"`
+	Tags               string  `json:"tags"`
+	Enabled            bool    `json:"enabled"`
 }
 
 // ResourceDetail 包含资源、码流与能力。
@@ -151,6 +198,7 @@ type Repository interface {
 	GetDevice(id string) (*PhysicalDevice, error)
 	GetDeviceByInternalCode(code string) (*PhysicalDevice, error)
 	ListDevices(page, count int, query, protocol, status string) ([]*DeviceSummary, int64, error)
+	UpdateDeviceFields(id string, patch DevicePatch) error
 
 	CreateBinding(b *AccessBinding) error
 	UpsertBinding(b *AccessBinding) error
@@ -160,6 +208,8 @@ type Repository interface {
 	ListResources(deviceID string) ([]*Resource, error)
 	ListChannels(page, count int, query, protocol, deviceInternalCode string) ([]*ChannelView, int64, error)
 	GetResource(id string) (*Resource, error)
+	GetResourceByInternalCode(code string) (*Resource, error)
+	UpdateResourceFields(id string, patch ResourcePatch) error
 
 	UpsertProfile(p *StreamProfile) error
 	ListProfiles(resourceID string) ([]*StreamProfile, error)

@@ -69,11 +69,14 @@ EventSource (zws_event_source)          事件/数据来源（与 Alarm 记录�
 UnifiedRef (zws_unified_ref)            旧表主键 → 统一 UUID 的映射
 ```
 
-- 统一 ID 使用 UUID；旧 `InternalCode` 保留为业务别名；旧数字通道 ID 继续被录像计划、分组、级联、告警引用。
+- 统一定位：`deviceInternalCode` / `channelInternalCode` 为对外身份；UUID 仅作内部主键；外码只用于协议交互。
 - 启动时 `assetProjector.Backfill()` 幂等回填 GB / ONVIF / 插件数据（`zws_unified_ref` 保证可重入）。
-- 新 API：`/api/v1/assets`、`/api/v1/assets/:id`、`/api/v1/assets/:id/sync`、`/api/v1/resources/:id`、`/api/v1/resources/:id/live/start|stop`。
-- 播放路由：按绑定协议翻译为 GB（设备号+通道号）、ONVIF（channelID+profileToken）、插件（deviceId+channelId），媒体仍由 ZMS 输出。
-- 旧 API/页面保持可用；录像计划/分组/级联/告警尚未迁移到统一 Resource，属于后续阶段。
+- 新 API：`/api/v1/assets`、`/api/v1/assets/tree`、`/api/v1/assets/:id`（GET/PUT）、`/api/v1/assets/:id/sync`、`/api/v1/channels/:code`（PUT）、`/api/v1/resources/:id`、`/api/v1/resources/:id/live/start|stop`。
+- 设备/通道编辑写统一资产表；用户编辑的经纬度/地图层级/标签/启用状态由 `attrs_json` 保留，协议同步不覆盖。
+- 播放流名统一为 `live/<deviceInternalCode>_<channelInternalCode>`；回放/下载为 `_playback` / `_download`。
+- 前端「设备资产」为设备→通道/资源树 + 右侧详情/编辑；「通道列表」为跨协议全量通道。
+- 私有协议统一由 zero-agent 托管插件：Agent 扫描 `plugins/*/plugin.yaml`、启停进程、反代 RPC，平台页面管理 Agent/插件。
+- 旧页面/API 保持可用；录像计划/分组/级联/告警尚未迁移到统一 Resource，属于后续阶段。
 
 ## 基础设施配置
 

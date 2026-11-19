@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"strings"
 	"testing"
 
 	domainasset "zero-web-server/internal/domain/asset"
@@ -52,5 +53,19 @@ func TestStableIDDeterministic(t *testing.T) {
 	}
 	if a == c {
 		t.Fatalf("stableID collision for different inputs")
+	}
+}
+
+func TestMergeResourceAttrsPreservesUserEdits(t *testing.T) {
+	incoming := `{"ptzType":3,"hasAudio":true,"longitude":1,"latitude":2}`
+	if got := mergeResourceAttrs(`{"ptzType":1}`, incoming); got != incoming {
+		t.Fatalf("without user edits should take incoming attrs, got %s", got)
+	}
+	existing := `{"ptzType":1,"longitude":120.5,"latitude":30.5,"mapLevel":12,"tags":"gate","enabled":false,"userEdited":true}`
+	got := mergeResourceAttrs(existing, incoming)
+	for _, want := range []string{`"longitude":120.5`, `"latitude":30.5`, `"mapLevel":12`, `"tags":"gate"`, `"enabled":false`, `"ptzType":3`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("merged attrs missing %s: %s", want, got)
+		}
 	}
 }

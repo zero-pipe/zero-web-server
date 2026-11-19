@@ -34,6 +34,15 @@
     <el-table v-loading="loading" :data="list" size="small" border>
       <el-table-column prop="name" label="通道名称" min-width="160" />
       <el-table-column prop="internalCode" label="通道内码" width="200" />
+      <el-table-column label="类型" width="110">
+        <template slot-scope="{ row }">{{ kindLabel(row.kind) }}</template>
+      </el-table-column>
+      <el-table-column label="经纬度" min-width="150">
+        <template slot-scope="{ row }">
+          <span v-if="row.longitude || row.latitude">{{ row.longitude }}, {{ row.latitude }}</span>
+          <span v-else class="sub-text">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="所属设备" min-width="180">
         <template slot-scope="{ row }">
           <div>{{ row.deviceName }}</div>
@@ -138,6 +147,16 @@ export default {
   methods: {
     protocolLabel(p) {
       return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[p] || (p || '-')
+    },
+    kindLabel(kind) {
+      return {
+        video_sensor: '视频通道',
+        audio_input: '音频输入',
+        audio_output: '音频输出',
+        alarm_input: '报警输入',
+        relay_output: '继电器',
+        metadata_source: '数据通道'
+      }[kind] || kind || '-'
     },
     load() {
       this.loading = true

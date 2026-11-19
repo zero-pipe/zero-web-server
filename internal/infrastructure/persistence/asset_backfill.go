@@ -205,6 +205,7 @@ func (p *AssetProjector) backfillGB() error {
 			}
 			attrs, _ := json.Marshal(map[string]any{
 				"gbDeviceId": ch.GBDeviceID, "ptzType": ch.PTZType, "hasAudio": ch.HasAudio,
+				"longitude": ch.GBLongitude, "latitude": ch.GBLatitude, "mapLevel": ch.MapLevel,
 			})
 			if err := p.upsertResource(chUID, ch.InternalCode, uid, bindingID, domainasset.ResourceVideoSensor,
 				ch.GBDeviceID, firstNonEmpty(ch.GBName, ch.Name), firstNonEmpty(ch.GBStatus, ch.Status, "OFF"),
@@ -477,6 +478,7 @@ func (p *AssetProjector) upsertResource(id, internalCode, deviceID, bindingID, k
 	if strings.TrimSpace(nameUpdate) == "" {
 		nameUpdate = name
 	}
+	attrs = mergeResourceAttrs(existing.AttrsJSON, attrs)
 	return p.db.Model(&model.AssetResource{}).Where("id = ?", id).Updates(map[string]any{
 		"internal_code": code,
 		"binding_id":    bindingID, "external_key": externalKey, "name": nameUpdate,
@@ -572,6 +574,31 @@ func (p *AssetProjector) getBinding(deviceID string) (*model.AccessBinding, erro
 
 func stableID(parts ...string) string {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(strings.Join(parts, "|"))).String()
+}
+
+// mergeResourceAttrs 保留用户在统一资产上编辑的字段，协议同步只更新协议字段。
+func mergeResourceAttrs(existing, incoming string) string {
+	if strings.TrimSpace(existing) == "" {
+		return incoming
+	}
+	var oldAttrs, newAttrs map[string]any
+	if json.Unmarshal([]byte(existing), &oldAttrs) != nil || json.Unmarshal([]byte(incoming), &newAttrs) != nil {
+		return incoming
+	}
+	if edited, _ := oldAttrs["userEdited"].(bool); !edited {
+		return incoming
+	}
+	for _, key := range []string{"longitude", "latitude", "mapLevel", "tags", "enabled"} {
+		if v, ok := oldAttrs[key]; ok {
+			newAttrs[key] = v
+		}
+	}
+	newAttrs["userEdited"] = true
+	raw, err := json.Marshal(newAttrs)
+	if err != nil {
+		return incoming
+	}
+	return string(raw)
 }
 
 func protocolDeviceOps(protocol string) []string {

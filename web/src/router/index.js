@@ -85,7 +85,7 @@ export const constantRoutes = [
     children: [{
       path: '/channel',
       name: 'Channel',
-      component: () => import('@/views/channel/index'),
+      component: () => import('@/views/channel/unified-panel'),
       meta: { title: '通道列表', icon: 'channelManger' }
     },
     {

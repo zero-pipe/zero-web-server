@@ -113,6 +113,63 @@ func (s *Service) ResourceDetail(resourceID string) (*domainasset.ResourceDetail
 	return &domainasset.ResourceDetail{Resource: res, Profiles: profiles, Capabilities: caps}, nil
 }
 
+// Tree 返回设备→通道/资源树（全量、已按协议/状态过滤）。
+func (s *Service) Tree(query, protocol, status string) ([]*domainasset.DeviceNode, error) {
+	list, _, err := s.repo.ListDevices(1, 500, query, protocol, status)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*domainasset.DeviceNode, 0, len(list))
+	for _, item := range list {
+		if item.Device == nil {
+			continue
+		}
+		resources, err := s.repo.ListResources(item.Device.ID)
+		if err != nil {
+			return nil, err
+		}
+		nodes := make([]*domainasset.ResourceNode, 0, len(resources))
+		for _, res := range resources {
+			profiles, _ := s.repo.ListProfiles(res.ID)
+			caps, _ := s.repo.ListCapabilities("resource", res.ID)
+			nodes = append(nodes, &domainasset.ResourceNode{
+				Resource: res, Profiles: profiles, Capabilities: caps,
+			})
+		}
+		out = append(out, &domainasset.DeviceNode{
+			Device: item.Device, Binding: item.Binding, Resources: nodes,
+		})
+	}
+	return out, nil
+}
+
+func (s *Service) UpdateDevice(deviceID string, patch domainasset.DevicePatch) (*domainasset.PhysicalDevice, error) {
+	if patch.Name != nil && strings.TrimSpace(*patch.Name) == "" {
+		return nil, fmt.Errorf("设备名称不能为空")
+	}
+	if _, err := s.repo.GetDevice(deviceID); err != nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	if err := s.repo.UpdateDeviceFields(deviceID, patch); err != nil {
+		return nil, err
+	}
+	return s.repo.GetDevice(deviceID)
+}
+
+func (s *Service) UpdateChannel(internalCode string, patch domainasset.ResourcePatch) (*domainasset.Resource, error) {
+	if patch.Name != nil && strings.TrimSpace(*patch.Name) == "" {
+		return nil, fmt.Errorf("通道名称不能为空")
+	}
+	res, err := s.repo.GetResourceByInternalCode(internalCode)
+	if err != nil {
+		return nil, fmt.Errorf("通道不存在")
+	}
+	if err := s.repo.UpdateResourceFields(res.ID, patch); err != nil {
+		return nil, err
+	}
+	return s.repo.GetResource(res.ID)
+}
+
 // Sync 调用对应协议的同步，然后重新投影统一资产。
 func (s *Service) Sync(ctx context.Context, deviceID string) error {
 	dev, err := s.repo.GetDevice(deviceID)
