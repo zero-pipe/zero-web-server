@@ -188,15 +188,25 @@ type GBDeviceChannel struct {
 func (GBDeviceChannel) TableName() string { return "zws_device_channel" }
 
 type Alarm struct {
-	ID          int     `gorm:"column:id;primaryKey;autoIncrement"`
-	ChannelID   int     `gorm:"column:channel_id"`
-	Description string  `gorm:"column:description;size:255"`
-	SnapPath    string  `gorm:"column:snap_path;size:255"`
-	RecordPath  string  `gorm:"column:record_path;size:255"`
-	Longitude   float64 `gorm:"column:longitude"`
-	Latitude    float64 `gorm:"column:latitude"`
-	AlarmType   int     `gorm:"column:alarm_type"`
-	AlarmTime   int64   `gorm:"column:alarm_time"`
+	ID                  int     `gorm:"column:id;primaryKey;autoIncrement"`
+	ChannelID           int     `gorm:"column:channel_id"`
+	Description         string  `gorm:"column:description;size:255"`
+	SnapPath            string  `gorm:"column:snap_path;size:255"`
+	RecordPath          string  `gorm:"column:record_path;size:255"`
+	Longitude           float64 `gorm:"column:longitude"`
+	Latitude            float64 `gorm:"column:latitude"`
+	AlarmType           int     `gorm:"column:alarm_type"`
+	AlarmCode           string  `gorm:"column:alarm_code;size:64"`
+	AlarmTime           int64   `gorm:"column:alarm_time"`
+	EventID             string  `gorm:"column:event_id;size:128;index"`
+	DeviceInternalCode  string  `gorm:"column:device_internal_code;size:32;index"`
+	ChannelInternalCode string  `gorm:"column:channel_internal_code;size:32;index"`
+	BBoxJSON            string  `gorm:"column:bbox_json;type:text"`
+	Severity            string  `gorm:"column:severity;size:32"`
+	Status              string  `gorm:"column:status;size:32"`
+	HandledBy           string  `gorm:"column:handled_by;size:128"`
+	HandledAt           int64   `gorm:"column:handled_at"`
+	Remark              string  `gorm:"column:remark;size:255"`
 }
 
 func (Alarm) TableName() string { return "zws_alarm" }
@@ -545,6 +555,22 @@ type AgentPlugin struct {
 }
 
 func (AgentPlugin) TableName() string { return "zws_agent_plugin" }
+
+// EventType 是统一事件类型注册表。
+type EventType struct {
+	Code           string `gorm:"column:code;primaryKey;size:64"`
+	Name           string `gorm:"column:name;size:128"`
+	Category       string `gorm:"column:category;size:32"`
+	Severity       string `gorm:"column:severity;size:32"`
+	AlarmEligible  bool   `gorm:"column:alarm_eligible"`
+	RequiresVideo  bool   `gorm:"column:requires_video"`
+	BBoxCapable    bool   `gorm:"column:bbox_capable"`
+	VendorMappings string `gorm:"column:vendor_mappings;type:text"`
+	Enabled        bool   `gorm:"column:enabled"`
+	UpdateTime     string `gorm:"column:update_time;size:50"`
+}
+
+func (EventType) TableName() string { return "zws_event_type" }
 
 // PluginDevice 是通过插件接入的设备。
 type PluginDevice struct {

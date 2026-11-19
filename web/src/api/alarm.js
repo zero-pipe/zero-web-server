@@ -38,3 +38,7 @@ export function clearAlarms(params) {
     url: `/api/v1/alarm/clear${qs ? '?' + qs : ''}`
   })
 }
+
+export function setAlarmStatus(id, data) {
+  return request({ url: `/api/v1/alarm/${id}/status`, method: 'put', data })
+}

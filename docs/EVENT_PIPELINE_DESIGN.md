@@ -380,11 +380,19 @@ Hello 增加：
 
 ## 9.1 告警投影与保留
 
-- 已关联到资源的视频事件会投影为 `zws_alarm`：
+- 事件类型先归一为 `zws_event_type` 规范码；未登记类型回落 `other`。
+- 只有 `alarm_eligible=true` 且关联到通道的事件才投影为 `zws_alarm`：
   - `channel_id` = 资源对应的旧通道数字 ID
+  - `event_id` = 事件唯一 ID
+  - `alarm_code` = 规范事件码（motion / line_crossing / intrusion ...）
+  - `alarm_type` = 兼容旧页面的数字码
+  - `device_internal_code` / `channel_internal_code` = 统一内码
+  - `bbox_json` = AI 目标框
   - `snap_path` = 事件图片 key
-  - `alarm_type` = 国标报警类型码（motion=7、line_crossing=10、intrusion=11 等）
-  - `alarm_time` = 事件 `occurredAt`（毫秒）
+  - `alarm_time` = 事件 `occurredAt`
+  - `status` = unhandled / handled / ignored
+- GB 直接报警上报也先构造 synthetic event，再投影报警，保证“报警必有事件”。
+- 事件详情由后端推导 `playback`：`supported / protocol / channelLegacyId / startAt / endAt`；GB 回放已接通，ONVIF/插件暂返回原因。
 - 自动保留：`event.retention_days`，默认 30 天；`<0` 关闭。后台启动时清理一次，之后每 24h 清理。
 
 ## 10. 已确认的设计选择

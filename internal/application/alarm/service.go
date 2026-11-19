@@ -1,21 +1,30 @@
 package alarmapp
 
 import (
+	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
 	domainalarm "zero-web-server/internal/domain/alarm"
 	domainchannel "zero-web-server/internal/domain/channel"
+	domaindevice "zero-web-server/internal/domain/device"
+	domainevent "zero-web-server/internal/domain/event"
+	"zero-web-server/internal/domain/shared"
+	"zero-web-server/internal/eventtype"
 	"zero-web-server/internal/gbsip"
 )
 
 type Service struct {
 	alarms   domainalarm.Repository
 	channels domainchannel.Repository
+	devices  domaindevice.Repository
+	events   domainevent.Repository
 }
 
-func NewService(alarms domainalarm.Repository, channels domainchannel.Repository) *Service {
-	return &Service{alarms: alarms, channels: channels}
+func NewService(alarms domainalarm.Repository, channels domainchannel.Repository,
+	devices domaindevice.Repository, events domainevent.Repository) *Service {
+	return &Service{alarms: alarms, channels: channels, devices: devices, events: events}
 }
 
 func (s *Service) HandleNotify(deviceID, channelGBID string, n *gbsip.AlarmNotify) error {
@@ -27,31 +36,119 @@ func (s *Service) HandleNotify(deviceID, channelGBID string, n *gbsip.AlarmNotif
 		// try channelGBID as device channel id from notify DeviceID field
 		return nil
 	}
-	alarmTime := time.Now().Unix()
+	alarmTime := time.Now().UnixMilli()
 	if n.AlarmTime != "" {
 		if t, err := time.ParseInLocation("2006-01-02T15:04:05", n.AlarmTime, time.Local); err == nil {
-			alarmTime = t.Unix()
+			alarmTime = t.UnixMilli()
 		}
 	}
-	return s.alarms.Create(&domainalarm.Alarm{
-		ChannelID:   ch.ID,
-		Description: n.AlarmDescription,
-		Longitude:   n.Longitude,
-		Latitude:    n.Latitude,
-		AlarmType:   n.AlarmType,
-		AlarmTime:   alarmTime,
-	})
+	code := eventtype.FromGBAlarmType(n.AlarmType)
+	var eventID, devInternal string
+	if s.devices != nil {
+		if dev, derr := s.devices.GetByDeviceID(deviceID); derr == nil && dev != nil {
+			devInternal = dev.InternalCode
+		}
+	}
+	if s.events != nil {
+		eventID = fmt.Sprintf("gb-alarm-%s-%d-%d", deviceID, ch.ID, time.Now().UnixNano())
+		raw, _ := json.Marshal(map[string]any{
+			"alarmType": n.AlarmType, "alarmDescription": n.AlarmDescription,
+			"alarmTime": n.AlarmTime, "channelId": channelGBID,
+		})
+		e := &domainevent.Event{
+			EventID: eventID, SchemaVersion: "zws.event.v1",
+			DeviceInternalCode: devInternal, DeviceName: deviceID,
+			ChannelInternalCode: ch.InternalCode, ChannelExternalKey: ch.GBDeviceID,
+			EventType: code, Category: eventtype.CategoryAlarm, Severity: "major",
+			OccurredAt: alarmTime, ReceivedAt: time.Now().UnixMilli(),
+			RawJSON: string(raw), Status: "mapped",
+		}
+		if devInternal == "" {
+			e.Status = "unmapped"
+		}
+		if err := s.events.Create(e); err != nil {
+			eventID = ""
+		}
+	}
+	alarm := &domainalarm.Alarm{
+		ChannelID:          ch.ID,
+		Description:        n.AlarmDescription,
+		Longitude:          n.Longitude,
+		Latitude:           n.Latitude,
+		AlarmType:          n.AlarmType,
+		AlarmCode:          code,
+		AlarmTime:          alarmTime,
+		EventID:            eventID,
+		DeviceInternalCode: devInternal, ChannelInternalCode: ch.InternalCode,
+		Severity: "major", Status: "unhandled",
+	}
+	if err := s.alarms.Create(alarm); err != nil {
+		return err
+	}
+	if eventID != "" && alarm.ID > 0 {
+		// 事件表用 UUID 主键，这里按 EventID 反查更新；
+		if e, err := s.events.Get(eventID); err == nil && e != nil {
+			_ = s.events.UpdateAlarmID(e.ID, alarm.ID)
+		}
+	}
+	return nil
 }
 
 func (s *Service) Get(id int) (*domainalarm.Alarm, error) {
-	return s.alarms.GetByID(id)
+	a, err := s.alarms.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	s.enrich(a)
+	return a, nil
 }
 
 func (s *Service) List(page, count int, alarmType *int, beginTime, endTime string) ([]*domainalarm.Alarm, int64, error) {
-	return s.alarms.List(page, count, alarmType, parseTimeMs(beginTime), parseTimeMs(endTime))
+	list, total, err := s.alarms.List(page, count, alarmType, parseTimeMs(beginTime), parseTimeMs(endTime))
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, a := range list {
+		s.enrich(a)
+	}
+	return list, total, nil
+}
+
+// enrich 补齐旧页面依赖的通道名称与回放上下文。
+func (s *Service) enrich(a *domainalarm.Alarm) {
+	if a == nil || a.ChannelID <= 0 || s.channels == nil {
+		return
+	}
+	ch, err := s.channels.GetByID(a.ChannelID)
+	if err != nil || ch == nil {
+		return
+	}
+	a.ChannelName = ch.Name
+	a.ChannelDeviceID = ch.GBDeviceID
+	if s.devices != nil {
+		if dev, derr := s.devices.GetByDeviceID(ch.DeviceID); derr == nil && dev != nil {
+			a.DeviceName = dev.Name
+		}
+	}
+	a.Playback = map[string]any{
+		"supported":       ch.DataType == shared.ChannelDataTypeGB28181,
+		"protocol":        map[bool]string{true: "gb28181", false: "other"}[ch.DataType == shared.ChannelDataTypeGB28181],
+		"channelLegacyId": a.ChannelID,
+		"startAt":         a.AlarmTime - 10_000,
+		"endAt":           a.AlarmTime + 10_000,
+	}
 }
 
 func (s *Service) Delete(ids []int) error { return s.alarms.Delete(ids) }
+
+func (s *Service) SetStatus(id int, status, handledBy, remark string) error {
+	switch status {
+	case "unhandled", "handled", "ignored":
+	default:
+		return fmt.Errorf("不支持的报警状态: %s", status)
+	}
+	return s.alarms.UpdateStatus(id, status, handledBy, remark, time.Now().UnixMilli())
+}
 
 func (s *Service) Clear(alarmType *int, beginTime, endTime string) error {
 	return s.alarms.Clear(alarmType, parseTimeMs(beginTime), parseTimeMs(endTime))

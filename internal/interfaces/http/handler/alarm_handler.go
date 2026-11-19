@@ -41,6 +41,28 @@ func (h *AlarmHandler) List(c *gin.Context) {
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
 }
 
+func (h *AlarmHandler) SetStatus(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		response.Error(c, response.CodeBadReq, "id 无效")
+		return
+	}
+	var body struct {
+		Status    string `json:"status"`
+		HandledBy string `json:"handledBy"`
+		Remark    string `json:"remark"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.svc.SetStatus(id, body.Status, body.HandledBy, body.Remark); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
 func (h *AlarmHandler) Delete(c *gin.Context) {
 	var ids []int
 	if err := c.ShouldBindJSON(&ids); err != nil {

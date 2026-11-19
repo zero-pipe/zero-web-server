@@ -81,11 +81,22 @@
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="alarmType" label="报警类型" width="160">
+        <el-table-column prop="alarmType" label="报警类型" width="170">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="getAlarmTypeTagType(scope.row.alarmType)">
-              {{ getAlarmTypeLabel(scope.row.alarmType) }}
+              {{ scope.row.alarmCode ? eventTypeLabel(scope.row.alarmCode) : getAlarmTypeLabel(scope.row.alarmType) }}
             </el-tag>
+            <div v-if="scope.row.alarmCode" class="sub-text">{{ scope.row.alarmCode }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="级别" width="80">
+          <template v-slot:default="scope">
+            <el-tag size="mini" :type="severityType(scope.row.severity)">{{ scope.row.severity || '—' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="处置" width="95">
+          <template v-slot:default="scope">
+            <el-tag size="mini" :type="statusType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="快照" width="100">
@@ -115,14 +126,12 @@
             {{ formatTime(scope.row.alarmTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template v-slot:default="scope">
-            <el-button
-              size="medium"
-              icon="el-icon-video-play"
-              type="text"
-              @click="openPlayback(scope.row)"
-            >回放</el-button>
+            <el-button size="medium" icon="el-icon-view" type="text" @click="openDetail(scope.row)">详情</el-button>
+            <el-button size="medium" icon="el-icon-video-play" type="text" @click="openPlayback(scope.row)">回放</el-button>
+            <el-button v-if="scope.row.status !== 'handled'" size="medium" type="text" @click="setStatus(scope.row, 'handled')">确认</el-button>
+            <el-button v-if="scope.row.status !== 'ignored'" size="medium" type="text" @click="setStatus(scope.row, 'ignored')">忽略</el-button>
             <el-button
               size="medium"
               icon="el-icon-delete"
@@ -173,11 +182,37 @@
         <el-button size="mini" @click="closePlayback">关闭</el-button>
       </span>
     </el-dialog>
+
+    <el-dialog title="报警详情" :visible.sync="detailVisible" width="720px">
+      <template v-if="detail">
+        <el-descriptions :column="2" size="small" border>
+          <el-descriptions-item label="报警码">{{ detail.alarmCode || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="事件 ID">{{ detail.eventId || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="设备内码">{{ detail.deviceInternalCode || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="通道内码">{{ detail.channelInternalCode || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="级别">{{ detail.severity || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="处置">{{ statusLabel(detail.status) }}</el-descriptions-item>
+          <el-descriptions-item label="时间">{{ formatTime(detail.alarmTime) }}</el-descriptions-item>
+          <el-descriptions-item label="通道 ID">{{ detail.channelId }}</el-descriptions-item>
+        </el-descriptions>
+        <div v-if="detail.snapPath" style="margin-top:14px;text-align:center">
+          <el-image :src="getSnapUrl(detail.id)" :preview-src-list="[getSnapUrl(detail.id)]" fit="contain" style="max-width:100%;max-height:340px" />
+        </div>
+        <div v-if="detail.bboxJson" style="margin-top:14px">
+          <div class="section-title">AI 目标框</div>
+          <pre class="json">{{ pretty(detail.bboxJson) }}</pre>
+        </div>
+        <div style="margin-top:14px">
+          <el-button size="small" type="primary" :disabled="!detail.channelId" @click="openPlayback(detail)">查看回放</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import playerTabs from '../common/playerTabs.vue'
+import { setAlarmStatus } from '@/api/alarm'
 
 const ALARM_TYPE_OPTIONS = [
   { value: 'VideoLoss', label: '视频丢失报警' },
@@ -252,7 +287,9 @@ export default {
       playbackError: null,
       playbackStreamInfo: null,
       playbackTitle: '录像回放',
-      currentPlaybackChannelId: null
+      currentPlaybackChannelId: null,
+      detailVisible: false,
+      detail: null
     }
   },
   created() {
@@ -295,6 +332,38 @@ export default {
     getSnapUrl(id) {
       const baseUrl = window.baseUrl ? window.baseUrl : ''
       return ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/v1/alarm/snap/${id}`
+    },
+    openDetail(row) {
+      this.detail = row
+      this.detailVisible = true
+    },
+    setStatus(row, status) {
+      const label = status === 'handled' ? '确认' : '忽略'
+      this.$confirm(`确认将该报警标记为${label}？`, '提示', { type: 'warning' }).then(() => {
+        setAlarmStatus(row.id, { status, handledBy: 'admin' }).then(() => {
+          this.$message.success('已更新')
+          this.getAlarmList()
+        }).catch(e => this.$message.error(e || '更新失败'))
+      }).catch(() => {})
+    },
+    eventTypeLabel(code) {
+      return {
+        motion: '移动侦测', line_crossing: '越界侦测', intrusion: '区域入侵', loitering: '徘徊',
+        video_loss: '视频丢失', tamper: '遮挡/破坏', audio_abnormal: '音频异常', scene_change: '场景变更',
+        face: '人脸', plate: '车牌', alarm_input: '报警输入', other: '其他'
+      }[code] || code
+    },
+    statusLabel(status) {
+      return { unhandled: '未处理', handled: '已确认', ignored: '已忽略' }[status] || (status || '未处理')
+    },
+    statusType(status) {
+      return status === 'handled' ? 'success' : (status === 'ignored' ? 'info' : 'warning')
+    },
+    severityType(severity) {
+      return severity === 'critical' ? 'danger' : (severity === 'major' ? 'warning' : 'info')
+    },
+    pretty(raw) {
+      try { return JSON.stringify(JSON.parse(raw), null, 2) } catch (e) { return raw }
     },
     openPlayback(row) {
       if (!row.channelId) {
@@ -442,3 +511,9 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.sub-text { color: #909399; font-size: 11px; line-height: 14px; }
+.section-title { font-weight: 600; margin-bottom: 6px; color: #303133; }
+.json { background: #f5f7fa; padding: 10px; border-radius: 6px; max-height: 240px; overflow: auto; font-size: 12px; }
+</style>

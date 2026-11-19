@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"zero-web-server/internal/eventtype"
 	"zero-web-server/internal/infrastructure/config"
 	"zero-web-server/internal/infrastructure/persistence/model"
 	"zero-web-server/pkg/idcode"
@@ -120,6 +121,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.MQTTConfig{},
 		&model.EventSubscription{},
 		&model.Event{},
+		&model.EventType{},
 		&model.Plugin{},
 		&model.Agent{},
 		&model.AgentPlugin{},
@@ -144,6 +146,32 @@ func autoMigrateAll(db *gorm.DB) error {
 	}
 	if err := ensureInternalCodes(db); err != nil {
 		return err
+	}
+	if err := seedEventTypes(db); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedEventTypes 写入内置事件类型；已存在的类型不覆盖，便于后续页面定制。
+func seedEventTypes(db *gorm.DB) error {
+	now := time.Now().Format("2006-01-02 15:04:05")
+	for _, t := range eventtype.Builtins() {
+		var count int64
+		if err := db.Model(&model.EventType{}).Where("code = ?", t.Code).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+		if err := db.Create(&model.EventType{
+			Code: t.Code, Name: t.Name, Category: t.Category, Severity: t.Severity,
+			AlarmEligible: t.AlarmEligible, RequiresVideo: t.RequiresVideo,
+			BBoxCapable: t.BBoxCapable, VendorMappings: t.VendorMappings,
+			Enabled: t.Enabled, UpdateTime: now,
+		}).Error; err != nil {
+			return err
+		}
 	}
 	return nil
 }

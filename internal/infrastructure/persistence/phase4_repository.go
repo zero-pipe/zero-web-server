@@ -20,7 +20,11 @@ func (r *AlarmRepository) Create(alarm *domainalarm.Alarm) error {
 	m := &model.Alarm{
 		ChannelID: alarm.ChannelID, Description: alarm.Description, SnapPath: alarm.SnapPath,
 		RecordPath: alarm.RecordPath, Longitude: alarm.Longitude, Latitude: alarm.Latitude,
-		AlarmType: alarm.AlarmType, AlarmTime: alarm.AlarmTime,
+		AlarmType: alarm.AlarmType, AlarmCode: alarm.AlarmCode, AlarmTime: alarm.AlarmTime,
+		EventID: alarm.EventID, DeviceInternalCode: alarm.DeviceInternalCode,
+		ChannelInternalCode: alarm.ChannelInternalCode, BBoxJSON: alarm.BBoxJSON,
+		Severity: alarm.Severity, Status: alarm.Status, HandledBy: alarm.HandledBy,
+		HandledAt: alarm.HandledAt, Remark: alarm.Remark,
 	}
 	if err := r.db.Create(m).Error; err != nil {
 		return err
@@ -85,6 +89,12 @@ func (r *AlarmRepository) Clear(alarmType *int, beginTime, endTime int64) error 
 		q = q.Where("alarm_time <= ?", endTime)
 	}
 	return q.Delete(&model.Alarm{}).Error
+}
+
+func (r *AlarmRepository) UpdateStatus(id int, status, handledBy, remark string, handledAt int64) error {
+	return r.db.Model(&model.Alarm{}).Where("id = ?", id).Updates(map[string]any{
+		"status": status, "handled_by": handledBy, "remark": remark, "handled_at": handledAt,
+	}).Error
 }
 
 type PositionRepository struct{ db *gorm.DB }
@@ -281,7 +291,11 @@ func toDomainAlarm(m *model.Alarm) *domainalarm.Alarm {
 	return &domainalarm.Alarm{
 		ID: m.ID, ChannelID: m.ChannelID, Description: m.Description, SnapPath: m.SnapPath,
 		RecordPath: m.RecordPath, Longitude: m.Longitude, Latitude: m.Latitude,
-		AlarmType: m.AlarmType, AlarmTime: m.AlarmTime,
+		AlarmType: m.AlarmType, AlarmCode: m.AlarmCode, AlarmTime: m.AlarmTime,
+		EventID: m.EventID, DeviceInternalCode: m.DeviceInternalCode,
+		ChannelInternalCode: m.ChannelInternalCode, BBoxJSON: m.BBoxJSON,
+		Severity: m.Severity, Status: m.Status, HandledBy: m.HandledBy,
+		HandledAt: m.HandledAt, Remark: m.Remark,
 	}
 }
 

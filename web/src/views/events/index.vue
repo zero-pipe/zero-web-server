@@ -5,17 +5,8 @@
         <el-input v-model="filters.deviceInternalCode" clearable placeholder="设备内码" style="width:180px" @keyup.enter.native="reload" />
       </el-form-item>
       <el-form-item label="事件类型">
-        <el-select v-model="filters.eventType" clearable filterable allow-create placeholder="全部" style="width:150px">
-          <el-option label="motion" value="motion" />
-          <el-option label="line_crossing" value="line_crossing" />
-          <el-option label="intrusion" value="intrusion" />
-          <el-option label="video_loss" value="video_loss" />
-          <el-option label="tamper" value="tamper" />
-          <el-option label="face" value="face" />
-          <el-option label="loitering" value="loitering" />
-          <el-option label="plate" value="plate" />
-          <el-option label="audio_abnormal" value="audio_abnormal" />
-          <el-option label="alarm_input" value="alarm_input" />
+        <el-select v-model="filters.eventType" clearable filterable placeholder="全部" style="width:170px">
+          <el-option v-for="t in eventTypes" :key="t.code" :label="t.name + ' (' + t.code + ')'" :value="t.code" />
         </el-select>
       </el-form-item>
       <el-form-item label="关联状态">
@@ -60,7 +51,12 @@
           <div class="sub">{{ row.deviceInternalCode }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="eventType" label="事件类型" width="130" />
+      <el-table-column label="事件类型" width="170">
+        <template slot-scope="{ row }">
+          <div>{{ typeName(row.eventType) }}</div>
+          <div class="sub">{{ row.eventType }}<span v-if="row.category"> · {{ categoryName(row.category) }}</span></div>
+        </template>
+      </el-table-column>
       <el-table-column prop="channelExternalKey" label="通道" width="90" />
       <el-table-column label="状态" width="90">
         <template slot-scope="{ row }">
@@ -82,9 +78,10 @@
         </template>
       </el-table-column>
       <el-table-column prop="eventId" label="事件 ID" min-width="180" show-overflow-tooltip />
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="140" fixed="right">
         <template slot-scope="{ row }">
           <el-button type="text" size="mini" @click="openDetail(row)">详情</el-button>
+          <el-button type="text" size="mini" :disabled="!row.playback || !row.playback.supported" @click="openPlayback(row)">回放</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -104,14 +101,19 @@
       <template v-if="detail">
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="事件 ID">{{ detail.eventId }}</el-descriptions-item>
-          <el-descriptions-item label="事件类型">{{ detail.eventType }}</el-descriptions-item>
+          <el-descriptions-item label="事件类型">{{ typeName(detail.eventType) }}（{{ detail.eventType }}）</el-descriptions-item>
+          <el-descriptions-item label="分类">{{ categoryName(detail.category) }}</el-descriptions-item>
           <el-descriptions-item label="设备">{{ detail.deviceName || '未关联' }}</el-descriptions-item>
           <el-descriptions-item label="设备内码">{{ detail.deviceInternalCode }}</el-descriptions-item>
-          <el-descriptions-item label="通道">{{ detail.channelExternalKey || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="通道">{{ detail.channelInternalCode || detail.channelExternalKey || '—' }}</el-descriptions-item>
           <el-descriptions-item label="时间">{{ formatTime(detail.occurredAt) }}</el-descriptions-item>
           <el-descriptions-item label="关联状态">{{ detail.status }}</el-descriptions-item>
           <el-descriptions-item label="资源 ID">{{ detail.resourceId || '—' }}</el-descriptions-item>
           <el-descriptions-item label="报警投影">{{ detail.alarmId ? ('#' + detail.alarmId) : '未投影' }}</el-descriptions-item>
+          <el-descriptions-item label="回放">
+            <el-button v-if="detail.playback && detail.playback.supported" type="text" size="mini" @click="openPlayback(detail)">查看回放</el-button>
+            <span v-else class="sub">{{ (detail.playback && detail.playback.reason) || '不可用' }}</span>
+          </el-descriptions-item>
         </el-descriptions>
         <div v-if="detail.imageUrl" class="section">
           <el-image :src="detail.imageUrl" :preview-src-list="[detail.imageUrl]" fit="contain" style="max-width:100%;max-height:360px" />
@@ -126,14 +128,39 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog :title="playbackTitle" :visible.sync="playbackDialogVisible" width="800px" :before-close="closePlayback" destroy-on-close>
+      <div v-if="playbackLoading" style="text-align:center;padding:40px 0;">
+        <i class="el-icon-loading" style="font-size:32px" />
+        <div style="margin-top:10px;color:#606266">正在加载回放...</div>
+      </div>
+      <div v-else-if="playbackError" style="text-align:center;padding:40px 0;color:#f56c6c">{{ playbackError }}</div>
+      <div v-else-if="playbackStreamInfo" style="height:400px;">
+        <playerTabs ref="playbackPlayer" :show-button="false" :showTab="true" :has-audio="true" />
+      </div>
+      <span slot="footer">
+        <el-button size="mini" @click="closePlayback">关闭</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { queryEvents, getEvent, getEventStats, clearEvents } from '@/api/event'
+import { queryEvents, getEvent, getEventStats, getEventTypes, clearEvents } from '@/api/event'
+import { playback as startPlayback, stopPlayback } from '@/api/commonChannel'
+import playerTabs from '@/views/common/playerTabs.vue'
+
+function formatDatetime(ts) {
+  if (!ts) return null
+  const d = new Date(ts)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
 
 export default {
   name: 'EventCenter',
+  components: { playerTabs },
   data() {
     return {
       loading: false,
@@ -144,11 +171,30 @@ export default {
       filters: { deviceInternalCode: '', eventType: '', status: '', range: [] },
       detailVisible: false,
       detail: null,
-      stats: {}
+      stats: {},
+      eventTypes: [],
+      playbackDialogVisible: false,
+      playbackLoading: false,
+      playbackError: null,
+      playbackStreamInfo: null,
+      playbackTitle: '事件回放',
+      playbackChannelId: null
     }
   },
-  created() { this.load(); this.loadStats() },
+  created() { this.load(); this.loadStats(); this.loadTypes() },
   methods: {
+    loadTypes() {
+      getEventTypes().then(res => {
+        this.eventTypes = ((res && res.data && res.data.list) || []).filter(t => t.enabled !== false)
+      }).catch(() => {})
+    },
+    typeName(code) {
+      const t = this.eventTypes.find(x => x.code === code)
+      return t ? t.name : (code || '—')
+    },
+    categoryName(category) {
+      return { alarm: '报警', status: '状态', operation: '操作', ai: 'AI', metadata: '数据' }[category] || category || '—'
+    },
     reload() { this.page = 1; this.load() },
     onSize(n) { this.count = n; this.page = 1; this.load() },
     load() {
@@ -188,6 +234,43 @@ export default {
         this.detail = (res && res.data) || null
         this.detailVisible = true
       }).catch(e => this.$message.error(e || '加载失败'))
+    },
+    openPlayback(row) {
+      const p = row && row.playback
+      if (!p || !p.supported || !p.channelLegacyId) {
+        this.$message.warning((p && p.reason) || '该事件暂不支持回放')
+        return
+      }
+      this.playbackTitle = `事件回放 - ${this.typeName(row.eventType)} (${this.formatTime(row.occurredAt)})`
+      this.playbackDialogVisible = true
+      this.playbackLoading = true
+      this.playbackError = null
+      this.playbackStreamInfo = null
+      this.playbackChannelId = p.channelLegacyId
+      startPlayback({
+        channelId: p.channelLegacyId,
+        startTime: formatDatetime(p.startAt),
+        endTime: formatDatetime(p.endAt)
+      }).then(data => {
+        this.playbackStreamInfo = data
+        this.playbackLoading = false
+        this.$nextTick(() => {
+          if (this.$refs.playbackPlayer) this.$refs.playbackPlayer.setStreamInfo(data)
+        })
+      }).catch(err => {
+        this.playbackLoading = false
+        this.playbackError = (err && err.msg) ? err.msg : '回放请求失败，请检查通道是否有该时段录像'
+      })
+    },
+    closePlayback() {
+      if (this.$refs.playbackPlayer) this.$refs.playbackPlayer.stop()
+      if (this.playbackStreamInfo && this.playbackChannelId) {
+        stopPlayback({ channelId: this.playbackChannelId, stream: this.playbackStreamInfo.stream }).catch(() => {})
+      }
+      this.playbackDialogVisible = false
+      this.playbackStreamInfo = null
+      this.playbackError = null
+      this.playbackChannelId = null
     },
     formatTime(ms) {
       if (!ms) return '-'

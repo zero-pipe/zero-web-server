@@ -43,6 +43,11 @@ func (h *EventHandler) Stats(c *gin.Context) {
 	response.OK(c, h.svc.Stats())
 }
 
+func (h *EventHandler) Types(c *gin.Context) {
+	list := h.svc.EventTypes()
+	response.OK(c, gin.H{"list": list, "total": len(list)})
+}
+
 func (h *EventHandler) Clear(c *gin.Context) {
 	var body struct {
 		BeforeTime int64 `json:"beforeTime"`

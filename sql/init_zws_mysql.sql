@@ -608,8 +608,21 @@ CREATE TABLE IF NOT EXISTS zws_alarm (
                           record_path VARCHAR(255) COMMENT '报警录像路径',
                           longitude DOUBLE COMMENT '报警附带的经度',
                           latitude DOUBLE COMMENT '报警附带的纬度',
-                          alarm_type INT COMMENT '报警类别',
-                          alarm_time bigint COMMENT '报警时间'
+                          alarm_type INT COMMENT '报警类别（旧数字码）',
+                          alarm_code VARCHAR(64) COMMENT '统一报警码',
+                          alarm_time bigint COMMENT '报警时间',
+                          event_id VARCHAR(128) COMMENT '关联事件ID',
+                          device_internal_code VARCHAR(32) COMMENT '设备内码',
+                          channel_internal_code VARCHAR(32) COMMENT '通道内码',
+                          bbox_json TEXT COMMENT 'AI目标框',
+                          severity VARCHAR(32) COMMENT '级别',
+                          status VARCHAR(32) DEFAULT 'unhandled' COMMENT '处置状态',
+                          handled_by VARCHAR(128),
+                          handled_at BIGINT,
+                          remark VARCHAR(255),
+                          KEY idx_alarm_event (event_id),
+                          KEY idx_alarm_device (device_internal_code),
+                          KEY idx_alarm_channel (channel_internal_code)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ONVIF 设备 / 通道
@@ -872,9 +885,23 @@ CREATE TABLE IF NOT EXISTS zws_event_source
     KEY idx_event_device (device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件来源';
 
-DROP TABLE IF EXISTS zws_unified_ref;
-CREATE TABLE IF NOT EXISTS zws_unified_ref
+DROP TABLE IF EXISTS zws_event_type;
+CREATE TABLE IF NOT EXISTS zws_event_type
 (
+    code            VARCHAR(64) NOT NULL PRIMARY KEY,
+    name            VARCHAR(128),
+    category        VARCHAR(32),
+    severity        VARCHAR(32),
+    alarm_eligible  TINYINT NOT NULL DEFAULT 0,
+    requires_video  TINYINT NOT NULL DEFAULT 0,
+    bbox_capable    TINYINT NOT NULL DEFAULT 0,
+    vendor_mappings TEXT,
+    enabled         TINYINT NOT NULL DEFAULT 1,
+    update_time     VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='统一事件类型注册表';
+
+DROP TABLE IF EXISTS zws_unified_ref;
+CREATE TABLE IF NOT EXISTS zws_unified_ref(
     id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     legacy_table VARCHAR(64) NOT NULL,
     legacy_id    VARCHAR(64) NOT NULL,

@@ -13,6 +13,7 @@ import (
 	domainalarm "zero-web-server/internal/domain/alarm"
 	domainasset "zero-web-server/internal/domain/asset"
 	domainevent "zero-web-server/internal/domain/event"
+	"zero-web-server/internal/eventtype"
 	applog "zero-web-server/pkg/log"
 )
 
@@ -93,6 +94,13 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 		OccurredAt: p.OccurredAt, ReceivedAt: p.ReceivedAt,
 		BBoxJSON: string(p.BBox), RawJSON: string(body), Status: "unmapped",
 	}
+	// 事件类型统一收敛到注册表规范码；未登记类型回落 other。
+	t := eventtype.Normalize(p.EventType)
+	e.EventType = t.Code
+	e.Category = t.Category
+	if strings.TrimSpace(e.Severity) == "" || e.Severity == "warning" {
+		e.Severity = t.Severity
+	}
 	if e.OccurredAt <= 0 {
 		e.OccurredAt = time.Now().UnixMilli()
 	}
@@ -142,13 +150,20 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 		applog.Warn("event persist failed", "event", p.EventID, "err", err)
 		return fmt.Errorf("persist event: %w", err)
 	}
-	if s.alarms != nil && legacyChannelID > 0 {
+	if s.alarms != nil && legacyChannelID > 0 && eventtype.IsAlarmEligible(e.EventType) {
 		alarm := &domainalarm.Alarm{
-			ChannelID:   legacyChannelID,
-			Description: fmt.Sprintf("[事件] %s %s", e.EventType, e.DeviceInternalCode),
-			SnapPath:    e.ImageKey,
-			AlarmType:   alarmTypeForEvent(e.EventType),
-			AlarmTime:   e.OccurredAt,
+			ChannelID:           legacyChannelID,
+			Description:         fmt.Sprintf("[事件] %s %s", t.Name, e.DeviceInternalCode),
+			SnapPath:            e.ImageKey,
+			AlarmType:           eventtype.LegacyAlarmType(e.EventType),
+			AlarmCode:           e.EventType,
+			AlarmTime:           e.OccurredAt,
+			EventID:             e.EventID,
+			DeviceInternalCode:  e.DeviceInternalCode,
+			ChannelInternalCode: e.ChannelInternalCode,
+			BBoxJSON:            e.BBoxJSON,
+			Severity:            e.Severity,
+			Status:              "unhandled",
 		}
 		if err := s.alarms.Create(alarm); err != nil {
 			applog.Warn("event alarm projection failed", "event", e.EventID, "err", err)
@@ -174,6 +189,11 @@ func (s *Service) Stats() map[string]uint64 {
 	}
 }
 
+// EventTypes 返回统一事件类型注册表（当前以内置码为准，数据库表用于后续可配置扩展）。
+func (s *Service) EventTypes() []eventtype.Type {
+	return eventtype.Builtins()
+}
+
 func (s *Service) ClearBefore(ctx context.Context, before int64) (int64, error) {
 	if before <= 0 {
 		return 0, fmt.Errorf("before 时间不能为空")
@@ -188,6 +208,7 @@ func (s *Service) List(ctx context.Context, page, count int, f domainevent.ListF
 	}
 	for _, e := range list {
 		s.refreshImageURL(ctx, e)
+		s.attachPlayback(e)
 	}
 	return list, total, nil
 }
@@ -198,7 +219,60 @@ func (s *Service) Get(ctx context.Context, id string) (*domainevent.Event, error
 		return nil, fmt.Errorf("事件不存在")
 	}
 	s.refreshImageURL(ctx, e)
+	s.attachPlayback(e)
 	return e, nil
+}
+
+// attachPlayback 由事件关联的设备/通道推导回放上下文，能力不足时给出原因。
+func (s *Service) attachPlayback(e *domainevent.Event) {
+	if e == nil {
+		return
+	}
+	t := eventtype.Normalize(e.EventType)
+	e.Category = t.Category
+	if e.OccurredAt <= 0 {
+		return
+	}
+	playback := &domainevent.PlaybackContext{
+		StartAt: e.OccurredAt - 10_000,
+		EndAt:   e.OccurredAt + 10_000,
+	}
+	defer func() { e.Playback = playback }()
+	if s.assets == nil {
+		playback.Reason = "资产服务未初始化"
+		return
+	}
+	dev, err := s.assets.GetDeviceByInternalCode(e.DeviceInternalCode)
+	if err != nil || dev == nil {
+		playback.Reason = "设备未映射"
+		return
+	}
+	binding, err := s.assets.GetBindingByDevice(dev.ID)
+	if err != nil || binding == nil {
+		playback.Reason = "缺少接入绑定"
+		return
+	}
+	playback.Protocol = binding.Protocol
+	res, err := s.assets.GetResourceByInternalCode(e.ChannelInternalCode)
+	if err != nil || res == nil {
+		playback.Reason = "通道未映射"
+		return
+	}
+	switch binding.Protocol {
+	case "gb28181":
+		playback.Supported = true
+		playback.DeviceExternal = binding.ExternalID
+		playback.ChannelExternal = res.ExternalKey
+		playback.ChannelLegacyID = res.LegacyChannelID
+	case "onvif":
+		playback.ChannelLegacyID = res.LegacyChannelID
+		playback.Reason = "ONVIF 回放尚未接入"
+	case "plugin":
+		playback.ChannelLegacyID = res.LegacyChannelID
+		playback.Reason = "插件回放尚未接入"
+	default:
+		playback.Reason = "不支持的接入协议"
+	}
 }
 
 func (s *Service) refreshImageURL(ctx context.Context, e *domainevent.Event) {
@@ -258,32 +332,6 @@ func findResource(resources []*domainasset.Resource, channel string) *domainasse
 		}
 	}
 	return nil
-}
-
-// alarmTypeForEvent 映射到国标报警类型码（同时用于前端标签展示）。
-func alarmTypeForEvent(eventType string) int {
-	switch eventType {
-	case "video_loss":
-		return 1
-	case "tamper":
-		return 2
-	case "motion":
-		return 7
-	case "line_crossing":
-		return 10
-	case "intrusion":
-		return 11
-	case "loitering":
-		return 15
-	case "audio_abnormal":
-		return 22
-	case "defocus":
-		return 25
-	case "scene_change":
-		return 26
-	default:
-		return 99
-	}
 }
 
 func (s *Service) StartRetention(ctx context.Context, days int) {
