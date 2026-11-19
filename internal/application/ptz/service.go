@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	domainasset "zero-web-server/internal/domain/asset"
+	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
 	domainptz "zero-web-server/internal/domain/ptz"
 	"zero-web-server/internal/gbsip"
@@ -41,6 +43,8 @@ const (
 )
 
 type Service struct {
+	channels      domainchannel.Repository
+	caps          domainasset.Repository
 	devices       domaindevice.Repository
 	sip           port.GBPTZNode
 	control       port.GBDeviceControl
@@ -48,8 +52,11 @@ type Service struct {
 	positions     sync.Map // "deviceID/channelGBID" -> gbsip.PTZPosition
 }
 
-func NewService(devices domaindevice.Repository, sipServer port.GBPTZNode, control port.GBDeviceControl) *Service {
+func NewService(devices domaindevice.Repository, channels domainchannel.Repository,
+	caps domainasset.Repository, sipServer port.GBPTZNode, control port.GBDeviceControl) *Service {
 	return &Service{
+		channels:      channels,
+		caps:          caps,
 		devices:       devices,
 		sip:           sipServer,
 		control:       control,
@@ -123,7 +130,41 @@ func (s *Service) Control(deviceID, channelID, command string, horizonSpeed, ver
 	if err != nil {
 		return err
 	}
+	if err := s.checkPTZCap(deviceID, channelID); err != nil {
+		return err
+	}
 	return s.sip.SendPTZ(device, channelID, command, horizonSpeed, verticalSpeed, zoomSpeed)
+}
+
+// checkPTZCap 云台能力校验：无声明放行，声明不支持/当前不可用则拒绝。
+func (s *Service) checkPTZCap(deviceID, channelID string) error {
+	if s.caps == nil || s.channels == nil {
+		return nil
+	}
+	ch, err := s.channels.GetOne(deviceID, channelID)
+	if err != nil || ch == nil {
+		return nil
+	}
+	res, err := s.caps.GetResourceByInternalCode(ch.InternalCode)
+	if err != nil || res == nil {
+		return nil
+	}
+	caps, err := s.caps.ListCapabilities("resource", res.ID)
+	if err != nil {
+		return nil
+	}
+	for _, c := range caps {
+		if c.Operation != "ptz" {
+			continue
+		}
+		if !c.Supported {
+			return fmt.Errorf("该通道不支持云台控制")
+		}
+		if !c.Available {
+			return fmt.Errorf("该通道云台能力当前不可用（设备离线或上次调用失败）")
+		}
+	}
+	return nil
 }
 
 // QueryPreset sends PresetQuery and waits for the device PresetQuery response.

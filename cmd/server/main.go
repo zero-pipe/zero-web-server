@@ -221,7 +221,7 @@ func main() {
 		recordTimeoutSec = 30
 	}
 	playbackService := playbackapp.NewService(
-		deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
+		assetRepo, deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
 	sipServer.SetMediaHandler(playbackService)
 	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
@@ -239,7 +239,7 @@ func main() {
 	})
 
 	playService := playapp.NewService(deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
-	ptzService := ptzapp.NewService(deviceRepo, sessionAdapter, sessionAdapter)
+	ptzService := ptzapp.NewService(deviceRepo, channelRepo, assetRepo, sessionAdapter, sessionAdapter)
 	sipServer.SetPTZPositionHandler(ptzService)
 	sipServer.SetSnapShotHandler(snapService)
 	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)

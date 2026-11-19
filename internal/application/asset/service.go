@@ -26,10 +26,7 @@ type Projector interface {
 type Service struct {
 	repo      domainasset.Repository
 	projector Projector
-	play      *playapp.Service
-	onvif     *onvifapp.Service
-	ipc       *ipcdevice.Service
-	device    *deviceapp.Service
+	drivers   map[string]ChannelDriver
 
 	mu       sync.Mutex
 	sessions map[string]*liveSession
@@ -47,8 +44,9 @@ type liveSession struct {
 func NewService(repo domainasset.Repository, projector Projector, play *playapp.Service,
 	onvif *onvifapp.Service, ipc *ipcdevice.Service, device *deviceapp.Service) *Service {
 	return &Service{
-		repo: repo, projector: projector, play: play, onvif: onvif,
-		ipc: ipc, device: device, sessions: map[string]*liveSession{},
+		repo: repo, projector: projector,
+		drivers: newDrivers(play, onvif, ipc, device),
+		sessions: map[string]*liveSession{},
 	}
 }
 
@@ -182,21 +180,12 @@ func (s *Service) Sync(ctx context.Context, deviceID string) error {
 	if err != nil || binding == nil {
 		return fmt.Errorf("设备缺少接入绑定")
 	}
-	switch binding.Protocol {
-	case "gb28181":
-		if err := s.device.SyncCatalog(binding.ExternalID); err != nil {
-			return err
-		}
-	case "onvif":
-		if _, err := s.onvif.SyncChannels(ctx, int64(binding.LegacyDeviceID)); err != nil {
-			return err
-		}
-	case "plugin":
-		if _, err := s.ipc.SyncChannels(ctx, binding.LegacyDeviceID); err != nil {
-			return err
-		}
-	default:
+	drv, ok := s.drivers[binding.Protocol]
+	if !ok {
 		return fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
+	}
+	if err := drv.Sync(ctx, binding); err != nil {
+		return err
 	}
 	if s.projector != nil {
 		return s.projector.Backfill()
@@ -233,43 +222,18 @@ func (s *Service) StartLive(ctx context.Context, resourceID, profileID string) (
 }
 
 func (s *Service) startLiveByProtocol(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, profile *domainasset.StreamProfile) (*dto.StreamContent, error) {
-
-	switch binding.Protocol {
-	case "gb28181":
-		if s.play == nil {
-			return nil, fmt.Errorf("GB 播放服务未启用")
-		}
-		return s.play.StartPlay(ctx, binding.ExternalID, res.ExternalKey)
-	case "onvif":
-		token := profileToken(profile)
-		content, err := s.onvif.StartPlay(ctx, int64(res.LegacyChannelID), token)
-		if err != nil {
-			return nil, err
-		}
-		s.setSession(res.ID, &liveSession{
-			Protocol: binding.Protocol, LegacyChannelID: int64(res.LegacyChannelID), ProfileToken: token,
-		})
-		return &dto.StreamContent{
-			App: content.App, Stream: content.Stream, MediaServerID: content.MediaServerID,
-			Flv: content.URLs["flv"], WsFlv: content.URLs["ws"], Hls: content.URLs["hls"],
-			Rtmp: content.URLs["rtmp"], Rtsp: content.URLs["rtsp"], Rtc: content.URLs["rtc"], Rtcs: content.URLs["rtcs"],
-			VideoCodec: content.VideoCodec, AudioCodec: content.AudioCodec,
-		}, nil
-	case "plugin":
-		if s.ipc == nil {
-			return nil, fmt.Errorf("插件服务未启用")
-		}
-		content, err := s.ipc.StartLive(ctx, binding.LegacyDeviceID, res.ExternalKey)
-		if err != nil {
-			return nil, err
-		}
-		s.setSession(res.ID, &liveSession{
-			Protocol: binding.Protocol, LegacyDeviceID: binding.LegacyDeviceID, ChannelKey: res.ExternalKey,
-		})
-		return content, nil
-	default:
+	drv, ok := s.drivers[binding.Protocol]
+	if !ok {
 		return nil, fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
 	}
+	content, sess, err := drv.StartLive(ctx, res, binding, profile)
+	if err != nil {
+		return nil, err
+	}
+	if sess != nil {
+		s.setSession(res.ID, sess)
+	}
+	return content, nil
 }
 
 func (s *Service) StopLive(ctx context.Context, resourceID string) error {
@@ -285,30 +249,14 @@ func (s *Service) StopLive(ctx context.Context, resourceID string) error {
 	} else if binding != nil {
 		protocol = binding.Protocol
 	}
-	switch protocol {
-	case "gb28181":
-		if binding == nil {
-			return fmt.Errorf("设备缺少接入绑定")
-		}
-		return s.play.StopPlay(binding.ExternalID, res.ExternalKey)
-	case "onvif":
-		token := ""
-		if sess != nil {
-			token = sess.ProfileToken
-		}
-		return s.onvif.StopPlay(ctx, int64(res.LegacyChannelID), token)
-	case "plugin":
-		devID := 0
-		if binding != nil {
-			devID = binding.LegacyDeviceID
-		}
-		if sess != nil {
-			devID = sess.LegacyDeviceID
-		}
-		return s.ipc.StopLive(ctx, devID, res.ExternalKey)
-	default:
+	drv, ok := s.drivers[protocol]
+	if !ok {
 		return fmt.Errorf("不支持的接入协议")
 	}
+	if protocol == "gb28181" && binding == nil {
+		return fmt.Errorf("设备缺少接入绑定")
+	}
+	return drv.StopLive(ctx, res, binding, sess)
 }
 
 func (s *Service) pickProfile(resourceID, profileID string) (*domainasset.StreamProfile, error) {

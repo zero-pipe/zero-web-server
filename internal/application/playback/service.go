@@ -12,6 +12,7 @@ import (
 	publishauth "zero-web-server/internal/application/publishauth"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
+	domainasset "zero-web-server/internal/domain/asset"
 	domainrecord "zero-web-server/internal/domain/record"
 	"zero-web-server/internal/dto"
 	"zero-web-server/internal/gbsip"
@@ -26,6 +27,7 @@ type DownloadProgress struct {
 }
 
 type Service struct {
+	caps          domainasset.Repository
 	devices       domaindevice.Repository
 	channels      domainchannel.Repository
 	sip           port.GBPlaybacker
@@ -37,6 +39,7 @@ type Service struct {
 }
 
 func NewService(
+	caps domainasset.Repository,
 	devices domaindevice.Repository,
 	channels domainchannel.Repository,
 	sipServer port.GBPlaybacker,
@@ -48,7 +51,7 @@ func NewService(
 		recordTimeoutSec = 30
 	}
 	return &Service{
-		devices: devices, channels: channels, sip: sipServer,
+		caps: caps, devices: devices, channels: channels, sip: sipServer,
 		media: media, serverID: serverID,
 		recordTimeout: time.Duration(recordTimeoutSec) * time.Second,
 	}
@@ -81,6 +84,9 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 	if err != nil {
 		return nil, err
 	}
+	if err := s.checkResourceCap(channel, "playback"); err != nil {
+		return nil, err
+	}
 	app := publishauth.LiveApp
 	stream := mediaurl.PlaybackStream(device.InternalCode, channel.InternalCode)
 	if stream == "" {
@@ -94,6 +100,7 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 			}
 			return gbsip.BuildPlaybackSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, gbsip.NormalizeStreamMode(d.StreamMode), startTime, endTime)
 		})
+	s.markResourceCap(channel, "playback", err == nil)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +115,9 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 	}
 	if downloadSpeed <= 0 {
 		downloadSpeed = 4
+	}
+	if err := s.checkResourceCap(channel, "playback"); err != nil {
+		return nil, err
 	}
 	app := publishauth.LiveApp
 	stream := mediaurl.DownloadStream(device.InternalCode, channel.InternalCode)
@@ -411,4 +421,56 @@ func ParseDownloadSpeed(v string) int {
 		return 4
 	}
 	return speed
+}
+
+// checkResourceCap 校验资源能力（无声明不拦截；声明不支持或上次失败则拒绝）。
+func (s *Service) checkResourceCap(channel *domainchannel.Channel, op string) error {
+	if s.caps == nil || channel == nil {
+		return nil
+	}
+	res, err := s.caps.GetResourceByInternalCode(channel.InternalCode)
+	if err != nil || res == nil {
+		return nil
+	}
+	caps, err := s.caps.ListCapabilities("resource", res.ID)
+	if err != nil {
+		return nil
+	}
+	for _, c := range caps {
+		if c.Operation != op {
+			continue
+		}
+		if !c.Supported {
+			return fmt.Errorf("该通道不支持%s", opText(op))
+		}
+		if !c.Available {
+			return fmt.Errorf("该通道%s能力当前不可用（设备离线或上次调用失败）", opText(op))
+		}
+	}
+	return nil
+}
+
+// markResourceCap 运行时更新能力可用性。
+func (s *Service) markResourceCap(channel *domainchannel.Channel, op string, ok bool) {
+	if s.caps == nil || channel == nil {
+		return
+	}
+	res, err := s.caps.GetResourceByInternalCode(channel.InternalCode)
+	if err != nil || res == nil {
+		return
+	}
+	_ = s.caps.SetCapabilityAvailable("resource", res.ID, op, ok)
+}
+
+func opText(op string) string {
+	switch op {
+	case "playback":
+		return "回放"
+	case "ptz":
+		return "云台控制"
+	case "snapshot":
+		return "抓拍"
+	default:
+		return op
+	}
 }
