@@ -66,6 +66,19 @@ func (b *bridge) Redirect(deviceID string) (string, int, bool) {
 	return b.redirect, 0, true
 }
 
+// OnTransportClosed marks a device offline immediately when its TCP
+// registration connection drops (NAT-inside devices, 9.1.1).
+func (b *bridge) OnTransportClosed(_ context.Context, deviceID string) error {
+	device, err := b.deviceSvc.GetByDeviceID(deviceID)
+	if err != nil || device == nil {
+		return nil
+	}
+	if !device.OnLine {
+		return nil
+	}
+	return b.deviceSvc.Offline(device)
+}
+
 func (b *bridge) OnRegister(ctx context.Context, ev gbserver.RegisterEvent) error {
 	if b.subordinate != nil && b.subordinate.Known(ev.DeviceID) {
 		return b.subordinate.OnRegister(ev)

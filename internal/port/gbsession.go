@@ -59,7 +59,13 @@ type GBDeviceControl interface {
 	SendDragZoom(device *domaindevice.Device, channelID string, zoomIn bool, length, width, midX, midY, lengthX, lengthY int) error
 	SendHomePosition(device *domaindevice.Device, channelID string, enabled, resetTime, presetIndex int) error
 	SendBasicParamConfig(device *domaindevice.Device, name string, expiration, heartBeatInterval, heartBeatCount, positionCapability int) error
-	SendConfigDownloadQuery(device *domaindevice.Device, configType string) error
+	QueryConfigDownload(device *domaindevice.Device, configType string) (string, <-chan gbsip.BasicParam)
+	QueryHomePosition(device *domaindevice.Device, channelID string) (string, <-chan gbsip.HomePosition)
+	QueryCruiseTrackList(device *domaindevice.Device, channelID string) (string, <-chan gbsip.CruiseTrackList)
+	QueryCruiseTrack(device *domaindevice.Device, channelID string, number int) (string, <-chan gbsip.CruiseTrack)
+	QueryPTZPosition(device *domaindevice.Device, channelID string) (string, <-chan gbsip.PTZPosition)
+	QuerySDCardStatus(device *domaindevice.Device, channelID string) (string, <-chan gbsip.SDCardStatus)
+	CancelQuery(sn string)
 	SendAlarmCmd(device *domaindevice.Device, channelID, alarmCmd string) error
 	SendTeleBoot(device *domaindevice.Device, channelID string) error
 	SendIFrameCmd(device *domaindevice.Device, channelID string) error

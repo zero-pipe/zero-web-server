@@ -17,6 +17,12 @@ type CatalogItem = manscdp.CatalogItem
 type RecordItem = manscdp.RecordItem
 type AlarmNotify = manscdp.AlarmNotify
 type MobilePositionNotify = manscdp.MobilePositionNotify
+type BasicParam = manscdp.BasicParam
+type HomePosition = manscdp.HomePosition
+type CruiseTrack = manscdp.CruiseTrack
+type CruiseTrackList = manscdp.CruiseTrackList
+type PTZPosition = manscdp.PTZPosition
+type SDCardStatus = manscdp.SDCardStatus
 
 // 会话类型与错误。
 type SessionType = session.SessionType
@@ -30,6 +36,7 @@ const (
 var (
 	ErrRecordTimeout = session.ErrRecordTimeout
 	ErrPresetTimeout = session.ErrPresetTimeout
+	ErrQueryTimeout  = session.ErrQueryTimeout
 )
 
 // NormalizeStreamMode 返回 INVITE SDP 使用的 RTP 媒体传输方式；空/未知回退 UDP。

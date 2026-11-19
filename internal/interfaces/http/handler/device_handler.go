@@ -416,3 +416,84 @@ func (h *DeviceHandler) DeviceStatus(c *gin.Context) {
 	}
 	response.OK(c, st)
 }
+
+// HomePositionQuery GET /api/device/query/home_position?deviceId=&channelId=
+func (h *DeviceHandler) HomePositionQuery(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	v, err := h.svc.QueryHomePosition(deviceID, channelID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, v)
+}
+
+// CruiseTrackListQuery GET /api/device/query/cruise_track_list?deviceId=&channelId=
+func (h *DeviceHandler) CruiseTrackListQuery(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	v, err := h.svc.QueryCruiseTrackList(deviceID, channelID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, v)
+}
+
+// CruiseTrackQuery GET /api/device/query/cruise_track?deviceId=&channelId=&number=
+func (h *DeviceHandler) CruiseTrackQuery(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	number, _ := strconv.Atoi(strings.TrimSpace(c.Query("number")))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	v, err := h.svc.QueryCruiseTrack(deviceID, channelID, number)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, v)
+}
+
+// PTZPositionQuery GET /api/device/query/ptz_position?deviceId=&channelId=
+func (h *DeviceHandler) PTZPositionQuery(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	v, err := h.svc.QueryPTZPosition(deviceID, channelID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, v)
+}
+
+// SDCardStatusQuery GET /api/device/query/sdcard_status?deviceId=&channelId=
+func (h *DeviceHandler) SDCardStatusQuery(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	v, err := h.svc.QuerySDCardStatus(deviceID, channelID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, v)
+}

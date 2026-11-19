@@ -10,6 +10,7 @@ import (
 	domaindevice "zero-web-server/internal/domain/device"
 	domainptz "zero-web-server/internal/domain/ptz"
 	domainrecord "zero-web-server/internal/domain/record"
+	"zero-web-server/internal/gbsip"
 	"zero-web-server/internal/infrastructure/config"
 	redisinfra "zero-web-server/internal/infrastructure/redis"
 	"zero-web-server/internal/port"
@@ -60,6 +61,7 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		Telemetry:      telemetryBridge{b: b},
 		CascadeInbound: b,
 		Redirect:       b,
+		Transport:      b,
 	})
 	if err != nil {
 		return nil, err
@@ -206,11 +208,89 @@ func (s *Server) SendBasicParamConfig(device *domaindevice.Device, name string, 
 }
 
 // SendConfigDownloadQuery 查询设备配置（BasicParam 等），当前不阻塞等待响应。
-func (s *Server) SendConfigDownloadQuery(device *domaindevice.Device, configType string) error {
-	if device == nil {
-		return fmt.Errorf("设备为空")
-	}
-	return s.lib.SendConfigDownloadQuery(toPeer(device), configType)
+// QueryConfigDownload 查询基础参数等配置，返回 SN 与解析结果通道。
+func (s *Server) QueryConfigDownload(device *domaindevice.Device, configType string) (string, <-chan gbsip.BasicParam) {
+	sn, raw := s.lib.QueryConfigDownload(toPeer(device), configType)
+	return sn, fanout(raw, func(m *manscdp.Message) (gbsip.BasicParam, bool) {
+		if m.BasicParam == nil {
+			return gbsip.BasicParam{}, false
+		}
+		return *m.BasicParam, true
+	})
+}
+
+// QueryHomePosition 查询看守位（2022）。
+func (s *Server) QueryHomePosition(device *domaindevice.Device, channelID string) (string, <-chan gbsip.HomePosition) {
+	sn, raw := s.lib.QueryHomePosition(toPeer(device), channelID)
+	return sn, fanout(raw, func(m *manscdp.Message) (gbsip.HomePosition, bool) {
+		if m.HomePosition == nil {
+			return gbsip.HomePosition{}, false
+		}
+		return *m.HomePosition, true
+	})
+}
+
+// QueryCruiseTrackList 查询巡航轨迹列表（2022）。
+func (s *Server) QueryCruiseTrackList(device *domaindevice.Device, channelID string) (string, <-chan gbsip.CruiseTrackList) {
+	sn, raw := s.lib.QueryCruiseTrackList(toPeer(device), channelID)
+	return sn, fanout(raw, func(m *manscdp.Message) (gbsip.CruiseTrackList, bool) {
+		if m.CruiseTrackList == nil {
+			return gbsip.CruiseTrackList{}, false
+		}
+		return *m.CruiseTrackList, true
+	})
+}
+
+// QueryCruiseTrack 查询单条巡航轨迹（2022）。
+func (s *Server) QueryCruiseTrack(device *domaindevice.Device, channelID string, number int) (string, <-chan gbsip.CruiseTrack) {
+	sn, raw := s.lib.QueryCruiseTrack(toPeer(device), channelID, number)
+	return sn, fanout(raw, func(m *manscdp.Message) (gbsip.CruiseTrack, bool) {
+		if m.CruiseTrack == nil {
+			return gbsip.CruiseTrack{}, false
+		}
+		return *m.CruiseTrack, true
+	})
+}
+
+// QueryPTZPosition 查询云台精准位置（2022）。
+func (s *Server) QueryPTZPosition(device *domaindevice.Device, channelID string) (string, <-chan gbsip.PTZPosition) {
+	sn, raw := s.lib.QueryPTZPosition(toPeer(device), channelID)
+	return sn, fanout(raw, func(m *manscdp.Message) (gbsip.PTZPosition, bool) {
+		if m.PTZPosition == nil {
+			return gbsip.PTZPosition{}, false
+		}
+		return *m.PTZPosition, true
+	})
+}
+
+// QuerySDCardStatus 查询存储卡状态（2022）。
+func (s *Server) QuerySDCardStatus(device *domaindevice.Device, channelID string) (string, <-chan gbsip.SDCardStatus) {
+	sn, raw := s.lib.QuerySDCardStatus(toPeer(device), channelID)
+	return sn, fanout(raw, func(m *manscdp.Message) (gbsip.SDCardStatus, bool) {
+		if m.SDCardStatus == nil {
+			return gbsip.SDCardStatus{}, false
+		}
+		return *m.SDCardStatus, true
+	})
+}
+
+// CancelQuery 取消未应答的查询。
+func (s *Server) CancelQuery(sn string) { s.lib.CancelQuery(sn) }
+
+// fanout 把通用查询应答通道转换为具体类型通道，附带超时/取消处理。
+func fanout[T any](raw <-chan *manscdp.Message, pick func(*manscdp.Message) (T, bool)) <-chan T {
+	out := make(chan T, 1)
+	go func() {
+		defer close(out)
+		msg, ok := <-raw
+		if !ok || msg == nil {
+			return
+		}
+		if v, ok := pick(msg); ok {
+			out <- v
+		}
+	}()
+	return out
 }
 
 // SendAlarmCmd 发送报警复位（AlarmCmd=ResetAlarm）。
