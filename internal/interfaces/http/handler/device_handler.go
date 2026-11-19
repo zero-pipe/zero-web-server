@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	deviceapp "zero-web-server/internal/application/device"
 	domaindevice "zero-web-server/internal/domain/device"
@@ -545,4 +548,36 @@ func (h *DeviceHandler) TargetTrack(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// SnapShotConfig POST /api/device/query/snap/config?deviceId=&channelId=&snapNum=&interval=&uploadUrl=&sessionId=
+// 下发图像抓拍配置；未给 uploadUrl 时使用当前服务地址生成。
+func (h *DeviceHandler) SnapShotConfig(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	snapNum, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("snapNum", "1")))
+	interval, _ := strconv.Atoi(strings.TrimSpace(c.DefaultQuery("interval", "1")))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	sessionID := strings.TrimSpace(c.Query("sessionId"))
+	if sessionID == "" {
+		sessionID = fmt.Sprintf("snap-%d", time.Now().UnixNano())
+	}
+	uploadURL := strings.TrimSpace(c.Query("uploadUrl"))
+	if uploadURL == "" {
+		scheme := "http"
+		if c.Request.TLS != nil {
+			scheme = "https"
+		}
+		uploadURL = fmt.Sprintf("%s://%s/api/v1/gb/snapshot/upload?deviceId=%s&sessionId=%s",
+			scheme, c.Request.Host, url.QueryEscape(deviceID), url.QueryEscape(sessionID))
+	}
+	id, err := h.svc.SendSnapShot(deviceID, channelID, snapNum, interval, uploadURL, sessionID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"sessionId": id, "uploadUrl": uploadURL})
 }

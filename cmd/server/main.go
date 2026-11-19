@@ -241,6 +241,7 @@ func main() {
 	playService := playapp.NewService(deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
 	ptzService := ptzapp.NewService(deviceRepo, sessionAdapter, sessionAdapter)
 	sipServer.SetPTZPositionHandler(ptzService)
+	sipServer.SetSnapShotHandler(snapService)
 	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)
 	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sessionAdapter, playbackService, sessionAdapter, sipCfg.ID, cfg.UserSettings.ServerID, platformChannelSvc)
 	sipServer.SetCascadeInbound(cascadeInbound)

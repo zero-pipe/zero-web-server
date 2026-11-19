@@ -168,6 +168,8 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerUser(api, userHandler)
 		registerServer(api, healthHandler, serverHandler)
 		registerAgentPublic(api, agentHandler)
+		// GB28181 图像抓拍：设备按 UploadURL 公开上传（2022 9.14）
+		api.POST("/gb/snapshot/upload", snapHandler.UploadGBSnapshot)
 	}
 
 	hookGroup := r.Group("/index/hook")

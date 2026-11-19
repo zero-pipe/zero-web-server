@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	objectstoreapp "zero-web-server/internal/application/objectstore"
@@ -13,11 +14,57 @@ import (
 
 // Service 抓拍图归档到 ObjectStore（固定 key：最新一帧可覆盖）。
 type Service struct {
-	store *objectstoreapp.Service
+	store    *objectstoreapp.Service
+	mu       sync.Mutex
+	finished map[string]SnapShotRecord // sessionID -> 最近一次完成通知
+}
+
+// SnapShotRecord 记录设备上报的图像抓拍完成通知。
+type SnapShotRecord struct {
+	DeviceID  string   `json:"deviceId"`
+	SessionID string   `json:"sessionId"`
+	Files     []string `json:"files"`
+	At        string   `json:"at"`
 }
 
 func NewService(store *objectstoreapp.Service) *Service {
-	return &Service{store: store}
+	return &Service{store: store, finished: make(map[string]SnapShotRecord)}
+}
+
+// PutSnapshot 归档 GB28181 图像抓拍上传的 JPEG（2022 9.14）。
+func (s *Service) PutSnapshot(ctx context.Context, deviceGBID, fileName string, data []byte) (key, url string, err error) {
+	if len(data) == 0 {
+		return "", "", fmt.Errorf("空图像")
+	}
+	name := strings.TrimSpace(fileName)
+	if name == "" {
+		name = fmt.Sprintf("%s_%d.jpg", sanitize(deviceGBID), time.Now().UnixMilli())
+	}
+	key = fmt.Sprintf("snapshot/%s/%s", sanitize(deviceGBID), sanitize(name))
+	if err := s.store.Store().Put(ctx, key, bytes.NewReader(data), int64(len(data)), "image/jpeg"); err != nil {
+		return "", "", err
+	}
+	url, _ = s.store.Store().PresignGet(ctx, key, time.Hour)
+	return key, url, nil
+}
+
+// HandleFinished 记录设备上报的抓拍完成通知。
+func (s *Service) HandleSnapShotFinished(deviceID, sessionID string, files []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.finished[sessionID] = SnapShotRecord{
+		DeviceID: deviceID, SessionID: sessionID, Files: files,
+		At: time.Now().Format("2006-01-02 15:04:05"),
+	}
+	return nil
+}
+
+// Finished 返回某会话的抓拍完成记录。
+func (s *Service) Finished(sessionID string) (SnapShotRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec, ok := s.finished[sessionID]
+	return rec, ok
 }
 
 func SnapKey(deviceID, channelID string) string {

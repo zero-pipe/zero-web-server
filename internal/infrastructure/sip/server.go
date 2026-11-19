@@ -36,6 +36,11 @@ type PTZPositionHandler interface {
 	HandlePTZPosition(deviceID, channelGBID string, pan, tilt, zoom int) error
 }
 
+// SnapShotHandler receives GB28181 UploadSnapShotFinished notifications (2022 9.14).
+type SnapShotHandler interface {
+	HandleSnapShotFinished(deviceID, sessionID string, files []string) error
+}
+
 // MediaHandler receives GB28181 MediaStatus (File to End) notifications.
 type MediaHandler interface {
 	HandleMediaStatus(deviceID, channelGBID, notifyType string) error
@@ -85,6 +90,7 @@ func (s *Server) SetAlarmHandler(h AlarmHandler)             { s.bridge.alarm = 
 func (s *Server) SetPositionHandler(h PositionHandler)       { s.bridge.position = h }
 func (s *Server) SetMediaHandler(h MediaHandler)             { s.bridge.media = h }
 func (s *Server) SetPTZPositionHandler(h PTZPositionHandler) { s.bridge.ptzPosition = h }
+func (s *Server) SetSnapShotHandler(h SnapShotHandler)       { s.bridge.snapShot = h }
 func (s *Server) SetSubordinateHandler(h SubordinateHandler) { s.bridge.subordinate = h }
 func (s *Server) SetCascadeInbound(h gbserver.CascadeInboundHandler) {
 	s.bridge.cascade = h
@@ -297,6 +303,19 @@ func fanout[T any](raw <-chan *manscdp.Message, pick func(*manscdp.Message) (T, 
 		}
 	}()
 	return out
+}
+
+// SendSnapShotConfig 下发图像抓拍配置（2022 9.14）。
+func (s *Server) SendSnapShotConfig(device *domaindevice.Device, channelID string, snapNum, interval int, uploadURL, sessionID string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildSnapShotConfig(target, s.lib.NextSN(), snapNum, interval, uploadURL, sessionID)
+	return s.lib.SendDeviceControl(toPeer(device), body)
 }
 
 // SendPTZPrecise 发送 PTZ 精准控制（2022）。

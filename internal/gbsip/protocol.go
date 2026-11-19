@@ -44,6 +44,16 @@ func NormalizeStreamMode(mode string) string {
 	return transport.Normalize(mode)
 }
 
+// ParseSnapShotFileName 解析 41 位抓拍文件名：设备编码+02+时间+序号。
+func ParseSnapShotFileName(name string) (deviceID, timestamp string, seq int, ok bool) {
+	return manscdp.ParseSnapShotFileName(name)
+}
+
+// ValidSnapShotSessionID 校验图像抓拍 SessionID（字母/数字/短划线，3~128）。
+func ValidSnapShotSessionID(id string) bool {
+	return manscdp.ValidSnapShotSessionID(id)
+}
+
 // BuildPTZPositionQuery 构造 PTZ 精准位置查询/订阅消息体。
 func BuildPTZPositionQuery(channelID, sn string) string {
 	return manscdp.BuildPTZPositionQuery(channelID, sn)

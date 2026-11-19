@@ -34,6 +34,7 @@ type bridge struct {
 	position    PositionHandler
 	media       MediaHandler
 	ptzPosition PTZPositionHandler
+	snapShot    SnapShotHandler
 	redirect    string
 	redis       *redisinfra.Client
 	password    string
@@ -238,6 +239,21 @@ func (b *bridge) OnAlarm(_ context.Context, deviceID, channelID string, alarm *m
 		return nil
 	}
 	return b.alarm.HandleNotify(deviceID, channelID, alarm)
+}
+
+func (b *bridge) OnSnapShotFinished(_ context.Context, deviceID string, ev *manscdp.SnapShotFinished) error {
+	if b.snapShot == nil || ev == nil {
+		return nil
+	}
+	files := make([]string, 0, len(ev.Images))
+	for _, img := range ev.Images {
+		if img.FilePath != "" {
+			files = append(files, img.FilePath)
+		} else if img.ImageID != "" {
+			files = append(files, img.ImageID)
+		}
+	}
+	return b.snapShot.HandleSnapShotFinished(deviceID, ev.SessionID, files)
 }
 
 func (b *bridge) OnPTZPosition(_ context.Context, deviceID, channelID string, pos *manscdp.PTZPosition) error {

@@ -2,6 +2,7 @@ package deviceapp
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	domaindevice "zero-web-server/internal/domain/device"
@@ -261,6 +262,23 @@ func (s *Service) QueryDeviceStatus(deviceID string) (*port.GBDeviceStatus, erro
 		s.sip.CancelDeviceStatusQuery(sn)
 		return nil, fmt.Errorf("设备状态查询超时")
 	}
+}
+
+// SendSnapShot 下发图像抓拍配置（2022 9.14）。sessionID 为空时由平台生成。
+func (s *Service) SendSnapShot(deviceID, channelID string, snapNum, interval int, uploadURL, sessionID string) (string, error) {
+	if strings.TrimSpace(sessionID) == "" {
+		sessionID = fmt.Sprintf("snap-%d", time.Now().UnixNano())
+	}
+	if !gbsip.ValidSnapShotSessionID(sessionID) {
+		return "", fmt.Errorf("sessionId 只能包含字母/数字/短划线，长度 3~128")
+	}
+	err := s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendSnapShotConfig(device, channelID, snapNum, interval, uploadURL, sessionID)
+	})
+	if err != nil {
+		return "", err
+	}
+	return sessionID, nil
 }
 
 // PTZPrecise 发送 PTZ 精准控制（2022）。

@@ -33,4 +33,6 @@ func registerDeviceQuery(parent *gin.RouterGroup, deviceHandler *handler.DeviceH
 	g.POST("/channel/stream/identification/update", deviceHandler.ChangeChannelStreamIdentification)
 	g.GET("/snap/:deviceId/:channelId", snapHandler.GetChannelSnap)
 	g.POST("/snap/:deviceId/:channelId", snapHandler.UploadChannelSnap)
+	g.POST("/snap/config", deviceHandler.SnapShotConfig)
+	g.GET("/snap/finished/:sessionId", snapHandler.Finished)
 }
