@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 	"zero-web-server/internal/apperr"
 
@@ -25,6 +26,8 @@ var (
 type Service struct {
 	repo     domainsub.Repository
 	serverID string
+	// catalogMu 按平台串行化目录接收，避免多批次并发导致孤儿标记竞态。
+	catalogMu sync.Map
 }
 
 func NewService(repo domainsub.Repository, serverID string) *Service {
@@ -156,6 +159,10 @@ func (s *Service) HandleCatalog(upstreamGBID string, items []gbsip.CatalogItem, 
 	if err != nil || p == nil {
 		return ErrPlatformNotFound
 	}
+	muAny, _ := s.catalogMu.LoadOrStore(p.ID, &sync.Mutex{})
+	mu := muAny.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 	now := time.Now().Format("2006-01-02 15:04:05")
 	seen := make(map[string]struct{}, len(items))
 	orphans := 0

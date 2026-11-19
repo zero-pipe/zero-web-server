@@ -83,8 +83,9 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 		}
 		channelIDs = dedupeInts(channelIDs)
 	}
+	// 没有共享通道时返回空目录：取消共享后仍需据此向上级发送删除通知。
 	if len(channelIDs) == 0 {
-		return nil, fmt.Errorf("未配置共享通道")
+		return []gbsip.CatalogItem{}, nil
 	}
 	regionBy := make(map[string]domaintree.Node, len(regions))
 	for _, r := range regions {
@@ -296,6 +297,9 @@ func (s *ChannelService) pushCatalog(platformID int) error {
 	prev, err := s.platforms.ListCatalogSnapshot(platformID)
 	if err != nil {
 		return err
+	}
+	if len(items) == 0 && len(prev) == 0 {
+		return fmt.Errorf("未配置共享通道")
 	}
 	prevMap := make(map[string]struct {
 		hash string
