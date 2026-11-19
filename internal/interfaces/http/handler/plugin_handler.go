@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
-	"time"
 
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	pluginapp "zero-web-server/internal/application/plugin"
@@ -17,12 +15,10 @@ import (
 )
 
 type PluginHandler struct {
-	plugins  *pluginapp.Service
-	ipc      *ipcdevice.Service
-	assets   assetPruner
-	project  assetProjector
-	token    string
-	rearm    pluginRearmer
+	plugins *pluginapp.Service
+	ipc     *ipcdevice.Service
+	assets  assetPruner
+	project assetProjector
 }
 
 // assetProjector 把 legacy 插件设备/通道投影到统一资产模型（由 asset.Service 实现）。
@@ -30,79 +26,12 @@ type assetProjector interface {
 	Backfill() error
 }
 
-
-type pluginRearmer interface {
-	RearmForPlugin(ctx context.Context, pluginID string)
-}
-
-// SetRearmer 注入插件重启后的自动补布防能力。
-func (h *PluginHandler) SetRearmer(r pluginRearmer) { h.rearm = r }
-
-func NewPluginHandler(plugins *pluginapp.Service, ipc *ipcdevice.Service, assets assetPruner, token string) *PluginHandler {
-	h := &PluginHandler{plugins: plugins, ipc: ipc, assets: assets, token: token}
+func NewPluginHandler(plugins *pluginapp.Service, ipc *ipcdevice.Service, assets assetPruner) *PluginHandler {
+	h := &PluginHandler{plugins: plugins, ipc: ipc, assets: assets}
 	if p, ok := assets.(assetProjector); ok {
 		h.project = p
 	}
 	return h
-}
-
-func (h *PluginHandler) checkToken(c *gin.Context) bool {
-	if h.token == "" {
-		return true
-	}
-	if c.GetHeader("X-Plugin-Token") != h.token {
-		response.Error(c, response.CodeUnauth, "插件令牌无效")
-		return false
-	}
-	return true
-}
-
-// Hello 插件注册（公开接口，凭 X-Plugin-Token 校验）。
-func (h *PluginHandler) Hello(c *gin.Context) {
-	if !h.checkToken(c) {
-		return
-	}
-	var req pluginapp.HelloRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, response.CodeBadReq, "参数错误: "+err.Error())
-		return
-	}
-	p, err := h.plugins.Hello(c.Request.Context(), req)
-	if err != nil {
-		response.FromError(c, err)
-		return
-	}
-	if h.rearm != nil {
-		pluginID := p.ID
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			h.rearm.RearmForPlugin(ctx, pluginID)
-			// 补布防会重新登录设备，在线状态可能在启动投影之后才更新。
-			if err := h.projectAssets(); err != nil {
-				applog.Warn("plugin asset projection failed after rearm", "err", err)
-			}
-		}()
-	}
-	response.OK(c, p)
-}
-
-func (h *PluginHandler) Heartbeat(c *gin.Context) {
-	if !h.checkToken(c) {
-		return
-	}
-	var body struct {
-		ID string `json:"id"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		response.Error(c, response.CodeBadReq, "参数错误")
-		return
-	}
-	if err := h.plugins.Heartbeat(c.Request.Context(), body.ID); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.OK(c, gin.H{"ok": true})
 }
 
 func (h *PluginHandler) List(c *gin.Context) {

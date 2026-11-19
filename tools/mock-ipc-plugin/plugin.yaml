@@ -1,0 +1,18 @@
+id: mock-ipc
+instance_id: mock-ipc-01
+name: Mock IPC
+vendor: mock
+version: 0.1.0
+protocols:
+  - mock.ipc.v1
+executable:
+  windows: mock-ipc-plugin.exe
+  linux: mock-ipc-plugin
+  darwin: mock-ipc-plugin
+listen: 127.0.0.1:19090
+health: /health
+capabilities: [live, ptz, alarm, arming]
+stream_transports: [rtsp_url]
+event_types: [motion, line_crossing, intrusion, video_loss, tamper]
+config_schema: schema.json
+enabled: true

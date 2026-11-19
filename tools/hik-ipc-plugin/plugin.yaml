@@ -1,0 +1,19 @@
+id: hik-ipc
+instance_id: hik-ipc-01
+name: 海康 IPC
+vendor: hikvision
+version: 0.2.0
+protocols:
+  - hik.private.v5
+executable:
+  windows: hik-ipc-plugin.exe
+  linux: hik-ipc-plugin
+listen: 127.0.0.1:19091
+health: /health
+capabilities: [live, ptz, alarm, arming, snapshot, mqtt]
+stream_transports: [rtsp_url]
+event_types: [motion, line_crossing, intrusion, video_loss, tamper]
+config_schema: schema.json
+env:
+  LD_LIBRARY_PATH: ${PLUGIN_DIR}/lib
+enabled: true

@@ -32,12 +32,18 @@ mkdir -p bin/hik-lib
 cp -f "$HERE/sdk/lib/"*.so* bin/hik-lib/ 2>/dev/null || true
 cp -rf "$HERE/sdk/lib/HCNetSDKCom" bin/hik-lib/
 
+# zero-agent 插件目录
+AGENT_PLUGIN="$ROOT/bin/agent-plugins/hik-ipc"
+rm -rf "$AGENT_PLUGIN"
+mkdir -p "$AGENT_PLUGIN/lib"
+cp -f bin/hik-ipc-plugin "$AGENT_PLUGIN/"
+cp -f "$HERE/plugin.yaml" "$HERE/schema.json" "$AGENT_PLUGIN/"
+cp -f "$HERE/sdk/lib/"*.so* "$AGENT_PLUGIN/lib/" 2>/dev/null || true
+cp -rf "$HERE/sdk/lib/HCNetSDKCom" "$AGENT_PLUGIN/lib/"
+
 echo "built: $ROOT/bin/hik-ipc-plugin"
 echo "runtime libs: $ROOT/bin/hik-lib"
+echo "agent plugin: $AGENT_PLUGIN"
 echo
 echo "run example:"
-echo "  PLATFORM_URL=http://127.0.0.1:18080 \\"
-echo "  PLUGIN_ENDPOINT=http://<this-host>:19091 \\"
-echo "  PLUGIN_LISTEN=:19091 \\"
-echo "  LD_LIBRARY_PATH=$ROOT/bin/hik-lib \\"
-echo "  ./bin/hik-ipc-plugin"
+echo "  ./bin/zero-agent -config configs/agent.yaml"

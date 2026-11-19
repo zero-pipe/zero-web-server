@@ -12,15 +12,25 @@
     <div v-show="!channelCtx">
     <el-card shadow="never">
       <div slot="header" class="card-header">
-        <span>插件实例</span>
+        <span>Agent 与插件</span>
         <el-button type="text" icon="el-icon-refresh" @click="loadAll">刷新</el-button>
       </div>
-      <el-table v-loading="loading" :data="plugins" size="small" border>
-        <el-table-column prop="id" label="实例 ID" min-width="140" />
-        <el-table-column prop="pluginId" label="插件" min-width="120" />
-        <el-table-column prop="vendor" label="厂商" width="100" />
-        <el-table-column prop="version" label="版本" width="90" />
-        <el-table-column label="协议" min-width="140">
+      <el-table v-loading="loading" :data="agentPlugins" size="small" border>
+        <el-table-column label="Agent" min-width="150">
+          <template slot-scope="{ row }">
+            <div>{{ row.agent.hostname || row.agent.id }}</div>
+            <el-tag :type="row.agent.status === 'online' ? 'success' : 'info'" size="mini">
+              {{ row.agent.status === 'online' ? '在线' : '离线' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="插件" min-width="160">
+          <template slot-scope="{ row }">
+            <div>{{ row.name || row.pluginId }}</div>
+            <span class="sub-text">{{ row.pluginId }} · {{ row.version }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="协议" min-width="130">
           <template slot-scope="{ row }">
             <el-tag v-for="p in row.protocols" :key="p" size="mini" style="margin-right:4px">{{ p }}</el-tag>
           </template>
@@ -30,22 +40,25 @@
             <el-tag v-for="c in row.capabilities" :key="c" size="mini" type="info" style="margin-right:4px">{{ c }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="流传输" min-width="120">
+        <el-table-column label="状态" width="120">
           <template slot-scope="{ row }">
-            <el-tag v-for="t in row.streamTransports" :key="t" size="mini" type="warning" style="margin-right:4px">{{ t }}</el-tag>
+            <el-tag :type="stateType(row.actualState)" size="mini">{{ stateLabel(row.actualState) }}</el-tag>
+            <el-tag v-if="row.desiredState === 'disabled'" type="warning" size="mini" style="margin-left:4px">已禁用</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template slot-scope="{ row }">
-            <el-tag :type="row.online ? 'success' : 'info'" size="mini">{{ row.online ? '在线' : '离线' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="endpoint" label="Endpoint" min-width="160" />
-        <el-table-column label="最后心跳" width="170">
+        <el-table-column label="最后上报" width="170">
           <template slot-scope="{ row }">{{ formatTime(row.lastSeen) }}</template>
         </el-table-column>
+        <el-table-column label="操作" width="190" fixed="right">
+          <template slot-scope="{ row }">
+            <el-button v-if="row.desiredState !== 'enabled'" type="text" size="mini" @click="setState(row, 'enable')">启用</el-button>
+            <el-button v-else type="text" size="mini" @click="setState(row, 'disable')">禁用</el-button>
+            <el-button type="text" size="mini" @click="setState(row, 'restart')">重启</el-button>
+          </template>
+        </el-table-column>
       </el-table>
-      <div class="hint">插件启动后调用 <code>POST /api/v1/plugins/hello</code> 注册；无插件时请先启动 mock 插件。</div>
+      <div v-if="!agentPlugins.length" class="hint">未发现 Agent。请先在接入主机启动 zero-agent，插件目录放入 plugin.yaml 与可执行文件。</div>
+      <div v-else class="hint">插件由 zero-agent 托管；禁用/重启后平台会自动同步插件与设备在线状态。</div>
     </el-card>
 
     <el-card shadow="never" style="margin-top:16px">
@@ -121,6 +134,7 @@ import {
   queryPlugins, queryIpcDevices, addIpcDevice, deleteIpcDevice,
   syncIpcDevice, armIpcDevice, disarmIpcDevice, getIpcArmStatus
 } from '@/api/plugin'
+import { queryAgents, queryAgentPlugins, setAgentPluginState } from '@/api/agent'
 import { getPipelineStatus } from '@/api/infra'
 import ChannelPanel from '@/views/channel/unified-panel'
 
@@ -132,6 +146,7 @@ export default {
       loading: false,
       submitting: false,
       plugins: [],
+      agentPlugins: [],
       devices: [],
       addVisible: false,
       addForm: { pluginId: '', protocol: '', name: '', params: {} },
@@ -157,12 +172,37 @@ export default {
   methods: {
     loadAll() {
       this.loading = true
+      this.loadAgents()
       Promise.all([queryPlugins(), queryIpcDevices(), getPipelineStatus()]).then(([p, d, ps]) => {
         this.plugins = p.data || []
         this.devices = (d.data && d.data.list) || []
         this.applyPipeline((ps && ps.data) || {})
         this.loadArmStatuses()
       }).finally(() => { this.loading = false })
+    },
+    loadAgents() {
+      queryAgents().then(res => {
+        const agents = (res.data && res.data.list) || []
+        return Promise.all(agents.map(a => queryAgentPlugins(a.id).then(r => {
+          const list = (r.data && r.data.list) || []
+          return list.map(p => ({ ...p, agent: a }))
+        })))
+      }).then(rows => {
+        this.agentPlugins = rows.reduce((all, cur) => all.concat(cur), [])
+      }).catch(() => { this.agentPlugins = [] })
+    },
+    setState(row, action) {
+      const label = action === 'enable' ? '启用' : action === 'disable' ? '禁用' : '重启'
+      setAgentPluginState(row.agentId, row.pluginId, action).then(() => {
+        this.$message.success(label + '命令已下发')
+        this.loadAll()
+      }).catch(e => this.$message.error(e || (label + '失败')))
+    },
+    stateLabel(state) {
+      return { running: '运行中', starting: '启动中', stopped: '已停止', error: '异常', discovered: '已发现', offline: '离线' }[state] || state || '-'
+    },
+    stateType(state) {
+      return state === 'running' ? 'success' : (state === 'error' ? 'danger' : 'info')
     },
     applyPipeline(p) {
       this.pipelineReady = !!p.ready
@@ -283,6 +323,7 @@ export default {
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .hint { margin-top: 8px; color: #909399; font-size: 12px; }
+.sub-text { color: #909399; font-size: 12px; }
 .field-desc { color: #909399; font-size: 12px; line-height: 18px; }
 .stream-links { margin-top: 10px; color: #606266; font-size: 12px; word-break: break-all; }
 </style>

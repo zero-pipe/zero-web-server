@@ -1,0 +1,11 @@
+# zero-agent 本地配置示例。
+# 生产环境请将 endpoint 改为平台可达的本机地址，token 与 zws 的 ZWS_AGENT_TOKEN 一致。
+agent_id: local-agent
+platform_url: http://127.0.0.1:18080
+token: ""
+endpoint: http://127.0.0.1:19000
+listen: 127.0.0.1:19000
+plugin_dir: ./bin/agent-plugins
+state_file: ./data/agent-state.json
+heartbeat: 10s
+start_timeout: 15s

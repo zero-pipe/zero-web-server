@@ -440,29 +440,29 @@ func (EventSubscription) TableName() string { return "zws_event_subscription" }
 
 // Event 平台事件记录（来自 MQTT 等）。
 type Event struct {
-	ID                 string `gorm:"column:id;primaryKey;size:36" json:"id"`
-	EventID            string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
-	SchemaVersion      string `gorm:"column:schema_version;size:16" json:"schemaVersion"`
-	SourceID           string `gorm:"column:source_id;size:36" json:"sourceId"`
-	DeviceID           string `gorm:"column:device_id;size:36;index" json:"deviceId"`
-	BindingID          string `gorm:"column:binding_id;size:36" json:"bindingId"`
-	ResourceID         string `gorm:"column:resource_id;size:36" json:"resourceId"`
-	DeviceInternalCode string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
-	DeviceUID          string `gorm:"column:device_uid;size:128" json:"deviceUid"`
-	ChannelExternalKey string `gorm:"column:channel_external_key;size:128" json:"channelExternalKey"`
+	ID                  string `gorm:"column:id;primaryKey;size:36" json:"id"`
+	EventID             string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
+	SchemaVersion       string `gorm:"column:schema_version;size:16" json:"schemaVersion"`
+	SourceID            string `gorm:"column:source_id;size:36" json:"sourceId"`
+	DeviceID            string `gorm:"column:device_id;size:36;index" json:"deviceId"`
+	BindingID           string `gorm:"column:binding_id;size:36" json:"bindingId"`
+	ResourceID          string `gorm:"column:resource_id;size:36" json:"resourceId"`
+	DeviceInternalCode  string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
+	DeviceUID           string `gorm:"column:device_uid;size:128" json:"deviceUid"`
+	ChannelExternalKey  string `gorm:"column:channel_external_key;size:128" json:"channelExternalKey"`
 	ChannelInternalCode string `gorm:"column:channel_internal_code;size:32;index" json:"channelInternalCode"`
-	EventType          string `gorm:"column:event_type;size:64;index" json:"eventType"`
-	Severity           string `gorm:"column:severity;size:16" json:"severity"`
-	OccurredAt         int64  `gorm:"column:occurred_at;index" json:"occurredAt"`
-	ReceivedAt         int64  `gorm:"column:received_at" json:"receivedAt"`
-	ImageKey           string `gorm:"column:image_key;size:512" json:"imageKey"`
-	ImageURL           string `gorm:"column:image_url;size:1024" json:"imageUrl"`
-	ImageExpiresAt     int64  `gorm:"column:image_expires_at" json:"imageExpiresAt"`
-	BBoxJSON           string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
-	RawJSON            string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
-	Status             string `gorm:"column:status;size:16" json:"status"`
-	AlarmID            int    `gorm:"column:alarm_id;default:0" json:"alarmId"`
-	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
+	EventType           string `gorm:"column:event_type;size:64;index" json:"eventType"`
+	Severity            string `gorm:"column:severity;size:16" json:"severity"`
+	OccurredAt          int64  `gorm:"column:occurred_at;index" json:"occurredAt"`
+	ReceivedAt          int64  `gorm:"column:received_at" json:"receivedAt"`
+	ImageKey            string `gorm:"column:image_key;size:512" json:"imageKey"`
+	ImageURL            string `gorm:"column:image_url;size:1024" json:"imageUrl"`
+	ImageExpiresAt      int64  `gorm:"column:image_expires_at" json:"imageExpiresAt"`
+	BBoxJSON            string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
+	RawJSON             string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
+	Status              string `gorm:"column:status;size:16" json:"status"`
+	AlarmID             int    `gorm:"column:alarm_id;default:0" json:"alarmId"`
+	CreateTime          string `gorm:"column:create_time;size:50" json:"createTime"`
 }
 
 func (Event) TableName() string { return "zws_event" }
@@ -506,6 +506,45 @@ type Plugin struct {
 }
 
 func (Plugin) TableName() string { return "zws_plugin" }
+
+// Agent 是接入侧 zero-agent 实例。
+type Agent struct {
+	ID         string `gorm:"column:id;primaryKey;size:128"`
+	Hostname   string `gorm:"column:hostname;size:255"`
+	IP         string `gorm:"column:ip;size:64"`
+	Version    string `gorm:"column:version;size:64"`
+	Endpoint   string `gorm:"column:endpoint;size:255"`
+	Status     string `gorm:"column:status;size:32"`
+	LastSeen   int64  `gorm:"column:last_seen"`
+	CreateTime string `gorm:"column:create_time;size:50"`
+	UpdateTime string `gorm:"column:update_time;size:50"`
+}
+
+func (Agent) TableName() string { return "zws_agent" }
+
+// AgentPlugin 是 Agent 上报的插件清单与运行状态。
+type AgentPlugin struct {
+	ID               string `gorm:"column:id;primaryKey;size:160"`
+	AgentID          string `gorm:"column:agent_id;size:128;index"`
+	PluginID         string `gorm:"column:plugin_id;size:128;index"`
+	Name             string `gorm:"column:name;size:255"`
+	Vendor           string `gorm:"column:vendor;size:128"`
+	Version          string `gorm:"column:version;size:64"`
+	Protocols        string `gorm:"column:protocols;type:text"`
+	Capabilities     string `gorm:"column:capabilities;type:text"`
+	StreamTransports string `gorm:"column:stream_transports;type:text"`
+	EventTypes       string `gorm:"column:event_types;type:text"`
+	ConfigSchema     string `gorm:"column:config_schema;type:longtext"`
+	Enabled          bool   `gorm:"column:enabled"`
+	DesiredState     string `gorm:"column:desired_state;size:32"`
+	ActualState      string `gorm:"column:actual_state;size:32"`
+	LastError        string `gorm:"column:last_error;type:text"`
+	LastSeen         int64  `gorm:"column:last_seen"`
+	CreateTime       string `gorm:"column:create_time;size:50"`
+	UpdateTime       string `gorm:"column:update_time;size:50"`
+}
+
+func (AgentPlugin) TableName() string { return "zws_agent_plugin" }
 
 // PluginDevice 是通过插件接入的设备。
 type PluginDevice struct {

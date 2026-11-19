@@ -13,6 +13,7 @@ import (
 	ipcplugin "zero-web-server/internal/adapter/ipcplugin"
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	"zero-web-server/internal/adapter/mqttbus"
+	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
@@ -151,6 +152,9 @@ func main() {
 	pluginRepo := persistence.NewPluginRepository(db)
 	pluginService := pluginapp.NewService(pluginRepo)
 	pluginToken := os.Getenv("ZWS_PLUGIN_TOKEN")
+	agentToken := os.Getenv("ZWS_AGENT_TOKEN")
+	agentRepo := persistence.NewAgentRepository(db)
+	agentService := agentapp.NewService(agentRepo, pluginRepo, agentToken)
 	ipcService := ipcdevice.NewService(pluginService, pluginRepo, mediaCluster, ipcplugin.NewFactory(pluginToken), cfg.UserSettings.ServerID)
 
 	assetRepo := persistence.NewAssetRepository(db)
@@ -183,6 +187,9 @@ func main() {
 
 	eventSubRepo := persistence.NewEventSubscriptionRepository(db)
 	eventSubService := eventsubapp.NewService(eventSubRepo, ipcService, pluginRepo, objectStoreService, infraService)
+	agentService.SetPluginStartedHook(func(ctx context.Context, pluginID string) {
+		eventSubService.RearmForPlugin(ctx, pluginID)
+	})
 
 	sipServer, err := sipinfra.NewServer(sipCfg, cfg.UserSettings.ServerID, sipCfg.Password, deviceService, redisClient)
 	if err != nil {
@@ -268,6 +275,7 @@ func main() {
 	}
 	eventIngest.StartRetention(ctx, retentionDays)
 	pluginService.Start(ctx, 10*time.Second, 30*time.Second)
+	agentService.Start(ctx, 10*time.Second, 30*time.Second)
 	if err := sipServer.Start(ctx); err != nil {
 		applog.Fatalf("start sip: %v", err)
 	}
@@ -324,6 +332,8 @@ func main() {
 		PluginService:       pluginService,
 		IPCService:          ipcService,
 		PluginToken:         pluginToken,
+		AgentService:        agentService,
+		AgentToken:          agentToken,
 		AssetService:        assetService,
 		InfraService:        infraService,
 		EventSubService:     eventSubService,

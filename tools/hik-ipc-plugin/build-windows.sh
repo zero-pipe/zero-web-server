@@ -50,11 +50,16 @@ cp -f bin/hik-ipc-plugin.exe "$OUT/"
 cp -f "$SDK_DIR/库文件/"*.dll "$OUT/"
 cp -rf "$SDK_DIR/库文件/HCNetSDKCom" "$OUT/"
 
+# zero-agent 插件目录
+AGENT_PLUGIN="$ROOT/bin/agent-plugins/hik-ipc"
+rm -rf "$AGENT_PLUGIN"
+mkdir -p "$AGENT_PLUGIN"
+cp -f bin/hik-ipc-plugin.exe "$OUT/"*.dll "$AGENT_PLUGIN/" 2>/dev/null || true
+cp -rf "$OUT/HCNetSDKCom" "$AGENT_PLUGIN/"
+cp -f "$HERE/plugin.yaml" "$HERE/schema.json" "$AGENT_PLUGIN/"
+
 echo "built: $OUT/hik-ipc-plugin.exe"
+echo "agent plugin: $AGENT_PLUGIN"
 echo
-echo "run example (Git Bash):"
-echo "  cd '$OUT'"
-echo "  PLATFORM_URL=http://127.0.0.1:18080 \\"
-echo "  PLUGIN_ENDPOINT=http://<this-host>:19091 \\"
-echo "  PLUGIN_LISTEN=:19091 \\"
-echo "  ./hik-ipc-plugin.exe"
+echo "run example:"
+echo "  ./bin/zero-agent -config configs/agent.yaml"

@@ -669,6 +669,48 @@ CREATE TABLE IF NOT EXISTS zws_onvif_channel (
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ---------------------------------------------------------------------------
+-- zero-agent 控制面
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS zws_agent;
+CREATE TABLE IF NOT EXISTS zws_agent
+(
+    id          VARCHAR(128) NOT NULL PRIMARY KEY COMMENT 'Agent ID',
+    hostname    VARCHAR(255),
+    ip          VARCHAR(64),
+    version     VARCHAR(64),
+    endpoint    VARCHAR(255) COMMENT '平台可达地址',
+    status      VARCHAR(32) NOT NULL DEFAULT 'offline',
+    last_seen   BIGINT NOT NULL DEFAULT 0,
+    create_time VARCHAR(50),
+    update_time VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='zero-agent';
+
+DROP TABLE IF EXISTS zws_agent_plugin;
+CREATE TABLE IF NOT EXISTS zws_agent_plugin
+(
+    id                VARCHAR(160) NOT NULL PRIMARY KEY COMMENT '运行时插件实例ID',
+    agent_id          VARCHAR(128) NOT NULL,
+    plugin_id         VARCHAR(128) NOT NULL,
+    name              VARCHAR(255),
+    vendor            VARCHAR(128),
+    version           VARCHAR(64),
+    protocols         TEXT,
+    capabilities      TEXT,
+    stream_transports TEXT,
+    event_types       TEXT,
+    config_schema     LONGTEXT,
+    enabled           TINYINT NOT NULL DEFAULT 1,
+    desired_state     VARCHAR(32) NOT NULL DEFAULT 'enabled',
+    actual_state      VARCHAR(32) NOT NULL DEFAULT 'discovered',
+    last_error        TEXT,
+    last_seen         BIGINT NOT NULL DEFAULT 0,
+    create_time       VARCHAR(50),
+    update_time       VARCHAR(50),
+    KEY idx_agent_plugin_agent (agent_id),
+    KEY idx_agent_plugin_plugin (plugin_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent 托管的插件';
+
+-- ---------------------------------------------------------------------------
 -- IPC 私有 SDK 插件（sidecar）注册与设备
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS zws_plugin;

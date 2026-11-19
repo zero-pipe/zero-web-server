@@ -7,7 +7,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,12 +19,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-)
-
-const (
-	pluginInstanceID = "hik-ipc-01"
-	pluginID         = "hik-ipc"
-	protocol         = "hik.private.v5"
 )
 
 var configSchema = `{
@@ -41,9 +34,6 @@ var configSchema = `{
 }`
 
 type config struct {
-	platformURL   string
-	endpoint      string
-	token         string
 	listen        string
 	rtspPort      int
 	rtspTmpl      string
@@ -82,9 +72,6 @@ var (
 
 func main() {
 	cfg := config{
-		platformURL:   env("PLATFORM_URL", "http://127.0.0.1:18080"),
-		endpoint:      env("PLUGIN_ENDPOINT", "http://127.0.0.1:19091"),
-		token:         env("PLUGIN_TOKEN", ""),
 		listen:        env("PLUGIN_LISTEN", ":19091"),
 		rtspPort:      envInt("HIK_RTSP_PORT", 554),
 		rtspTmpl:      env("HIK_RTSP_TEMPLATE", ""),
@@ -101,6 +88,7 @@ func main() {
 	defer sdk.Cleanup()
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/health", okHandler)
 	mux.HandleFunc("/v1/login", handleLogin)
 	mux.HandleFunc("/v1/logout", handleLogout)
 	mux.HandleFunc("/v1/channels", handleChannels(cfg))
@@ -114,16 +102,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
-	// 先绑定监听再注册：平台收到 hello 后可能立刻回调 /v1/login（补布防），
-	// 监听必须已经就绪，否则会因连接被拒把插件标记离线。
+	// 先绑定监听，Agent 健康检查通过后再认为插件就绪。
 	go func() {
-		log.Printf("hik plugin listening on %s, endpoint=%s", cfg.listen, cfg.endpoint)
+		log.Printf("hik plugin listening on %s", cfg.listen)
 		if err := http.Serve(ln, mux); err != nil {
 			log.Fatalf("serve: %v", err)
 		}
 	}()
 
-	register(cfg)
 	select {}
 }
 
@@ -412,37 +398,6 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, nil)
 }
 
-func register(cfg config) {
-	body := map[string]any{
-		"id":               pluginInstanceID,
-		"pluginId":         pluginID,
-		"vendor":           "hikvision",
-		"version":          "0.2.0",
-		"protocols":        []string{protocol},
-		"capabilities":     []string{"live", "ptz", "alarm", "arming", "snapshot", "mqtt"},
-		"streamTransports": []string{"rtsp_url"},
-		"configSchema":     configSchema,
-		"endpoint":         cfg.endpoint,
-	}
-	for {
-		if err := post(cfg, "/api/v1/plugins/hello", body); err != nil {
-			log.Printf("register failed (retry in 3s): %v", err)
-			time.Sleep(3 * time.Second)
-			continue
-		}
-		log.Printf("registered with platform: %s", pluginInstanceID)
-		break
-	}
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		for range ticker.C {
-			if err := post(cfg, "/api/v1/plugins/heartbeat", map[string]any{"id": pluginInstanceID}); err != nil {
-				log.Printf("heartbeat failed: %v", err)
-			}
-		}
-	}()
-}
-
 func okHandler(w http.ResponseWriter, _ *http.Request) { writeOK(w, nil) }
 
 func writeOK(w http.ResponseWriter, data any) {
@@ -456,27 +411,6 @@ func writeErr(w http.ResponseWriter, code, msg string) {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
-}
-
-func post(cfg config, path string, in any) error {
-	raw, _ := json.Marshal(in)
-	req, err := http.NewRequest(http.MethodPost, cfg.platformURL+path, bytes.NewReader(raw))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if cfg.token != "" {
-		req.Header.Set("X-Plugin-Token", cfg.token)
-	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("http %d", resp.StatusCode)
-	}
-	return nil
 }
 
 func env(key, def string) string {

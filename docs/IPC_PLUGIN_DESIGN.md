@@ -74,36 +74,45 @@
 
 ## 5. 插件注册与生命周期
 
-### 5.1 注册（Plugin → Platform）
+### 5.1 注册（Agent → Platform）
 
-插件启动后调用平台 `PluginRegistry.Hello`：
+插件**不直接注册**。zero-agent 扫描 `plugins/*/plugin.yaml`，启动插件进程后，把清单与状态上报平台：
 
 ```text
-plugin_id:        hik-sidecar-01            # 实例唯一 ID（建议 hostname/进程名）
-protocols:        ["hik.private.v5"]        # 支持的协议/版本命名空间
-vendor:           "hikvision"
-version:          "0.1.0"
-capabilities:     ["live","ptz","preset","alarm","playback"]
-stream_transports:["rtsp_url","rtp_push"]   # 支持的取流方式
-config_schema:    { JSON Schema }           # 设备配置表单（ip/port/user/pass/channel...）
-endpoint:         "10.0.0.5:50051"          # 插件 RPC 地址
-heartbeat_sec:    10
+agent_id:         edge-01
+endpoint:         http://10.0.0.5:19000
+plugins:
+  - instance_id:  hik-ipc-01
+    plugin_id:    hik-ipc
+    protocols:    ["hik.private.v5"]
+    capabilities: ["live","ptz","preset","alarm","playback"]
+    stream_transports: ["rtsp_url","rtp_push"]
+    config_schema: { JSON Schema }
+    desired_state: enabled
+    actual_state:  running
 ```
 
-平台返回 `plugin_instance_id` 与 `heartbeat_interval`。随后插件按间隔调用 `Heartbeat`。
+平台保存 `zws_agent` / `zws_agent_plugin`，并把运行中的插件投影为 `zws_plugin`：
+
+- `zws_plugin.id = instance_id`
+- `zws_plugin.endpoint = {agent.endpoint}/plugins/{plugin_id}`
+- 平台调用插件统一经 Agent 反代，不直连插件端口。
+
+Agent 心跳周期上报全部插件状态；平台返回 `desired_state`，Agent 据此启停本地进程。
 
 ### 5.2 状态与离线处理
 
-- 平台记录 `zws_plugin`：`last_seen`、`status`、`version`。
-- 连续 N 次心跳缺失 → 插件 `offline`：
-  - 其名下设备置 `offline`；
-  - 该插件发起的流标记为需清理（平台调用 ZMS 关流并通知插件 `StopLive`，失败则记录）。
-- 插件重连后重新 `Hello`，平台下发其名下设备清单供重新登录（可选，推荐由平台在首次 `StartLive` 时按需登录）。
+- Agent 心跳超时 → Agent 离线，其托管插件全部离线，名下设备置 `offline`。
+- 插件进程异常退出 → Agent 自动重启（5s 退避），并上报 `error`/`running`。
+- 平台启用/禁用/重启插件 → 下发 Agent 命令，成功后同步 `zws_plugin.online` 与设备状态。
+- Agent 断线重连后重新注册；平台以数据库中的 `desired_state` 为准，Agent 本地状态服从平台。
 
 ### 5.3 部署形态
 
-- **独立部署（推荐）**：插件单独进程/容器，平台通过 endpoint 访问；便于多实例、灰度、隔离。
-- **平台托管（可选）**：平台拉起插件进程并注入 endpoint/token，适合单机部署；需做进程守护与日志回收。
+- **唯一形态：zero-agent 托管 + 反代**。
+- Agent 每台接入主机安装一套，负责插件目录、进程守护、日志、启停与平台通信。
+- 插件只监听 `127.0.0.1:<port>`，不保存平台地址、不直接访问平台 API。
+- Windows 使用 Windows Service，Linux 使用 systemd；Agent 配置见 `configs/agent.yaml`。
 
 ## 6. 设备配置：动态 Schema
 
@@ -395,20 +404,27 @@ CREATE TABLE zws_plugin_channel (
 
 | 能力 | 位置 |
 | --- | --- |
-| 插件注册表 | `internal/application/plugin` |
+| Agent 控制面 | `internal/application/agent`、`internal/domain/agent` |
+| Agent 主机服务 | `cmd/zero-agent`、`internal/agent` |
+| 插件注册表（运行时） | `internal/application/plugin` |
 | 插件/设备/通道实体 | `internal/domain/plugin` |
 | JSON-RPC 客户端 | `internal/adapter/ipcplugin` |
 | 插件设备编排/取流 | `internal/application/ipcdevice` |
-| HTTP 接口 | `internal/interfaces/http/handler/plugin_handler.go`、`routes_plugin.go` |
-| 表结构 | `zws_plugin` / `zws_plugin_device` / `zws_plugin_channel` |
+| HTTP 接口 | `agent_handler.go`、`plugin_handler.go`、`routes_agent.go`、`routes_plugin.go` |
+| 表结构 | `zws_agent` / `zws_agent_plugin` / `zws_plugin` / `zws_plugin_device` / `zws_plugin_channel` |
 
 接口：
 
 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/api/v1/plugins/hello` | `X-Plugin-Token` | 插件注册 |
-| POST | `/api/v1/plugins/heartbeat` | `X-Plugin-Token` | 心跳 |
-| GET | `/api/v1/plugins` | JWT | 插件列表 |
+| POST | `/api/v1/agents/register` | `X-Agent-Token` | Agent 注册并上报插件 |
+| POST | `/api/v1/agents/heartbeat` | `X-Agent-Token` | Agent 心跳并同步状态 |
+| GET | `/api/v1/agents` | JWT | Agent 列表 |
+| GET | `/api/v1/agents/:id/plugins` | JWT | Agent 插件列表 |
+| POST | `/api/v1/agents/:id/plugins/:pluginId/enable` | JWT | 启用插件 |
+| POST | `/api/v1/agents/:id/plugins/:pluginId/disable` | JWT | 禁用插件 |
+| POST | `/api/v1/agents/:id/plugins/:pluginId/restart` | JWT | 重启插件 |
+| GET | `/api/v1/plugins` | JWT | 运行时插件列表 |
 | GET | `/api/v1/ipc/devices` | JWT | 插件设备列表 |
 | POST | `/api/v1/ipc/devices` | JWT | 添加设备（登录+同步通道） |
 | DELETE | `/api/v1/ipc/devices?id=` | JWT | 删除设备 |
@@ -418,7 +434,7 @@ CREATE TABLE zws_plugin_channel (
 | GET | `/api/v1/ipc/play/stop?deviceId=&channelId=` | JWT | 停止直播 |
 | POST | `/api/v1/ipc/ptz` | JWT | PTZ |
 
-`ZWS_PLUGIN_TOKEN` 环境变量可启用插件注册令牌校验（为空则不校验）。
+`ZWS_AGENT_TOKEN` 与 Agent 配置 `token` 一致，用于注册/心跳/命令/反代鉴权；`ZWS_PLUGIN_TOKEN` 仍用于平台 → Agent 反代的 RPC 鉴权（两者可配置为同一值）。
 
 ### 17.2 插件侧协议（v1）
 

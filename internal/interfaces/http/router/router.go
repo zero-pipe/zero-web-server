@@ -1,6 +1,7 @@
 package router
 
 import (
+	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
@@ -83,6 +84,8 @@ type Deps struct {
 	PluginService       *pluginapp.Service
 	IPCService          *ipcdevice.Service
 	PluginToken         string
+	AgentService        *agentapp.Service
+	AgentToken          string
 	AssetService        *assetapp.Service
 	InfraService        *infraconfigapp.Service
 	EventSubService     *eventsubapp.Service
@@ -145,8 +148,8 @@ func Setup(r *gin.Engine, deps Deps) {
 	regionHandler := handler.NewRegionHandler(deps.RegionService)
 	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
-	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.AssetService, deps.PluginToken)
-	pluginHandler.SetRearmer(deps.EventSubService)
+	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.AssetService)
+	agentHandler := handler.NewAgentHandler(deps.AgentService, deps.AgentToken)
 	eventSubHandler := handler.NewEventSubHandler(deps.EventSubService, deps.InfraService)
 	eventHandler := handler.NewEventHandler(deps.EventService)
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
@@ -164,7 +167,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	{
 		registerUser(api, userHandler)
 		registerServer(api, healthHandler, serverHandler)
-		registerPluginPublic(api, pluginHandler)
+		registerAgentPublic(api, agentHandler)
 	}
 
 	hookGroup := r.Group("/index/hook")
@@ -177,6 +180,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		auth.POST("/user/changePassword", userHandler.ChangePassword)
 
 		registerPlugin(auth, pluginHandler)
+		registerAgents(auth, agentHandler)
 		registerEventSub(auth, eventSubHandler)
 		registerEvents(auth, eventHandler)
 		registerAssets(auth, assetHandler)
