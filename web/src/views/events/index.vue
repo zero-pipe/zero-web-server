@@ -1,12 +1,12 @@
 <template>
   <div class="app-container">
     <el-form :inline="true" size="mini">
-      <el-form-item label="设备内码">
-        <el-input v-model="filters.deviceInternalCode" clearable placeholder="设备内码" style="width:180px" @keyup.enter.native="reload" />
+      <el-form-item label="设备名称">
+        <el-input v-model="filters.deviceName" clearable placeholder="设备名称" style="width:180px" @keyup.enter.native="reload" />
       </el-form-item>
       <el-form-item label="事件类型">
         <el-select v-model="filters.eventType" clearable filterable placeholder="全部" style="width:170px">
-          <el-option v-for="t in eventTypes" :key="t.code" :label="t.name + ' (' + t.code + ')'" :value="t.code" />
+          <el-option v-for="t in eventTypes" :key="t.code" :label="t.name" :value="t.code" />
         </el-select>
       </el-form-item>
       <el-form-item label="关联状态">
@@ -48,16 +48,17 @@
       <el-table-column label="设备" min-width="170">
         <template slot-scope="{ row }">
           <div>{{ row.deviceName || '未关联设备' }}</div>
-          <div class="sub">{{ row.deviceInternalCode }}</div>
         </template>
       </el-table-column>
       <el-table-column label="事件类型" width="170">
         <template slot-scope="{ row }">
           <div>{{ typeName(row.eventType) }}</div>
-          <div class="sub">{{ row.eventType }}<span v-if="row.category"> · {{ categoryName(row.category) }}</span></div>
+          <div class="sub">{{ categoryName(row.category) }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="channelExternalKey" label="通道" width="90" />
+      <el-table-column label="通道" width="150">
+        <template slot-scope="{ row }">{{ row.channelName || '—' }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template slot-scope="{ row }">
           <el-tag size="mini" :type="row.status === 'mapped' ? 'success' : 'warning'">
@@ -77,7 +78,6 @@
           <span v-else class="sub">—</span>
         </template>
       </el-table-column>
-      <el-table-column prop="eventId" label="事件 ID" min-width="180" show-overflow-tooltip />
       <el-table-column label="操作" width="140" fixed="right">
         <template slot-scope="{ row }">
           <el-button type="text" size="mini" @click="openDetail(row)">详情</el-button>
@@ -100,16 +100,12 @@
     <el-dialog title="事件详情" :visible.sync="detailVisible" width="760px">
       <template v-if="detail">
         <el-descriptions :column="2" size="small" border>
-          <el-descriptions-item label="事件 ID">{{ detail.eventId }}</el-descriptions-item>
-          <el-descriptions-item label="事件类型">{{ typeName(detail.eventType) }}（{{ detail.eventType }}）</el-descriptions-item>
+          <el-descriptions-item label="事件类型">{{ typeName(detail.eventType) }}</el-descriptions-item>
           <el-descriptions-item label="分类">{{ categoryName(detail.category) }}</el-descriptions-item>
-          <el-descriptions-item label="设备">{{ detail.deviceName || '未关联' }}</el-descriptions-item>
-          <el-descriptions-item label="设备内码">{{ detail.deviceInternalCode }}</el-descriptions-item>
-          <el-descriptions-item label="通道">{{ detail.channelInternalCode || detail.channelExternalKey || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="设备">{{ detail.deviceName || '未关联设备' }}</el-descriptions-item>
+          <el-descriptions-item label="通道">{{ detail.channelName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="时间">{{ formatTime(detail.occurredAt) }}</el-descriptions-item>
-          <el-descriptions-item label="关联状态">{{ detail.status }}</el-descriptions-item>
-          <el-descriptions-item label="资源 ID">{{ detail.resourceId || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="报警投影">{{ detail.alarmId ? ('#' + detail.alarmId) : '未投影' }}</el-descriptions-item>
+          <el-descriptions-item label="报警投影">{{ detail.alarmId ? '已生成报警' : '未生成报警' }}</el-descriptions-item>
           <el-descriptions-item label="回放">
             <el-button v-if="detail.playback && detail.playback.supported" type="text" size="mini" @click="openPlayback(detail)">查看回放</el-button>
             <span v-else class="sub">{{ (detail.playback && detail.playback.reason) || '不可用' }}</span>
@@ -118,14 +114,18 @@
         <div v-if="detail.imageUrl" class="section">
           <el-image :src="detail.imageUrl" :preview-src-list="[detail.imageUrl]" fit="contain" style="max-width:100%;max-height:360px" />
         </div>
-        <div v-if="detail.bboxJson" class="section">
-          <div class="section-title">bbox</div>
-          <pre class="json">{{ pretty(detail.bboxJson) }}</pre>
-        </div>
-        <div v-if="detail.rawJson" class="section">
-          <div class="section-title">原始事件</div>
-          <pre class="json">{{ pretty(detail.rawJson) }}</pre>
-        </div>
+        <el-collapse v-if="detail.bboxJson || detail.rawJson" class="section">
+          <el-collapse-item title="高级信息（排障用）" name="advanced">
+            <div v-if="detail.bboxJson">
+              <div class="section-title">目标框数据</div>
+              <pre class="json">{{ pretty(detail.bboxJson) }}</pre>
+            </div>
+            <div v-if="detail.rawJson">
+              <div class="section-title">原始事件数据</div>
+              <pre class="json">{{ pretty(detail.rawJson) }}</pre>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
       </template>
     </el-dialog>
 
@@ -168,7 +168,7 @@ export default {
       total: 0,
       page: 1,
       count: 20,
-      filters: { deviceInternalCode: '', eventType: '', status: '', range: [] },
+      filters: { deviceName: '', eventType: '', status: '', range: [] },
       detailVisible: false,
       detail: null,
       stats: {},
@@ -190,10 +190,10 @@ export default {
     },
     typeName(code) {
       const t = this.eventTypes.find(x => x.code === code)
-      return t ? t.name : (code || '—')
+      return t ? t.name : '其他'
     },
     categoryName(category) {
-      return { alarm: '报警', status: '状态', operation: '操作', ai: 'AI', metadata: '数据' }[category] || category || '—'
+      return { alarm: '报警', status: '状态', operation: '操作', ai: 'AI', metadata: '数据' }[category] || '—'
     },
     reload() { this.page = 1; this.load() },
     onSize(n) { this.count = n; this.page = 1; this.load() },
@@ -201,7 +201,7 @@ export default {
       this.loading = true
       const params = {
         page: this.page, count: this.count,
-        deviceInternalCode: this.filters.deviceInternalCode,
+        deviceName: this.filters.deviceName,
         eventType: this.filters.eventType,
         status: this.filters.status
       }

@@ -219,11 +219,24 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 		var existing []model.GBDeviceChannel
 		_ = tx.Where("device_id = ?", deviceID).Find(&existing).Error
 		keep := make(map[string]string, len(existing))
+		keepName := make(map[string]string, len(existing))
 		for _, row := range existing {
 			gb := strings.TrimSpace(row.GBDeviceID)
-			if gb != "" && strings.TrimSpace(row.InternalCode) != "" {
+			if gb == "" {
+				continue
+			}
+			if strings.TrimSpace(row.InternalCode) != "" {
 				keep[gb] = row.InternalCode
 			}
+			if strings.TrimSpace(row.Name) != "" {
+				keepName[gb] = row.Name
+			}
+		}
+		var dev model.GBDevice
+		_ = tx.Where("device_id = ?", deviceID).First(&dev).Error
+		deviceName := dev.Name
+		if strings.TrimSpace(dev.CustomName) != "" {
+			deviceName = dev.CustomName
 		}
 		if err := tx.Where("device_id = ?", deviceID).Delete(&model.GBDeviceChannel{}).Error; err != nil {
 			return err
@@ -232,7 +245,7 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 			return nil
 		}
 		models := make([]model.GBDeviceChannel, 0, len(channels))
-		for _, ch := range channels {
+		for i, ch := range channels {
 			code := strings.TrimSpace(ch.InternalCode)
 			if code == "" {
 				if prev, ok := keep[strings.TrimSpace(ch.GBDeviceID)]; ok {
@@ -246,14 +259,18 @@ func (r *ChannelRepository) ResetByDevice(deviceID string, dataDeviceID int, cha
 				}
 			}
 			ch.InternalCode = code
+			name := keepName[strings.TrimSpace(ch.GBDeviceID)]
+			if strings.TrimSpace(name) == "" {
+				name = shared.DefaultChannelName(deviceName, i+1)
+			}
 			models = append(models, model.GBDeviceChannel{
 				InternalCode:         code,
 				DeviceID:             deviceID,
 				DataType:             shared.ChannelDataTypeGB28181,
 				DataDeviceID:         dataDeviceID,
 				GBDeviceID:           ch.GBDeviceID,
-				Name:                 ch.Name,
-				GBName:               ch.Name,
+				Name:                 name,
+				GBName:               name,
 				Manufacturer:         ch.Manufacturer,
 				Model:                ch.Model,
 				Parental:             ch.Parental,

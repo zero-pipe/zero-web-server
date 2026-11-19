@@ -21,7 +21,6 @@ const (
 	ProtocolGB28181 = "gb28181"
 	ProtocolONVIF   = "onvif"
 
-	StatusPending = "pending"
 	StatusOnline  = "online"
 	StatusOffline = "offline"
 )
@@ -368,8 +367,8 @@ func (s *Service) createONVIF(ctx context.Context, req CreateRequest) (*DeviceVi
 }
 
 func viewFromGB(d *domaindevice.Device) *DeviceView {
-	status := StatusPending
-	addr := "待注册"
+	status := StatusOffline
+	addr := "—"
 	if d.OnLine {
 		status = StatusOnline
 		if d.HostAddress != "" {
@@ -378,7 +377,6 @@ func viewFromGB(d *domaindevice.Device) *DeviceView {
 			addr = fmt.Sprintf("%s:%d", d.IP, d.Port)
 		}
 	} else if d.HostAddress != "" || d.IP != "" {
-		status = StatusOffline
 		if d.HostAddress != "" {
 			addr = d.HostAddress
 		} else {

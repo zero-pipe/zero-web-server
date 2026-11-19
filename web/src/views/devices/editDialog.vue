@@ -17,9 +17,6 @@
       <el-form-item label="设备名称" prop="name">
         <el-input v-model="form.name" maxlength="64" show-word-limit />
       </el-form-item>
-      <el-form-item label="内码">
-        <el-input :value="form.internalCode" disabled placeholder="平台自动生成" />
-      </el-form-item>
       <el-form-item label="厂商">
         <el-select v-model="form.vendor" clearable placeholder="不限 / 未知" style="width: 100%;">
           <el-option label="海康" value="海康" />
@@ -30,7 +27,7 @@
       </el-form-item>
 
       <template v-if="row && row.protocol === 'gb28181'">
-        <el-form-item label="设备编号">
+        <el-form-item label="国标编号">
           <el-input :value="form.gb.deviceId" disabled />
         </el-form-item>
         <el-form-item label="注册密码">

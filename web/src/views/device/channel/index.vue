@@ -49,10 +49,10 @@
             default-first-option
             @change="subStreamChange"
           >
-            <el-option label="stream:0(主码流)" value="stream:0" />
-            <el-option label="stream:1(子码流)" value="stream:1" />
-            <el-option label="streamnumber:0(主码流-2022)" value="streamnumber:0" />
-            <el-option label="streamnumber:1(子码流-2022)" value="streamnumber:1" />
+            <el-option label="主码流" value="stream:0" />
+            <el-option label="子码流" value="stream:1" />
+            <el-option label="主码流（2022）" value="streamnumber:0" />
+            <el-option label="子码流（2022）" value="streamnumber:1" />
           </el-select>
         </el-form-item>
         <el-form-item style="float: right;">
@@ -83,10 +83,10 @@
               default-first-option
               @change="channelSubStreamChange(scope.row)"
             >
-              <el-option label="stream:0(主码流)" value="stream:0" />
-              <el-option label="stream:1(子码流)" value="stream:1" />
-              <el-option label="streamnumber:0(主码流-2022)" value="streamnumber:0" />
-              <el-option label="streamnumber:1(子码流-2022)" value="streamnumber:1" />
+              <el-option label="主码流" value="stream:0" />
+              <el-option label="子码流" value="stream:1" />
+              <el-option label="主码流（2022）" value="streamnumber:0" />
+              <el-option label="子码流（2022）" value="streamnumber:1" />
             </el-select>
           </template>
         </el-table-column>

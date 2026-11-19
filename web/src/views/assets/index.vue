@@ -2,7 +2,7 @@
   <div class="app-container asset-page">
     <el-form :inline="true" size="mini" class="asset-filter">
       <el-form-item label="搜索">
-        <el-input v-model="query" clearable placeholder="名称 / 内码 / 序列号" style="width:220px" @input="reload" />
+        <el-input v-model="query" clearable placeholder="名称 / 序列号 / IP" style="width:220px" @input="reload" />
       </el-form-item>
       <el-form-item label="接入">
         <el-select v-model="protocol" clearable placeholder="全部" style="width:130px" @change="reload">
@@ -69,7 +69,6 @@
           <el-form :model="deviceForm" label-width="90px" size="small" class="edit-form">
             <el-row :gutter="16">
               <el-col :span="12"><el-form-item label="设备名称"><el-input v-model="deviceForm.name" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="设备内码"><el-input :value="selectedDevice.device.internalCode" disabled /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="厂商"><el-input v-model="deviceForm.vendor" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="型号"><el-input v-model="deviceForm.model" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="序列号"><el-input v-model="deviceForm.serialNumber" /></el-form-item></el-col>
@@ -82,8 +81,8 @@
           <el-descriptions :column="2" size="small" border>
             <el-descriptions-item label="接入协议">{{ selectedDevice.binding ? selectedDevice.binding.protocol : '—' }}</el-descriptions-item>
             <el-descriptions-item label="接入方式">{{ selectedDevice.binding ? selectedDevice.binding.mode : '—' }}</el-descriptions-item>
-            <el-descriptions-item label="外部 ID">{{ selectedDevice.binding ? selectedDevice.binding.externalId : '—' }}</el-descriptions-item>
-            <el-descriptions-item label="接入地址">{{ selectedDevice.binding ? (selectedDevice.binding.endpoint || selectedDevice.binding.externalId) : '—' }}</el-descriptions-item>
+            <el-descriptions-item label="接入地址">{{ accessAddress }}</el-descriptions-item>
+            <el-descriptions-item label="国标编号">{{ gbDeviceCode }}</el-descriptions-item>
           </el-descriptions>
 
           <div class="section-title">能力</div>
@@ -100,8 +99,6 @@
             <el-table-column label="类型" width="110">
               <template slot-scope="{ row }">{{ kindLabel(row.resource.kind) }}</template>
             </el-table-column>
-            <el-table-column prop="resource.internalCode" label="通道内码" min-width="150" />
-            <el-table-column prop="resource.externalKey" label="外部 ID" min-width="110" show-overflow-tooltip />
             <el-table-column label="经纬度" min-width="150">
               <template slot-scope="{ row }">
                 <span v-if="row.resource.longitude || row.resource.latitude">{{ row.resource.longitude }}, {{ row.resource.latitude }}</span>
@@ -127,7 +124,7 @@
           <div class="detail-head">
             <div>
               <el-button type="text" icon="el-icon-back" @click="backToDevice">返回设备</el-button>
-              <span class="detail-title">{{ resourceForm.name || selectedResource.resource.internalCode }}</span>
+              <span class="detail-title">{{ resourceForm.name || '未命名通道' }}</span>
               <el-tag size="mini" type="info" style="margin-left:8px">{{ kindLabel(selectedResource.resource.kind) }}</el-tag>
             </div>
             <div>
@@ -138,8 +135,6 @@
           <el-form :model="resourceForm" label-width="100px" size="small" class="edit-form">
             <el-row :gutter="16">
               <el-col :span="12"><el-form-item label="通道名称"><el-input v-model="resourceForm.name" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="通道内码"><el-input :value="selectedResource.resource.internalCode" disabled /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="外部 ID"><el-input :value="selectedResource.resource.externalKey" disabled /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="资源类型"><el-input :value="kindLabel(selectedResource.resource.kind)" disabled /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="经度"><el-input-number v-model="resourceForm.longitude" :precision="6" :step="0.000001" style="width:100%" controls-position="right" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="纬度"><el-input-number v-model="resourceForm.latitude" :precision="6" :step="0.000001" style="width:100%" controls-position="right" /></el-form-item></el-col>
@@ -175,7 +170,7 @@
       </el-card>
     </div>
 
-    <el-dialog :title="playing ? ('播放 - ' + (playing.resource.name || playing.resource.internalCode)) : '播放'" :visible.sync="playerVisible" width="820px" @closed="stopLive">
+    <el-dialog :title="playing ? ('播放 - ' + (playing.resource.name || '未命名通道')) : '播放'" :visible.sync="playerVisible" width="820px" @closed="stopLive">
       <jessibuca v-if="playerVisible && videoUrl" :video-url="videoUrl" height="440px" />
       <div v-if="streamInfo" class="stream-links">
         <div v-if="streamInfo.flv">FLV: {{ streamInfo.flv }}</div>
@@ -228,6 +223,18 @@ export default {
   watch: {
     treeFilter(v) { this.$refs.tree && this.$refs.tree.filter(v) }
   },
+  computed: {
+    accessAddress() {
+      const b = this.selectedDevice && this.selectedDevice.binding
+      if (!b) return '—'
+      if (b.protocol === 'gb28181') return b.endpoint || '—'
+      return b.endpoint || b.externalId || '—'
+    },
+    gbDeviceCode() {
+      const b = this.selectedDevice && this.selectedDevice.binding
+      return b && b.protocol === 'gb28181' ? (b.externalId || '—') : '—'
+    }
+  },
   created() {
     const q = (this.$route && this.$route.query) || {}
     if (q.query) this.query = q.query
@@ -249,7 +256,7 @@ export default {
         const device = n.device
         const children = (n.resources || []).map(r => ({
           id: 'r:' + r.resource.id,
-          label: r.resource.name || r.resource.internalCode,
+          label: r.resource.name || '未命名通道',
           kindLabel: KIND_LABELS[r.resource.kind] || r.resource.kind,
           type: 'resource',
           node: r,
@@ -274,7 +281,7 @@ export default {
     filterNode(value, data) {
       if (!value) return true
       const node = data.node || {}
-      const hay = [data.label, node.internalCode, node.externalKey, node.device && node.device.internalCode].filter(Boolean).join(' ')
+      const hay = [data.label, node.name, node.device && node.device.name, node.device && node.device.serialNumber].filter(Boolean).join(' ')
       return hay.toLowerCase().includes(value.toLowerCase())
     },
     nodeIcon(data) {

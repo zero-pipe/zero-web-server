@@ -6,6 +6,7 @@ import (
 	"time"
 
 	domainplugin "zero-web-server/internal/domain/plugin"
+	"zero-web-server/internal/domain/shared"
 	"zero-web-server/internal/infrastructure/persistence/model"
 	"zero-web-server/pkg/idcode"
 
@@ -195,14 +196,20 @@ func (r *PluginRepository) ReplaceChannels(deviceDBID int, channels []*domainplu
 		var existing []model.PluginChannel
 		_ = tx.Where("device_db_id = ?", deviceDBID).Find(&existing).Error
 		keep := map[string]string{}
+		keepName := map[string]string{}
 		for i := range existing {
 			keep[existing[i].ChannelID] = existing[i].InternalCode
+			if strings.TrimSpace(existing[i].Name) != "" {
+				keepName[existing[i].ChannelID] = existing[i].Name
+			}
 		}
+		var dev model.PluginDevice
+		_ = tx.First(&dev, deviceDBID).Error
 		if err := tx.Where("device_db_id = ?", deviceDBID).Delete(&model.PluginChannel{}).Error; err != nil {
 			return err
 		}
 		now := time.Now().Format("2006-01-02 15:04:05")
-		for _, ch := range channels {
+		for i, ch := range channels {
 			code := ch.InternalCode
 			if code == "" {
 				code = keep[ch.ChannelID]
@@ -214,11 +221,15 @@ func (r *PluginRepository) ReplaceChannels(deviceDBID int, channels []*domainplu
 					return err
 				}
 			}
+			name := keepName[ch.ChannelID]
+			if strings.TrimSpace(name) == "" {
+				name = shared.DefaultChannelName(dev.Name, i+1)
+			}
 			ch.ID, ch.InternalCode, ch.DeviceDBID = 0, code, deviceDBID
 			ch.CreateTime, ch.UpdateTime = now, now
 			if err := tx.Create(&model.PluginChannel{
 				InternalCode: code, DeviceDBID: deviceDBID, ChannelID: ch.ChannelID,
-				Name: ch.Name, Status: ch.Status, PTZType: ch.PTZType, HasAudio: ch.HasAudio,
+				Name: name, Status: ch.Status, PTZType: ch.PTZType, HasAudio: ch.HasAudio,
 				CreateTime: now, UpdateTime: now,
 			}).Error; err != nil {
 				return err

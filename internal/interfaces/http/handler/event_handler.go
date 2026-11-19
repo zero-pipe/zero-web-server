@@ -26,6 +26,7 @@ func (h *EventHandler) List(c *gin.Context) {
 	f := domainevent.ListFilter{
 		DeviceID:           c.Query("deviceId"),
 		DeviceInternalCode: c.Query("deviceInternalCode"),
+		DeviceName:         c.Query("deviceName"),
 		EventType:          c.Query("eventType"),
 		Status:             c.Query("status"),
 		Begin:              begin,

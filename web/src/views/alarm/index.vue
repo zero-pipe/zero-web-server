@@ -80,18 +80,16 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="alarmType" label="报警类型" width="170">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="getAlarmTypeTagType(scope.row.alarmType)">
               {{ scope.row.alarmCode ? eventTypeLabel(scope.row.alarmCode) : getAlarmTypeLabel(scope.row.alarmType) }}
             </el-tag>
-            <div v-if="scope.row.alarmCode" class="sub-text">{{ scope.row.alarmCode }}</div>
           </template>
         </el-table-column>
         <el-table-column label="级别" width="80">
           <template v-slot:default="scope">
-            <el-tag size="mini" :type="severityType(scope.row.severity)">{{ scope.row.severity || '—' }}</el-tag>
+            <el-tag size="mini" :type="severityType(scope.row.severity)">{{ severityLabel(scope.row.severity) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="处置" width="95">
@@ -117,8 +115,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="报警描述" show-overflow-tooltip />
+        <el-table-column prop="deviceName" label="设备" width="150" />
         <el-table-column prop="channelName" label="通道名称" width="150" />
-        <el-table-column prop="channelDeviceId" label="通道编号" width="180" />
         <el-table-column prop="longitude" label="经度" width="110" />
         <el-table-column prop="latitude" label="纬度" width="110" />
         <el-table-column label="报警时间" width="170">
@@ -186,22 +184,22 @@
     <el-dialog title="报警详情" :visible.sync="detailVisible" width="720px">
       <template v-if="detail">
         <el-descriptions :column="2" size="small" border>
-          <el-descriptions-item label="报警码">{{ detail.alarmCode || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="事件 ID">{{ detail.eventId || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="设备内码">{{ detail.deviceInternalCode || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="通道内码">{{ detail.channelInternalCode || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="级别">{{ detail.severity || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="处置">{{ statusLabel(detail.status) }}</el-descriptions-item>
+          <el-descriptions-item label="报警类型">{{ detail.alarmCode ? eventTypeLabel(detail.alarmCode) : getAlarmTypeLabel(detail.alarmType) }}</el-descriptions-item>
           <el-descriptions-item label="时间">{{ formatTime(detail.alarmTime) }}</el-descriptions-item>
-          <el-descriptions-item label="通道 ID">{{ detail.channelId }}</el-descriptions-item>
+          <el-descriptions-item label="设备">{{ detail.deviceName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="通道">{{ detail.channelName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="级别">{{ severityLabel(detail.severity) }}</el-descriptions-item>
+          <el-descriptions-item label="处置">{{ statusLabel(detail.status) }}</el-descriptions-item>
         </el-descriptions>
         <div v-if="detail.snapPath" style="margin-top:14px;text-align:center">
           <el-image :src="getSnapUrl(detail.id)" :preview-src-list="[getSnapUrl(detail.id)]" fit="contain" style="max-width:100%;max-height:340px" />
         </div>
-        <div v-if="detail.bboxJson" style="margin-top:14px">
-          <div class="section-title">AI 目标框</div>
-          <pre class="json">{{ pretty(detail.bboxJson) }}</pre>
-        </div>
+        <el-collapse v-if="detail.bboxJson" style="margin-top:14px">
+          <el-collapse-item title="高级信息（排障用）" name="advanced">
+            <div class="section-title">目标框数据</div>
+            <pre class="json">{{ pretty(detail.bboxJson) }}</pre>
+          </el-collapse-item>
+        </el-collapse>
         <div style="margin-top:14px">
           <el-button size="small" type="primary" :disabled="!detail.channelId" @click="openPlayback(detail)">查看回放</el-button>
         </div>
@@ -351,7 +349,7 @@ export default {
         motion: '移动侦测', line_crossing: '越界侦测', intrusion: '区域入侵', loitering: '徘徊',
         video_loss: '视频丢失', tamper: '遮挡/破坏', audio_abnormal: '音频异常', scene_change: '场景变更',
         face: '人脸', plate: '车牌', alarm_input: '报警输入', other: '其他'
-      }[code] || code
+      }[code] || '其他'
     },
     statusLabel(status) {
       return { unhandled: '未处理', handled: '已确认', ignored: '已忽略' }[status] || (status || '未处理')
@@ -361,6 +359,9 @@ export default {
     },
     severityType(severity) {
       return severity === 'critical' ? 'danger' : (severity === 'major' ? 'warning' : 'info')
+    },
+    severityLabel(severity) {
+      return { critical: '严重', major: '重要', warning: '一般', info: '提示' }[severity] || '提示'
     },
     pretty(raw) {
       try { return JSON.stringify(JSON.parse(raw), null, 2) } catch (e) { return raw }

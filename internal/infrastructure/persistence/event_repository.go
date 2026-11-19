@@ -45,11 +45,13 @@ func (r *EventRepository) Exists(eventID string) (bool, error) {
 func (r *EventRepository) Get(id string) (*domainevent.Event, error) {
 	var row struct {
 		model.Event
-		DeviceName string `gorm:"column:device_name"`
+		DeviceName  string `gorm:"column:device_name"`
+		ChannelName string `gorm:"column:channel_name"`
 	}
 	err := r.db.Table("zws_event e").
-		Select("e.*, d.name AS device_name").
+		Select("e.*, d.name AS device_name, r.name AS channel_name").
 		Joins("LEFT JOIN zws_physical_device d ON d.id = e.device_id").
+		Joins("LEFT JOIN zws_resource r ON r.id = e.resource_id").
 		Where("e.id = ?", id).Scan(&row).Error
 	if err != nil {
 		return nil, err
@@ -57,7 +59,7 @@ func (r *EventRepository) Get(id string) (*domainevent.Event, error) {
 	if row.ID == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	return toDomainEvent(&row.Event, row.DeviceName), nil
+	return toDomainEvent(&row.Event, row.DeviceName, row.ChannelName), nil
 }
 
 func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*domainevent.Event, int64, error) {
@@ -68,12 +70,16 @@ func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*do
 		count = 20
 	}
 	q := r.db.Table("zws_event e").
-		Joins("LEFT JOIN zws_physical_device d ON d.id = e.device_id")
+		Joins("LEFT JOIN zws_physical_device d ON d.id = e.device_id").
+		Joins("LEFT JOIN zws_resource r ON r.id = e.resource_id")
 	if f.DeviceID != "" {
 		q = q.Where("e.device_id = ?", f.DeviceID)
 	}
 	if f.DeviceInternalCode != "" {
 		q = q.Where("e.device_internal_code = ?", f.DeviceInternalCode)
+	}
+	if f.DeviceName != "" {
+		q = q.Where("d.name LIKE ?", "%"+f.DeviceName+"%")
 	}
 	if f.EventType != "" {
 		q = q.Where("e.event_type = ?", f.EventType)
@@ -93,9 +99,10 @@ func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*do
 	}
 	var rows []struct {
 		model.Event
-		DeviceName string `gorm:"column:device_name"`
+		DeviceName  string `gorm:"column:device_name"`
+		ChannelName string `gorm:"column:channel_name"`
 	}
-	err := q.Select("e.*, d.name AS device_name").
+	err := q.Select("e.*, d.name AS device_name, r.name AS channel_name").
 		Order("e.occurred_at DESC, e.id DESC").
 		Offset((page - 1) * count).Limit(count).Scan(&rows).Error
 	if err != nil {
@@ -103,7 +110,7 @@ func (r *EventRepository) List(page, count int, f domainevent.ListFilter) ([]*do
 	}
 	out := make([]*domainevent.Event, 0, len(rows))
 	for i := range rows {
-		out = append(out, toDomainEvent(&rows[i].Event, rows[i].DeviceName))
+		out = append(out, toDomainEvent(&rows[i].Event, rows[i].DeviceName, rows[i].ChannelName))
 	}
 	return out, total, nil
 }
@@ -117,10 +124,11 @@ func (r *EventRepository) DeleteBefore(before int64) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-func toDomainEvent(m *model.Event, deviceName string) *domainevent.Event {
+func toDomainEvent(m *model.Event, deviceName, channelName string) *domainevent.Event {
 	return &domainevent.Event{
 		ID: m.ID, EventID: m.EventID, SchemaVersion: m.SchemaVersion, SourceID: m.SourceID,
-		DeviceID: m.DeviceID, DeviceName: deviceName, BindingID: m.BindingID, ResourceID: m.ResourceID,
+		DeviceID: m.DeviceID, DeviceName: deviceName, ChannelName: channelName,
+		BindingID: m.BindingID, ResourceID: m.ResourceID,
 		DeviceInternalCode: m.DeviceInternalCode, DeviceUID: m.DeviceUID,
 		ChannelExternalKey: m.ChannelExternalKey, ChannelInternalCode: m.ChannelInternalCode,
 		EventType: m.EventType, Severity: m.Severity,

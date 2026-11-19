@@ -60,6 +60,15 @@ func (p *AssetProjector) Prune() error {
 	if err := p.db.Find(&refs).Error; err != nil {
 		return err
 	}
+	// 同一统一对象可能因旧表重建产生多条映射（旧 ID + 新 ID）；
+	// 只要还有一条映射对应的 legacy 行存在，就不能删除统一对象。
+	liveUnified := map[string]bool{}
+	for i := range refs {
+		r := &refs[i]
+		if set, tracked := sets[r.LegacyTable]; tracked && set[r.LegacyID] {
+			liveUnified[r.UnifiedID] = true
+		}
+	}
 	for i := range refs {
 		r := &refs[i]
 		set, tracked := sets[r.LegacyTable]
@@ -69,15 +78,17 @@ func (p *AssetProjector) Prune() error {
 		if set[r.LegacyID] {
 			continue // legacy 仍存在
 		}
-		// 孤儿：按实体类型级联删除统一资产
-		switch r.EntityType {
-		case "physical_device":
-			if err := p.deleteDeviceTree(r.UnifiedID); err != nil {
-				return err
-			}
-		case "resource":
-			if err := p.deleteResourceTree(r.UnifiedID); err != nil {
-				return err
+		// 孤儿：按实体类型级联删除统一资产（仍有其它存活映射时只删映射）。
+		if !liveUnified[r.UnifiedID] {
+			switch r.EntityType {
+			case "physical_device":
+				if err := p.deleteDeviceTree(r.UnifiedID); err != nil {
+					return err
+				}
+			case "resource":
+				if err := p.deleteResourceTree(r.UnifiedID); err != nil {
+					return err
+				}
 			}
 		}
 		if err := p.db.Where("legacy_table = ? AND legacy_id = ?", r.LegacyTable, r.LegacyID).
@@ -194,7 +205,7 @@ func (p *AssetProjector) backfillGB() error {
 		}
 		for ci := range channels {
 			ch := &channels[ci]
-			chUID, err := p.legacyID("zws_device_channel", strconv.Itoa(ch.ID))
+			chUID, err := p.resourceLegacyID("zws_device_channel", strconv.Itoa(ch.ID), ch.InternalCode)
 			if err != nil {
 				return err
 			}
@@ -273,7 +284,7 @@ func (p *AssetProjector) backfillONVIF() error {
 		}
 		for ci := range channels {
 			ch := &channels[ci]
-			chUID, err := p.legacyID("zws_onvif_channel", strconv.FormatInt(ch.ID, 10))
+			chUID, err := p.resourceLegacyID("zws_onvif_channel", strconv.FormatInt(ch.ID, 10), ch.InternalCode)
 			if err != nil {
 				return err
 			}
@@ -343,7 +354,7 @@ func (p *AssetProjector) backfillPlugin() error {
 		}
 		for ci := range channels {
 			ch := &channels[ci]
-			chUID, err := p.legacyID("zws_plugin_channel", strconv.Itoa(ch.ID))
+			chUID, err := p.resourceLegacyID("zws_plugin_channel", strconv.Itoa(ch.ID), ch.InternalCode)
 			if err != nil {
 				return err
 			}
@@ -547,6 +558,28 @@ func (p *AssetProjector) legacyID(table, legacyID string) (string, error) {
 		return "", err
 	}
 	return ref.UnifiedID, nil
+}
+
+// resourceLegacyID 优先按旧 ID 映射；旧表重建导致 ID 变化时，用通道内码找回原统一资源，
+// 避免协议同步把用户改名/编辑数据投影成一条新资源。
+func (p *AssetProjector) resourceLegacyID(table, legacyID, internalCode string) (string, error) {
+	var ref model.UnifiedRef
+	err := p.db.Where("legacy_table = ? AND legacy_id = ?", table, legacyID).First(&ref).Error
+	if err == nil {
+		return ref.UnifiedID, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return "", err
+	}
+	code := strings.TrimSpace(internalCode)
+	if code != "" {
+		var res model.AssetResource
+		if e := p.db.Where("internal_code = ?", code).First(&res).Error; e == nil {
+			_ = p.upsertRef(table, legacyID, "resource", res.ID)
+			return res.ID, nil
+		}
+	}
+	return stableID("legacy", table, legacyID), nil
 }
 
 func (p *AssetProjector) upsertRef(table, legacyID, entityType, unifiedID string) error {

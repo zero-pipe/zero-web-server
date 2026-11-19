@@ -8,6 +8,7 @@ type Event struct {
 	SourceID            string           `json:"sourceId"`
 	DeviceID            string           `json:"deviceId"`
 	DeviceName          string           `json:"deviceName"`
+	ChannelName         string           `json:"channelName"`
 	BindingID           string           `json:"bindingId"`
 	ResourceID          string           `json:"resourceId"`
 	DeviceInternalCode  string           `json:"deviceInternalCode"`
@@ -45,6 +46,7 @@ type PlaybackContext struct {
 type ListFilter struct {
 	DeviceID           string
 	DeviceInternalCode string
+	DeviceName         string
 	EventType          string
 	Status             string
 	Begin              int64

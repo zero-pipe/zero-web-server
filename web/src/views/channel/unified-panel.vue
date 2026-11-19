@@ -9,7 +9,7 @@
           v-model="query"
           clearable
           style="width: 15rem"
-          placeholder="名称 / 设备内码 / 通道内码 / 通道标识"
+          placeholder="通道名称 / 设备名称"
           prefix-icon="el-icon-search"
           @keyup.enter.native="search"
           @clear="search"
@@ -24,7 +24,7 @@
         </el-select>
       </el-form-item>
       <el-form-item v-if="deviceInternalCode && !deviceLocked">
-        <el-tag size="mini" closable @close="clearDevice">设备：{{ deviceInternalCode }}</el-tag>
+        <el-tag size="mini" closable @close="clearDevice">设备：{{ deviceName || '已选择' }}</el-tag>
       </el-form-item>
       <el-form-item>
         <el-button size="mini" icon="el-icon-refresh-right" @click="load">刷新</el-button>
@@ -33,7 +33,6 @@
 
     <el-table v-loading="loading" :data="list" size="small" border>
       <el-table-column prop="name" label="通道名称" min-width="160" />
-      <el-table-column prop="internalCode" label="通道内码" width="200" />
       <el-table-column label="类型" width="110">
         <template slot-scope="{ row }">{{ kindLabel(row.kind) }}</template>
       </el-table-column>
@@ -46,18 +45,11 @@
       <el-table-column label="所属设备" min-width="180">
         <template slot-scope="{ row }">
           <div>{{ row.deviceName }}</div>
-          <div class="sub-text">{{ row.deviceInternalCode }}</div>
         </template>
       </el-table-column>
       <el-table-column label="协议" width="100">
         <template slot-scope="{ row }">
           <el-tag size="mini" effect="plain">{{ protocolLabel(row.protocol) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="通道标识" min-width="170">
-        <template slot-scope="{ row }">
-          <span v-if="row.gbCode" title="国标通道编码">{{ row.gbCode }}</span>
-          <span v-else>{{ row.externalKey }}</span>
         </template>
       </el-table-column>
       <el-table-column label="在线" width="80">
@@ -104,6 +96,8 @@ export default {
   props: {
     // 固定设备内码（设备详情下钻时传入）
     deviceInternalCode: { type: String, default: '' },
+    // 设备名称（展示用）
+    deviceName: { type: String, default: '' },
     // 限定协议（gb28181 | onvif | plugin）
     protocol: { type: String, default: '' },
     // 嵌入到接入页时显示「返回」页头

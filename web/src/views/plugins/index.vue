@@ -7,6 +7,7 @@
       device-locked
       protocol="plugin"
       :device-internal-code="channelCtx.internalCode"
+      :device-name="channelCtx.name"
       @back="channelCtx = null"
     />
     <div v-show="!channelCtx">
@@ -27,7 +28,7 @@
         <el-table-column label="插件" min-width="160">
           <template slot-scope="{ row }">
             <div>{{ row.name || row.pluginId }}</div>
-            <span class="sub-text">{{ row.pluginId }} · {{ row.version }}</span>
+            <span class="sub-text">v{{ row.version }}</span>
           </template>
         </el-table-column>
         <el-table-column label="协议" min-width="130">
@@ -69,7 +70,9 @@
       <el-table v-loading="loading" :data="devices" size="small" border>
         <el-table-column prop="name" label="名称" min-width="140" />
         <el-table-column prop="protocol" label="协议" width="140" />
-        <el-table-column prop="deviceUid" label="设备 UID" min-width="140" />
+        <el-table-column label="地址/注册信息" min-width="160">
+          <template slot-scope="{ row }">{{ deviceAddress(row) }}</template>
+        </el-table-column>
         <el-table-column prop="manufacturer" label="厂商" width="100" />
         <el-table-column prop="model" label="型号" width="120" />
         <el-table-column label="在线" width="80">
@@ -111,7 +114,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="设备名称">
-          <el-input v-model="addForm.name" placeholder="留空则使用设备 UID" />
+          <el-input v-model="addForm.name" placeholder="留空则使用 IP:端口" />
         </el-form-item>
         <el-form-item v-for="(f, key) in schemaProps" :key="key" :label="f.title || key">
           <el-input v-if="isNumber(f)" v-model.number="addForm.params[key]" />
@@ -242,8 +245,16 @@ export default {
         this.loadArmStatuses()
       }).catch(e => this.$message.error(e || '布防失败'))
     },
-    formatTime(ms) {
-      if (!ms) return '-'
+    deviceAddress(row) {
+      let params = {}
+      try { params = JSON.parse(row.driverParams || '{}') } catch (e) { params = {} }
+      if (params.ip) return params.port ? `${params.ip}:${params.port}` : params.ip
+      const uid = row.deviceUid || ''
+      const i = uid.lastIndexOf('-')
+      if (i > 0 && /^\d+$/.test(uid.slice(i + 1))) return uid.slice(0, i) + ':' + uid.slice(i + 1)
+      return uid || '—'
+    },
+    formatTime(ms) {      if (!ms) return '-'
       const d = new Date(ms)
       const pad = n => (n < 10 ? '0' + n : n)
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`

@@ -6,7 +6,7 @@
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
-            placeholder="名称 / 内码 / 国标编码"
+            placeholder="名称 / 国标编码"
             prefix-icon="el-icon-search"
             clearable
             @input="search"
@@ -218,7 +218,6 @@ export default {
       channelList: [],
       excelFields: {
         名称: 'gbName',
-        内码: 'internalCode',
         国标编码: 'gbDeviceId',
         厂家: 'gbManufacturer',
         类型: {

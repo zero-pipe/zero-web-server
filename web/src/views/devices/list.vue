@@ -5,7 +5,7 @@
         <el-input
           v-model="query"
           style="width: 180px;"
-          placeholder="名称 / 内码 / IP"
+          placeholder="名称 / IP"
           prefix-icon="el-icon-search"
           clearable
           @input="reload"
@@ -27,7 +27,6 @@
         <el-select v-model="status" style="width: 100px;" clearable placeholder="全部" @change="reload">
           <el-option label="在线" value="online" />
           <el-option label="离线" value="offline" />
-          <el-option label="待上线" value="pending" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -77,7 +76,6 @@
       <el-table-column label="状态" width="90">
         <template v-slot:default="{ row }">
           <el-tag v-if="row.status === 'online'" size="mini" type="success">在线</el-tag>
-          <el-tag v-else-if="row.status === 'pending'" size="mini" type="warning">待上线</el-tag>
           <el-tag v-else size="mini" type="info">离线</el-tag>
         </template>
       </el-table-column>

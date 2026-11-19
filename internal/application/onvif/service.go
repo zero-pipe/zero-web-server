@@ -11,6 +11,7 @@ import (
 
 	domainonvif "zero-web-server/internal/domain/onvif"
 	domainptz "zero-web-server/internal/domain/ptz"
+	"zero-web-server/internal/domain/shared"
 	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/onvifcli"
 	"zero-web-server/internal/port"
@@ -257,10 +258,11 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainon
 		channels = append(channels, ch)
 	}
 
-	// 同步时按 VideoSource 保留内码/国标码，避免 Open API 引用失效
+	// 同步时按 VideoSource 保留内码/国标码/用户改名，避免 Open API 与用户编辑失效
 	if existing, err := s.channels.ListByDeviceID(ctx, deviceID); err == nil {
 		keepCode := make(map[string]string, len(existing))
 		keepGb := make(map[string]string, len(existing))
+		keepName := make(map[string]string, len(existing))
 		for _, row := range existing {
 			key := strings.TrimSpace(row.VideoSource)
 			if key == "" {
@@ -275,6 +277,9 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainon
 			if g := strings.TrimSpace(row.GbCode); g != "" {
 				keepGb[key] = g
 			}
+			if n := strings.TrimSpace(row.Name); n != "" {
+				keepName[key] = n
+			}
 		}
 		for _, ch := range channels {
 			key := strings.TrimSpace(ch.VideoSource)
@@ -286,6 +291,9 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int64) ([]*domainon
 			}
 			if g, ok := keepGb[key]; ok {
 				ch.GbCode = g
+			}
+			if n, ok := keepName[key]; ok {
+				ch.Name = n
 			}
 		}
 	}
@@ -724,11 +732,7 @@ func injectRTSPAuth(rawURL, username, password string) string {
 
 // channelName 统一通道展示名：设备名_channel_N
 func channelName(deviceName string, index int) string {
-	base := strings.TrimSpace(deviceName)
-	if base == "" {
-		base = "device"
-	}
-	return fmt.Sprintf("%s_channel_%d", base, index)
+	return shared.DefaultChannelName(deviceName, index)
 }
 
 // groupProfilesByVideoSource 按视频源归组，组内保留全部主/子码流 Profile。

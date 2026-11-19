@@ -5,10 +5,7 @@
         <el-form-item label="名称" prop="gbName">
           <el-input v-model="form.gbName" placeholder="请输入通道名称" />
         </el-form-item>
-        <el-form-item label="内码">
-          <el-input :value="form.internalCode" disabled placeholder="平台自动生成" />
-        </el-form-item>
-        <el-form-item label="编码" prop="gbDeviceId">
+        <el-form-item label="国标通道编码" prop="gbDeviceId">
           <el-input v-model="form.gbDeviceId" placeholder="请输入通道编码">
             <template v-slot:append>
               <el-button @click="buildDeviceIdCode(form.gbDeviceId)">生成</el-button>

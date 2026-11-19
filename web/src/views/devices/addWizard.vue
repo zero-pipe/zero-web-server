@@ -88,7 +88,7 @@
         :title="accessTip"
       />
       <el-form ref="gbForm" :model="gb" :rules="gbRules" label-width="100px" size="small">
-        <el-form-item label="设备编号" prop="deviceId">
+        <el-form-item label="国标编号" prop="deviceId">
           <el-input v-model="gb.deviceId" placeholder="20 位 GB28181 编码" />
         </el-form-item>
         <el-form-item label="注册密码">

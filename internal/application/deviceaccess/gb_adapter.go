@@ -14,7 +14,7 @@ func (a gbAdapter) List(_ context.Context, q ListQuery) ([]*DeviceView, error) {
 	case StatusOnline:
 		v := true
 		online = &v
-	case StatusOffline, StatusPending:
+	case StatusOffline:
 		v := false
 		online = &v
 	}

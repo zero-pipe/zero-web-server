@@ -78,7 +78,7 @@ func (r *AssetRepository) ListDevices(page, count int, query, protocol, status s
 	switch status {
 	case "online":
 		q = q.Where("d.online = ?", true)
-	case "offline", "pending":
+	case "offline":
 		q = q.Where("d.online = ?", false)
 	}
 	var total int64
