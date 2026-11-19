@@ -140,3 +140,28 @@ export function updateCustomChannel(data) {
   })
 }
 
+
+// 按业务目录（215/216 分组节点）共享
+export function groupShareList(platformId) {
+  return request({
+    method: 'get',
+    url: '/api/v1/platform/group/list',
+    params: { platformId }
+  })
+}
+
+export function groupShareAdd(platformId, groupDeviceIds) {
+  return request({
+    method: 'post',
+    url: '/api/v1/platform/group/add',
+    data: { platformId, groupDeviceIds }
+  })
+}
+
+export function groupShareRemove(platformId, groupDeviceIds) {
+  return request({
+    method: 'post',
+    url: '/api/v1/platform/group/remove',
+    data: { platformId, groupDeviceIds }
+  })
+}

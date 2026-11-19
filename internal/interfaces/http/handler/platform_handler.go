@@ -186,3 +186,47 @@ func (h *PlatformHandler) ChannelCustomUpdate(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+type groupShareReq struct {
+	PlatformID    int      `json:"platformId"`
+	GroupDeviceIDs []string `json:"groupDeviceIds"`
+}
+
+// GroupShareList GET /api/v1/platform/group/list?platformId=
+func (h *PlatformHandler) GroupShareList(c *gin.Context) {
+	platformID, _ := strconv.Atoi(c.Query("platformId"))
+	list, err := h.channel.ListGroupShares(platformID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// GroupShareAdd POST /api/v1/platform/group/add
+func (h *PlatformHandler) GroupShareAdd(c *gin.Context) {
+	var req groupShareReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.channel.AddGroupShares(req.PlatformID, req.GroupDeviceIDs); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// GroupShareRemove POST /api/v1/platform/group/remove
+func (h *PlatformHandler) GroupShareRemove(c *gin.Context) {
+	var req groupShareReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, response.CodeBadReq, "参数错误")
+		return
+	}
+	if err := h.channel.RemoveGroupShares(req.PlatformID, req.GroupDeviceIDs); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}

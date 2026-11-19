@@ -43,6 +43,10 @@ type Repository interface {
 	Delete(id int) error
 	UpdateStatus(id int, online bool) error
 	ListCatalogSnapshot(platformID int) ([]*CatalogSnapshot, error)
+	// 按业务分组（215/216 节点）共享（级联共享源）。
+	ListGroupShares(platformID int) ([]string, error)
+	AddGroupShares(platformID int, groupDeviceIDs []string) error
+	RemoveGroupShares(platformID int, groupDeviceIDs []string) error
 	ReplaceCatalogSnapshot(platformID int, list []*CatalogSnapshot) error
 	ListEnabled() ([]*Platform, error)
 }

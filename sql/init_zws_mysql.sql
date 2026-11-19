@@ -505,6 +505,22 @@ CREATE TABLE IF NOT EXISTS zws_platform_catalog_snapshot
     UNIQUE KEY uk_plat_catalog_snap (platform_id, device_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='向上级推送目录快照';
 
+DROP TABLE IF EXISTS zws_platform_group_share;
+CREATE TABLE IF NOT EXISTS zws_platform_group_share
+(
+    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id     INT NOT NULL,
+    group_device_id VARCHAR(50) NOT NULL COMMENT '共享的业务目录节点(215/216)国标编号',
+    UNIQUE KEY uk_plat_group (platform_id, group_device_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上级平台按业务目录共享';
+
+DROP TABLE IF EXISTS zws_gb_code_seq;
+CREATE TABLE IF NOT EXISTS zws_gb_code_seq
+(
+    prefix VARCHAR(14) NOT NULL PRIMARY KEY COMMENT '中心8+行业2+类型3+网络1',
+    next   BIGINT NOT NULL DEFAULT 0 COMMENT '已分配的最大序号'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标码序号分配';
+
 -- 对象存储对接配置（MinIO / S3），平台不自建存储
 DROP TABLE IF EXISTS zws_object_store_config;
 CREATE TABLE IF NOT EXISTS zws_object_store_config

@@ -533,6 +533,23 @@ type PlatformCatalogSnapshot struct {
 
 func (PlatformCatalogSnapshot) TableName() string { return "zws_platform_catalog_snapshot" }
 
+// PlatformGroupShare 上级平台按业务分组/虚拟组织节点的共享（级联只共享业务目录）。
+type PlatformGroupShare struct {
+	ID            int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlatformID    int    `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_group" json:"platformId"`
+	GroupDeviceID string `gorm:"column:group_device_id;size:50;not null;uniqueIndex:uk_plat_group" json:"groupDeviceId"`
+}
+
+func (PlatformGroupShare) TableName() string { return "zws_platform_group_share" }
+
+// GBCodeSeq 平台分配的国标码序号（按 14 位前缀隔离，防重复）。
+type GBCodeSeq struct {
+	Prefix string `gorm:"column:prefix;primaryKey;size:14" json:"prefix"`
+	Next   int64  `gorm:"column:next;not null;default:0" json:"next"`
+}
+
+func (GBCodeSeq) TableName() string { return "zws_gb_code_seq" }
+
 // Plugin 是 sidecar 插件实例注册信息。
 type Plugin struct {
 	ID               string `gorm:"column:id;primaryKey;size:128"`

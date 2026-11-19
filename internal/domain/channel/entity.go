@@ -47,6 +47,12 @@ type Repository interface {
 	ListByGroupParent(page, count int, query string, channelType *int, online *bool, groupDeviceID string) ([]*Channel, int64, error)
 	ListIDsByDevice(deviceID string) ([]int, error)
 	CountCommonByIDs(channelIDs []int) (int64, error)
+	// ListByDataDeviceIDs 按所属设备批量取通道（分配国标码用）。
+	ListByDataDeviceIDs(dataDeviceIDs []int) ([]*Channel, error)
+	// NextGBSeq 按 14 位前缀原子分配下一个 6 位序号。
+	NextGBSeq(prefix string) (int, error)
+	// SetGBDeviceID 写入通道国标编号（分配后固化，不随同步覆盖）。
+	SetGBDeviceID(channelID int, gbDeviceID string) error
 	CountCommonByDataDeviceIDs(dataDeviceIDs []int) (int64, error)
 	SetCivilCode(civilCode string, channelIDs []int) error
 	ClearCivilCode(channelIDs []int) error

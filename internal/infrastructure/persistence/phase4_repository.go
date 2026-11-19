@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"strings"
 	"fmt"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"zero-web-server/internal/infrastructure/persistence/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type AlarmRepository struct{ db *gorm.DB }
@@ -374,4 +376,42 @@ func (r *PlatformRepository) ReplaceCatalogSnapshot(platformID int, list []*doma
 		}
 		return tx.Create(&rows).Error
 	})
+}
+
+func (r *PlatformRepository) ListGroupShares(platformID int) ([]string, error) {
+	var rows []model.PlatformGroupShare
+	if err := r.db.Where("platform_id = ?", platformID).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.GroupDeviceID)
+	}
+	return out, nil
+}
+
+func (r *PlatformRepository) AddGroupShares(platformID int, groupDeviceIDs []string) error {
+	if len(groupDeviceIDs) == 0 {
+		return nil
+	}
+	rows := make([]model.PlatformGroupShare, 0, len(groupDeviceIDs))
+	for _, id := range groupDeviceIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		rows = append(rows, model.PlatformGroupShare{PlatformID: platformID, GroupDeviceID: id})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&rows).Error
+}
+
+func (r *PlatformRepository) RemoveGroupShares(platformID int, groupDeviceIDs []string) error {
+	if len(groupDeviceIDs) == 0 {
+		return nil
+	}
+	return r.db.Where("platform_id = ? AND group_device_id IN ?", platformID, groupDeviceIDs).
+		Delete(&model.PlatformGroupShare{}).Error
 }

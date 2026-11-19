@@ -21,4 +21,7 @@ func registerPlatform(parent *gin.RouterGroup, platformHandler *handler.Platform
 	g.POST("/channel/device/remove", platformHandler.ChannelDeviceRemove)
 	g.DELETE("/channel/remove", platformHandler.ChannelRemove)
 	g.POST("/channel/custom/update", platformHandler.ChannelCustomUpdate)
+	g.GET("/group/list", platformHandler.GroupShareList)
+	g.POST("/group/add", platformHandler.GroupShareAdd)
+	g.POST("/group/remove", platformHandler.GroupShareRemove)
 }

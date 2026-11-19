@@ -68,11 +68,24 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 	if err != nil {
 		return nil, err
 	}
+	regions, _ := s.nodes.ListAllRegions()
+	groups, _ := s.nodes.ListAllGroups()
+
+	// 按业务目录（215/216 分组）共享：展开子树，把节点下所有通道纳入本次目录。
+	if shares, err := s.platforms.ListGroupShares(platformID); err == nil && len(shares) > 0 {
+		expanded := expandGroupSubtree(shares, groups)
+		if all, _, err := s.channels.ListAll(1, 100000, ""); err == nil {
+			for _, ch := range all {
+				if _, ok := expanded[strings.TrimSpace(ch.ParentID)]; ok {
+					channelIDs = append(channelIDs, ch.ID)
+				}
+			}
+		}
+		channelIDs = dedupeInts(channelIDs)
+	}
 	if len(channelIDs) == 0 {
 		return nil, fmt.Errorf("未配置共享通道")
 	}
-	regions, _ := s.nodes.ListAllRegions()
-	groups, _ := s.nodes.ListAllGroups()
 	regionBy := make(map[string]domaintree.Node, len(regions))
 	for _, r := range regions {
 		regionBy[strings.TrimSpace(r.DeviceID)] = r
@@ -358,4 +371,51 @@ func splitCatalogBatches(platformID string, events []gbsip.CatalogItem) [][]gbsi
 		batches = append(batches, cur)
 	}
 	return batches
+}
+
+// expandGroupSubtree 从共享的 215/216 节点展开到所有后代分组。
+func expandGroupSubtree(roots []string, groups []domaintree.Node) map[string]struct{} {
+	children := make(map[string][]string, len(groups))
+	exists := make(map[string]struct{}, len(groups))
+	for _, g := range groups {
+		exists[g.DeviceID] = struct{}{}
+		if p := strings.TrimSpace(g.ParentDeviceID); p != "" {
+			children[p] = append(children[p], g.DeviceID)
+		}
+	}
+	out := make(map[string]struct{}, len(roots))
+	queue := make([]string, 0, len(roots))
+	for _, r := range roots {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		out[r] = struct{}{}
+		queue = append(queue, r)
+	}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, child := range children[cur] {
+			if _, seen := out[child]; seen {
+				continue
+			}
+			out[child] = struct{}{}
+			queue = append(queue, child)
+		}
+	}
+	return out
+}
+
+func dedupeInts(in []int) []int {
+	seen := make(map[int]struct{}, len(in))
+	out := make([]int, 0, len(in))
+	for _, v := range in {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }

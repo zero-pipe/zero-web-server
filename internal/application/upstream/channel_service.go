@@ -176,3 +176,24 @@ func (s *ChannelService) maybeAutoPush(platformID int) {
 	}
 	_ = s.PushCatalog(platformID)
 }
+
+// ListGroupShares 返回该平台已共享的业务目录节点。
+func (s *ChannelService) ListGroupShares(platformID int) ([]string, error) {
+	return s.platforms.ListGroupShares(platformID)
+}
+
+// AddGroupShares 按业务目录节点（215/216）共享，节点下通道动态跟随。
+func (s *ChannelService) AddGroupShares(platformID int, groupDeviceIDs []string) error {
+	if _, err := s.platforms.GetByID(platformID); err != nil {
+		return fmt.Errorf("平台不存在")
+	}
+	return s.platforms.AddGroupShares(platformID, groupDeviceIDs)
+}
+
+// RemoveGroupShares 取消按业务目录节点的共享。
+func (s *ChannelService) RemoveGroupShares(platformID int, groupDeviceIDs []string) error {
+	if _, err := s.platforms.GetByID(platformID); err != nil {
+		return fmt.Errorf("平台不存在")
+	}
+	return s.platforms.RemoveGroupShares(platformID, groupDeviceIDs)
+}

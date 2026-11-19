@@ -16,6 +16,7 @@ import (
 	domainptz "zero-web-server/internal/domain/ptz"
 	"zero-web-server/internal/domain/shared"
 	"zero-web-server/internal/dto"
+	applog "zero-web-server/pkg/log"
 )
 
 type View struct {
@@ -135,6 +136,8 @@ type Service struct {
 	playback *playbackapp.Service
 	ptz      *ptzapp.Service
 	onvif    *onvifapp.Service
+	// gbPrefix 返回平台前 10 位国标前缀（中心8+行业2），用于给无码设备分配国标码。
+	gbPrefix func() string
 }
 
 func NewService(
@@ -144,8 +147,12 @@ func NewService(
 	playback *playbackapp.Service,
 	ptz *ptzapp.Service,
 	onvif *onvifapp.Service,
+	gbPrefix func() string,
 ) *Service {
-	return &Service{channels: ch, groups: groups, play: play, playback: playback, ptz: ptz, onvif: onvif}
+	return &Service{
+		channels: ch, groups: groups, play: play, playback: playback,
+		ptz: ptz, onvif: onvif, gbPrefix: gbPrefix,
+	}
 }
 
 func (s *Service) GetOne(id int) (*View, error) {
@@ -489,7 +496,11 @@ func (s *Service) AddToGroup(parentID, businessGroup string, channelIDs []int) e
 	if cnt == 0 {
 		return fmt.Errorf("所有通道Id不存在")
 	}
-	return s.channels.SetGroup(parentID, businessGroup, channelIDs)
+	if err := s.channels.SetGroup(parentID, businessGroup, channelIDs); err != nil {
+		return err
+	}
+	s.ensureGBCodesByChannelIDs(channelIDs)
+	return nil
 }
 
 func (s *Service) AddToGroupByDevices(parentID, businessGroup string, deviceIDs []int) error {
@@ -518,7 +529,47 @@ func (s *Service) AddToGroupByDevices(parentID, businessGroup string, deviceIDs 
 	if cnt == 0 {
 		return fmt.Errorf("所选设备下无可用通道")
 	}
-	return s.channels.SetGroupByDataDeviceIDs(parentID, businessGroup, deviceIDs)
+	if err := s.channels.SetGroupByDataDeviceIDs(parentID, businessGroup, deviceIDs); err != nil {
+		return err
+	}
+	if list, err := s.channels.ListByDataDeviceIDs(deviceIDs); err == nil {
+		ids := make([]int, 0, len(list))
+		for _, c := range list {
+			ids = append(ids, c.ID)
+		}
+		s.ensureGBCodesByChannelIDs(ids)
+	}
+	return nil
+}
+
+// ensureGBCodesByChannelIDs 给挂入国标业务目录但还没有国标码的通道分配国标码并固化。
+// 规则：平台前 10 位 + 通道类型 131 + 网络标识 0 + 6 位序号；一个通道全局一个码，已有序号不覆盖。
+func (s *Service) ensureGBCodesByChannelIDs(channelIDs []int) {
+	if s.gbPrefix == nil {
+		return
+	}
+	prefix := strings.TrimSpace(s.gbPrefix())
+	if len(prefix) < 10 {
+		return
+	}
+	for _, id := range channelIDs {
+		ch, err := s.channels.GetByID(id)
+		if err != nil || ch == nil || strings.TrimSpace(ch.GBDeviceID) != "" {
+			continue
+		}
+		base := prefix[:10] + "131" + "0"
+		seq, err := s.channels.NextGBSeq(base)
+		if err != nil {
+			applog.Warnf("[channel] 分配国标码失败 channel=%d err=%v", id, err)
+			continue
+		}
+		code := fmt.Sprintf("%s%06d", base, seq)
+		if err := s.channels.SetGBDeviceID(id, code); err != nil {
+			applog.Warnf("[channel] 写入国标码失败 channel=%d code=%s err=%v", id, code, err)
+			continue
+		}
+		applog.Infof("[channel] 已分配国标码 channel=%d code=%s", id, code)
+	}
 }
 
 func gbGroupTypeCode(deviceID string) string {

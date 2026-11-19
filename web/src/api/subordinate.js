@@ -30,3 +30,18 @@ export function removeSubordinate(id) {
     url: `/api/v1/subordinate/delete/${id}`
   })
 }
+
+export function subordinateCatalogTree(id) {
+  return request({
+    method: 'get',
+    url: `/api/v1/subordinate/${id}/catalog/tree`
+  })
+}
+
+export function subordinateCatalog(id, params) {
+  return request({
+    method: 'get',
+    url: `/api/v1/subordinate/${id}/catalog`,
+    params
+  })
+}

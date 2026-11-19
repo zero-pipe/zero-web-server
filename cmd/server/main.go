@@ -259,7 +259,14 @@ func main() {
 	recordPlanService.Start()
 	defer recordPlanService.Stop()
 
-	commonChannelService := channelapp.NewService(channelRepo, groupRegionRepo, playService, playbackService, ptzService, onvifService)
+	gbPrefix := func() string {
+		c, err := gbSipConfigService.CurrentSIP()
+		if err != nil || len(c.ID) < 10 {
+			return ""
+		}
+		return c.ID[:10]
+	}
+	commonChannelService := channelapp.NewService(channelRepo, groupRegionRepo, playService, playbackService, ptzService, onvifService, gbPrefix)
 	groupService := groupapp.NewService(groupRegionRepo)
 	regionService := regionapp.NewService(groupRegionRepo)
 

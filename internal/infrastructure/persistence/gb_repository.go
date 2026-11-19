@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"zero-web-server/pkg/idcode"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DeviceRepository struct {
@@ -729,4 +731,48 @@ func toDomainChannel(m *model.GBDeviceChannel) *domainchannel.Channel {
 		CreateTime:           m.CreateTime,
 		UpdateTime:           m.UpdateTime,
 	}
+}
+
+// ListByDataDeviceIDs 按所属设备批量取通道。
+func (r *ChannelRepository) ListByDataDeviceIDs(dataDeviceIDs []int) ([]*domainchannel.Channel, error) {
+	if len(dataDeviceIDs) == 0 {
+		return []*domainchannel.Channel{}, nil
+	}
+	var rows []model.GBDeviceChannel
+	if err := r.db.Where("channel_type = 0 AND data_device_id IN ?", dataDeviceIDs).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainchannel.Channel, 0, len(rows))
+	for i := range rows {
+		out = append(out, toDomainChannel(&rows[i]))
+	}
+	return out, nil
+}
+
+// NextGBSeq 按 14 位前缀原子分配下一个 6 位序号（事务 + 行锁）。
+func (r *ChannelRepository) NextGBSeq(prefix string) (int, error) {
+	seq := 0
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var row model.GBCodeSeq
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("prefix = ?", prefix).First(&row).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			seq = 1
+			return tx.Create(&model.GBCodeSeq{Prefix: prefix, Next: 1}).Error
+		}
+		if err != nil {
+			return err
+		}
+		seq = int(row.Next) + 1
+		return tx.Model(&model.GBCodeSeq{}).Where("prefix = ?", prefix).Update("next", seq).Error
+	})
+	return seq, err
+}
+
+// SetGBDeviceID 写入通道国标编号。
+func (r *ChannelRepository) SetGBDeviceID(channelID int, gbDeviceID string) error {
+	return r.db.Model(&model.GBDeviceChannel{}).Where("id = ?", channelID).
+		Updates(map[string]interface{}{
+			"gb_device_id": gbDeviceID,
+			"update_time":  time.Now().Format("2006-01-02 15:04:05"),
+		}).Error
 }

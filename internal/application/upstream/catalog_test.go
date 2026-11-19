@@ -1,6 +1,10 @@
 package upstreamapp
 
-import "testing"
+import (
+	"testing"
+
+	domaintree "zero-web-server/internal/domain/tree"
+)
 
 func TestRegionNodeID(t *testing.T) {
 	cases := map[string]string{
@@ -44,5 +48,26 @@ func TestItemTypeOfID(t *testing.T) {
 	}
 	if itemTypeOfID("bad") != "node" {
 		t.Error("unknown id should be node")
+	}
+}
+
+func TestExpandGroupSubtree(t *testing.T) {
+	groups := []domaintree.Node{
+		{DeviceID: "g215", Name: "业务分组", ParentDeviceID: ""},
+		{DeviceID: "g216a", Name: "虚拟组织A", ParentDeviceID: "g215"},
+		{DeviceID: "g216b", Name: "虚拟组织B", ParentDeviceID: "g215"},
+		{DeviceID: "gother", Name: "无关", ParentDeviceID: ""},
+	}
+	got := expandGroupSubtree([]string{"g215"}, groups)
+	for _, want := range []string{"g215", "g216a", "g216b"} {
+		if _, ok := got[want]; !ok {
+			t.Fatalf("subtree missing %s: %v", want, got)
+		}
+	}
+	if _, ok := got["gother"]; ok {
+		t.Fatal("unrelated group must not be included")
+	}
+	if d := dedupeInts([]int{1, 2, 1, 3}); len(d) != 3 {
+		t.Fatalf("dedupe failed: %v", d)
 	}
 }

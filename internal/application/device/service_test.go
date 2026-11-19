@@ -182,6 +182,11 @@ func (f *fakeChannelRepo) ListByGroupParent(page, count int, query string, chann
 }
 func (f *fakeChannelRepo) ListIDsByDevice(deviceID string) ([]int, error) { return nil, nil }
 func (f *fakeChannelRepo) CountCommonByIDs(ids []int) (int64, error)      { return 0, nil }
+func (f *fakeChannelRepo) ListByDataDeviceIDs(ids []int) ([]*domainchannel.Channel, error) {
+	return nil, nil
+}
+func (f *fakeChannelRepo) NextGBSeq(prefix string) (int, error) { return 1, nil }
+func (f *fakeChannelRepo) SetGBDeviceID(id int, gb string) error { return nil }
 func (f *fakeChannelRepo) CountCommonByDataDeviceIDs(ids []int) (int64, error) {
 	return 0, nil
 }

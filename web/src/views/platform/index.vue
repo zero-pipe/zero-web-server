@@ -43,8 +43,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="transport" label="传输" width="80" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="210" fixed="right">
           <template v-slot:default="scope">
+            <el-button type="text" size="medium" @click="openSubCatalog(scope.row)">目录</el-button>
             <el-button type="text" size="medium" @click="openSubEdit(scope.row)">编辑</el-button>
             <el-button type="text" size="medium" style="color:#f56c6c" @click="deleteSub(scope.row)">删除</el-button>
           </template>
@@ -221,11 +222,13 @@
       :device-ips="deviceIps"
     />
     <shareChannel ref="shareChannel" />
+    <subordinateCatalog ref="subordinateCatalog" />
   </div>
 </template>
 
 <script>
 import shareChannel from './dialog/shareChannel.vue'
+import subordinateCatalog from './dialog/subordinateCatalog.vue'
 import platformEdit from './edit.vue'
 import { querySubordinate, addSubordinate, updateSubordinate, removeSubordinate } from '@/api/subordinate'
 import Vue from 'vue'
@@ -234,7 +237,8 @@ export default {
   name: 'Platform',
   components: {
     shareChannel,
-    platformEdit
+    platformEdit,
+    subordinateCatalog
   },
   data() {
     return {
@@ -296,6 +300,9 @@ export default {
         })
         .catch(err => this.$message.error(err || '加载下级失败'))
         .finally(() => { this.subLoading = false })
+    },
+    openSubCatalog(row) {
+      this.$refs.subordinateCatalog.openDialog(row.id, row.name)
     },
     openSubEdit(row) {
       if (row) {
