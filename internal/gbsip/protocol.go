@@ -54,6 +54,11 @@ func ValidSnapShotSessionID(id string) bool {
 	return manscdp.ValidSnapShotSessionID(id)
 }
 
+// CatalogNotifySize 估算目录通知报文字节数，用于按 MTU 分批。
+func CatalogNotifySize(platformID string, items []CatalogItem) int {
+	return len(manscdp.BuildCatalogNotify(platformID, "1", items))
+}
+
 // BuildPTZPositionQuery 构造 PTZ 精准位置查询/订阅消息体。
 func BuildPTZPositionQuery(channelID, sn string) string {
 	return manscdp.BuildPTZPositionQuery(channelID, sn)

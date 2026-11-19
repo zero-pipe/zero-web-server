@@ -28,6 +28,9 @@ type Repository interface {
 	GetGroupByID(id int) (*domaintree.Node, error)
 	QueryGroupChannels(query, parentDeviceID string) ([]domaintree.Node, error)
 	QueryRegionTree(parentID *int) ([]domaintree.Node, error)
+	// ListAllRegions / ListAllGroups 返回全部区域(0)与分组(215/216)节点，供级联目录组装。
+	ListAllRegions() ([]domaintree.Node, error)
+	ListAllGroups() ([]domaintree.Node, error)
 	GetRegionByID(id int) (*domaintree.Node, error)
 	QueryRegionChannels(parentDeviceID string) ([]domaintree.Node, error)
 	AddRegion(region *RegionRecord) error

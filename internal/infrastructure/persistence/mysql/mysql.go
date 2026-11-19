@@ -107,6 +107,8 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.Platform{},
 		&model.PlatformChannel{},
 		&model.SubordinatePlatform{},
+		&model.SubordinateCatalog{},
+		&model.PlatformCatalogSnapshot{},
 		&model.StreamPush{},
 		&model.StreamProxy{},
 		&model.CloudRecord{},

@@ -5,7 +5,6 @@ import (
 
 	domainchannel "zero-web-server/internal/domain/channel"
 	domainplatform "zero-web-server/internal/domain/platform"
-	"zero-web-server/internal/gbsip"
 	"zero-web-server/internal/port"
 )
 
@@ -35,6 +34,7 @@ type ChannelService struct {
 	platforms  domainplatform.Repository
 	channels   channelRepo
 	platformCh PlatformChannelRepository
+	nodes      catalogNodeRepo
 	sip        port.PlatformClient
 }
 
@@ -42,9 +42,13 @@ func NewChannelService(
 	platforms domainplatform.Repository,
 	channels channelRepo,
 	platformCh PlatformChannelRepository,
+	nodes catalogNodeRepo,
 	sipClient port.PlatformClient,
 ) *ChannelService {
-	return &ChannelService{platforms: platforms, channels: channels, platformCh: platformCh, sip: sipClient}
+	return &ChannelService{
+		platforms: platforms, channels: channels, platformCh: platformCh,
+		nodes: nodes, sip: sipClient,
+	}
 }
 
 func (s *ChannelService) List(platformID, page, count int, query string, hasShare *bool) ([]ChannelView, int64, error) {
@@ -152,39 +156,7 @@ func (s *ChannelService) RemoveChannelsByDevice(platformID int, deviceIDs []stri
 }
 
 func (s *ChannelService) PushCatalog(platformID int) error {
-	platform, err := s.platforms.GetByID(platformID)
-	if err != nil {
-		return fmt.Errorf("平台不存在")
-	}
-	channelIDs, err := s.platformCh.ListPlatformChannels(platformID)
-	if err != nil || len(channelIDs) == 0 {
-		return fmt.Errorf("未配置共享通道")
-	}
-	items := make([]gbsip.CatalogItem, 0, len(channelIDs))
-	for _, id := range channelIDs {
-		ch, err := s.channels.GetByID(id)
-		if err != nil {
-			continue
-		}
-		status := ch.Status
-		if status == "" {
-			status = "ON"
-		}
-		catalogID := ch.GBDeviceID
-		catalogName := ch.Name
-		if row, err := s.platformCh.GetPlatformChannel(platformID, id); err == nil && row != nil {
-			if row.CustomDeviceID != "" {
-				catalogID = row.CustomDeviceID
-			}
-			if row.CustomName != "" {
-				catalogName = row.CustomName
-			}
-		}
-		items = append(items, gbsip.CatalogItem{
-			DeviceID: catalogID, Name: catalogName, Status: status,
-		})
-	}
-	return s.sip.SendCatalogNotify(platform, items)
+	return s.pushCatalog(platformID)
 }
 
 func (s *ChannelService) UpdateCustom(platformID, channelID int, customID, customName string) error {

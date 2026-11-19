@@ -3,6 +3,7 @@ package persistence
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	domainsub "zero-web-server/internal/domain/subordinate"
 	"zero-web-server/internal/infrastructure/persistence/model"
@@ -148,4 +149,72 @@ func toSubModel(p *domainsub.Platform) *model.SubordinatePlatform {
 		CreateTime:   p.CreateTime,
 		UpdateTime:   p.UpdateTime,
 	}
+}
+
+// ---- 下级目录（级联接收）----
+
+func toCatalogEntry(m *model.SubordinateCatalog) *domainsub.CatalogEntry {
+	return &domainsub.CatalogEntry{
+		ID: m.ID, PlatformID: m.PlatformID, DeviceID: m.DeviceID, Name: m.Name,
+		ParentID: m.ParentID, TypeCode: m.TypeCode, ItemType: m.ItemType,
+		Status: m.Status, CivilCode: m.CivilCode, Manufacturer: m.Manufacturer,
+		Model: m.Model, Orphan: m.Orphan, RawJSON: m.RawJSON,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+}
+
+func (r *SubordinateRepository) ListCatalog(platformID int) ([]*domainsub.CatalogEntry, error) {
+	var rows []model.SubordinateCatalog
+	if err := r.db.Where("platform_id = ?", platformID).Order("device_id ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainsub.CatalogEntry, 0, len(rows))
+	for i := range rows {
+		out = append(out, toCatalogEntry(&rows[i]))
+	}
+	return out, nil
+}
+
+func (r *SubordinateRepository) GetCatalog(platformID int, deviceID string) (*domainsub.CatalogEntry, error) {
+	var row model.SubordinateCatalog
+	if err := r.db.Where("platform_id = ? AND device_id = ?", platformID, deviceID).First(&row).Error; err != nil {
+		return nil, err
+	}
+	return toCatalogEntry(&row), nil
+}
+
+// UpsertCatalog 按 (platform_id, device_id) 更新或插入；保留 create_time。
+func (r *SubordinateRepository) UpsertCatalog(e *domainsub.CatalogEntry) error {
+	now := time.Now().Format("2006-01-02 15:04:05")
+	var row model.SubordinateCatalog
+	err := r.db.Where("platform_id = ? AND device_id = ?", e.PlatformID, e.DeviceID).First(&row).Error
+	if err == gorm.ErrRecordNotFound {
+		row = model.SubordinateCatalog{
+			PlatformID: e.PlatformID, DeviceID: e.DeviceID, CreateTime: now,
+		}
+		e.CreateTime = now
+	} else if err != nil {
+		return err
+	}
+	row.Name = e.Name
+	row.ParentID = e.ParentID
+	row.TypeCode = e.TypeCode
+	row.ItemType = e.ItemType
+	row.Status = e.Status
+	row.CivilCode = e.CivilCode
+	row.Manufacturer = e.Manufacturer
+	row.Model = e.Model
+	row.Orphan = e.Orphan
+	row.RawJSON = e.RawJSON
+	row.UpdateTime = now
+	e.UpdateTime = now
+	if row.ID == 0 {
+		return r.db.Create(&row).Error
+	}
+	return r.db.Save(&row).Error
+}
+
+func (r *SubordinateRepository) DeleteCatalog(platformID int, deviceID string) error {
+	return r.db.Where("platform_id = ? AND device_id = ?", platformID, deviceID).
+		Delete(&model.SubordinateCatalog{}).Error
 }

@@ -13,4 +13,6 @@ func registerSubordinate(parent *gin.RouterGroup, subordinateHandler *handler.Su
 	g.POST("/add", subordinateHandler.Add)
 	g.POST("/update/:id", subordinateHandler.Update)
 	g.DELETE("/delete/:id", subordinateHandler.Delete)
+	g.GET("/:id/catalog", subordinateHandler.Catalog)
+	g.GET("/:id/catalog/tree", subordinateHandler.CatalogTree)
 }

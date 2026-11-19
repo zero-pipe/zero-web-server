@@ -340,3 +340,38 @@ func toDomainPlatform(m *model.Platform) *domainplatform.Platform {
 }
 
 func timeNow() string { return time.Now().Format("2006-01-02 15:04:05") }
+
+func (r *PlatformRepository) ListCatalogSnapshot(platformID int) ([]*domainplatform.CatalogSnapshot, error) {
+	var rows []model.PlatformCatalogSnapshot
+	if err := r.db.Where("platform_id = ?", platformID).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainplatform.CatalogSnapshot, 0, len(rows))
+	for i := range rows {
+		out = append(out, &domainplatform.CatalogSnapshot{
+			PlatformID: rows[i].PlatformID, DeviceID: rows[i].DeviceID, Name: rows[i].Name,
+			ParentID: rows[i].ParentID, ItemType: rows[i].ItemType, Status: rows[i].Status,
+			Hash: rows[i].Hash,
+		})
+	}
+	return out, nil
+}
+
+func (r *PlatformRepository) ReplaceCatalogSnapshot(platformID int, list []*domainplatform.CatalogSnapshot) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("platform_id = ?", platformID).Delete(&model.PlatformCatalogSnapshot{}).Error; err != nil {
+			return err
+		}
+		if len(list) == 0 {
+			return nil
+		}
+		rows := make([]model.PlatformCatalogSnapshot, 0, len(list))
+		for _, e := range list {
+			rows = append(rows, model.PlatformCatalogSnapshot{
+				PlatformID: platformID, DeviceID: e.DeviceID, Name: e.Name,
+				ParentID: e.ParentID, ItemType: e.ItemType, Status: e.Status, Hash: e.Hash,
+			})
+		}
+		return tx.Create(&rows).Error
+	})
+}

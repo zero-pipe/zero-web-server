@@ -77,3 +77,38 @@ func (h *SubordinateHandler) Delete(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+// Catalog GET /api/v1/subordinate/:id/catalog?query=&orphan=
+func (h *SubordinateHandler) Catalog(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的下级平台ID")
+		return
+	}
+	var orphan *bool
+	if v := c.Query("orphan"); v == "true" || v == "false" {
+		b := v == "true"
+		orphan = &b
+	}
+	list, err := h.svc.CatalogList(id, c.Query("query"), orphan)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// CatalogTree GET /api/v1/subordinate/:id/catalog/tree
+func (h *SubordinateHandler) CatalogTree(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的下级平台ID")
+		return
+	}
+	tree, err := h.svc.CatalogTree(id)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, tree)
+}

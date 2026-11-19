@@ -469,6 +469,42 @@ CREATE TABLE IF NOT EXISTS zws_subordinate_platform
     UNIQUE KEY uk_sub_gb_id (device_gb_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下级国标平台';
 
+DROP TABLE IF EXISTS zws_subordinate_catalog;
+CREATE TABLE IF NOT EXISTS zws_subordinate_catalog
+(
+    id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id  INT NOT NULL,
+    device_id    VARCHAR(50) NOT NULL COMMENT '下级目录项国标编号',
+    name         VARCHAR(255),
+    parent_id    VARCHAR(50) COMMENT '父节点国标编号',
+    type_code    VARCHAR(8) COMMENT '类型编码(11-13位)',
+    item_type    VARCHAR(16) COMMENT 'node/channel',
+    status       VARCHAR(16),
+    civil_code   VARCHAR(16),
+    manufacturer VARCHAR(128),
+    model        VARCHAR(128),
+    orphan       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '父节点不存在，未挂载',
+    raw_json     TEXT,
+    create_time  VARCHAR(50),
+    update_time  VARCHAR(50),
+    UNIQUE KEY uk_sub_catalog (platform_id, device_id),
+    KEY idx_sub_catalog_parent (parent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下级平台推送的国标目录';
+
+DROP TABLE IF EXISTS zws_platform_catalog_snapshot;
+CREATE TABLE IF NOT EXISTS zws_platform_catalog_snapshot
+(
+    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id INT NOT NULL,
+    device_id   VARCHAR(50) NOT NULL,
+    name        VARCHAR(255),
+    parent_id   VARCHAR(50),
+    item_type   VARCHAR(16),
+    status      VARCHAR(16),
+    hash        VARCHAR(64) COMMENT '内容指纹，用于差分推送',
+    UNIQUE KEY uk_plat_catalog_snap (platform_id, device_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='向上级推送目录快照';
+
 -- 对象存储对接配置（MinIO / S3），平台不自建存储
 DROP TABLE IF EXISTS zws_object_store_config;
 CREATE TABLE IF NOT EXISTS zws_object_store_config

@@ -720,6 +720,7 @@ func toDomainChannel(m *model.GBDeviceChannel) *domainchannel.Channel {
 		Parental:             m.Parental,
 		ParentID:             parentID,
 		BusinessGroupID:      bizGroup,
+		CivilCode:            strings.TrimSpace(m.GBCivilCode),
 		Longitude:            lon,
 		Latitude:             lat,
 		HasAudio:             m.HasAudio,

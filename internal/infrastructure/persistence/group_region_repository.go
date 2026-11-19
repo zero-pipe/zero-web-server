@@ -392,3 +392,37 @@ WHERE channel_type = 0 AND gb_parent_id IN ?`, nowTimeStr(), deviceIDs).Error
 }
 
 var _ domaingroupregion.Repository = (*GroupRegionRepository)(nil)
+
+// ListAllRegions 返回全部行政区划节点（device_id, name, parent_device_id）。
+func (r *GroupRegionRepository) ListAllRegions() ([]domaintree.Node, error) {
+	sql := `
+SELECT id, device_id, name, parent_id, parent_device_id,
+       CONCAT('region', id) AS tree_id, 0 AS type, 0 AS is_leaf, 'ON' AS status
+FROM zws_common_region
+ORDER BY device_id ASC`
+	var rows []domaintree.Node
+	if err := r.db.Raw(sql).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		rows = []domaintree.Node{}
+	}
+	return rows, nil
+}
+
+// ListAllGroups 返回全部业务分组(215)与虚拟组织(216)节点。
+func (r *GroupRegionRepository) ListAllGroups() ([]domaintree.Node, error) {
+	sql := `
+SELECT id, device_id, name, parent_id, parent_device_id, business_group, civil_code, alias,
+       CONCAT('group', id) AS tree_id, SUBSTRING(device_id, 11, 3) AS type, 0 AS is_leaf, 'ON' AS status
+FROM zws_common_group
+ORDER BY device_id ASC`
+	var rows []domaintree.Node
+	if err := r.db.Raw(sql).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		rows = []domaintree.Node{}
+	}
+	return rows, nil
+}

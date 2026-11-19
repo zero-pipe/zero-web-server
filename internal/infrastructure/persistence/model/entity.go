@@ -498,6 +498,41 @@ type SubordinatePlatform struct {
 
 func (SubordinatePlatform) TableName() string { return "zws_subordinate_platform" }
 
+// SubordinateCatalog 下级平台推送来的目录项（级联接收，独立于本机设备表）。
+type SubordinateCatalog struct {
+	ID           int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlatformID   int    `gorm:"column:platform_id;not null;uniqueIndex:uk_sub_catalog" json:"platformId"`
+	DeviceID     string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_sub_catalog" json:"deviceId"`
+	Name         string `gorm:"column:name;size:255" json:"name"`
+	ParentID     string `gorm:"column:parent_id;size:50;index:idx_sub_catalog_parent" json:"parentId"`
+	TypeCode     string `gorm:"column:type_code;size:8" json:"typeCode"`
+	ItemType     string `gorm:"column:item_type;size:16" json:"itemType"`
+	Status       string `gorm:"column:status;size:16" json:"status"`
+	CivilCode    string `gorm:"column:civil_code;size:16" json:"civilCode"`
+	Manufacturer string `gorm:"column:manufacturer;size:128" json:"manufacturer"`
+	Model        string `gorm:"column:model;size:128" json:"model"`
+	Orphan       bool   `gorm:"column:orphan;not null;default:0" json:"orphan"`
+	RawJSON      string `gorm:"column:raw_json;type:text" json:"rawJson"`
+	CreateTime   string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime   string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (SubordinateCatalog) TableName() string { return "zws_subordinate_catalog" }
+
+// PlatformCatalogSnapshot 记录向上级平台推送的目录快照（级联推送差分）。
+type PlatformCatalogSnapshot struct {
+	ID         int    `gorm:"column:id;primaryKey;autoIncrement"`
+	PlatformID int    `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_catalog_snap" json:"platformId"`
+	DeviceID   string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_plat_catalog_snap" json:"deviceId"`
+	Name       string `gorm:"column:name;size:255" json:"name"`
+	ParentID   string `gorm:"column:parent_id;size:50" json:"parentId"`
+	ItemType   string `gorm:"column:item_type;size:16" json:"itemType"`
+	Status     string `gorm:"column:status;size:16" json:"status"`
+	Hash       string `gorm:"column:hash;size:64" json:"hash"`
+}
+
+func (PlatformCatalogSnapshot) TableName() string { return "zws_platform_catalog_snapshot" }
+
 // Plugin 是 sidecar 插件实例注册信息。
 type Plugin struct {
 	ID               string `gorm:"column:id;primaryKey;size:128"`

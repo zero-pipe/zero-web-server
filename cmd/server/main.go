@@ -227,7 +227,7 @@ func main() {
 	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
 	platformService := upstreamapp.NewService(platformRepo, sipCfg, platformSIPClient, cfg.UserSettings.ServerID)
 	platformChannelSvc := upstreamapp.NewChannelService(
-		platformRepo, channelRepo, platformRepo, platformSIPClient,
+		platformRepo, channelRepo, platformRepo, groupRegionRepo, platformSIPClient,
 	)
 
 	gbSipConfigService.SetOnChange(func(updated config.SIPConfig, requirePre bool, _ bool) {

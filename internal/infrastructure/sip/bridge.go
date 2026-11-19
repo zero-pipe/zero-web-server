@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domaindevice "zero-web-server/internal/domain/device"
+	"zero-web-server/internal/gbsip"
 	"zero-web-server/internal/infrastructure/config"
 	redisinfra "zero-web-server/internal/infrastructure/redis"
 
@@ -23,6 +24,7 @@ type SubordinateHandler interface {
 	OnRegister(ev gbserver.RegisterEvent) error
 	OnUnregister(gbID string) error
 	OnKeepalive(gbID, ip string, port int) error
+	OnCatalog(gbID string, items []gbsip.CatalogItem, incremental bool) error
 }
 
 // bridge adapts ZWS device/alarm/position/redis into gb28181-go handlers.
@@ -200,9 +202,8 @@ func (b *bridge) OnKeepalive(_ context.Context, deviceID, ip string, port int) e
 
 func (b *bridge) OnCatalog(_ context.Context, deviceID string, items []manscdp.CatalogItem, incremental bool) error {
 	if b.subordinate != nil && b.subordinate.Known(deviceID) {
-		// 下级目录入库留给后续通道映射波次；此处先保活在线即可
 		_ = b.subordinate.OnKeepalive(deviceID, "", 0)
-		return nil
+		return b.subordinate.OnCatalog(deviceID, items, incremental)
 	}
 	return b.deviceSvc.HandleCatalog(deviceID, items, incremental)
 }

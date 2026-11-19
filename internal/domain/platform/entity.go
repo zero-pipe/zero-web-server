@@ -23,6 +23,17 @@ type Platform struct {
 	UpdateTime      string `json:"updateTime"`
 }
 
+// CatalogSnapshot 记录上一次推送给该平台的目录，用于计算 ADD/UPDATE/DEL。
+type CatalogSnapshot struct {
+	PlatformID int    `json:"platformId"`
+	DeviceID   string `json:"deviceId"`
+	Name       string `json:"name"`
+	ParentID   string `json:"parentId"`
+	ItemType   string `json:"itemType"`
+	Status     string `json:"status"`
+	Hash       string `json:"hash"`
+}
+
 type Repository interface {
 	GetByID(id int) (*Platform, error)
 	GetByServerGBID(serverGBID string) (*Platform, error)
@@ -31,6 +42,8 @@ type Repository interface {
 	Update(p *Platform) error
 	Delete(id int) error
 	UpdateStatus(id int, online bool) error
+	ListCatalogSnapshot(platformID int) ([]*CatalogSnapshot, error)
+	ReplaceCatalogSnapshot(platformID int, list []*CatalogSnapshot) error
 	ListEnabled() ([]*Platform, error)
 }
 

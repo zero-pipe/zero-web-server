@@ -15,6 +15,8 @@ type Channel struct {
 	Parental        int     `json:"parental"`
 	ParentID        string  `json:"parentId"`
 	BusinessGroupID string  `json:"businessGroupId"`
+	// CivilCode 行政区划编码（gb_civil_code，级联目录挂载用）。
+	CivilCode string `json:"civilCode"`
 	Longitude       float64 `json:"longitude"`
 	Latitude        float64 `json:"latitude"`
 	HasAudio        bool    `json:"hasAudio"`
