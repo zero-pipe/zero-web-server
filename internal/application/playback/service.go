@@ -14,6 +14,7 @@ import (
 	domainrecord "zero-web-server/internal/domain/record"
 	"zero-web-server/internal/dto"
 	"zero-web-server/internal/gbsip"
+	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/port"
 )
 
@@ -80,7 +81,10 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 		return nil, err
 	}
 	app := publishauth.LiveApp
-	stream := fmt.Sprintf("%s_%s_playback", device.DeviceID, channel.GBDeviceID)
+	stream := mediaurl.PlaybackStream(device.InternalCode, channel.InternalCode)
+	if stream == "" {
+		return nil, fmt.Errorf("设备或通道内码缺失")
+	}
 	content, err := s.startMediaInvite(ctx, device, channel, app, stream, gbsip.SessionPlayback, startTime, endTime, 0,
 		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
 			sdpIP := d.SDPIP
@@ -105,7 +109,10 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 		downloadSpeed = 4
 	}
 	app := publishauth.LiveApp
-	stream := fmt.Sprintf("%s_%s_download", device.DeviceID, channel.GBDeviceID)
+	stream := mediaurl.DownloadStream(device.InternalCode, channel.InternalCode)
+	if stream == "" {
+		return nil, fmt.Errorf("设备或通道内码缺失")
+	}
 	content, err := s.startMediaInvite(ctx, device, channel, app, stream, gbsip.SessionDownload, startTime, endTime, downloadSpeed,
 		func(d *domaindevice.Device, ch *domainchannel.Channel, rtpPort int, ssrc string, node port.MediaEndpoint) string {
 			sdpIP := d.SDPIP
@@ -123,7 +130,14 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 
 func (s *Service) StopPlayback(deviceID, channelDeviceID, stream string) error {
 	if stream == "" {
-		stream = fmt.Sprintf("%s_%s_playback", deviceID, channelDeviceID)
+		device, channel, err := s.loadDeviceChannel(deviceID, channelDeviceID)
+		if err != nil {
+			return err
+		}
+		stream = mediaurl.PlaybackStream(device.InternalCode, channel.InternalCode)
+		if stream == "" {
+			return fmt.Errorf("设备或通道内码缺失")
+		}
 	}
 	_ = s.sip.CloseInviteSession(stream)
 	if node, err := s.media.ResolveForStream(context.Background(), publishauth.LiveApp, stream, "auto"); err == nil {
@@ -135,7 +149,14 @@ func (s *Service) StopPlayback(deviceID, channelDeviceID, stream string) error {
 
 func (s *Service) StopDownload(deviceID, channelDeviceID, stream string) error {
 	if stream == "" {
-		stream = fmt.Sprintf("%s_%s_download", deviceID, channelDeviceID)
+		device, channel, err := s.loadDeviceChannel(deviceID, channelDeviceID)
+		if err != nil {
+			return err
+		}
+		stream = mediaurl.DownloadStream(device.InternalCode, channel.InternalCode)
+		if stream == "" {
+			return fmt.Errorf("设备或通道内码缺失")
+		}
 	}
 	_ = s.sip.CloseInviteSession(stream)
 	if node, err := s.media.ResolveForStream(context.Background(), publishauth.LiveApp, stream, "auto"); err == nil {

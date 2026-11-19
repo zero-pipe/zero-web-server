@@ -421,7 +421,7 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken s
 	vhost := "__defaultVhost__"
 	stream := mediaurl.LiveStream(device.InternalCode, ch.InternalCode)
 	if stream == "" {
-		stream = fmt.Sprintf("%d_%s", device.ID, sanitizeStream(ch.ProfileToken))
+		return nil, fmt.Errorf("设备或通道内码缺失")
 	}
 
 	prefer := device.MediaServerID
@@ -578,19 +578,12 @@ func (s *Service) StopPlay(ctx context.Context, channelID int64, profileToken st
 		stream = mediaurl.LiveStream(dev.InternalCode, ch.InternalCode)
 	}
 	if stream == "" {
-		stream = fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken))
+		return fmt.Errorf("设备或通道内码缺失")
 	}
 	if node, err := s.media.ResolveForStream(ctx, app, stream, "auto"); err == nil {
 		s.resetONVIFStream(ctx, vhost, app, stream, node)
 	}
 	s.media.UnbindStream(app, stream)
-	// 兼容旧命名（数字设备 ID + ProfileToken）。
-	if legacy := fmt.Sprintf("%d_%s", ch.DeviceID, sanitizeStream(ch.ProfileToken)); legacy != stream {
-		if node, err := s.media.ResolveForStream(ctx, mediaurl.LiveApp, legacy, "auto"); err == nil {
-			s.resetONVIFStream(ctx, vhost, mediaurl.LiveApp, legacy, node)
-		}
-		s.media.UnbindStream(mediaurl.LiveApp, legacy)
-	}
 	return nil
 }
 

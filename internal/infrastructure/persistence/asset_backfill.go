@@ -429,7 +429,7 @@ func (p *AssetProjector) upsertBinding(deviceID, protocol, mode, externalID, end
 	now := nowText()
 	if err == gorm.ErrRecordNotFound {
 		return p.db.Create(&model.AccessBinding{
-			ID: uuid.NewString(), DeviceID: deviceID, Protocol: protocol, Mode: mode,
+			ID: stableID("binding", deviceID), DeviceID: deviceID, Protocol: protocol, Mode: mode,
 			ExternalID: externalID, Endpoint: endpoint, PluginInstanceID: pluginInstance,
 			ConfigJSON: cfg, Status: status, LegacyDeviceID: legacyDeviceID,
 			CreateTime: now, UpdateTime: now,
@@ -538,7 +538,8 @@ func (p *AssetProjector) legacyID(table, legacyID string) (string, error) {
 	var ref model.UnifiedRef
 	err := p.db.Where("legacy_table = ? AND legacy_id = ?", table, legacyID).First(&ref).Error
 	if err == gorm.ErrRecordNotFound {
-		return uuid.NewString(), nil
+		// 映射丢失时使用确定性 ID，避免同一 legacy 记录在重复投影中生成不同 UUID。
+		return stableID("legacy", table, legacyID), nil
 	}
 	if err != nil {
 		return "", err

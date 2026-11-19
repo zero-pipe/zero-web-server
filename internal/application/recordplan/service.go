@@ -111,7 +111,8 @@ func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
 	app := mediaurl.LiveApp
 	stream := mediaurl.LiveStream(ch.DeviceInternalCode, ch.InternalCode)
 	if stream == "" {
-		stream = fmt.Sprintf("%s_%s", ch.DeviceID, ch.GBDeviceID)
+		applog.Warnf("[record-plan] skip channel=%d: device/channel internal code missing", ch.ID)
+		return
 	}
 	s.publish.EnableMP4(app, stream)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

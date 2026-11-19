@@ -13,17 +13,30 @@ const LiveApp = "live"
 
 // LiveStream 统一流标识：<设备内码>_<通道内码>。
 // 设备内码/通道内码是平台归一化身份；协议侧标识（国标码、通道号、ProfileToken）不参与流命名。
+// 任一内码缺失时返回空串，调用方必须拒绝播放，禁止回退协议标识。
 func LiveStream(deviceInternalCode, channelInternalCode string) string {
 	d := strings.TrimSpace(deviceInternalCode)
 	c := strings.TrimSpace(channelInternalCode)
-	switch {
-	case d != "" && c != "":
-		return d + "_" + c
-	case d != "":
-		return d
-	default:
-		return c
+	if d == "" || c == "" {
+		return ""
 	}
+	return d + "_" + c
+}
+
+// PlaybackStream 回放流标识：<设备内码>_<通道内码>_playback。
+func PlaybackStream(deviceInternalCode, channelInternalCode string) string {
+	if base := LiveStream(deviceInternalCode, channelInternalCode); base != "" {
+		return base + "_playback"
+	}
+	return ""
+}
+
+// DownloadStream 下载流标识：<设备内码>_<通道内码>_download。
+func DownloadStream(deviceInternalCode, channelInternalCode string) string {
+	if base := LiveStream(deviceInternalCode, channelInternalCode); base != "" {
+		return base + "_download"
+	}
+	return ""
 }
 
 // BuildGB28181PushURL 国标收流地址摘要（UDP 或 TCP 被动 listen 端口）。
