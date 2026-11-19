@@ -49,6 +49,7 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		redis:     redis,
 		password:  password,
 		serverID:  serverID,
+		redirect:  cfg.RedirectContact,
 	}
 	libCfg := toLibConfig(cfg, serverID, false)
 	libCfg.Password = password
@@ -58,6 +59,7 @@ func NewServer(cfg config.SIPConfig, serverID, password string, deviceSvc Device
 		Message:        b,
 		Telemetry:      telemetryBridge{b: b},
 		CascadeInbound: b,
+		Redirect:       b,
 	})
 	if err != nil {
 		return nil, err
@@ -86,6 +88,7 @@ func (s *Server) ApplyConfig(cfg config.SIPConfig) {
 	s.cfg = cfg
 	libCfg := toLibConfig(cfg, s.bridge.serverID, s.lib.Config().RequirePreRegister)
 	s.bridge.password = cfg.Password
+	s.bridge.redirect = cfg.RedirectContact
 	s.lib.ApplyConfig(libCfg)
 	s.sipCfg = libCfg
 }

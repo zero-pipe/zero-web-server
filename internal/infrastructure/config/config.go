@@ -43,6 +43,9 @@ type SIPConfig struct {
 	ID       string `mapstructure:"id"`
 	Password string `mapstructure:"password"`
 	Alarm    bool   `mapstructure:"alarm"`
+	// RedirectContact 非空时作为 2022 注册重定向入口，把设备 REGISTER 以 302
+	// 指向该 Contact（格式 sip:<服务器编码>@<IP>:<端口>）。
+	RedirectContact string `mapstructure:"redirect_contact"`
 }
 
 type ServerConfig struct {

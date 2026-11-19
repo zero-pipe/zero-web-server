@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	domaindevice "zero-web-server/internal/domain/device"
@@ -32,6 +33,7 @@ type bridge struct {
 	alarm       AlarmHandler
 	position    PositionHandler
 	media       MediaHandler
+	redirect    string
 	redis       *redisinfra.Client
 	password    string
 	serverID    string
@@ -53,6 +55,15 @@ func (b *bridge) ResolvePassword(deviceID string) (string, bool, error) {
 		return d.Password, true, nil
 	}
 	return b.password, true, nil
+}
+
+// Redirect implements gbserver.RedirectPolicy: when configured, every device
+// is told to register at another server (2022 §9.1.2.3).
+func (b *bridge) Redirect(deviceID string) (string, int, bool) {
+	if strings.TrimSpace(b.redirect) == "" {
+		return "", 0, false
+	}
+	return b.redirect, 0, true
 }
 
 func (b *bridge) OnRegister(ctx context.Context, ev gbserver.RegisterEvent) error {
