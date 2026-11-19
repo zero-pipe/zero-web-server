@@ -17,4 +17,7 @@ func registerRegion(parent *gin.RouterGroup, regionHandler *handler.RegionHandle
 	g.GET("/description", regionHandler.Description)
 	g.GET("/addByCivilCode", regionHandler.AddByCivilCode)
 	g.GET("/base/child/list", regionHandler.BaseChildList)
+	g.GET("/code_mapping/list", regionHandler.CodeMappingList)
+	g.POST("/code_mapping/save", regionHandler.CodeMappingSave)
+	g.DELETE("/code_mapping/delete", regionHandler.CodeMappingDelete)
 }

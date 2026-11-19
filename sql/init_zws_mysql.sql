@@ -521,6 +521,14 @@ CREATE TABLE IF NOT EXISTS zws_gb_code_seq
     next   BIGINT NOT NULL DEFAULT 0 COMMENT '已分配的最大序号'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标码序号分配';
 
+DROP TABLE IF EXISTS zws_region_code_mapping;
+CREATE TABLE IF NOT EXISTS zws_region_code_mapping
+(
+    region_device_id VARCHAR(50) NOT NULL PRIMARY KEY COMMENT '区划编号',
+    gb_code          VARCHAR(20) NOT NULL COMMENT '对外国标码',
+    update_time      VARCHAR(50)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='区划节点对外编码映射';
+
 -- 对象存储对接配置（MinIO / S3），平台不自建存储
 DROP TABLE IF EXISTS zws_object_store_config;
 CREATE TABLE IF NOT EXISTS zws_object_store_config

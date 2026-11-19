@@ -111,6 +111,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.PlatformCatalogSnapshot{},
 		&model.PlatformGroupShare{},
 		&model.GBCodeSeq{},
+		&model.RegionCodeMapping{},
 		&model.StreamPush{},
 		&model.StreamProxy{},
 		&model.CloudRecord{},

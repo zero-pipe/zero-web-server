@@ -550,6 +550,15 @@ type GBCodeSeq struct {
 
 func (GBCodeSeq) TableName() string { return "zws_gb_code_seq" }
 
+// RegionCodeMapping 区划节点对外国标码映射（公安等上级指定编码场景）。
+type RegionCodeMapping struct {
+	RegionDeviceID string `gorm:"column:region_device_id;primaryKey;size:50" json:"regionDeviceId"`
+	GBCode         string `gorm:"column:gb_code;size:20" json:"gbCode"`
+	UpdateTime     string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (RegionCodeMapping) TableName() string { return "zws_region_code_mapping" }
+
 // Plugin 是 sidecar 插件实例注册信息。
 type Plugin struct {
 	ID               string `gorm:"column:id;primaryKey;size:128"`

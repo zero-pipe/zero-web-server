@@ -426,3 +426,47 @@ ORDER BY device_id ASC`
 	}
 	return rows, nil
 }
+
+// GetRegionByDeviceID 按区划/国标编号查节点。
+func (r *GroupRegionRepository) GetRegionByDeviceID(deviceID string) (*domaintree.Node, error) {
+	var row struct {
+		ID             int    `gorm:"column:id"`
+		DeviceID       string `gorm:"column:device_id"`
+		Name           string `gorm:"column:name"`
+		ParentDM       string `gorm:"column:parent_device_id"`
+	}
+	if err := r.db.Raw(`SELECT id, device_id, name, COALESCE(parent_device_id,'') AS parent_dm
+FROM zws_common_region WHERE device_id = ?`, deviceID).Scan(&row).Error; err != nil {
+		return nil, err
+	}
+	if row.ID == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return &domaintree.Node{ID: row.ID, DeviceID: row.DeviceID, Name: row.Name, ParentDeviceID: row.ParentDM}, nil
+}
+
+// ListRegionCodeMappings 返回全部区划编码映射。
+func (r *GroupRegionRepository) ListRegionCodeMappings() ([]*domaingroupregion.RegionCodeMapping, error) {
+	var rows []domaingroupregion.RegionCodeMapping
+	if err := r.db.Raw(`SELECT region_device_id, gb_code FROM zws_region_code_mapping`).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domaingroupregion.RegionCodeMapping, 0, len(rows))
+	for i := range rows {
+		out = append(out, &rows[i])
+	}
+	return out, nil
+}
+
+// UpsertRegionCodeMapping 写入/更新映射。
+func (r *GroupRegionRepository) UpsertRegionCodeMapping(m *domaingroupregion.RegionCodeMapping) error {
+	return r.db.Exec(`INSERT INTO zws_region_code_mapping (region_device_id, gb_code, update_time)
+VALUES (?, ?, ?)
+ON DUPLICATE KEY UPDATE gb_code = VALUES(gb_code), update_time = VALUES(update_time)`,
+		m.RegionDeviceID, m.GBCode, nowTimeStr()).Error
+}
+
+// DeleteRegionCodeMapping 删除映射（恢复默认推导）。
+func (r *GroupRegionRepository) DeleteRegionCodeMapping(regionDeviceID string) error {
+	return r.db.Exec(`DELETE FROM zws_region_code_mapping WHERE region_device_id = ?`, regionDeviceID).Error
+}

@@ -63,6 +63,8 @@
             <el-button plain type="warning" @click="showUnusualChanel()">
               异常挂载通道
             </el-button>
+            <el-button plain @click="openBuild">按区划建树</el-button>
+            <el-button plain @click="openMapping">编码映射</el-button>
           </el-form-item>
           <el-form-item >
             <el-button icon="el-icon-refresh-right" circle @click="getChannelList()" />
@@ -124,6 +126,50 @@
     </div>
     <GbChannelSelect ref="gbChannelSelect" data-type="civilCode" />
     <UnusualRegionChannelSelect ref="unusualRegionChannelSelect" />
+    <el-dialog title="按行政区划建树" :visible.sync="buildDialog" width="460px" @open="loadProvinces">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px;"
+        title="选择到需要的层级后确认，系统会自动补齐上级区划节点（已存在的跳过）。" />
+      <el-form label-width="90px" size="small">
+        <el-form-item label="省/直辖市">
+          <el-select v-model="selProv" filterable placeholder="请选择" style="width:100%;" @change="onProvChange">
+            <el-option v-for="p in provList" :key="p.deviceId" :label="p.name" :value="p.deviceId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="市/地区">
+          <el-select v-model="selCity" filterable placeholder="可选" clearable style="width:100%;" @change="onCityChange">
+            <el-option v-for="c in cityList" :key="c.deviceId" :label="c.name" :value="c.deviceId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="区/县">
+          <el-select v-model="selDist" filterable placeholder="可选" clearable style="width:100%;">
+            <el-option v-for="d in distList" :key="d.deviceId" :label="d.name" :value="d.deviceId" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button size="small" @click="buildDialog = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="buildLoading" @click="confirmBuild">确定建树</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog title="区划节点对外编码映射" :visible.sync="mappingDialog" width="640px" @open="loadMappings">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px;"
+        title="上级平台（如省厅）指定区划节点国标码时在此配置；未配置则按 区划码补0+00+216+0+000000 推导。" />
+      <el-form :inline="true" size="mini">
+        <el-form-item label="区划编号"><el-input v-model="mappingForm.regionDeviceId" placeholder="如 530102" style="width:140px;" /></el-form-item>
+        <el-form-item label="对外国标码"><el-input v-model="mappingForm.gbCode" placeholder="20位" maxlength="20" style="width:220px;" /></el-form-item>
+        <el-form-item><el-button type="primary" size="mini" @click="saveMapping">保存</el-button></el-form-item>
+      </el-form>
+      <el-table size="small" :data="mappingList" height="320">
+        <el-table-column prop="regionDeviceId" label="区划编号" width="160" />
+        <el-table-column prop="gbCode" label="对外国标码" />
+        <el-table-column label="操作" width="80">
+          <template v-slot:default="scope">
+            <el-button type="text" style="color:#f56c6c" @click="deleteMapping(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -131,6 +177,7 @@
 import RegionTree from '../..//common/RegionTree.vue'
 import GbChannelSelect from '../../dialog/GbChannelSelect.vue'
 import UnusualRegionChannelSelect from './UnusualRegionChannelSelect.vue'
+import { addByCivilCode, queryChildListInBase, codeMappingList, saveCodeMapping, deleteCodeMapping } from '@/api/region'
 
 export default {
   name: 'Region',
@@ -154,7 +201,18 @@ export default {
       regionId: '',
       regionDeviceId: '',
       regionParents: [],
-      multipleSelection: []
+      multipleSelection: [],
+      buildDialog: false,
+      buildLoading: false,
+      provList: [],
+      cityList: [],
+      distList: [],
+      selProv: '',
+      selCity: '',
+      selDist: '',
+      mappingDialog: false,
+      mappingList: [],
+      mappingForm: { regionDeviceId: '', gbCode: '' }
     }
   },
 
@@ -165,6 +223,70 @@ export default {
   destroyed() {
   },
   methods: {
+    openBuild() {
+      this.selProv = ''
+      this.selCity = ''
+      this.selDist = ''
+      this.cityList = []
+      this.distList = []
+      this.buildDialog = true
+    },
+    async loadProvinces() {
+      const res = await queryChildListInBase('')
+      this.provList = res.data || []
+    },
+    async onProvChange(code) {
+      this.selCity = ''
+      this.selDist = ''
+      this.distList = []
+      const res = await queryChildListInBase(code)
+      this.cityList = res.data || []
+    },
+    async onCityChange(code) {
+      this.selDist = ''
+      const res = await queryChildListInBase(code)
+      this.distList = res.data || []
+    },
+    async confirmBuild() {
+      const code = this.selDist || this.selCity || this.selProv
+      if (!code) {
+        this.$message.warning('请至少选择省级')
+        return
+      }
+      this.buildLoading = true
+      try {
+        const res = await addByCivilCode(code)
+        const created = (res.data || []).length
+        this.$message.success(created > 0 ? `已创建 ${created} 个区划节点` : '区划节点已存在')
+        this.buildDialog = false
+        if (this.$refs.regionTree && this.$refs.regionTree.loadTree) {
+          this.$refs.regionTree.loadTree(null)
+        }
+      } finally {
+        this.buildLoading = false
+      }
+    },
+    openMapping() {
+      this.mappingDialog = true
+    },
+    async loadMappings() {
+      const res = await codeMappingList()
+      this.mappingList = res.data || []
+    },
+    async saveMapping() {
+      if (!this.mappingForm.regionDeviceId || !this.mappingForm.gbCode) {
+        this.$message.warning('请填写区划编号与国标码')
+        return
+      }
+      await saveCodeMapping(this.mappingForm)
+      this.$message.success('已保存')
+      this.mappingForm = { regionDeviceId: '', gbCode: '' }
+      this.loadMappings()
+    },
+    async deleteMapping(row) {
+      await deleteCodeMapping(row.regionDeviceId)
+      this.loadMappings()
+    },
     initData: function() {
       this.getChannelList()
     },

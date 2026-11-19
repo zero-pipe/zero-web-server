@@ -94,3 +94,15 @@ export function queryTree(params) {
   })
 }
 
+
+export function codeMappingList() {
+  return request({ method: 'get', url: '/api/v1/region/code_mapping/list' })
+}
+
+export function saveCodeMapping(data) {
+  return request({ method: 'post', url: '/api/v1/region/code_mapping/save', data })
+}
+
+export function deleteCodeMapping(regionDeviceId) {
+  return request({ method: 'delete', url: '/api/v1/region/code_mapping/delete', params: { regionDeviceId } })
+}

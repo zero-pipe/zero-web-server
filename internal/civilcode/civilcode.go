@@ -148,3 +148,22 @@ func GetDescription(code string) string {
 	}
 	return ""
 }
+
+// Ancestors 返回从根到指定编码的完整链路（含自身），用于按区划一键建树。
+func Ancestors(code string) []RegionItem {
+	ensureLoaded()
+	code = strings.TrimSpace(code)
+	e, ok := byCode[code]
+	if !ok {
+		return nil
+	}
+	chain := []RegionItem{{DeviceID: e.Code, Name: e.Name, ParentDeviceID: e.ParentCode}}
+	for parent := e.ParentCode; parent != ""; parent = byCode[parent].ParentCode {
+		p, ok := byCode[parent]
+		if !ok {
+			break
+		}
+		chain = append([]RegionItem{{DeviceID: p.Code, Name: p.Name, ParentDeviceID: p.ParentCode}}, chain...)
+	}
+	return chain
+}

@@ -8,6 +8,7 @@ import (
 
 	domainchannel "zero-web-server/internal/domain/channel"
 	domainplatform "zero-web-server/internal/domain/platform"
+	domaingroupregion "zero-web-server/internal/domain/groupregion"
 	domaintree "zero-web-server/internal/domain/tree"
 	"zero-web-server/internal/gbsip"
 )
@@ -16,6 +17,7 @@ import (
 type catalogNodeRepo interface {
 	ListAllRegions() ([]domaintree.Node, error)
 	ListAllGroups() ([]domaintree.Node, error)
+	ListRegionCodeMappings() ([]*domaingroupregion.RegionCodeMapping, error)
 }
 
 // catalogBatchSize 单条目录通知最大条目（附录 N 建议触发阈值 100 条）。
@@ -70,6 +72,20 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 	}
 	regions, _ := s.nodes.ListAllRegions()
 	groups, _ := s.nodes.ListAllGroups()
+	regionCodes := make(map[string]string)
+	if maps, err := s.nodes.ListRegionCodeMappings(); err == nil {
+		for _, m := range maps {
+			if len(strings.TrimSpace(m.GBCode)) == 20 {
+				regionCodes[strings.TrimSpace(m.RegionDeviceID)] = strings.TrimSpace(m.GBCode)
+			}
+		}
+	}
+	resolveRegionID := func(code string) string {
+		if mapped, ok := regionCodes[strings.TrimSpace(code)]; ok {
+			return mapped
+		}
+		return regionNodeID(code)
+	}
 
 	// 按业务目录（215/216 分组）共享：展开子树，把节点下所有通道纳入本次目录。
 	if shares, err := s.platforms.ListGroupShares(platformID); err == nil && len(shares) > 0 {
@@ -108,7 +124,7 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 		if !ok {
 			return
 		}
-		id := regionNodeID(code)
+		id := resolveRegionID(code)
 		if id == "" {
 			return
 		}
@@ -122,7 +138,7 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 			CivilCode: civilCodeOf(code),
 		}
 		if parent := strings.TrimSpace(region.ParentDeviceID); parent != "" {
-			item.ParentID = regionNodeID(parent)
+			item.ParentID = resolveRegionID(parent)
 			addRegionChain(parent, d+1)
 		}
 		nodes[id] = item
@@ -155,7 +171,7 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 			item.ParentID = parent
 			addGroupChain(parent, d+1)
 		case g.CivilCode != "":
-			if rid := regionNodeID(g.CivilCode); rid != "" {
+			if rid := resolveRegionID(g.CivilCode); rid != "" {
 				if _, ok := regionBy[g.CivilCode]; ok {
 					item.ParentID = rid
 					addRegionChain(g.CivilCode, d+1)
@@ -179,7 +195,7 @@ func (s *ChannelService) buildCatalog(platformID int) ([]gbsip.CatalogItem, erro
 			continue
 		}
 		seenCh[ch.GBDeviceID] = struct{}{}
-		channels = append(channels, s.channelItem(platformID, ch, groupBy, regionBy, addGroupChain, addRegionChain))
+		channels = append(channels, s.channelItem(platformID, ch, groupBy, regionBy, resolveRegionID, addGroupChain, addRegionChain))
 	}
 
 	// 计算是否有子节点（Parental），并按深度降序输出（祖先在前）。
@@ -233,6 +249,7 @@ func (s *ChannelService) channelItem(
 	platformID int,
 	ch *domainchannel.Channel,
 	groupBy, regionBy map[string]domaintree.Node,
+	resolveRegionID func(string) string,
 	addGroupChain func(string, int),
 	addRegionChain func(string, int),
 ) gbsip.CatalogItem {
@@ -272,7 +289,7 @@ func (s *ChannelService) channelItem(
 	}
 	if code := strings.TrimSpace(ch.CivilCode); code != "" {
 		if _, ok := regionBy[code]; ok {
-			item.ParentID = regionNodeID(code)
+			item.ParentID = resolveRegionID(code)
 			addRegionChain(code, 1)
 		}
 	}

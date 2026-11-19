@@ -23,6 +23,12 @@ type RegionRecord struct {
 	ParentDeviceID string `json:"parentDeviceId"`
 }
 
+// RegionCodeMapping 区划节点对外国标码映射（为空则按默认规则推导）。
+type RegionCodeMapping struct {
+	RegionDeviceID string `json:"regionDeviceId"`
+	GBCode         string `json:"gbCode"`
+}
+
 type Repository interface {
 	QueryGroupTree(query string, parentID *int) ([]domaintree.Node, error)
 	GetGroupByID(id int) (*domaintree.Node, error)
@@ -34,6 +40,12 @@ type Repository interface {
 	GetRegionByID(id int) (*domaintree.Node, error)
 	QueryRegionChannels(parentDeviceID string) ([]domaintree.Node, error)
 	AddRegion(region *RegionRecord) error
+	// GetRegionByDeviceID 按国标/区划编号查节点（一键建树去重用）。
+	GetRegionByDeviceID(deviceID string) (*domaintree.Node, error)
+	// 区划节点对外编码映射（公安等场景上级指定编码）。
+	ListRegionCodeMappings() ([]*RegionCodeMapping, error)
+	UpsertRegionCodeMapping(m *RegionCodeMapping) error
+	DeleteRegionCodeMapping(regionDeviceID string) error
 	UpdateRegion(region *RegionRecord) error
 	GetGroupRecordByID(id int) (*GroupRecord, error)
 	AddBusinessGroup(group *GroupRecord) error
