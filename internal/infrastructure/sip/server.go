@@ -3,6 +3,7 @@ package sipinfra
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	domainchannel "zero-web-server/internal/domain/channel"
@@ -27,6 +28,11 @@ type AlarmHandler interface {
 
 type PositionHandler interface {
 	HandleNotify(deviceID, channelGBID string, pos *MobilePositionNotify) error
+}
+
+// MediaHandler receives GB28181 MediaStatus (File to End) notifications.
+type MediaHandler interface {
+	HandleMediaStatus(deviceID, channelGBID, notifyType string) error
 }
 
 // Server wraps gb28181-go platform SIP server with ZWS domain adapters.
@@ -68,6 +74,7 @@ func (s *Server) SetRequirePreRegister(v bool) {
 
 func (s *Server) SetAlarmHandler(h AlarmHandler)             { s.bridge.alarm = h }
 func (s *Server) SetPositionHandler(h PositionHandler)       { s.bridge.position = h }
+func (s *Server) SetMediaHandler(h MediaHandler)             { s.bridge.media = h }
 func (s *Server) SetSubordinateHandler(h SubordinateHandler) { s.bridge.subordinate = h }
 func (s *Server) SetCascadeInbound(h gbserver.CascadeInboundHandler) {
 	s.bridge.cascade = h
@@ -202,6 +209,84 @@ func (s *Server) SendConfigDownloadQuery(device *domaindevice.Device, configType
 	}
 	return s.lib.SendConfigDownloadQuery(toPeer(device), configType)
 }
+
+// SendAlarmCmd 发送报警复位（AlarmCmd=ResetAlarm）。
+func (s *Server) SendAlarmCmd(device *domaindevice.Device, channelID, alarmCmd string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	sn, ch := s.lib.SendAlarmCmd(toPeer(device), target, alarmCmd)
+	go func() {
+		if res, ok := <-ch; ok {
+			log.Printf("[gb28181] AlarmCmd result: sn=%s device=%s result=%s", sn, target, res.Result)
+		}
+	}()
+	return nil
+}
+
+// SendTeleBoot 发送远程重启。
+func (s *Server) SendTeleBoot(device *domaindevice.Device, channelID string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	sn, ch := s.lib.SendTeleBoot(toPeer(device), target)
+	go func() {
+		if res, ok := <-ch; ok {
+			log.Printf("[gb28181] TeleBoot result: sn=%s device=%s result=%s", sn, target, res.Result)
+		}
+	}()
+	return nil
+}
+
+// SendIFrameCmd 发送强制关键帧。
+func (s *Server) SendIFrameCmd(device *domaindevice.Device, channelID string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	sn, ch := s.lib.SendIFrameCmd(toPeer(device), target)
+	go func() {
+		if res, ok := <-ch; ok {
+			log.Printf("[gb28181] IFrame result: sn=%s device=%s result=%s", sn, target, res.Result)
+		}
+	}()
+	return nil
+}
+
+// SendDeviceStatusQuery 查询设备状态，返回 SN 与转换后的结果通道。
+func (s *Server) SendDeviceStatusQuery(device *domaindevice.Device) (string, <-chan port.GBDeviceStatus) {
+	sn, raw := s.lib.SendDeviceStatusQuery(toPeer(device))
+	out := make(chan port.GBDeviceStatus, 1)
+	go func() {
+		defer close(out)
+		st, ok := <-raw
+		if !ok || st == nil {
+			return
+		}
+		out <- port.GBDeviceStatus{
+			Online:     st.Online,
+			Status:     st.Status,
+			Encode:     st.Encode,
+			Record:     st.Record,
+			DeviceTime: st.DeviceTime,
+		}
+	}()
+	return sn, out
+}
+
+// CancelDeviceStatusQuery 取消未应答的状态查询。
+func (s *Server) CancelDeviceStatusQuery(sn string) { s.lib.CancelDeviceStatusQuery(sn) }
 
 func (s *Server) SendAudioBroadcast(device *domaindevice.Device, channelGBID string) error {
 	return s.lib.SendAudioBroadcast(toPeer(device), channelGBID)

@@ -13,7 +13,9 @@ type DeviceLifecycle interface {
 	Offline(device *domaindevice.Device) error
 	SaveRegister(device *domaindevice.Device) (*domaindevice.Device, error)
 	HandleKeepalive(deviceID, ip string, port int) error
-	HandleCatalog(deviceID string, items []gbsip.CatalogItem) error
+	// HandleCatalog 处理设备目录。incremental=true 表示增量 NOTIFY（按 item.Event
+	// 增/改/删单条，不影响其它通道）；false 表示查询应答全量（整表重建）。
+	HandleCatalog(deviceID string, items []gbsip.CatalogItem, incremental bool) error
 	HandleDeviceInfo(deviceID, name, manufacturer, model, firmware string) error
 	OnDeviceOnline(device *domaindevice.Device)
 }

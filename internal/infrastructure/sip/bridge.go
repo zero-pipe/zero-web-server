@@ -31,6 +31,7 @@ type bridge struct {
 	cascade     gbserver.CascadeInboundHandler
 	alarm       AlarmHandler
 	position    PositionHandler
+	media       MediaHandler
 	redis       *redisinfra.Client
 	password    string
 	serverID    string
@@ -150,13 +151,13 @@ func (b *bridge) OnKeepalive(_ context.Context, deviceID, ip string, port int) e
 	return b.deviceSvc.HandleKeepalive(deviceID, ip, port)
 }
 
-func (b *bridge) OnCatalog(_ context.Context, deviceID string, items []manscdp.CatalogItem) error {
+func (b *bridge) OnCatalog(_ context.Context, deviceID string, items []manscdp.CatalogItem, incremental bool) error {
 	if b.subordinate != nil && b.subordinate.Known(deviceID) {
 		// 下级目录入库留给后续通道映射波次；此处先保活在线即可
 		_ = b.subordinate.OnKeepalive(deviceID, "", 0)
 		return nil
 	}
-	return b.deviceSvc.HandleCatalog(deviceID, items)
+	return b.deviceSvc.HandleCatalog(deviceID, items, incremental)
 }
 
 func (b *bridge) OnDeviceInfo(_ context.Context, deviceID, name, manufacturer, model, firmware string) error {
@@ -173,9 +174,10 @@ func (b *bridge) OnDeviceStatus(_ context.Context, deviceID string, status *mans
 }
 
 func (b *bridge) OnMediaStatus(_ context.Context, deviceID string, status *manscdp.MediaStatusNotify) error {
-	_ = deviceID
-	_ = status
-	return nil
+	if b.media == nil || status == nil {
+		return nil
+	}
+	return b.media.HandleMediaStatus(deviceID, status.DeviceID, status.NotifyType)
 }
 
 func (b *bridge) OnDeviceControlResult(_ context.Context, deviceID, sn, result string) error {

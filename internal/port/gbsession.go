@@ -60,8 +60,22 @@ type GBDeviceControl interface {
 	SendHomePosition(device *domaindevice.Device, channelID string, enabled, resetTime, presetIndex int) error
 	SendBasicParamConfig(device *domaindevice.Device, name string, expiration, heartBeatInterval, heartBeatCount, positionCapability int) error
 	SendConfigDownloadQuery(device *domaindevice.Device, configType string) error
+	SendAlarmCmd(device *domaindevice.Device, channelID, alarmCmd string) error
+	SendTeleBoot(device *domaindevice.Device, channelID string) error
+	SendIFrameCmd(device *domaindevice.Device, channelID string) error
+	SendDeviceStatusQuery(device *domaindevice.Device) (string, <-chan GBDeviceStatus)
+	CancelDeviceStatusQuery(sn string)
 	SendSubscribe(device *domaindevice.Device, eventType, body string, expiresSec int) error
 	SendSubscribeCancel(device *domaindevice.Device, eventType, body string) error
+}
+
+// GBDeviceStatus 是 DeviceStatus 查询应答（9.3 / A.2.4.2）。
+type GBDeviceStatus struct {
+	Online     string `json:"online"`
+	Status     string `json:"status"`
+	Encode     string `json:"encode"`
+	Record     string `json:"record"`
+	DeviceTime string `json:"deviceTime"`
 }
 
 // GBSession 是 GB28181 SIP 能力的组合端口。

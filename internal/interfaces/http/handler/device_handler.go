@@ -356,3 +356,63 @@ func parseIntQuery(c *gin.Context, key string, def int) int {
 	}
 	return v
 }
+
+// AlarmReset GET /api/device/control/alarm_reset?deviceId=&channelId=
+func (h *DeviceHandler) AlarmReset(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	if err := h.svc.AlarmReset(deviceID, channelID); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// TeleBoot GET /api/device/control/teleboot?deviceId=&channelId=
+func (h *DeviceHandler) TeleBoot(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	if err := h.svc.TeleBoot(deviceID, channelID); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// IFrame GET /api/device/control/iframe?deviceId=&channelId=
+func (h *DeviceHandler) IFrame(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	if err := h.svc.IFrame(deviceID, channelID); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DeviceStatus GET /api/device/query/devices/:deviceId/status
+func (h *DeviceHandler) DeviceStatus(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Param("deviceId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	st, err := h.svc.QueryDeviceStatus(deviceID)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, st)
+}

@@ -42,7 +42,7 @@ func (s *Service) Add(p *domainplatform.Platform) error {
 		return err
 	}
 	if p.Enable {
-		go s.registerPlatform(p)
+		s.registerPlatform(p)
 	}
 	return nil
 }
@@ -54,7 +54,7 @@ func (s *Service) Update(p *domainplatform.Platform) error {
 	}
 	s.stopKeepalive(p.ID)
 	if p.Enable {
-		go s.registerPlatform(p)
+		s.registerPlatform(p)
 	} else {
 		_ = s.platforms.UpdateStatus(p.ID, false)
 	}
@@ -81,44 +81,106 @@ func (s *Service) ApplySIPConfig(cfg config.SIPConfig) {
 }
 
 func (s *Service) registerPlatform(p *domainplatform.Platform) {
-	if err := s.sip.Register(p); err != nil {
-		_ = s.platforms.UpdateStatus(p.ID, false)
-		return
-	}
-	_ = s.platforms.UpdateStatus(p.ID, true)
-	s.startKeepalive(p)
+	go s.runPlatform(p)
 }
 
-func (s *Service) startKeepalive(p *domainplatform.Platform) {
+// Registration lifecycle constants (01-§1): refresh before expiry, and retry
+// a failed REGISTER no more often than every retryInterval.
+const (
+	registerRetryInterval = 60 * time.Second
+	keepaliveDefaultSecs  = 60
+	keepaliveFailLimit    = 3
+)
+
+func (s *Service) runPlatform(p *domainplatform.Platform) {
+	s.stopKeepalive(p.ID)
 	ctx, cancel := context.WithCancel(context.Background())
 	s.tasks.Store(p.ID, cancel)
-	interval := 60
+	defer s.tasks.Delete(p.ID)
+
+	expires := platformExpiresSecs(p)
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		if err := s.sip.Register(p); err != nil {
+			_ = s.platforms.UpdateStatus(p.ID, false)
+			if !sleepCtx(ctx, registerRetryInterval) {
+				return
+			}
+			continue
+		}
+		_ = s.platforms.UpdateStatus(p.ID, true)
+		if !s.keepaliveLoop(ctx, p, expires) {
+			return // cancelled
+		}
+		// Keepalive exhausted: fall through and re-REGISTER.
+	}
+}
+
+// keepaliveLoop runs heartbeats and refreshes the registration before it
+// expires. Returns false when ctx is cancelled, true when the caller should
+// re-register (keepalive exhausted or refresh failed).
+func (s *Service) keepaliveLoop(ctx context.Context, p *domainplatform.Platform, expires int) bool {
+	interval := keepaliveDefaultSecs
 	if p.KeepTimeout != "" {
 		if v, err := strconv.Atoi(p.KeepTimeout); err == nil && v > 0 {
 			interval = v
 		}
 	}
-	go func() {
-		ticker := time.NewTicker(time.Duration(interval) * time.Second)
-		defer ticker.Stop()
-		failures := 0
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if err := s.sip.Keepalive(p); err != nil {
-					failures++
-					if failures >= 3 {
-						_ = s.platforms.UpdateStatus(p.ID, false)
-						return
-					}
-				} else {
-					failures = 0
+	// Refresh at ~2/3 of the lifetime, but never faster than one keepalive tick.
+	refreshAfter := time.Duration(expires) * time.Second * 2 / 3
+	if refreshAfter < time.Duration(interval)*time.Second {
+		refreshAfter = time.Duration(interval) * time.Second
+	}
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	defer ticker.Stop()
+	failures := 0
+	lastRegister := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-ticker.C:
+			if time.Since(lastRegister) >= refreshAfter {
+				if err := s.sip.Register(p); err != nil {
+					_ = s.platforms.UpdateStatus(p.ID, false)
+					return true
 				}
+				lastRegister = time.Now()
+			}
+			if err := s.sip.Keepalive(p); err != nil {
+				failures++
+				if failures >= keepaliveFailLimit {
+					_ = s.platforms.UpdateStatus(p.ID, false)
+					return true
+				}
+			} else {
+				failures = 0
 			}
 		}
-	}()
+	}
+}
+
+func platformExpiresSecs(p *domainplatform.Platform) int {
+	if p.Expires != "" {
+		if v, err := strconv.Atoi(p.Expires); err == nil && v > 0 {
+			return v
+		}
+	}
+	return 3600
+}
+
+// sleepCtx waits for d or ctx cancellation. Returns false if cancelled.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
 }
 
 func (s *Service) stopKeepalive(platformID int) {
@@ -135,7 +197,7 @@ func (s *Service) StartEnabledPlatforms() {
 		return
 	}
 	for _, p := range list {
-		go s.registerPlatform(p)
+		s.registerPlatform(p)
 	}
 }
 

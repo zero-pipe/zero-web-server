@@ -42,6 +42,11 @@ func PlaySSRC(domain string, seq int) string {
 	return ssrc.Play(domain, seq)
 }
 
+// PlaybackSSRC 生成历史回放/下载 SSRC（首位 1，区别于实时点播）。
+func PlaybackSSRC(domain string, seq int) string {
+	return ssrc.Playback(domain, seq)
+}
+
 // SDP 构造。
 func BuildPlaySDP(deviceID, sdpIP string, port int, ssrc, streamMode, streamIdentification string) string {
 	return sdp.BuildPlay(deviceID, sdpIP, port, ssrc, streamMode, streamIdentification)

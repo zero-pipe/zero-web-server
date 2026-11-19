@@ -223,6 +223,7 @@ func main() {
 	playbackService := playbackapp.NewService(
 		deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, recordTimeoutSec,
 	)
+	sipServer.SetMediaHandler(playbackService)
 	platformSIPClient := sipinfra.NewPlatformClient(sipCfg)
 	platformService := upstreamapp.NewService(platformRepo, sipCfg, platformSIPClient, cfg.UserSettings.ServerID)
 	platformChannelSvc := upstreamapp.NewChannelService(

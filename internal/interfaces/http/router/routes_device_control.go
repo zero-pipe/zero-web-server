@@ -13,4 +13,7 @@ func registerDeviceControl(parent *gin.RouterGroup, deviceHandler *handler.Devic
 	g.GET("/home_position", deviceHandler.HomePosition)
 	g.GET("/drag_zoom/zoom_in", deviceHandler.DragZoomIn)
 	g.GET("/drag_zoom/zoom_out", deviceHandler.DragZoomOut)
+	g.GET("/alarm_reset", deviceHandler.AlarmReset)
+	g.GET("/teleboot", deviceHandler.TeleBoot)
+	g.GET("/iframe", deviceHandler.IFrame)
 }

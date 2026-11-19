@@ -334,7 +334,7 @@ func TestHandleCatalogCreatesChannelsAndBackfills(t *testing.T) {
 		{DeviceID: "ch1", Manufacturer: "Acme", Model: "M1", Status: "ON"},
 		{DeviceID: "ch2", Status: "OFF"},
 	}
-	if err := svc.HandleCatalog("dev", items); err != nil {
+	if err := svc.HandleCatalog("dev", items, false); err != nil {
 		t.Fatalf("HandleCatalog: %v", err)
 	}
 	rows := chans.rows["dev"]
@@ -354,7 +354,7 @@ func TestHandleCatalogEmptyIPCDeviceCreatesDefaultChannel(t *testing.T) {
 	ipc := "34020000001320000001"
 	devs.rows[ipc] = &domaindevice.Device{ID: 1, DeviceID: ipc, Name: "cam"}
 
-	if err := svc.HandleCatalog(ipc, nil); err != nil {
+	if err := svc.HandleCatalog(ipc, nil, false); err != nil {
 		t.Fatalf("HandleCatalog: %v", err)
 	}
 	rows := chans.rows[ipc]

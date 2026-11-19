@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
@@ -39,12 +40,15 @@ func (s *Service) autoSyncCatalogOnce(deviceID string) {
 	log.Printf("GB28181 default channel created: device=%s", deviceID)
 }
 
-func (s *Service) HandleCatalog(deviceID string, items []gbsip.CatalogItem) error {
+func (s *Service) HandleCatalog(deviceID string, items []gbsip.CatalogItem, incremental bool) error {
 	device, err := s.GetByDeviceID(deviceID)
 	if err != nil {
 		return err
 	}
 	s.ensureDeviceDBID(device)
+	if incremental {
+		return s.handleCatalogIncremental(device, items)
+	}
 	now := nowStr()
 	deviceName := device.Name
 	if device.CustomName != "" {
@@ -98,6 +102,162 @@ func (s *Service) HandleCatalog(deviceID string, items []gbsip.CatalogItem) erro
 	return nil
 }
 
+// handleCatalogIncremental applies a Catalog NOTIFY without rebuilding the
+// whole channel table. Only the channels named in the notify change; all other
+// channels stay untouched. item.Event drives ADD/UPDATE (upsert), DEL (remove)
+// and ON/OFF/VLOST/DEFECT (status update, 附录 J/N).
+func (s *Service) handleCatalogIncremental(device *domaindevice.Device, items []gbsip.CatalogItem) error {
+	if len(items) == 0 {
+		return nil
+	}
+	current, _, err := s.channels.ListByDevice(device.DeviceID, 1, 10000, "", nil)
+	if err != nil {
+		return err
+	}
+	deviceName := device.Name
+	if device.CustomName != "" {
+		deviceName = device.CustomName
+	}
+	merged, stats := mergeCatalogIncremental(current, items, device.DeviceID, deviceName, nowStr())
+	if len(merged) == 0 {
+		log.Printf("GB28181 catalog notify: device=%s ignores empty result (no channel deletion)", device.DeviceID)
+		return nil
+	}
+	if err := s.channels.ResetByDevice(device.DeviceID, device.ID, merged); err != nil {
+		return err
+	}
+	s.backfillDeviceFromChannels(device, merged)
+	log.Printf("GB28181 catalog notify applied: device=%s items=%d added=%d updated=%d removed=%d total=%d",
+		device.DeviceID, len(items), stats.added, stats.updated, stats.removed, len(merged))
+	return nil
+}
+
+type catalogMergeStats struct {
+	added, updated, removed int
+}
+
+// mergeCatalogIncremental folds a Catalog NOTIFY into the current channel set.
+// Channels absent from the notify are preserved; item.Event decides add/update/
+// delete/status-change (附录 J/N). Pure function — unit tested.
+func mergeCatalogIncremental(current []*domainchannel.Channel, items []gbsip.CatalogItem, deviceID, deviceName, now string) ([]*domainchannel.Channel, catalogMergeStats) {
+	byGB := make(map[string]*domainchannel.Channel, len(current))
+	order := make([]string, 0, len(current))
+	for _, ch := range current {
+		gb := strings.TrimSpace(ch.GBDeviceID)
+		if gb == "" {
+			continue
+		}
+		if _, dup := byGB[gb]; !dup {
+			order = append(order, gb)
+		}
+		byGB[gb] = ch
+	}
+
+	var stats catalogMergeStats
+	nextIndex := len(current) + 1
+	for _, item := range items {
+		gb := strings.TrimSpace(item.DeviceID)
+		if gb == "" {
+			continue
+		}
+		event := strings.ToUpper(strings.TrimSpace(item.Event))
+		existing, exists := byGB[gb]
+		switch event {
+		case "DEL":
+			if exists {
+				delete(byGB, gb)
+				stats.removed++
+			}
+		case "ADD", "UPDATE":
+			if exists {
+				mergeCatalogItem(existing, item, now)
+				stats.updated++
+			} else {
+				byGB[gb] = newCatalogChannel(deviceID, deviceName, nextIndex, item, now)
+				nextIndex++
+				stats.added++
+			}
+		default:
+			// ON/OFF/VLOST/DEFECT or unknown: status change on an existing channel.
+			if exists {
+				if item.Status != "" {
+					existing.Status = item.Status
+					existing.UpdateTime = now
+				}
+				stats.updated++
+			} else {
+				byGB[gb] = newCatalogChannel(deviceID, deviceName, nextIndex, item, now)
+				nextIndex++
+				stats.added++
+			}
+		}
+	}
+
+	merged := make([]*domainchannel.Channel, 0, len(byGB))
+	seen := make(map[string]bool, len(byGB))
+	for _, gb := range order {
+		if ch, ok := byGB[gb]; ok && !seen[gb] {
+			merged = append(merged, ch)
+			seen[gb] = true
+		}
+	}
+	for gb, ch := range byGB {
+		if !seen[gb] {
+			merged = append(merged, ch)
+		}
+	}
+	return merged, stats
+}
+
+// newCatalogChannel builds a fresh channel from a catalog item.
+func newCatalogChannel(deviceID, deviceName string, index int, item gbsip.CatalogItem, now string) *domainchannel.Channel {
+	ch := &domainchannel.Channel{
+		DeviceID:   deviceID,
+		GBDeviceID: item.DeviceID,
+		Name:       channelDisplayName(deviceName, index),
+		Status:     item.Status,
+		CreateTime: now,
+		UpdateTime: now,
+	}
+	mergeCatalogItem(ch, item, now)
+	if ch.Status == "" {
+		ch.Status = "ON"
+	}
+	return ch
+}
+
+// mergeCatalogItem fills channel fields from a catalog item, leaving fields the
+// item does not carry untouched so a partial notify does not erase data.
+func mergeCatalogItem(ch *domainchannel.Channel, item gbsip.CatalogItem, now string) {
+	if item.Manufacturer != "" {
+		ch.Manufacturer = item.Manufacturer
+	}
+	if item.Model != "" {
+		ch.Model = item.Model
+	}
+	if item.Parental != 0 {
+		ch.Parental = item.Parental
+	}
+	if item.ParentID != "" {
+		ch.ParentID = item.ParentID
+	}
+	if item.Status != "" {
+		ch.Status = item.Status
+	}
+	if item.Longitude != 0 {
+		ch.Longitude = item.Longitude
+	}
+	if item.Latitude != 0 {
+		ch.Latitude = item.Latitude
+	}
+	if item.PTZType != 0 {
+		ch.PTZType = item.PTZType
+	}
+	if ch.CreateTime == "" {
+		ch.CreateTime = now
+	}
+	ch.UpdateTime = now
+}
 // backfillDeviceFromChannels 设备厂商/型号常在 Catalog Item 里，DeviceInfo 未回时从通道补齐。
 // 不再用通道名回填设备名（通道已统一为 设备名_channel_N）。
 func (s *Service) backfillDeviceFromChannels(device *domaindevice.Device, channels []*domainchannel.Channel) {

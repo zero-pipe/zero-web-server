@@ -3,6 +3,7 @@ package playbackapp
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -166,8 +167,43 @@ func (s *Service) StopDownload(deviceID, channelDeviceID, stream string) error {
 	return nil
 }
 
-func (s *Service) DownloadProgress(stream string) (*DownloadProgress, error) {
-	sess, ok := s.sip.InviteManager().Get(stream)
+// HandleMediaStatus reacts to a GB28181 MediaStatus notify. NotifyType 121
+// ("File to End") means the device finished streaming a playback/download file,
+// so we tear the session down instead of waiting for the client to stop it
+// (2016 §7.8/§9.9, A.2.5.4).
+func (s *Service) HandleMediaStatus(deviceID, channelGBID, notifyType string) error {
+	if notifyType != "121" {
+		return nil
+	}
+	device, err := s.devices.GetByDeviceID(deviceID)
+	if err != nil || device == nil {
+		return nil
+	}
+	channel, err := s.channels.GetOne(deviceID, channelGBID)
+	if err != nil || channel == nil {
+		return nil
+	}
+	for _, stream := range []string{
+		mediaurl.PlaybackStream(device.InternalCode, channel.InternalCode),
+		mediaurl.DownloadStream(device.InternalCode, channel.InternalCode),
+	} {
+		if stream == "" {
+			continue
+		}
+		if _, ok := s.sip.InviteManager().Get(stream); !ok {
+			continue
+		}
+		_ = s.sip.CloseInviteSession(stream)
+		if node, err := s.media.ResolveForStream(context.Background(), publishauth.LiveApp, stream, "auto"); err == nil {
+			_ = node.CloseStreams(context.Background(), "__defaultVhost__", publishauth.LiveApp, stream)
+		}
+		s.media.UnbindStream(publishauth.LiveApp, stream)
+		log.Printf("[GB28181] media status ended: stream=%s device=%s channel=%s", stream, deviceID, channelGBID)
+	}
+	return nil
+}
+
+func (s *Service) DownloadProgress(stream string) (*DownloadProgress, error) {	sess, ok := s.sip.InviteManager().Get(stream)
 	if !ok {
 		return &DownloadProgress{Progress: 100, Stream: stream}, nil
 	}
@@ -237,6 +273,10 @@ func (s *Service) startMediaInvite(
 	s.media.BindStream(node.ID(), app, stream)
 
 	ssrc := gbsip.PlaySSRC(s.sip.Domain(), s.nextSSRCSeq())
+	if sessionType != gbsip.SessionPlay {
+		// 历史回放/下载 SSRC 首位为 1（附录-编码与SDP）
+		ssrc = gbsip.PlaybackSSRC(s.sip.Domain(), s.nextSSRCSeq())
+	}
 	sdp := buildSDP(device, channel, rtpPort, ssrc, node)
 
 	done := make(chan *dto.StreamContent, 1)

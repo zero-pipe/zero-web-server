@@ -2,6 +2,10 @@ package deviceapp
 
 import (
 	"fmt"
+	"time"
+
+	domaindevice "zero-web-server/internal/domain/device"
+	"zero-web-server/internal/port"
 )
 
 func (s *Service) Guard(deviceID, guardCmd string) error {
@@ -98,4 +102,65 @@ func (s *Service) QueryBasicParam(deviceID string) (map[string]interface{}, erro
 		"latitude":           nil,
 	}
 	return out, nil
+}
+
+// AlarmReset 发送报警复位（AlarmCmd=ResetAlarm）。
+func (s *Service) AlarmReset(deviceID, channelID string) error {
+	return s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendAlarmCmd(device, channelID, "ResetAlarm")
+	})
+}
+
+// TeleBoot 远程重启设备。
+func (s *Service) TeleBoot(deviceID, channelID string) error {
+	return s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendTeleBoot(device, channelID)
+	})
+}
+
+// IFrame 请求强制关键帧。
+func (s *Service) IFrame(deviceID, channelID string) error {
+	return s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendIFrameCmd(device, channelID)
+	})
+}
+
+// controlDevice 统一做 SIP 就绪、设备在线校验后执行控制。
+func (s *Service) controlDevice(deviceID string, fn func(device *domaindevice.Device) error) error {
+	if s.sip == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	return fn(device)
+}
+
+// QueryDeviceStatus 查询设备状态（DeviceStatus），5 秒内无应答返回错误。
+func (s *Service) QueryDeviceStatus(deviceID string) (*port.GBDeviceStatus, error) {
+	if s.sip == nil {
+		return nil, fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.GetByDeviceID(deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return nil, fmt.Errorf("设备离线")
+	}
+	sn, ch := s.sip.SendDeviceStatusQuery(device)
+	select {
+	case st, ok := <-ch:
+		if !ok || st.Online == "" && st.Status == "" {
+			return nil, fmt.Errorf("设备未应答状态查询")
+		}
+		return &st, nil
+	case <-time.After(5 * time.Second):
+		s.sip.CancelDeviceStatusQuery(sn)
+		return nil, fmt.Errorf("设备状态查询超时")
+	}
 }
