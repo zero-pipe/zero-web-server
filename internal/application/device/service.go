@@ -6,6 +6,7 @@ import (
 	"zero-web-server/internal/apperr"
 
 	domainchannel "zero-web-server/internal/domain/channel"
+	domainasset "zero-web-server/internal/domain/asset"
 	domaindevice "zero-web-server/internal/domain/device"
 	"zero-web-server/internal/port"
 )
@@ -17,6 +18,7 @@ var (
 
 type Service struct {
 	devices            domaindevice.Repository
+	caps               domainasset.Repository
 	channels           domainchannel.Repository
 	redis              port.DeviceCache
 	sip                port.GBDeviceControl
@@ -50,4 +52,9 @@ func NewService(devices domaindevice.Repository, channels domainchannel.Reposito
 
 func (s *Service) SetSIP(sipServer port.GBDeviceControl) {
 	s.sip = sipServer
+}
+
+// SetCapabilities 注入统一资产能力仓（可空，空则不做能力拦截）。
+func (s *Service) SetCapabilities(caps domainasset.Repository) {
+	s.caps = caps
 }

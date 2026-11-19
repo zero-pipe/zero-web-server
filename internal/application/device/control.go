@@ -272,9 +272,13 @@ func (s *Service) SendSnapShot(deviceID, channelID string, snapNum, interval int
 	if !gbsip.ValidSnapShotSessionID(sessionID) {
 		return "", fmt.Errorf("sessionId 只能包含字母/数字/短划线，长度 3~128")
 	}
+	if err := s.checkChannelCapByGB(deviceID, channelID, "snapshot"); err != nil {
+		return "", err
+	}
 	err := s.controlDevice(deviceID, func(device *domaindevice.Device) error {
 		return s.sip.SendSnapShotConfig(device, channelID, snapNum, interval, uploadURL, sessionID)
 	})
+	s.markChannelCapByGB(deviceID, channelID, "snapshot", err == nil)
 	if err != nil {
 		return "", err
 	}

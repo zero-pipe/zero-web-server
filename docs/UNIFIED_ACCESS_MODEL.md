@@ -83,7 +83,7 @@ UnifiedRef（zws_unified_ref）                旧表主键 → 统一 UUID 的�
 - 常见操作：`play`（实时）、`playback`（回放）、`ptz`、`snapshot`、`audio`、`alarm`、`subscribe`、`guard`、`transport`、`sync`。
 - `Supported` 表示协议/设备声明支持；`Configured` 表示平台已配置；`Available` 表示最近一次调用是否成功。
 - **运行时熔断**：调用前若声明 `Supported=false` 直接拒绝；调用失败把 `Available` 置 false 并记录日志，恢复后置回 true。页面据此置灰按钮，避免反复调用烂固件。
-- 当前已接入熔断的入口：资源实时播放（`resources/:id/live/start`）。回放、PTZ、抓拍的熔断按同一方式扩展。
+- 已接入熔断的入口：资源实时播放（`resources/:id/live/start`）、回放/下载、云台控制、抓拍下发、通道音频开关（启用前校验支持性）。
 
 ## 7. 事件与报警
 
@@ -113,17 +113,16 @@ UnifiedRef（zws_unified_ref）                旧表主键 → 统一 UUID 的�
 |---|---|---|
 | 统一资产模型 | PhysicalDevice/AccessBinding/Resource/StreamProfile/Capability 已落地并回填 | ✅ 已具备 |
 | 通道作为最小调度单元 | 通道 = Resource，播放/云台/事件均按资源定位 | ✅ 基本具备 |
-| 能力声明 + 运行时降级 | 能力表已建；实时播放、回放/下载、云台控制已接入熔断 | ✅ 主要操作已具备，抓拍待接 |
+| 能力声明 + 运行时降级 | 能力表已建；实时播放、回放/下载、云台、抓拍、音频已接入校验/熔断 | ✅ 已具备 |
 | 统一驱动接口（ChannelDriver） | `internal/application/channeldrv`：gb/onvif/plugin 统一实现实时/停止/同步/云台，资产与云台业务层不再按协议分支 | ✅ 已具备 |
 | 云台速度归一化 [0,1] | 业务层只传 `PTZCommand{Speed,Zoom}`（0~1），GB×255、插件×100、ONVIF 浮点在各驱动内换算 | ✅ 已具备 |
 | 流源统一抽象（StreamSource） | 统一返回 `dto.StreamContent`（含各协议播放地址） | ✅ 基本具备 |
-| 超时与并发保护 | SIP 等待 5s、ONVIF 客户端 30s；无全局并发限制 | ⚠️ 部分 |
+| 超时与并发保护 | 驱动层统一：单次调用 30s 超时 + 全局并发 32 信号量；SIP/ONVIF 各自另有等待超时 | ✅ 已具备 |
 | 级联编码映射与反查 | 通道国标码全局唯一、落库；级联按通道国标码反查 | ✅ 已具备（见 GB 场景文档） |
 
 **后续路线（按优先级）**
-1. 能力熔断扩展到抓拍/音频。
-2. 驱动接口扩展到回放/下载/抓拍（当前驱动覆盖实时/停止/同步/云台）。
-3. 外部设备调用的统一超时/并发信号量。
+1. 驱动接口扩展到回放/下载/抓拍（当前驱动覆盖实时/停止/同步/云台）。
+2. 能力熔断/超时参数按设备类型可配置（当前为全局常量）。
 
 ## 11. 已定决策
 

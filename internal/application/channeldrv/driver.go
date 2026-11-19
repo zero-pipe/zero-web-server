@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	deviceapp "zero-web-server/internal/application/device"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
@@ -57,13 +58,83 @@ type Deps struct {
 // Registry 协议 → 驱动。
 type Registry map[string]ChannelDriver
 
+// 外部设备调用统一保护：单次调用超时 + 全局并发上限。
+const (
+	defaultCallTimeout   = 30 * time.Second
+	defaultMaxConcurrent = 32
+)
+
 // New 构建驱动表；新增协议在此注册。
 func New(d Deps) Registry {
 	return Registry{
-		"gb28181": &gbDriver{play: d.Play, device: d.Device, devices: d.Devices, ptz: d.PTZ},
-		"onvif":   &onvifDriver{onvif: d.ONVIF},
-		"plugin":  &pluginDriver{ipc: d.Plugin},
+		"gb28181": newLimited(&gbDriver{play: d.Play, device: d.Device, devices: d.Devices, ptz: d.PTZ}),
+		"onvif":   newLimited(&onvifDriver{onvif: d.ONVIF}),
+		"plugin":  newLimited(&pluginDriver{ipc: d.Plugin}),
 	}
+}
+
+// limited 给驱动加超时与并发信号量，避免烂固件拖垮调用方。
+type limited struct {
+	next    ChannelDriver
+	timeout time.Duration
+	sem     chan struct{}
+}
+
+func newLimited(next ChannelDriver) *limited {
+	return &limited{next: next, timeout: defaultCallTimeout, sem: make(chan struct{}, defaultMaxConcurrent)}
+}
+
+func (l *limited) begin(ctx context.Context) (context.Context, func(), error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cctx, cancel := context.WithTimeout(ctx, l.timeout)
+	select {
+	case l.sem <- struct{}{}:
+		return cctx, func() { <-l.sem; cancel() }, nil
+	case <-cctx.Done():
+		cancel()
+		return nil, nil, fmt.Errorf("设备调用繁忙或超时: %w", cctx.Err())
+	}
+}
+
+func (l *limited) Protocol() string { return l.next.Protocol() }
+
+func (l *limited) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer done()
+	return l.next.StartLive(cctx, res, binding, profile)
+}
+
+func (l *limited) StopLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, sess *Session) error {
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return l.next.StopLive(cctx, res, binding, sess)
+}
+
+func (l *limited) Sync(ctx context.Context, binding *domainasset.AccessBinding) error {
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return l.next.Sync(cctx, binding)
+}
+
+func (l *limited) PTZ(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd PTZCommand) error {
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return l.next.PTZ(cctx, res, binding, cmd)
 }
 
 // Get 按协议取驱动。

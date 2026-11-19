@@ -38,6 +38,11 @@ func (s *Service) ChangeChannelAudio(channelID int, audio bool) error {
 	if _, err := s.channels.GetByID(channelID); err != nil {
 		return errors.New("通道不存在")
 	}
+	if audio {
+		if err := s.checkChannelCapByID(channelID, "audio"); err != nil {
+			return err
+		}
+	}
 	return s.channels.ChangeAudio(channelID, audio)
 }
 

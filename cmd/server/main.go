@@ -205,6 +205,7 @@ func main() {
 		}
 	}
 	deviceService.SetSIP(sipServer)
+	deviceService.SetCapabilities(assetRepo)
 	sessionAdapter := sipinfra.NewSessionAdapter(sipServer)
 	sipServer.SetRequirePreRegister(requirePreRegister)
 
