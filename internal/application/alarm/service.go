@@ -7,6 +7,7 @@ import (
 	"time"
 
 	domainalarm "zero-web-server/internal/domain/alarm"
+	domainasset "zero-web-server/internal/domain/asset"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
 	domainevent "zero-web-server/internal/domain/event"
@@ -20,11 +21,12 @@ type Service struct {
 	channels domainchannel.Repository
 	devices  domaindevice.Repository
 	events   domainevent.Repository
+	assets   domainasset.Repository
 }
 
 func NewService(alarms domainalarm.Repository, channels domainchannel.Repository,
-	devices domaindevice.Repository, events domainevent.Repository) *Service {
-	return &Service{alarms: alarms, channels: channels, devices: devices, events: events}
+	devices domaindevice.Repository, events domainevent.Repository, assets domainasset.Repository) *Service {
+	return &Service{alarms: alarms, channels: channels, devices: devices, events: events, assets: assets}
 }
 
 func (s *Service) HandleNotify(deviceID, channelGBID string, n *gbsip.AlarmNotify) error {
@@ -116,7 +118,35 @@ func (s *Service) List(page, count int, alarmType *int, beginTime, endTime strin
 
 // enrich 补齐旧页面依赖的通道名称与回放上下文。
 func (s *Service) enrich(a *domainalarm.Alarm) {
-	if a == nil || a.ChannelID <= 0 || s.channels == nil {
+	if a == nil {
+		return
+	}
+	// 优先用统一资产（跨 GB/ONVIF/插件），旧通道表只作兜底。
+	if s.assets != nil && a.ChannelInternalCode != "" {
+		if dev, err := s.assets.GetDeviceByInternalCode(a.DeviceInternalCode); err == nil && dev != nil {
+			a.DeviceName = dev.Name
+		}
+		if res, err := s.assets.GetResourceByInternalCode(a.ChannelInternalCode); err == nil && res != nil {
+			a.ChannelName = res.Name
+			a.ChannelDeviceID = res.ExternalKey
+			supported := false
+			protocol := ""
+			if binding, berr := s.assets.GetBindingByDevice(res.DeviceID); berr == nil && binding != nil {
+				protocol = binding.Protocol
+				supported = protocol == "gb28181"
+			}
+			a.Playback = map[string]any{
+				"supported":       supported,
+				"protocol":        protocol,
+				"channelLegacyId": res.LegacyChannelID,
+				"startAt":         a.AlarmTime - 10_000,
+				"endAt":           a.AlarmTime + 10_000,
+				"reason":          map[bool]string{true: "", false: protocol + " 回放尚未接入"}[supported],
+			}
+			return
+		}
+	}
+	if a.ChannelID <= 0 || s.channels == nil {
 		return
 	}
 	ch, err := s.channels.GetByID(a.ChannelID)

@@ -370,21 +370,28 @@ export default {
         this.$message({ showClose: true, message: '该报警无关联通道，无法回放', type: 'warning' })
         return
       }
+      if (row.playback && row.playback.supported === false) {
+        this.$message({ showClose: true, message: row.playback.reason || '该通道暂不支持回放', type: 'warning' })
+        return
+      }
       this.playbackTitle = `录像回放 - ${row.channelName || row.channelDeviceId} (${this.formatTime(row.alarmTime)})`
       this.playbackDialogVisible = true
       this.playbackLoading = true
       this.playbackError = null
       this.playbackStreamInfo = null
       this.playbackVideoUrl = null
-      this.currentPlaybackChannelId = row.channelId
+      this.currentPlaybackChannelId = (row.playback && row.playback.channelLegacyId) || row.channelId
 
-      // 开始时间：报警时间前10秒，结束时间：报警时间后10秒（共20秒）
-      const alarmTs = row.alarmTime
-      const startTime = formatDatetime(alarmTs - 10 * 1000)
-      const endTime = formatDatetime(alarmTs + 10 * 1000)
+      // 优先使用后端推导的回放窗口，否则报警时间前后 10 秒。
+      const startTime = row.playback && row.playback.startAt
+        ? formatDatetime(row.playback.startAt)
+        : formatDatetime(row.alarmTime - 10 * 1000)
+      const endTime = row.playback && row.playback.endAt
+        ? formatDatetime(row.playback.endAt)
+        : formatDatetime(row.alarmTime + 10 * 1000)
 
       this.$store.dispatch('commonChanel/playback', {
-        channelId: row.channelId,
+        channelId: this.currentPlaybackChannelId,
         startTime: startTime,
         endTime: endTime
       }).then(data => {

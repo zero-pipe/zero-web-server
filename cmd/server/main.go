@@ -211,7 +211,7 @@ func main() {
 	subordinateService := downstreamapp.NewService(subordinateRepo, cfg.UserSettings.ServerID)
 	sipServer.SetSubordinateHandler(subordinateService)
 
-	alarmService := alarmapp.NewService(alarmRepo, channelRepo, deviceRepo, eventRepo)
+	alarmService := alarmapp.NewService(alarmRepo, channelRepo, deviceRepo, eventRepo, assetRepo)
 	positionService := positionapp.NewService(positionRepo, channelRepo)
 	sipServer.SetAlarmHandler(alarmService)
 	sipServer.SetPositionHandler(positionService)
