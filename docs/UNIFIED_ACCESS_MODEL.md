@@ -25,7 +25,7 @@ interfaces（HTTP/Hook） → application → domain
                      adapter / infrastructure（MySQL、Redis、SIP、ONVIF、插件 RPC）
 ```
 
-- `internal/application/**` 只依赖 `domain`、`port`、`dto`、`gbsip` 与中立工具包（`config` 例外）。
+- `internal/application/**` 只依赖 `domain`、`port`、`dto`、`gbsip` 与中立工具包（`config` 例外）；协议侧服务（play/onvif/ipcdevice/device）只允许在 `channeldrv` 的装配处注入。
 - 基础设施通过 `port` 接口回调应用层（如 SIP 注册/目录回调 `port.DeviceLifecycle`），不得反向依赖具体服务类型。
 - 媒体服务（ZMS）不内嵌，通过 HTTP API + Hook 对接。
 
@@ -114,17 +114,16 @@ UnifiedRef（zws_unified_ref）                旧表主键 → 统一 UUID 的�
 | 统一资产模型 | PhysicalDevice/AccessBinding/Resource/StreamProfile/Capability 已落地并回填 | ✅ 已具备 |
 | 通道作为最小调度单元 | 通道 = Resource，播放/云台/事件均按资源定位 | ✅ 基本具备 |
 | 能力声明 + 运行时降级 | 能力表已建；实时播放、回放/下载、云台控制已接入熔断 | ✅ 主要操作已具备，抓拍待接 |
-| 统一驱动接口（ChannelDriver） | 已抽象：`asset/driver.go` 中 gb/onvif/plugin 三个驱动统一实现实时/停止/同步，业务层不再按协议分支 | ✅ 已具备 |
-| 云台速度归一化 [-1,1] | 各协议各自量纲（GB 速度档位、ONVIF 浮点） | ⚠️ 待做（P2） |
+| 统一驱动接口（ChannelDriver） | `internal/application/channeldrv`：gb/onvif/plugin 统一实现实时/停止/同步/云台，资产与云台业务层不再按协议分支 | ✅ 已具备 |
+| 云台速度归一化 [0,1] | 业务层只传 `PTZCommand{Speed,Zoom}`（0~1），GB×255、插件×100、ONVIF 浮点在各驱动内换算 | ✅ 已具备 |
 | 流源统一抽象（StreamSource） | 统一返回 `dto.StreamContent`（含各协议播放地址） | ✅ 基本具备 |
 | 超时与并发保护 | SIP 等待 5s、ONVIF 客户端 30s；无全局并发限制 | ⚠️ 部分 |
 | 级联编码映射与反查 | 通道国标码全局唯一、落库；级联按通道国标码反查 | ✅ 已具备（见 GB 场景文档） |
 
 **后续路线（按优先级）**
 1. 能力熔断扩展到抓拍/音频。
-2. 云台速度归一化 [-1,1]，在各驱动内换算。
-3. 驱动接口扩展到回放/PTZ/抓拍（当前驱动只覆盖实时/停止/同步）。
-4. 外部设备调用的统一超时/并发信号量。
+2. 驱动接口扩展到回放/下载/抓拍（当前驱动覆盖实时/停止/同步/云台）。
+3. 外部设备调用的统一超时/并发信号量。
 
 ## 11. 已定决策
 

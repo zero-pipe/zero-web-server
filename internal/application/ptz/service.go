@@ -2,12 +2,14 @@ package ptzapp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"zero-web-server/internal/application/channeldrv"
 	domainasset "zero-web-server/internal/domain/asset"
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
@@ -45,6 +47,7 @@ const (
 type Service struct {
 	channels      domainchannel.Repository
 	caps          domainasset.Repository
+	drivers       channeldrv.Registry
 	devices       domaindevice.Repository
 	sip           port.GBPTZNode
 	control       port.GBDeviceControl
@@ -53,10 +56,11 @@ type Service struct {
 }
 
 func NewService(devices domaindevice.Repository, channels domainchannel.Repository,
-	caps domainasset.Repository, sipServer port.GBPTZNode, control port.GBDeviceControl) *Service {
+	caps domainasset.Repository, drivers channeldrv.Registry, sipServer port.GBPTZNode, control port.GBDeviceControl) *Service {
 	return &Service{
 		channels:      channels,
 		caps:          caps,
+		drivers:       drivers,
 		devices:       devices,
 		sip:           sipServer,
 		control:       control,
@@ -133,7 +137,63 @@ func (s *Service) Control(deviceID, channelID, command string, horizonSpeed, ver
 	if err := s.checkPTZCap(deviceID, channelID); err != nil {
 		return err
 	}
+	if err := s.ptzViaDriver(deviceID, channelID, command, horizonSpeed, verticalSpeed, zoomSpeed); err == nil {
+		return nil
+	} else if !errors.Is(err, errNoDriver) {
+		return err
+	}
 	return s.sip.SendPTZ(device, channelID, command, horizonSpeed, verticalSpeed, zoomSpeed)
+}
+
+var errNoDriver = errors.New("no driver")
+
+// ptzViaDriver 走统一驱动（协议差异与速度换算在驱动内），找不到资源/驱动时回落旧通道。
+func (s *Service) ptzViaDriver(deviceID, channelID, command string, h, v, z int) error {
+	if s.drivers == nil || s.caps == nil || s.channels == nil {
+		return errNoDriver
+	}
+	ch, err := s.channels.GetOne(deviceID, channelID)
+	if err != nil || ch == nil {
+		return errNoDriver
+	}
+	res, err := s.caps.GetResourceByInternalCode(ch.InternalCode)
+	if err != nil || res == nil {
+		return errNoDriver
+	}
+	binding, err := s.caps.GetBindingByDevice(res.DeviceID)
+	if err != nil || binding == nil {
+		return errNoDriver
+	}
+	drv, ok := s.drivers.Get(binding.Protocol)
+	if !ok {
+		return errNoDriver
+	}
+	maxSpeed := h
+	if v > maxSpeed {
+		maxSpeed = v
+	}
+	cmd := channeldrv.PTZCommand{
+		Direction: command,
+		Speed:     normalizeSpeed(maxSpeed, 255),
+		Zoom:      normalizeSpeed(z, 16),
+	}
+	if err := drv.PTZ(context.Background(), res, binding, cmd); err != nil {
+		_ = s.caps.SetCapabilityAvailable("resource", res.ID, "ptz", false)
+		return err
+	}
+	_ = s.caps.SetCapabilityAvailable("resource", res.ID, "ptz", true)
+	return nil
+}
+
+func normalizeSpeed(v, max int) float64 {
+	if v <= 0 {
+		return 0
+	}
+	f := float64(v) / float64(max)
+	if f > 1 {
+		f = 1
+	}
+	return f
 }
 
 // checkPTZCap 云台能力校验：无声明放行，声明不支持/当前不可用则拒绝。

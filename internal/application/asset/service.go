@@ -8,10 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	deviceapp "zero-web-server/internal/application/device"
-	ipcdevice "zero-web-server/internal/application/ipcdevice"
-	onvifapp "zero-web-server/internal/application/onvif"
-	playapp "zero-web-server/internal/application/play"
+	"zero-web-server/internal/application/channeldrv"
 	domainasset "zero-web-server/internal/domain/asset"
 	"zero-web-server/internal/dto"
 )
@@ -26,27 +23,16 @@ type Projector interface {
 type Service struct {
 	repo      domainasset.Repository
 	projector Projector
-	drivers   map[string]ChannelDriver
+	drivers   channeldrv.Registry
 
 	mu       sync.Mutex
-	sessions map[string]*liveSession
+	sessions map[string]*channeldrv.Session
 }
 
-type liveSession struct {
-	Protocol        string
-	DeviceExternal  string
-	ChannelKey      string
-	LegacyDeviceID  int
-	LegacyChannelID int64
-	ProfileToken    string
-}
-
-func NewService(repo domainasset.Repository, projector Projector, play *playapp.Service,
-	onvif *onvifapp.Service, ipc *ipcdevice.Service, device *deviceapp.Service) *Service {
+func NewService(repo domainasset.Repository, projector Projector, drivers channeldrv.Registry) *Service {
 	return &Service{
-		repo: repo, projector: projector,
-		drivers: newDrivers(play, onvif, ipc, device),
-		sessions: map[string]*liveSession{},
+		repo: repo, projector: projector, drivers: drivers,
+		sessions: map[string]*channeldrv.Session{},
 	}
 }
 
@@ -180,7 +166,7 @@ func (s *Service) Sync(ctx context.Context, deviceID string) error {
 	if err != nil || binding == nil {
 		return fmt.Errorf("设备缺少接入绑定")
 	}
-	drv, ok := s.drivers[binding.Protocol]
+	drv, ok := s.drivers.Get(binding.Protocol)
 	if !ok {
 		return fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
 	}
@@ -222,7 +208,7 @@ func (s *Service) StartLive(ctx context.Context, resourceID, profileID string) (
 }
 
 func (s *Service) startLiveByProtocol(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, profile *domainasset.StreamProfile) (*dto.StreamContent, error) {
-	drv, ok := s.drivers[binding.Protocol]
+	drv, ok := s.drivers.Get(binding.Protocol)
 	if !ok {
 		return nil, fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
 	}
@@ -249,7 +235,7 @@ func (s *Service) StopLive(ctx context.Context, resourceID string) error {
 	} else if binding != nil {
 		protocol = binding.Protocol
 	}
-	drv, ok := s.drivers[protocol]
+	drv, ok := s.drivers.Get(protocol)
 	if !ok {
 		return fmt.Errorf("不支持的接入协议")
 	}
@@ -288,7 +274,7 @@ func profileToken(p *domainasset.StreamProfile) string {
 	return sel.ProfileToken
 }
 
-func (s *Service) setSession(resourceID string, sess *liveSession) {
+func (s *Service) setSession(resourceID string, sess *channeldrv.Session) {
 	if sess == nil {
 		return
 	}
@@ -297,7 +283,7 @@ func (s *Service) setSession(resourceID string, sess *liveSession) {
 	s.sessions[resourceID] = sess
 }
 
-func (s *Service) getSession(resourceID string) *liveSession {
+func (s *Service) getSession(resourceID string) *channeldrv.Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sess := s.sessions[resourceID]

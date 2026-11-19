@@ -16,6 +16,7 @@ import (
 	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
+	"zero-web-server/internal/application/channeldrv"
 	appauth "zero-web-server/internal/application/auth"
 	cascadeapp "zero-web-server/internal/application/cascade"
 	channelapp "zero-web-server/internal/application/channel"
@@ -238,19 +239,23 @@ func main() {
 		platformSIPClient.ApplyConfig(updated)
 	})
 
+	onvifFactory := onvifinfra.NewClientFactory(30)
+	onvifService := onvifapp.NewService(
+		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaCluster, cfg.UserSettings.ServerID,
+	)
 	playService := playapp.NewService(deviceRepo, channelRepo, sessionAdapter, mediaCluster, cfg.UserSettings.ServerID, cfg.Server.Port)
-	ptzService := ptzapp.NewService(deviceRepo, channelRepo, assetRepo, sessionAdapter, sessionAdapter)
+	drivers := channeldrv.New(channeldrv.Deps{
+		Play: playService, ONVIF: onvifService, Plugin: ipcService,
+		Device: deviceService, Devices: deviceRepo, PTZ: sessionAdapter,
+	})
+	ptzService := ptzapp.NewService(deviceRepo, channelRepo, assetRepo, drivers, sessionAdapter, sessionAdapter)
 	sipServer.SetPTZPositionHandler(ptzService)
 	sipServer.SetSnapShotHandler(snapService)
 	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)
 	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sessionAdapter, playbackService, sessionAdapter, sipCfg.ID, cfg.UserSettings.ServerID, platformChannelSvc)
 	sipServer.SetCascadeInbound(cascadeInbound)
-	onvifFactory := onvifinfra.NewClientFactory(30)
-	onvifService := onvifapp.NewService(
-		onvifDeviceRepo, onvifChannelRepo, onvifFactory, mediaCluster, cfg.UserSettings.ServerID,
-	)
 	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
-	assetService := assetapp.NewService(assetRepo, assetProjector, playService, onvifService, ipcService, deviceService)
+	assetService := assetapp.NewService(assetRepo, assetProjector, drivers)
 
 	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)
