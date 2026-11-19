@@ -116,6 +116,14 @@ make frontend-dev   # 前端开发模式
 make frontend-build # 前端构建
 ```
 
+Windows 前后端一起启动：
+
+```bat
+tools\dev.cmd              REM 推荐：自动绕过 PowerShell 执行策略
+tools\dev.cmd status
+tools\dev.cmd stop
+```
+
 ## 贡献
 
 欢迎提交 Issue / PR。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。

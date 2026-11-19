@@ -9,15 +9,15 @@ run:
 # One-shot dev: backend + frontend (local MySQL/Redis; add --docker if using Docker)
 dev:
 	@if [ -x tools/dev.sh ]; then ./tools/dev.sh start; \
-	else echo "Run: powershell -File tools/dev.ps1 start"; fi
+	else echo "Run: tools\\dev.cmd start (Windows) or powershell -ExecutionPolicy Bypass -File tools/dev.ps1 start"; fi
 
 dev-stop:
 	@if [ -x tools/dev.sh ]; then ./tools/dev.sh stop; \
-	else echo "Run: powershell -File tools/dev.ps1 stop"; fi
+	else echo "Run: tools\\dev.cmd stop (Windows) or powershell -ExecutionPolicy Bypass -File tools/dev.ps1 stop"; fi
 
 dev-status:
 	@if [ -x tools/dev.sh ]; then ./tools/dev.sh status; \
-	else echo "Run: powershell -File tools/dev.ps1 status"; fi
+	else echo "Run: tools\\dev.cmd status (Windows) or powershell -ExecutionPolicy Bypass -File tools/dev.ps1 status"; fi
 
 build:
 	go build -o bin/zero-web-server ./cmd/server

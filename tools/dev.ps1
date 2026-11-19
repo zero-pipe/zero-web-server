@@ -1,6 +1,8 @@
 # zero-web-server dev orchestrator (Windows)
 # Usage:
-#   .\tools\dev.ps1                 # backend + frontend (uses local MySQL/Redis if already running)
+#   .\tools\dev.cmd                 # recommended: bypasses PowerShell execution policy
+#   powershell -ExecutionPolicy Bypass -File .\tools\dev.ps1
+#   .\tools\dev.ps1                 # only if scripts are allowed on this machine
 #   .\tools\dev.ps1 start -Docker   # optional: docker compose up MySQL/Redis first
 #   .\tools\dev.ps1 start -Media    # optional: ../zms/demo_media_server
 #   .\tools\dev.ps1 start -SkipBuild   # skip go build, use existing bin/zero-web-server.exe
