@@ -66,6 +66,9 @@ type GBDeviceControl interface {
 	QueryPTZPosition(device *domaindevice.Device, channelID string) (string, <-chan gbsip.PTZPosition)
 	QuerySDCardStatus(device *domaindevice.Device, channelID string) (string, <-chan gbsip.SDCardStatus)
 	CancelQuery(sn string)
+	SendPTZPrecise(device *domaindevice.Device, channelID string, pan, tilt, zoom float64) error
+	SendFormatSDCard(device *domaindevice.Device, channelID string) error
+	SendTargetTrack(device *domaindevice.Device, channelID, trackType string) error
 	SendAlarmCmd(device *domaindevice.Device, channelID, alarmCmd string) error
 	SendTeleBoot(device *domaindevice.Device, channelID string) error
 	SendIFrameCmd(device *domaindevice.Device, channelID string) error

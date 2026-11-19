@@ -497,3 +497,52 @@ func (h *DeviceHandler) SDCardStatusQuery(c *gin.Context) {
 	}
 	response.OK(c, v)
 }
+
+// PTZPrecise GET /api/device/control/ptz_precise?deviceId=&channelId=&pan=&tilt=&zoom=
+func (h *DeviceHandler) PTZPrecise(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	pan, _ := strconv.ParseFloat(c.Query("pan"), 64)
+	tilt, _ := strconv.ParseFloat(c.Query("tilt"), 64)
+	zoom, _ := strconv.ParseFloat(c.Query("zoom"), 64)
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	if err := h.svc.PTZPrecise(deviceID, channelID, pan, tilt, zoom); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// FormatSDCard GET /api/device/control/sdcard_format?deviceId=&channelId=
+func (h *DeviceHandler) FormatSDCard(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	if deviceID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 不能为空")
+		return
+	}
+	if err := h.svc.FormatSDCard(deviceID, channelID); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// TargetTrack GET /api/device/control/target_track?deviceId=&channelId=&trackType=
+func (h *DeviceHandler) TargetTrack(c *gin.Context) {
+	deviceID := strings.TrimSpace(c.Query("deviceId"))
+	channelID := strings.TrimSpace(c.Query("channelId"))
+	trackType := strings.TrimSpace(c.Query("trackType"))
+	if deviceID == "" || channelID == "" {
+		response.Error(c, response.CodeBadReq, "deviceId 与 channelId 不能为空")
+		return
+	}
+	if err := h.svc.TargetTrack(deviceID, channelID, trackType); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}

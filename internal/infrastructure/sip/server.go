@@ -31,6 +31,11 @@ type PositionHandler interface {
 	HandleNotify(deviceID, channelGBID string, pos *MobilePositionNotify) error
 }
 
+// PTZPositionHandler receives GB28181 PTZPosition (2022) notifications.
+type PTZPositionHandler interface {
+	HandlePTZPosition(deviceID, channelGBID string, pan, tilt, zoom int) error
+}
+
 // MediaHandler receives GB28181 MediaStatus (File to End) notifications.
 type MediaHandler interface {
 	HandleMediaStatus(deviceID, channelGBID, notifyType string) error
@@ -79,6 +84,7 @@ func (s *Server) SetRequirePreRegister(v bool) {
 func (s *Server) SetAlarmHandler(h AlarmHandler)             { s.bridge.alarm = h }
 func (s *Server) SetPositionHandler(h PositionHandler)       { s.bridge.position = h }
 func (s *Server) SetMediaHandler(h MediaHandler)             { s.bridge.media = h }
+func (s *Server) SetPTZPositionHandler(h PTZPositionHandler) { s.bridge.ptzPosition = h }
 func (s *Server) SetSubordinateHandler(h SubordinateHandler) { s.bridge.subordinate = h }
 func (s *Server) SetCascadeInbound(h gbserver.CascadeInboundHandler) {
 	s.bridge.cascade = h
@@ -291,6 +297,45 @@ func fanout[T any](raw <-chan *manscdp.Message, pick func(*manscdp.Message) (T, 
 		}
 	}()
 	return out
+}
+
+// SendPTZPrecise 发送 PTZ 精准控制（2022）。
+func (s *Server) SendPTZPrecise(device *domaindevice.Device, channelID string, pan, tilt, zoom float64) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildPTZPreciseCtrl(target, s.lib.NextSN(), pan, tilt, zoom)
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendFormatSDCard 发送存储卡格式化（2022，无应答）。
+func (s *Server) SendFormatSDCard(device *domaindevice.Device, channelID string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildFormatSDCard(target, s.lib.NextSN())
+	return s.lib.SendDeviceControl(toPeer(device), body)
+}
+
+// SendTargetTrack 发送目标跟踪（2022，无应答）。
+func (s *Server) SendTargetTrack(device *domaindevice.Device, channelID, trackType string) error {
+	if device == nil {
+		return fmt.Errorf("设备为空")
+	}
+	target := strings.TrimSpace(channelID)
+	if target == "" {
+		target = device.DeviceID
+	}
+	body := manscdp.BuildTargetTrack(target, s.lib.NextSN(), trackType)
+	return s.lib.SendDeviceControl(toPeer(device), body)
 }
 
 // SendAlarmCmd 发送报警复位（AlarmCmd=ResetAlarm）。

@@ -262,3 +262,24 @@ func (s *Service) QueryDeviceStatus(deviceID string) (*port.GBDeviceStatus, erro
 		return nil, fmt.Errorf("设备状态查询超时")
 	}
 }
+
+// PTZPrecise 发送 PTZ 精准控制（2022）。
+func (s *Service) PTZPrecise(deviceID, channelID string, pan, tilt, zoom float64) error {
+	return s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendPTZPrecise(device, channelID, pan, tilt, zoom)
+	})
+}
+
+// FormatSDCard 发送存储卡格式化（2022）。
+func (s *Service) FormatSDCard(deviceID, channelID string) error {
+	return s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendFormatSDCard(device, channelID)
+	})
+}
+
+// TargetTrack 发送目标跟踪（2022）。
+func (s *Service) TargetTrack(deviceID, channelID, trackType string) error {
+	return s.controlDevice(deviceID, func(device *domaindevice.Device) error {
+		return s.sip.SendTargetTrack(device, channelID, trackType)
+	})
+}

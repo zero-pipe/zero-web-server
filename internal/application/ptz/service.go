@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	domaindevice "zero-web-server/internal/domain/device"
@@ -42,15 +43,79 @@ const (
 type Service struct {
 	devices       domaindevice.Repository
 	sip           port.GBPTZNode
+	control       port.GBDeviceControl
 	presetTimeout time.Duration
+	positions     sync.Map // "deviceID/channelGBID" -> gbsip.PTZPosition
 }
 
-func NewService(devices domaindevice.Repository, sipServer port.GBPTZNode) *Service {
+func NewService(devices domaindevice.Repository, sipServer port.GBPTZNode, control port.GBDeviceControl) *Service {
 	return &Service{
 		devices:       devices,
 		sip:           sipServer,
+		control:       control,
 		presetTimeout: 4 * time.Second,
 	}
+}
+
+// HandlePTZPosition 缓存设备推送的云台精准位置（2022 订阅通知）。
+func (s *Service) HandlePTZPosition(deviceID, channelGBID string, pan, tilt, zoom int) error {
+	s.positions.Store(deviceID+"/"+channelGBID, gbsip.PTZPosition{Pan: pan, Tilt: tilt, Zoom: zoom})
+	return nil
+}
+
+// LatestPTZPosition 返回最近一次缓存的云台精准位置。
+func (s *Service) LatestPTZPosition(deviceID, channelGBID string) (*gbsip.PTZPosition, bool) {
+	v, ok := s.positions.Load(deviceID + "/" + channelGBID)
+	if !ok {
+		return nil, false
+	}
+	p := v.(gbsip.PTZPosition)
+	return &p, true
+}
+
+// QueryPTZPosition 主动查询设备云台精准位置（2022）。
+func (s *Service) QueryPTZPosition(deviceID, channelGBID string) (*gbsip.PTZPosition, error) {
+	if s.control == nil {
+		return nil, fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.devices.GetByDeviceID(deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return nil, fmt.Errorf("设备离线")
+	}
+	sn, ch := s.control.QueryPTZPosition(device, channelGBID)
+	select {
+	case p, ok := <-ch:
+		if !ok {
+			return nil, fmt.Errorf("设备未应答")
+		}
+		s.positions.Store(deviceID+"/"+channelGBID, p)
+		return &p, nil
+	case <-time.After(5 * time.Second):
+		s.control.CancelQuery(sn)
+		return nil, fmt.Errorf("设备应答超时")
+	}
+}
+
+// SubscribePTZPosition 订阅设备云台精准位置变化（2022）。
+func (s *Service) SubscribePTZPosition(deviceID, channelGBID string, expires int) error {
+	if s.control == nil {
+		return fmt.Errorf("SIP 未就绪")
+	}
+	device, err := s.devices.GetByDeviceID(deviceID)
+	if err != nil {
+		return fmt.Errorf("设备不存在")
+	}
+	if !device.OnLine {
+		return fmt.Errorf("设备离线")
+	}
+	if expires <= 0 {
+		expires = 3600
+	}
+	body := gbsip.BuildPTZPositionQuery(channelGBID, "1")
+	return s.control.SendSubscribe(device, "PTZPosition", body, expires)
 }
 
 func (s *Service) Control(deviceID, channelID, command string, horizonSpeed, verticalSpeed, zoomSpeed int) error {

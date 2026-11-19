@@ -16,4 +16,7 @@ func registerDeviceControl(parent *gin.RouterGroup, deviceHandler *handler.Devic
 	g.GET("/alarm_reset", deviceHandler.AlarmReset)
 	g.GET("/teleboot", deviceHandler.TeleBoot)
 	g.GET("/iframe", deviceHandler.IFrame)
+	g.GET("/ptz_precise", deviceHandler.PTZPrecise)
+	g.GET("/sdcard_format", deviceHandler.FormatSDCard)
+	g.GET("/target_track", deviceHandler.TargetTrack)
 }

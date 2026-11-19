@@ -44,6 +44,11 @@ func NormalizeStreamMode(mode string) string {
 	return transport.Normalize(mode)
 }
 
+// BuildPTZPositionQuery 构造 PTZ 精准位置查询/订阅消息体。
+func BuildPTZPositionQuery(channelID, sn string) string {
+	return manscdp.BuildPTZPositionQuery(channelID, sn)
+}
+
 // PlaySSRC 生成 GB28181 播放 SSRC（0 + domain[3:8] + 4 位序号）。
 func PlaySSRC(domain string, seq int) string {
 	return ssrc.Play(domain, seq)

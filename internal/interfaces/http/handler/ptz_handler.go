@@ -217,3 +217,33 @@ func (h *PTZHandler) SetScanSpeed(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
+
+// PTZPosition 返回最近缓存的云台精准位置（2022 订阅通知）。
+func (h *PTZHandler) PTZPosition(c *gin.Context) {
+	pos, ok := h.svc.LatestPTZPosition(c.Param("deviceId"), c.Param("channelId"))
+	if !ok {
+		response.Error(c, response.CodeError, "暂无位置数据，请先订阅")
+		return
+	}
+	response.OK(c, pos)
+}
+
+// PTZPositionQuery 主动查询设备云台精准位置（2022）。
+func (h *PTZHandler) PTZPositionQuery(c *gin.Context) {
+	pos, err := h.svc.QueryPTZPosition(c.Param("deviceId"), c.Param("channelId"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, pos)
+}
+
+// PTZPositionSubscribe 订阅云台精准位置变化（2022）。
+func (h *PTZHandler) PTZPositionSubscribe(c *gin.Context) {
+	expires, _ := strconv.Atoi(c.DefaultQuery("expires", "3600"))
+	if err := h.svc.SubscribePTZPosition(c.Param("deviceId"), c.Param("channelId"), expires); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}

@@ -33,6 +33,7 @@ type bridge struct {
 	alarm       AlarmHandler
 	position    PositionHandler
 	media       MediaHandler
+	ptzPosition PTZPositionHandler
 	redirect    string
 	redis       *redisinfra.Client
 	password    string
@@ -237,6 +238,13 @@ func (b *bridge) OnAlarm(_ context.Context, deviceID, channelID string, alarm *m
 		return nil
 	}
 	return b.alarm.HandleNotify(deviceID, channelID, alarm)
+}
+
+func (b *bridge) OnPTZPosition(_ context.Context, deviceID, channelID string, pos *manscdp.PTZPosition) error {
+	if b.ptzPosition == nil || pos == nil {
+		return nil
+	}
+	return b.ptzPosition.HandlePTZPosition(deviceID, channelID, pos.Pan, pos.Tilt, pos.Zoom)
 }
 
 func (b *bridge) OnMobilePosition(_ context.Context, deviceID, channelID string, pos *manscdp.MobilePositionNotify) error {
