@@ -113,24 +113,25 @@ checksum: sha256:...
 #### 控制面与数据面
 
 ```text
-平台 zws  ──WebSocket/HTTPS（Agent 主动外连，NAT 友好）──  zero-agent
+平台 zws  ──HTTPS 注册/心跳（Agent 主动外连）──  zero-agent
                                                           ├─ plugin A（127.0.0.1:port）
                                                           └─ plugin B（127.0.0.1:port）
-平台调用插件：统一经 Agent 反代 /agent/{agentId}/plugin/{pluginId}/rpc
+平台调用 Agent：HTTPS（启停/状态）
+平台调用插件：统一经 Agent 反代 /plugins/{pluginId}/{rpcPath}
 ```
 
 **只支持 Agent 托管 + 反代**：
 
 - 平台不需要知道插件端口，插件只监听 localhost；
-- NAT/防火墙只开 Agent 一个出站连接；
+- Agent 的 `endpoint` 必须平台可达；Agent 主动向平台注册/心跳；
 - 启停、日志、健康统一由 Agent 负责；
 - 不提供插件直连平台模式，插件不得自注册到平台。
 
 #### 平台地址与 token
 
-- Agent 配置 `platform_url` 与 `agent_token`；安装时由部署包/注册码写入，插件不保存平台地址。
-- Agent 注册成功后，平台返回 `plugin_token`、`heartbeat_interval`；
-- 插件启动参数只由 Agent 注入：`PLUGIN_ID`、`PLUGIN_INSTANCE_ID`、`AGENT_RPC_URL`、`PLUGIN_TOKEN`；
+- Agent 配置 `platform_url` 与 `token`；安装时由部署包/注册码写入，插件不保存平台地址。
+- Agent 注册/心跳响应返回插件 `desiredState`，Agent 据此对账本地进程；
+- 插件启动参数只由 Agent 注入：`PLUGIN_LISTEN`、`PLUGIN_ID`、`PLUGIN_INSTANCE_ID`、`PLUGIN_TOKEN`；
 - 插件不硬编码平台地址、不直接访问平台 API。
 
 #### Agent 生命周期
@@ -147,11 +148,8 @@ checksum: sha256:...
 #### Agent 与平台 API（草案）
 
 ```text
-POST /api/v1/agents/register            # agent_id/host/version/token
-POST /api/v1/agents/heartbeat           # 状态、插件状态、资源摘要
-GET  /api/v1/agents/{id}/desired-state  # 或 WS 推送
-POST /api/v1/agents/{id}/report         # 命令结果/日志/错误
-WS   /api/v1/agents/ws                  # 推荐：命令下发 + 心跳 + 状态
+POST /api/v1/agents/register            # agent_id/host/endpoint/plugins
+POST /api/v1/agents/heartbeat           # 状态、插件状态、desired 对账
 管理员：
 GET  /api/v1/agents
 GET  /api/v1/agents/{id}/plugins
