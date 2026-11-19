@@ -17,11 +17,18 @@ import (
 )
 
 type DeviceHandler struct {
-	svc *deviceapp.Service
+	svc    *deviceapp.Service
+	assets assetPruner
 }
 
 func NewDeviceHandler(svc *deviceapp.Service) *DeviceHandler {
 	return &DeviceHandler{svc: svc}
+}
+
+// WithAssetPruner 注入统一资产清理器，删除设备后回收残留资产。
+func (h *DeviceHandler) WithAssetPruner(p assetPruner) *DeviceHandler {
+	h.assets = p
+	return h
 }
 
 func (h *DeviceHandler) GetDevice(c *gin.Context) {
@@ -99,6 +106,9 @@ func (h *DeviceHandler) DeleteDevice(c *gin.Context) {
 	if err := h.svc.Delete(c.Param("deviceId")); err != nil {
 		response.FromError(c, err)
 		return
+	}
+	if h.assets != nil {
+		_ = h.assets.Prune() // 清理该设备在统一资产中的残留
 	}
 	response.OK(c, nil)
 }

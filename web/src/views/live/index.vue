@@ -16,12 +16,7 @@
             <i class="iconfont icon-a-mti-9fenpingshi btn" :class="{active: spiltIndex === 3}" @click="spiltIndex=3" />
           </div>
           <div class="global-player-control">
-            播放器:
-            <el-select v-model="globalPlayer" size="mini" style="width: 120px">
-              <el-option label="Jessibuca" value="jessibuca" />
-              <el-option label="WebRTC" value="webRTC" />
-              <el-option label="H265web" value="h265web" />
-            </el-select>
+            <player-mode-select />
           </div>
           <div class="fullscreen-control">
             <i class="el-icon-full-screen btn" @click="fullScreen()" />
@@ -46,7 +41,7 @@
                 :ref="'playerTabs' + i"
                 :show-tab="false"
                 :show-button="true"
-                :preferred-player="globalPlayer"
+                :preferred-player="preferredPlayer"
                 @playStatusChange="onPlayerPlayStatus(i - 1, $event)"
               />
               <div
@@ -101,6 +96,8 @@
 <script>
 
 import PlayerTabs from '../common/playerTabs.vue'
+import PlayerModeSelect from '../common/playerModeSelect.vue'
+import { modeToPreferredPlayer } from '@/utils/playerStrategy'
 import DeviceTree from '../common/DeviceTree.vue'
 import channelPtzPanel from '../channel/common/channelPtzPanel.vue'
 import LivePtzPreset from './LivePtzPreset.vue'
@@ -109,7 +106,7 @@ import screenFull from 'screenfull'
 export default {
   name: 'Live',
   components: {
-    PlayerTabs, DeviceTree, channelPtzPanel, LivePtzPreset
+    PlayerTabs, PlayerModeSelect, DeviceTree, channelPtzPanel, LivePtzPreset
   },
 
   data() {
@@ -120,7 +117,6 @@ export default {
       pullCountdown: [],
       pullCycle: [],
       pullFading: [],
-      globalPlayer: 'jessibuca',
       sidebarVisible: true, // 侧边栏
       ptzVisible: false, // 云台面板
       currentChannelId: null, // 当前选中通道
@@ -172,6 +168,10 @@ export default {
   },
 
   computed: {
+    /** 全局播放模式（store）换算成 PlayerTabs 的偏好引擎，空串交给策略自动决定 */
+    preferredPlayer() {
+      return modeToPreferredPlayer(this.$store.getters.playerMode)
+    },
     liveStyle() {
       return {
         display: 'grid',
@@ -200,16 +200,6 @@ export default {
       }
       window.localStorage.setItem('split', newValue)
     },
-    globalPlayer(newKey) {
-      for (let i = 1; i <= this.layout[this.spiltIndex].spilt; i++) {
-        const ref = this.$refs['playerTabs' + i]
-        if (ref) {
-          const instance = ref instanceof Array ? ref[0] : ref
-          instance.switchPlayer(newKey)
-        }
-      }
-      window.localStorage.setItem('globalPlayer', newKey)
-    },
     '$route.fullPath': 'checkPlayByParam'
   },
   mounted() {
@@ -218,10 +208,6 @@ export default {
     this.handleResize()
   },
   created() {
-    const savedPlayer = window.localStorage.getItem('globalPlayer')
-    if (savedPlayer && ['jessibuca', 'webRTC', 'h265web'].includes(savedPlayer)) {
-      this.globalPlayer = savedPlayer
-    }
     const savedSplit = window.localStorage.getItem('split')
     if (savedSplit !== null && savedSplit !== '') {
       const n = parseInt(savedSplit, 10)

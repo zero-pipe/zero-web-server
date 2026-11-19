@@ -44,6 +44,8 @@ type Repository interface {
 	GetRegionByDeviceID(deviceID string) (*domaintree.Node, error)
 	// ListRegionChildren 返回直接子区划（删除子树时逐层收集）。
 	ListRegionChildren(parentID int) ([]RegionRecord, error)
+	// ListRegionChildrenByDeviceID 按父区划编号返回子区划（兼容 parent_id 悬挂的历史数据）。
+	ListRegionChildrenByDeviceID(parentDeviceID string) ([]RegionRecord, error)
 	// DeleteRegionsByIDs 删除区划节点（调用方负责先删子后删父）。
 	DeleteRegionsByIDs(ids []int) error
 	// ClearChannelsByCivilCodes 解除通道对区划的挂载（gb_civil_code 置空）。

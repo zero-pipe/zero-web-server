@@ -305,7 +305,8 @@ export default {
         const data = await this.$store.dispatch('server/getMediaInfo', {
           app: playStream.app,
           stream: playStream.stream,
-          mediaServerId: playStream.mediaServerId
+          mediaServerId: playStream.mediaServerId,
+          silent: true // 轮询等待流上线，不弹全局错误
         })
         if (data) {
           const url = location.protocol === 'https:' ? playStream.rtcs : playStream.rtc

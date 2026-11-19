@@ -102,7 +102,27 @@ export default {
       this.activePlayer = this.playerList[0].key
     }
   },
+  watch: {
+    // 全局播放模式变化（任意页面切换后）：按可用能力重新落位到具体引擎
+    preferredPlayer() {
+      this.$nextTick(() => this.reapplyPreference())
+    }
+  },
   methods: {
+    /** 按当前 preferredPlayer/策略重新选择引擎；仅在变化时重启播放。 */
+    reapplyPreference() {
+      const before = this.activePlayer
+      this.ensureActivePlayer()
+      if (this.activePlayer === before) return
+      if (this.$refs[before] && this.$refs[before].pause) {
+        this.$refs[before].pause()
+      }
+      this.$nextTick(() => {
+        this.play()
+        this.syncPlayerSize()
+      })
+      this.$emit('player-changed', this.activePlayer)
+    },
     getPlayerList() {
       return this.playerList
     },

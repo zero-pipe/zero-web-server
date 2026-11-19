@@ -97,18 +97,20 @@ WHERE channel_type = 0 AND gb_parent_id = ?`
 
 func (r *GroupRegionRepository) QueryRegionTree(parentID *int) ([]domaintree.Node, error) {
 	sql := `
-SELECT id, device_id, name, parent_id, parent_device_id,
-       CONCAT('region', id) AS tree_id, 0 AS type, 0 AS is_leaf, 'ON' AS status
-FROM zws_common_region
+SELECT r.id, r.device_id, r.name, r.parent_id, r.parent_device_id,
+       CONCAT('region', r.id) AS tree_id, 0 AS type, 0 AS is_leaf, 'ON' AS status
+FROM zws_common_region r
 WHERE 1=1`
 	args := make([]any, 0, 1)
 	if parentID != nil {
-		sql += " AND parent_id = ?"
+		sql += " AND r.parent_id = ?"
 		args = append(args, *parentID)
 	} else {
-		sql += " AND parent_id IS NULL"
+		// 根层：除正常根节点外，把父节点已删的孤儿节点也显示出来，
+		// 否则它们既不显示也无法从界面删除，却仍会占用 device_id 导致无法重建。
+		sql += " AND (r.parent_id IS NULL OR NOT EXISTS (SELECT 1 FROM zws_common_region p WHERE p.id = r.parent_id))"
 	}
-	sql += " ORDER BY device_id ASC"
+	sql += " ORDER BY r.device_id ASC"
 	var rows []domaintree.Node
 	if err := r.db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
@@ -185,6 +187,17 @@ func (r *GroupRegionRepository) ListRegionChildren(parentID int) ([]domaingroupr
 	err := r.db.Raw(`
 SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id
 FROM zws_common_region WHERE parent_id = ?`, parentID).Scan(&rows).Error
+	if rows == nil {
+		rows = []domaingroupregion.RegionRecord{}
+	}
+	return rows, err
+}
+
+func (r *GroupRegionRepository) ListRegionChildrenByDeviceID(parentDeviceID string) ([]domaingroupregion.RegionRecord, error) {
+	var rows []domaingroupregion.RegionRecord
+	err := r.db.Raw(`
+SELECT id, device_id, name, parent_id, COALESCE(parent_device_id, '') AS parent_device_id
+FROM zws_common_region WHERE parent_device_id = ?`, strings.TrimSpace(parentDeviceID)).Scan(&rows).Error
 	if rows == nil {
 		rows = []domaingroupregion.RegionRecord{}
 	}

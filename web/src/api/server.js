@@ -112,10 +112,11 @@ export function checkObjectStoreHealth() {
 }
 
 export function getMediaInfo(params) {
-  const { app, stream, mediaServerId } = params
+  const { app, stream, mediaServerId, silent } = params
   return request({
     method: 'get',
     url: `/api/v1/server/media_server/media_info`,
+    silent: !!silent,
     params: {
       app: app,
       stream: stream,

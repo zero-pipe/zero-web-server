@@ -45,7 +45,10 @@ service.interceptors.response.use(
     }
     if (res.code && res.code !== 0) {
       const msg = res.msg || '请求失败'
-      Message.error({ message: msg, showClose: true })
+      // config.silent：轮询类接口自行处理失败（如等待流上线），不弹全局提示
+      if (!response.config || !response.config.silent) {
+        Message.error({ message: msg, showClose: true })
+      }
       return Promise.reject(new Error(msg))
     }
     return res
@@ -61,7 +64,7 @@ service.interceptors.response.use(
       if (/timeout of \d+ms exceeded/i.test(msg)) {
         msg = '请求超时，请检查后端服务或媒体节点是否可达'
       }
-      if (msg && store.getters.showConfirmBoxForLoginLose) {
+      if (msg && store.getters.showConfirmBoxForLoginLose && !(error && error.config && error.config.silent)) {
         Message.error({ message: msg, showClose: true })
       }
       return Promise.reject(error || new Error(msg))
@@ -86,7 +89,7 @@ service.interceptors.response.use(
           })
         })
       }
-    } else if (store.getters.showConfirmBoxForLoginLose) {
+    } else if (store.getters.showConfirmBoxForLoginLose && !(error.config && error.config.silent)) {
       const data = error.response.data
       Message.error({
         message: (data && data.msg) || error.message || '请求失败',

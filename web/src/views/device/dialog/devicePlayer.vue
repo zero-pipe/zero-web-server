@@ -15,10 +15,7 @@
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
         <span class="vms-player-select">
-          播放器:
-          <el-select v-model="selectedPlayer" size="mini" style="width: 120px" @change="onPlayerChange">
-            <el-option v-for="p in availablePlayers" :key="p.key" :label="p.label" :value="p.key" />
-          </el-select>
+          <player-mode-select />
         </span>
       </div>
 
@@ -38,7 +35,7 @@
                 :has-audio="hasAudio"
                 :show-button="true"
                 :show-tab="false"
-                :preferred-player="selectedPlayer"
+                :preferred-player="preferredPlayer"
                 @playerChanged="playerChanged"
               />
             </div>
@@ -102,11 +99,12 @@
 <script>
 import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '../../common/playerTabs.vue'
+import playerModeSelect from '../../common/playerModeSelect.vue'
 import devicePtzPanel from '../common/devicePtzPanel.vue'
 import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
 import streamMediaPanel from '../../common/streamMediaPanel.vue'
-import { resolvePlayerStrategy, PLAYER_LABELS } from '@/utils/playerStrategy'
+import { modeToPreferredPlayer } from '@/utils/playerStrategy'
 
 function isDomeCamera(ptzType) {
   const t = Number(ptzType)
@@ -116,7 +114,7 @@ function isDomeCamera(ptzType) {
 export default {
   name: 'DevicePlayer',
   directives: { elDragDialog },
-  components: { playerTabs, devicePtzPanel, PtzPreset, mediaInfo, streamMediaPanel },
+  components: { playerTabs, playerModeSelect, devicePtzPanel, PtzPreset, mediaInfo, streamMediaPanel },
   data() {
     return {
       videoUrl: '',
@@ -133,7 +131,6 @@ export default {
       playError: '',
       showVideoDialog: false,
       streamInfo: null,
-      selectedPlayer: 'jessibuca',
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
@@ -141,48 +138,19 @@ export default {
       dragZoomDirection: ''
     }
   },
-  created() {
-    const saved = window.localStorage.getItem('globalPlayer')
-    if (saved && ['jessibuca', 'webRTC', 'h265web'].includes(saved)) {
-      this.selectedPlayer = saved
-    }
-  },
   computed: {
+    /** 全局播放模式（store）换算成 PlayerTabs 的偏好引擎 */
+    preferredPlayer() {
+      return modeToPreferredPlayer(this.$store.getters.playerMode)
+    },
     ptzEnabled() {
       return isDomeCamera(this.ptzType)
     },
     isStreaming() {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
-    },
-    /** 当前码流/能力下可用的播放器（用户可见文案），用于顶部播放器下拉过滤 */
-    availablePlayers() {
-      const s = this.streamInfo
-      const strategy = resolvePlayerStrategy({
-        videoCodec: s && s.videoCodec,
-        audioCodec: s && s.audioCodec,
-        hasAudio: this.hasAudio,
-        rtcAvailable: !!(s && (s.rtc || s.rtcs))
-      })
-      return strategy.allowedPlayers.map(key => ({ key, label: PLAYER_LABELS[key] || key }))
-    }
-  },
-  watch: {
-    // 可用播放器随码流能力变化：若当前选择已不可用，切到列表首个
-    availablePlayers(list) {
-      if (!list || !list.length) return
-      if (!list.some(p => p.key === this.selectedPlayer)) {
-        this.selectedPlayer = list[0].key
-      }
     }
   },
   methods: {
-    onPlayerChange(key) {
-      this.selectedPlayer = key
-      window.localStorage.setItem('globalPlayer', key)
-      if (this.$refs.playerTabs) {
-        this.$refs.playerTabs.switchPlayer(key)
-      }
-    },
     extraTabClick() {},
     refreshMediaInfo() {
       this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo()

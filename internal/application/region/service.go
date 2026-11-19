@@ -186,22 +186,35 @@ func (s *Service) Delete(id int) error {
 	ids := []int{id}
 	codes := []string{root.DeviceID}
 	visited := map[int]bool{id: true}
-	queue := []int{id}
+	type pending struct {
+		id       int
+		deviceID string
+	}
+	queue := []pending{{id: id, deviceID: root.DeviceID}}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		children, err := s.repo.ListRegionChildren(cur)
+		children, err := s.repo.ListRegionChildren(cur.id)
 		if err != nil {
 			return err
 		}
-		for i := range children {
-			if visited[children[i].ID] {
+		// 历史脏数据里子节点的 parent_id 可能指向已删除的重复父行，
+		// 因此再按 parent_device_id 收集一次，避免漏删造成孤儿节点。
+		var byDevice []domaingroupregion.RegionRecord
+		if strings.TrimSpace(cur.deviceID) != "" {
+			byDevice, err = s.repo.ListRegionChildrenByDeviceID(cur.deviceID)
+			if err != nil {
+				return err
+			}
+		}
+		for _, child := range append(children, byDevice...) {
+			if visited[child.ID] {
 				continue
 			}
-			visited[children[i].ID] = true
-			ids = append(ids, children[i].ID)
-			codes = append(codes, children[i].DeviceID)
-			queue = append(queue, children[i].ID)
+			visited[child.ID] = true
+			ids = append(ids, child.ID)
+			codes = append(codes, child.DeviceID)
+			queue = append(queue, pending{id: child.ID, deviceID: child.DeviceID})
 		}
 	}
 	if err := s.repo.ClearChannelsByCivilCodes(codes); err != nil {

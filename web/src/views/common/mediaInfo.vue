@@ -2,7 +2,7 @@
   <div id="mediaInfo" class="media-info-panel">
     <div class="mi-toolbar">
       <span class="mi-title">流媒体概况</span>
-      <el-button class="mi-refresh" icon="el-icon-refresh-right" circle size="mini" @click="getMediaInfo" />
+      <el-button class="mi-refresh" icon="el-icon-refresh-right" circle size="mini" @click="getMediaInfo(false)" />
     </div>
 
     <template v-if="hasInfo">
@@ -85,14 +85,16 @@ export default {
     this.getMediaInfo()
   },
   methods: {
-    getMediaInfo() {
+    getMediaInfo(silent) {
       if (!this.app || !this.stream || !this.mediaServerId) {
         return
       }
       this.$store.dispatch('server/getMediaInfo', {
         app: this.app,
         stream: this.stream,
-        mediaServerId: this.mediaServerId
+        mediaServerId: this.mediaServerId,
+        // 轮询/自动刷新时流可能尚未上线，静默等待，不弹全局错误
+        silent: silent !== false
       })
         .then(data => {
           this.info = data || {}
@@ -103,7 +105,7 @@ export default {
     startTask() {
       this.stopTask()
       this.getMediaInfo()
-      this.task = setInterval(this.getMediaInfo, 1000)
+      this.task = setInterval(() => this.getMediaInfo(), 1000)
     },
     stopTask() {
       if (this.task) {

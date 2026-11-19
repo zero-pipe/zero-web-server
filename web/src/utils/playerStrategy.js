@@ -14,6 +14,28 @@ export const PLAYER_LABELS = {
   webRTC: '超低延迟'
 }
 
+/** 全局播放模式：所有页面共用同一个选择，内部再按码流能力换算成具体引擎。 */
+export const PLAYER_MODE_OPTIONS = [
+  { key: 'auto', label: '自动' },
+  { key: 'jessibuca', label: '标准' },
+  { key: 'webRTC', label: '超低延迟' }
+]
+
+/** 全局播放模式持久化键（沿用历史键名，兼容老版本已保存的值）。 */
+export const PLAYER_MODE_STORAGE_KEY = 'globalPlayer'
+
+/** 归一化历史/非法值：h265web 等旧值归入「自动」（H265 由策略强制高清，无需用户选择）。 */
+export function normalizePlayerMode(mode) {
+  if (mode === 'jessibuca' || mode === 'webRTC') return mode
+  return 'auto'
+}
+
+/** 模式 → PlayerTabs 的 preferredPlayer（空串表示交给策略自动决定）。 */
+export function modeToPreferredPlayer(mode) {
+  const m = normalizePlayerMode(mode)
+  return m === 'auto' ? '' : m
+}
+
 /** WebRTC 能承载的音频编码；AAC 等需转码，默认不选 WebRTC（会无声）。 */
 export const WEBRTC_AUDIO_CODECS = ['OPUS', 'PCMU', 'PCMA', 'G722']
 

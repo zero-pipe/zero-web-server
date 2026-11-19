@@ -214,9 +214,12 @@
                     title="切换播放器"
                   >{{ playerLabel }}</a>
                   <el-dropdown-menu slot="dropdown" :append-to-body="false">
-                    <el-dropdown-item command="jessibuca">Jessibuca</el-dropdown-item>
-                    <el-dropdown-item command="webRTC">WebRTC</el-dropdown-item>
-                    <el-dropdown-item command="h265web">H265Web</el-dropdown-item>
+                    <el-dropdown-item
+                      v-for="p in playerOptions"
+                      :key="p.key"
+                      :command="p.key"
+                    >{{ p.label }}
+                    </el-dropdown-item>
                   </el-dropdown-menu>
                 </el-dropdown>
                 <a
@@ -254,6 +257,7 @@ import recordDownload from '../../dialog/recordDownload.vue'
 import ChooseTimeRange from '../../dialog/chooseTimeRange.vue'
 import moment from 'moment'
 import screenfull from 'screenfull'
+import { PLAYER_LABELS, modeToPreferredPlayer } from '@/utils/playerStrategy'
 
 export default {
   name: 'DeviceRecord',
@@ -313,9 +317,11 @@ export default {
     }
   },
   computed: {
+    playerOptions() {
+      return ['jessibuca', 'webRTC', 'h265web'].map(key => ({ key, label: PLAYER_LABELS[key] || key }))
+    },
     playerLabel() {
-      const labels = { jessibuca: 'Jessibuca', webRTC: 'WebRTC', h265web: 'H265Web' }
-      return labels[this.activePlayer] || 'Jessibuca'
+      return PLAYER_LABELS[this.activePlayer] || PLAYER_LABELS.jessibuca
     },
     boxStyle() {
       if (this.showSidebar) {
@@ -354,6 +360,7 @@ export default {
     changePlayer(player) {
       if (this.activePlayer === player) return
       this.activePlayer = player
+      this.$store.dispatch('setPlayerMode', player)
       if (this.streamInfo) {
         this.videoUrl = this.getUrlByStreamInfo()
         this.$nextTick(() => {

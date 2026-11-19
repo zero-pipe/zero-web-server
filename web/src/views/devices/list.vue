@@ -198,9 +198,8 @@
 </template>
 
 <script>
-import { listDevices, syncDevice } from '@/api/devices'
-import { deleteDevice as deleteGBDevice } from '@/api/device'
-import { deleteDevice as deleteOnvifDevice, discoverDevices } from '@/api/onvif'
+import { listDevices, syncDevice, deleteDevice as deleteUnifiedDevice } from '@/api/devices'
+import { discoverDevices } from '@/api/onvif'
 import addWizard from './addWizard.vue'
 import editDialog from './editDialog.vue'
 import configInfo from '@/views/dialog/configInfo.vue'
@@ -367,14 +366,8 @@ export default {
     },
     handleDelete(row) {
       this.$confirm(`确定删除设备「${row.name}」？`, '提示', { type: 'warning' }).then(() => {
-        // 走各协议已有删除接口，避免统一 DELETE + id 冒号的兼容问题
-        if (row.protocol === 'gb28181') {
-          return deleteGBDevice(row.rawId)
-        }
-        if (row.protocol === 'onvif') {
-          return deleteOnvifDevice(row.rawId)
-        }
-        return Promise.reject(new Error('不支持的协议'))
+        // 统一删除：级联清理旧表通道 + 统一资产（设备/资源/能力/映射）
+        return deleteUnifiedDevice(row.id)
       }).then(() => {
         this.$message.success('已删除')
         this.loadList()

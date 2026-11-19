@@ -14,12 +14,7 @@
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
         <span class="vms-player-select">
-          播放器:
-          <el-select v-model="selectedPlayer" size="mini" style="width: 120px" @change="onPlayerChange">
-            <el-option label="Jessibuca" value="jessibuca" />
-            <el-option label="WebRTC" value="webRTC" />
-            <el-option label="H265web" value="h265web" />
-          </el-select>
+          <player-mode-select />
         </span>
       </div>
 
@@ -39,7 +34,7 @@
                 :has-audio="hasAudio"
                 :show-button="true"
                 :show-tab="false"
-                :preferred-player="selectedPlayer"
+                :preferred-player="preferredPlayer"
                 @playerChanged="playerChanged"
               />
             </div>
@@ -100,6 +95,8 @@
 <script>
 import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '../common/playerTabs.vue'
+import playerModeSelect from '../common/playerModeSelect.vue'
+import { modeToPreferredPlayer } from '@/utils/playerStrategy'
 import channelPtzPanel from './common/channelPtzPanel.vue'
 import channelPreset from './common/ptzPreset.vue'
 import mediaInfo from '../common/mediaInfo.vue'
@@ -113,7 +110,7 @@ function isDomeCamera(ptzType) {
 export default {
   name: 'ChannelPlayer',
   directives: { elDragDialog },
-  components: { playerTabs, channelPtzPanel, channelPreset, mediaInfo, streamMediaPanel },
+  components: { playerTabs, playerModeSelect, channelPtzPanel, channelPreset, mediaInfo, streamMediaPanel },
   data() {
     return {
       videoUrl: '',
@@ -128,7 +125,6 @@ export default {
       playError: '',
       showVideoDialog: false,
       streamInfo: null,
-      selectedPlayer: 'jessibuca',
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
@@ -136,13 +132,11 @@ export default {
       dragZoomDirection: ''
     }
   },
-  created() {
-    const saved = window.localStorage.getItem('globalPlayer')
-    if (saved && ['jessibuca', 'webRTC', 'h265web'].includes(saved)) {
-      this.selectedPlayer = saved
-    }
-  },
   computed: {
+    /** 全局播放模式（store）换算成 PlayerTabs 的偏好引擎 */
+    preferredPlayer() {
+      return modeToPreferredPlayer(this.$store.getters.playerMode)
+    },
     ptzEnabled() {
       return isDomeCamera(this.ptzType)
     },
@@ -151,15 +145,8 @@ export default {
     }
   },
   methods: {
-    onPlayerChange(key) {
-      this.selectedPlayer = key
-      window.localStorage.setItem('globalPlayer', key)
-      if (this.$refs.playerTabs) {
-        this.$refs.playerTabs.switchPlayer(key)
-      }
-    },
     refreshMediaInfo() {
-      this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo()
+      this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo(false)
     },
     openDialog(tab, channelId, param) {
       if (this.showVideoDialog) return
