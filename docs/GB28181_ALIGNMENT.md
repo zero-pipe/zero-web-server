@@ -32,33 +32,48 @@
 
 ### 设备控制
 - 云台 PTZ、预置位、前端控制、录像控制、布防/撤防、拉框缩放、看守位、基础参数配置、报警复位、
-  远程重启、强制关键帧。
-- `DeviceStatus` 查询已接线：`GET /api/v1/device/query/devices/:deviceId/status`。
+  远程重启、强制关键帧、PTZ 精准控制、存储卡格式化、目标跟踪。
+- `DeviceStatus` 查询：`GET /api/v1/device/query/devices/:deviceId/status`。
+- `ConfigDownload` 查询：`QueryBasicParam` 读取设备实际应答，超时回退本地字段。
+
+### 查询族（2022）
+- 看守位 / 巡航轨迹列表 / 单条巡航轨迹 / 云台精准位置 / 存储卡状态：
+  `GET /api/v1/device/query/{home_position|cruise_track_list|cruise_track|ptz_position|sdcard_status}`。
+- 云台精准位置支持订阅与通知：`GET /api/v1/front-end/ptz_position/subscribe/:deviceId/:channelId`，
+  推送值缓存在 `GET /api/v1/front-end/ptz_position/:deviceId/:channelId`。
+
+### 级联（平台作为下级）
+- 上级 `SUBSCRIBE`（Catalog/Alarm/MobilePosition）应答并回填 Expires；目录订阅后主动推送一次目录。
+- 上级 `Query`（Catalog/DeviceInfo/DeviceStatus）按共享通道应答。
+- 上级 `INVITE` 按 Offer 的 `s=` 分派实时/回放/下载；`INFO` 回放控制转发到叶子设备；`BYE` 收尾释放会话。
+- 目录应答/通知按附录 J 补全 Manufacturer/Model/Parental/ParentID/RegisterWay/Secrecy/经纬度等字段。
+
+### 图像抓拍（2022 9.14）
+- `POST /api/v1/device/query/snap/config` 下发抓拍配置，自动生成 SessionID 与 UploadURL。
+- `POST /api/v1/gb/snapshot/upload`（公开）接收设备 JPEG，按 41 位文件名解析设备并归档对象存储。
+- `UploadSnapShotFinished` 通知记录，可查询 `GET /api/v1/device/query/snap/finished/:sessionId`。
 
 ### 其他
-- 报警/MobilePosition 通知接收；Catalog/Alarm/MobilePosition 订阅及自动续订。
+- 报警/MobilePosition/PTZPosition 通知接收；Catalog/Alarm/MobilePosition 订阅及自动续订。
+- 报警解析 2022 扩展字段 `AlarmTypeParam` / `EventType` / `EventData`。
+- TCP 注册连接断开立即判设备离线（NAT 内侧设备）。
 - `OPTIONS` 返回 `Allow`，用于能力探测。
 
-## 待补齐（按优先级）
+## 明确不做 / 暂缓
 
-### P1（2016 已要求）
-- `ConfigDownload` 应答解析（当前 `QueryBasicParam` 只发送查询，返回本地库字段）。
-- 报警业务分发：按目标路由把报警转发给上级/终端，并回填 `Alarm` 业务应答（图 15）。
-- 级联方向“被订阅/被查询”：入向 `SUBSCRIBE` 与入向 `Query(Catalog/DeviceInfo/DeviceStatus)` 应答。
-- 级联入站回放/下载：解析 Offer 的 `s=Playback/Download`、`t=/u=` 并回填对应 `s=`。
-- 语音广播/对讲：真实设备入站 `INVITE` 拉流（当前仅通知 + WebRTC 推流），目录上报 137 语音输出设备。
-- TCP 长连接断线判定（NAT 内侧设备）。
+- **语音广播与对讲**：按业务需要暂不实现（现有仅 Broadcast 通知 + WebRTC 推流，未做设备入站拉流）。
+- **设备软件升级（9.13）**：按业务需要暂不实现。
+- **报警分发到上级/终端**：需要先定分发路由策略（转发目标、预案），属产品决策，暂不实现。
+- **编码增强（AAC/G.722.1/SVAC 的 SDP 声明）**：改动会触及已在海康设备上验证通过的实时点播 SDP，
+  为避免回归暂缓；如后续需要非 PS 直连流再单独立项。
+- **协议版本标识（2022 附录 I）**：缺少可机读的标准原文（PDF 字体嵌入导致文本无法提取），
+  未按猜测实现；拿到附录 I 原文或样例报文后再做。
 
-### P2（2022 新增 / 增强）
-- 2022 查询族接线：HomePositionQuery / CruiseTrackList / CruiseTrack / PTZPosition（构造器已有，缺解析与路由）、
-  SDCardStatus。
-- PTZ 精准控制、存储卡格式化、目标跟踪；PTZ 精准位置事件订阅与通知。
-- 设备软件升级（9.13）：升级命令、文件获取、结果通知。
-- 图像抓拍（9.14）：抓拍配置下发、`UploadSnapShotFinished`、41 位文件名规则。
-  注意：现有 `snap` 是平台侧截帧存档，与此不是一回事。
-- 协议版本标识（2022 附录 I）。
-- 编码增强：AAC / G.722.1 / SVAC 的 SDP 声明与目录 EncodeType。
-- 报警 `AlarmTypeParam` 扩展字段解析、`MediaStatus` 之外的设备状态变化聚合。
+## 待验证
+
+- 级联回放/下载与 INFO 控制需用两个平台实例对打验证（当前平台可互为上下级）。
+- 图像抓拍需支持 9.14 的设备验证上传与完成通知。
+- 2022 查询族（看守位/巡航/云台位置/存储卡）需 2022 固件设备验证。
 
 ## 与平台约定相关的说明
 - 内码/外码/国标编号的展示规则见 [PLATFORM_CONVENTIONS.md](PLATFORM_CONVENTIONS.md)。

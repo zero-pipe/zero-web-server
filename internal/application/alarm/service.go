@@ -56,6 +56,7 @@ func (s *Service) HandleNotify(deviceID, channelGBID string, n *gbsip.AlarmNotif
 		raw, _ := json.Marshal(map[string]any{
 			"alarmType": n.AlarmType, "alarmDescription": n.AlarmDescription,
 			"alarmTime": n.AlarmTime, "channelId": channelGBID,
+			"alarmTypeParam": n.AlarmTypeParam, "eventType": n.EventType, "eventData": n.EventData,
 		})
 		e := &domainevent.Event{
 			EventID: eventID, SchemaVersion: "zws.event.v1",
