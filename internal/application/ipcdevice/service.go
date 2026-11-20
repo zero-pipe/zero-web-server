@@ -91,6 +91,11 @@ func (s *Service) AddDevice(ctx context.Context, pluginID, protocol, name string
 
 func (s *Service) ListDevices() ([]*domainplugin.Device, error) { return s.repo.ListDevices() }
 
+// CountByPlugin 统计插件设备数，用于插件卸载前的引用检查。
+func (s *Service) CountByPlugin(pluginID string) (int, error) {
+	return s.repo.CountDevicesByPlugin(pluginID)
+}
+
 func (s *Service) ListChannels(deviceID int) ([]*domainplugin.Channel, error) {
 	return s.repo.ListChannels(deviceID)
 }

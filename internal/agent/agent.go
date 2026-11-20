@@ -151,6 +151,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		writeJSON(w, http.StatusOK, map[string]any{"plugins": a.report()})
 	}))
 	mux.HandleFunc("/api/v1/plugins/", a.auth(a.handlePluginAction))
+	mux.HandleFunc("/api/v1/plugins/installed", a.auth(a.handleInstalled))
 	mux.HandleFunc("/plugins/", a.auth(a.handleProxy))
 
 	srv := &http.Server{Addr: a.cfg.Listen, Handler: mux}
@@ -168,58 +169,118 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 func (a *Agent) discover() error {
-	patterns := []string{filepath.Join(a.cfg.PluginDir, "*", "plugin.yaml"), filepath.Join(a.cfg.PluginDir, "*", "plugin.yml")}
-	seen := map[string]bool{}
-	for _, pattern := range patterns {
-		files, _ := filepath.Glob(pattern)
-		for _, file := range files {
-			dir := filepath.Dir(file)
-			data, err := os.ReadFile(file)
-			if err != nil {
-				log.Printf("read manifest %s: %v", file, err)
-				continue
-			}
-			var m Manifest
-			if err := yaml.Unmarshal(data, &m); err != nil {
-				log.Printf("parse manifest %s: %v", file, err)
-				continue
-			}
-			m.ID = strings.TrimSpace(m.ID)
-			if m.ID == "" {
-				log.Printf("manifest %s: id is required", file)
-				continue
-			}
-			if seen[m.ID] {
-				log.Printf("manifest %s: duplicate id %s", file, m.ID)
-				continue
-			}
-			if m.InstanceID == "" {
-				m.InstanceID = a.cfg.AgentID + "-" + m.ID
-			}
-			if m.Listen == "" {
-				m.Listen = "127.0.0.1:0"
-			}
-			if m.ConfigSchema != "" && !strings.HasPrefix(strings.TrimSpace(m.ConfigSchema), "{") {
-				raw, err := os.ReadFile(filepath.Join(dir, m.ConfigSchema))
-				if err != nil {
-					log.Printf("manifest %s: read config schema: %v", file, err)
-				} else {
-					m.ConfigSchema = string(raw)
-				}
-			}
-			p := &plugin{dir: dir, manifest: m, desired: "enabled", actual: "discovered"}
-			if m.Enabled != nil && !*m.Enabled {
-				p.desired = "disabled"
-			}
-			if state, ok := a.savedState()[m.ID]; ok {
-				p.desired = state
-			}
-			if p.desired == "disabled" {
-				p.actual = "stopped"
-			}
-			seen[m.ID] = true
-			a.plugins[m.ID] = p
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.discoverLocked()
+}
+
+// pluginRoots 返回插件清单所在目录：兼容两种布局
+//   - 手工部署：plugin_dir/<plugin>/plugin.yaml
+//   - 平台安装：plugin_dir/<plugin>/<version>/plugin.yaml（以 .current 指向生效版本）
+func (a *Agent) pluginRoots() []string {
+	var roots []string
+	entries, err := os.ReadDir(a.cfg.PluginDir)
+	if err != nil {
+		return roots
+	}
+	for _, e := range entries {
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
 		}
+		base := filepath.Join(a.cfg.PluginDir, e.Name())
+		root := base
+		if cur, err := readCurrent(base); err == nil && cur != "" {
+			if st, err := os.Stat(filepath.Join(base, cur)); err == nil && st.IsDir() {
+				root = filepath.Join(base, cur)
+			}
+		}
+		roots = append(roots, root)
+	}
+	return roots
+}
+
+// discoverLocked 重新扫描插件根目录；调用方必须持有 a.mu 写锁。
+// 同版本同路径的插件保留原运行态，避免重扫导致页面闪断。
+func (a *Agent) discoverLocked() error {
+	seen := map[string]bool{}
+	roots := a.pluginRoots()
+	for _, root := range roots {
+		var file string
+		for _, fname := range []string{"plugin.yaml", "plugin.yml"} {
+			candidate := filepath.Join(root, fname)
+			if _, err := os.Stat(candidate); err == nil {
+				file = candidate
+				break
+			}
+		}
+		if file == "" {
+			continue
+		}
+		dir := root
+		data, err := os.ReadFile(file)
+		if err != nil {
+			log.Printf("read manifest %s: %v", file, err)
+			continue
+		}
+		var m Manifest
+		if err := yaml.Unmarshal(data, &m); err != nil {
+			log.Printf("parse manifest %s: %v", file, err)
+			continue
+		}
+		m.ID = strings.TrimSpace(m.ID)
+		if m.ID == "" {
+			log.Printf("manifest %s: id is required", file)
+			continue
+		}
+		if seen[m.ID] {
+			log.Printf("manifest %s: duplicate id %s", file, m.ID)
+			continue
+		}
+		if m.InstanceID == "" {
+			m.InstanceID = a.cfg.AgentID + "-" + m.ID
+		}
+		if m.Listen == "" {
+			m.Listen = "127.0.0.1:0"
+		}
+		if m.ConfigSchema != "" && !strings.HasPrefix(strings.TrimSpace(m.ConfigSchema), "{") {
+			raw, err := os.ReadFile(filepath.Join(dir, m.ConfigSchema))
+			if err != nil {
+				log.Printf("manifest %s: read config schema: %v", file, err)
+			} else {
+				m.ConfigSchema = string(raw)
+			}
+		}
+		seen[m.ID] = true
+		if old, ok := a.plugins[m.ID]; ok && old.dir == dir && old.manifest.Version == m.Version {
+			old.mu.Lock()
+			old.manifest = m
+			old.mu.Unlock()
+			continue
+		}
+		p := &plugin{dir: dir, manifest: m, desired: "enabled", actual: "discovered"}
+		if m.Enabled != nil && !*m.Enabled {
+			p.desired = "disabled"
+		}
+		if state, ok := a.savedState()[m.ID]; ok {
+			p.desired = state
+		}
+		if p.desired == "disabled" {
+			p.actual = "stopped"
+		}
+		a.plugins[m.ID] = p
+	}
+	// 扫描不到的插件（版本切换/卸载）：停进程并移除。
+	for id, old := range a.plugins {
+		if seen[id] {
+			continue
+		}
+		old.mu.Lock()
+		running := old.cmd != nil && !old.exited
+		old.mu.Unlock()
+		if running {
+			go a.stop(old, "manifest removed")
+		}
+		delete(a.plugins, id)
 	}
 	return nil
 }
@@ -250,7 +311,11 @@ func (a *Agent) start(p *plugin) {
 	if time.Now().Before(p.restart) {
 		return
 	}
-	exe := p.manifest.Executable[runtime.GOOS]
+	// 规范键优先 goos-goarch；兼容旧的仅 goos 写法与 default。
+	exe := p.manifest.Executable[runtime.GOOS+"-"+runtime.GOARCH]
+	if exe == "" {
+		exe = p.manifest.Executable[runtime.GOOS]
+	}
 	if exe == "" {
 		exe = p.manifest.Executable["default"]
 	}
@@ -386,11 +451,12 @@ func (a *Agent) watchdog(ctx context.Context) {
 			for _, p := range a.snapshot() {
 				p.mu.Lock()
 				desired, exited, restartAt, listen := p.desired, p.exited, p.restart, p.manifest.Listen
+				neverStarted := p.cmd == nil
 				p.mu.Unlock()
 				if desired != "enabled" {
 					continue
 				}
-				if exited && !time.Now().Before(restartAt) {
+				if (exited || neverStarted) && !time.Now().Before(restartAt) {
 					a.start(p)
 					continue
 				}
@@ -429,12 +495,42 @@ func (a *Agent) handlePluginAction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	p := a.get(parts[0])
+	pluginID, action := parts[0], parts[1]
+	// install/uninstall 针对"尚不存在或待移除"的插件，先于查找处理。
+	switch action {
+	case "install":
+		var req installRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+			http.Error(w, "invalid body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.PluginID == "" {
+			req.PluginID = pluginID
+		}
+		if err := a.install(r.Context(), req); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"plugins": a.report()})
+		return
+	case "uninstall":
+		var req struct {
+			Version string `json:"version"`
+		}
+		_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req)
+		if err := a.uninstall(pluginID, req.Version); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"plugins": a.report()})
+		return
+	}
+	p := a.get(pluginID)
 	if p == nil {
 		http.Error(w, "plugin not found", http.StatusNotFound)
 		return
 	}
-	switch parts[1] {
+	switch action {
 	case "enable":
 		a.setDesired(p, "enabled")
 		a.start(p)
@@ -449,6 +545,37 @@ func (a *Agent) handlePluginAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"plugins": a.report()})
+}
+
+// handleInstalled 列出平台安装的版本（供平台对账）。
+func (a *Agent) handleInstalled(w http.ResponseWriter, r *http.Request) {
+	type entry struct {
+		PluginID string   `json:"pluginId"`
+		Current  string   `json:"current"`
+		Versions []string `json:"versions"`
+	}
+	var out []entry
+	entries, _ := os.ReadDir(a.cfg.PluginDir)
+	for _, e := range entries {
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		base := filepath.Join(a.cfg.PluginDir, e.Name())
+		var versions []string
+		subs, _ := os.ReadDir(base)
+		for _, sub := range subs {
+			if sub.IsDir() && !strings.HasPrefix(sub.Name(), ".") {
+				versions = append(versions, sub.Name())
+			}
+		}
+		if len(versions) == 0 {
+			continue // 手工部署布局没有版本目录
+		}
+		sort.Strings(versions)
+		cur, _ := readCurrent(base)
+		out = append(out, entry{PluginID: e.Name(), Current: cur, Versions: versions})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"installed": out})
 }
 
 func (a *Agent) setDesired(p *plugin, state string) {
@@ -623,6 +750,7 @@ func (a *Agent) report() []map[string]any {
 			"streamTransports": p.manifest.StreamTransports, "eventTypes": p.manifest.EventTypes,
 			"configSchema": p.manifest.ConfigSchema, "enabled": p.desired == "enabled",
 			"desiredState": p.desired, "actualState": p.actual, "lastError": p.lastErr,
+			"source": p.source(),
 		})
 		p.mu.Unlock()
 	}

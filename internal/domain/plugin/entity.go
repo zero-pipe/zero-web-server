@@ -65,6 +65,7 @@ type Repository interface {
 	ListDevices() ([]*Device, error)
 	GetDevice(id int) (*Device, error)
 	GetDeviceByUID(pluginID, deviceUID string) (*Device, error)
+	CountDevicesByPlugin(pluginID string) (int, error)
 
 	ReplaceChannels(deviceDBID int, channels []*Channel) error
 	ListChannels(deviceDBID int) ([]*Channel, error)

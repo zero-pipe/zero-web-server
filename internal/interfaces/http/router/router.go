@@ -23,6 +23,7 @@ import (
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
 	pluginapp "zero-web-server/internal/application/plugin"
+	pluginpkgapp "zero-web-server/internal/application/pluginpkgapp"
 	positionapp "zero-web-server/internal/application/position"
 	ptzapp "zero-web-server/internal/application/ptz"
 	publishauth "zero-web-server/internal/application/publishauth"
@@ -43,53 +44,54 @@ import (
 )
 
 type Deps struct {
-	AuthService         *appauth.Service
-	ONVIFService        *onvifapp.Service
-	DeviceService       *deviceapp.Service
-	DeviceAccessService *deviceaccess.Service
-	PlayService         *playapp.Service
-	PlaybackService     *playbackapp.Service
-	PTZService          *ptzapp.Service
-	AlarmService        *alarmapp.Service
-	PlatformService     *upstreamapp.Service
-	PlatformChannelSvc  *upstreamapp.ChannelService
-	SubordinateService  *downstreamapp.Service
-	PositionService     *positionapp.Service
-	CloudRecordService  *cloudrecordapp.Service
-	StreamPushService   *streampushapp.Service
-	StreamProxyService  *streamproxyapp.Service
-	RecordPlanService   *recordplanapp.Service
-	MediaServerService  *mediaserverapp.Service
-	CommonChannelSvc    *channelapp.Service
-	GroupService        *groupapp.Service
-	RegionService       *regionapp.Service
-	UserRepo            *persistence.UserRepository
-	PublishAuth         *publishauth.PublishAuth
-	StreamOnDemand      bool
-	MediaBaseURL        string
-	JWT                 *jwtmgr.Manager
-	ServerID            string
-	Version             string
-	PlayTimeoutMs       int
-	RecordInfoTimeoutMs int
-	SIPConfig           config.SIPConfig
-	GbSipConfigService  *gbsipconfig.Service
-	ObjectStoreService  *objectstoreapp.Service
-	SnapService         *snapapp.Service
-	ServerPort          int
-	MediaIP             string
-	LogDir              string
-	Metrics             *ops.Metrics
-	Dashboard           *ops.Dashboard
-	PluginService       *pluginapp.Service
-	IPCService          *ipcdevice.Service
-	PluginToken         string
-	AgentService        *agentapp.Service
-	AgentToken          string
-	AssetService        *assetapp.Service
-	InfraService        *infraconfigapp.Service
-	EventSubService     *eventsubapp.Service
-	EventService        *eventingest.Service
+	AuthService          *appauth.Service
+	ONVIFService         *onvifapp.Service
+	DeviceService        *deviceapp.Service
+	DeviceAccessService  *deviceaccess.Service
+	PlayService          *playapp.Service
+	PlaybackService      *playbackapp.Service
+	PTZService           *ptzapp.Service
+	AlarmService         *alarmapp.Service
+	PlatformService      *upstreamapp.Service
+	PlatformChannelSvc   *upstreamapp.ChannelService
+	SubordinateService   *downstreamapp.Service
+	PositionService      *positionapp.Service
+	CloudRecordService   *cloudrecordapp.Service
+	StreamPushService    *streampushapp.Service
+	StreamProxyService   *streamproxyapp.Service
+	RecordPlanService    *recordplanapp.Service
+	MediaServerService   *mediaserverapp.Service
+	CommonChannelSvc     *channelapp.Service
+	GroupService         *groupapp.Service
+	RegionService        *regionapp.Service
+	UserRepo             *persistence.UserRepository
+	PublishAuth          *publishauth.PublishAuth
+	StreamOnDemand       bool
+	MediaBaseURL         string
+	JWT                  *jwtmgr.Manager
+	ServerID             string
+	Version              string
+	PlayTimeoutMs        int
+	RecordInfoTimeoutMs  int
+	SIPConfig            config.SIPConfig
+	GbSipConfigService   *gbsipconfig.Service
+	ObjectStoreService   *objectstoreapp.Service
+	SnapService          *snapapp.Service
+	ServerPort           int
+	MediaIP              string
+	LogDir               string
+	Metrics              *ops.Metrics
+	Dashboard            *ops.Dashboard
+	PluginService        *pluginapp.Service
+	IPCService           *ipcdevice.Service
+	PluginToken          string
+	AgentService         *agentapp.Service
+	PluginPackageService *pluginpkgapp.Service
+	AgentToken           string
+	AssetService         *assetapp.Service
+	InfraService         *infraconfigapp.Service
+	EventSubService      *eventsubapp.Service
+	EventService         *eventingest.Service
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -149,6 +151,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	roleHandler := handler.NewRoleHandler(deps.AuthService)
 	logHandler := handler.NewLogHandler(ops.NewLogService(deps.LogDir))
 	pluginHandler := handler.NewPluginHandler(deps.PluginService, deps.IPCService, deps.AssetService)
+	pluginPackageHandler := handler.NewPluginPackageHandler(deps.PluginPackageService, deps.AgentToken)
 	agentHandler := handler.NewAgentHandler(deps.AgentService, deps.AgentToken)
 	eventSubHandler := handler.NewEventSubHandler(deps.EventSubService, deps.InfraService)
 	eventHandler := handler.NewEventHandler(deps.EventService)
@@ -168,6 +171,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerUser(api, userHandler)
 		registerServer(api, healthHandler, serverHandler)
 		registerAgentPublic(api, agentHandler)
+		registerPluginPackagePublic(api, pluginPackageHandler)
 		// GB28181 图像抓拍：设备按 UploadURL 公开上传（2022 9.14）
 		api.POST("/gb/snapshot/upload", snapHandler.UploadGBSnapshot)
 	}
@@ -182,6 +186,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		auth.POST("/user/changePassword", userHandler.ChangePassword)
 
 		registerPlugin(auth, pluginHandler)
+		registerPluginPackages(auth, pluginPackageHandler)
 		registerAgents(auth, agentHandler)
 		registerEventSub(auth, eventSubHandler)
 		registerEvents(auth, eventHandler)

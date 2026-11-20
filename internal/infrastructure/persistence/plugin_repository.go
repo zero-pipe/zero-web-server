@@ -155,6 +155,23 @@ func (r *PluginRepository) DeleteDevice(id int) error {
 	})
 }
 
+// CountDevicesByPlugin 统计某插件（按清单 plugin_id，如 hikvision-ipc）接入的设备数。
+// 设备表存的是运行时实例 ID（agentId-pluginId），故按运行时实例反查。
+func (r *PluginRepository) CountDevicesByPlugin(pluginID string) (int, error) {
+	var ids []string
+	if err := r.db.Model(&model.Plugin{}).Where("plugin_id = ?", pluginID).Pluck("id", &ids).Error; err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	var n int64
+	if err := r.db.Model(&model.PluginDevice{}).Where("plugin_id IN ?", ids).Count(&n).Error; err != nil {
+		return 0, err
+	}
+	return int(n), nil
+}
+
 func (r *PluginRepository) ListDevices() ([]*domainplugin.Device, error) {
 	var rows []model.PluginDevice
 	if err := r.db.Order("id DESC").Find(&rows).Error; err != nil {

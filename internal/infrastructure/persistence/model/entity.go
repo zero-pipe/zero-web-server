@@ -617,6 +617,46 @@ type AgentPlugin struct {
 
 func (AgentPlugin) TableName() string { return "zws_agent_plugin" }
 
+// PluginPackage 是平台登记的插件安装包（.zwplugin）。
+type PluginPackage struct {
+	ID               string `gorm:"column:id;primaryKey;size:64"`
+	PluginID         string `gorm:"column:plugin_id;size:64;uniqueIndex:uk_plugin_pkg_version,priority:1"`
+	Version          string `gorm:"column:version;size:64;uniqueIndex:uk_plugin_pkg_version,priority:2"`
+	Name             string `gorm:"column:name;size:255"`
+	Vendor           string `gorm:"column:vendor;size:128"`
+	ObjectKey        string `gorm:"column:object_key;size:512"`
+	SHA256           string `gorm:"column:sha256;size:64"`
+	SizeBytes        int64  `gorm:"column:size_bytes"`
+	ManifestJSON     string `gorm:"column:manifest_json;type:longtext"`
+	ConfigSchema     string `gorm:"column:config_schema;type:longtext"`
+	Protocols        string `gorm:"column:protocols;type:text"`
+	Capabilities     string `gorm:"column:capabilities;type:text"`
+	StreamTransports string `gorm:"column:stream_transports;type:text"`
+	EventTypes       string `gorm:"column:event_types;type:text"`
+	Architectures    string `gorm:"column:architectures;type:text"`
+	Status           string `gorm:"column:status;size:32"`
+	ErrorMsg         string `gorm:"column:error_msg;type:text"`
+	CreateTime       string `gorm:"column:create_time;size:50"`
+	UpdateTime       string `gorm:"column:update_time;size:50"`
+}
+
+func (PluginPackage) TableName() string { return "zws_plugin_package" }
+
+// PluginInstall 是插件包在某 Agent 上的安装任务/状态。
+type PluginInstall struct {
+	ID         string `gorm:"column:id;primaryKey;size:64"`
+	AgentID    string `gorm:"column:agent_id;size:128;index"`
+	PackageID  string `gorm:"column:package_id;size:64;index"`
+	PluginID   string `gorm:"column:plugin_id;size:64;index"`
+	Version    string `gorm:"column:version;size:64"`
+	Status     string `gorm:"column:status;size:32"`
+	LastError  string `gorm:"column:last_error;type:text"`
+	CreateTime string `gorm:"column:create_time;size:50"`
+	UpdateTime string `gorm:"column:update_time;size:50"`
+}
+
+func (PluginInstall) TableName() string { return "zws_plugin_install" }
+
 // EventType 是统一事件类型注册表。
 type EventType struct {
 	Code           string `gorm:"column:code;primaryKey;size:64"`

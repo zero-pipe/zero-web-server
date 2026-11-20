@@ -130,6 +130,8 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.Plugin{},
 		&model.Agent{},
 		&model.AgentPlugin{},
+		&model.PluginPackage{},
+		&model.PluginInstall{},
 		&model.PluginDevice{},
 		&model.PluginChannel{},
 		&model.PhysicalDevice{},

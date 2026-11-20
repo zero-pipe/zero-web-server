@@ -129,6 +129,12 @@ export const constantRoutes = [
         name: 'IpcPlugins',
         component: () => import('@/views/plugins/index'),
         meta: { title: '插件接入', icon: 'el-icon-connection' }
+      },
+      {
+        path: '/plugins/packages',
+        name: 'PluginPackages',
+        component: () => import('@/views/plugins/packages'),
+        meta: { title: '插件包管理', icon: 'el-icon-box' }
       }
     ]
   },

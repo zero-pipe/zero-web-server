@@ -98,6 +98,7 @@ func (r *fakePluginRepo) UpsertPlugin(p *domainplugin.Plugin) error {
 	r.plugins[p.ID] = &cp
 	return nil
 }
+func (r *fakePluginRepo) CountDevicesByPlugin(string) (int, error) { return 0, nil }
 func (r *fakePluginRepo) UpdatePluginSeen(id string, ts int64, online bool) error {
 	if p := r.plugins[id]; p != nil {
 		p.Online, p.LastSeen = online, ts

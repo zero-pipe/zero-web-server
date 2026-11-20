@@ -784,6 +784,51 @@ CREATE TABLE IF NOT EXISTS zws_agent_plugin
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent 托管的插件';
 
 -- ---------------------------------------------------------------------------
+-- 插件安装包与安装任务（平台分发 .zwplugin 到 zero-agent）
+-- ---------------------------------------------------------------------------
+DROP TABLE IF EXISTS zws_plugin_install;
+CREATE TABLE IF NOT EXISTS zws_plugin_install
+(
+    id          VARCHAR(64) NOT NULL PRIMARY KEY,
+    agent_id    VARCHAR(128) NOT NULL,
+    package_id  VARCHAR(64) NOT NULL,
+    plugin_id   VARCHAR(64) NOT NULL,
+    version     VARCHAR(64),
+    status      VARCHAR(32) NOT NULL DEFAULT 'pending',
+    last_error  TEXT,
+    create_time VARCHAR(50),
+    update_time VARCHAR(50),
+    KEY idx_plugin_install_agent (agent_id),
+    KEY idx_plugin_install_pkg (package_id),
+    KEY idx_plugin_install_plugin (plugin_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件包安装任务';
+
+DROP TABLE IF EXISTS zws_plugin_package;
+CREATE TABLE IF NOT EXISTS zws_plugin_package
+(
+    id                VARCHAR(64) NOT NULL PRIMARY KEY,
+    plugin_id         VARCHAR(64) NOT NULL,
+    version           VARCHAR(64) NOT NULL,
+    name              VARCHAR(255),
+    vendor            VARCHAR(128),
+    object_key        VARCHAR(512),
+    sha256            VARCHAR(64),
+    size_bytes        BIGINT NOT NULL DEFAULT 0,
+    manifest_json     LONGTEXT,
+    config_schema     LONGTEXT,
+    protocols         TEXT,
+    capabilities      TEXT,
+    stream_transports TEXT,
+    event_types       TEXT,
+    architectures     TEXT,
+    status            VARCHAR(32) NOT NULL DEFAULT 'valid',
+    error_msg         TEXT,
+    create_time       VARCHAR(50),
+    update_time       VARCHAR(50),
+    UNIQUE KEY uk_plugin_pkg_version (plugin_id, version)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件安装包';
+
+-- ---------------------------------------------------------------------------
 -- IPC 私有 SDK 插件（sidecar）注册与设备
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS zws_plugin;

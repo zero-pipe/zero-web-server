@@ -641,7 +641,7 @@ func protocolDeviceOps(protocol string) []string {
 	case "onvif":
 		return []string{"play", "ptz", "snapshot", "sync"}
 	case "plugin":
-		return []string{"play", "ptz", "sync"}
+		return []string{"play", "playback", "ptz", "snapshot", "alarm", "subscribe", "sync"}
 	default:
 		return []string{"play"}
 	}

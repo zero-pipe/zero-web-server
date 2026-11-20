@@ -47,12 +47,20 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", okHandler)
+	mux.HandleFunc("/v1/info", handleInfo)
 	mux.HandleFunc("/v1/login", handleLogin)
 	mux.HandleFunc("/v1/logout", okHandler)
 	mux.HandleFunc("/v1/channels", handleChannels)
 	mux.HandleFunc("/v1/live/start", handleLiveStart(cfg.rtspURL))
 	mux.HandleFunc("/v1/live/stop", okHandler)
 	mux.HandleFunc("/v1/ptz", okHandler)
+	mux.HandleFunc("/v1/snapshot", okHandler)
+	mux.HandleFunc("/v1/config/get", okHandler)
+	mux.HandleFunc("/v1/config/set", okHandler)
+	mux.HandleFunc("/v1/record/query", handleRecordQuery)
+	mux.HandleFunc("/v1/playback/start", handleLiveStart(cfg.rtspURL))
+	mux.HandleFunc("/v1/playback/stop", okHandler)
+	mux.HandleFunc("/v1/playback/control", okHandler)
 	mux.HandleFunc("/v1/arm", handleArm)
 	mux.HandleFunc("/v1/disarm", handleDisarm)
 	mux.HandleFunc("/v1/mock/event", handleMockEvent)
@@ -265,6 +273,37 @@ func handleLiveStart(rtspURL string) http.HandlerFunc {
 		}
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtspURL})
 	}
+}
+
+// handleInfo 返回清单摘要，按规范 5.2 提供 /v1/info。
+func handleInfo(w http.ResponseWriter, _ *http.Request) {
+	writeOK(w, map[string]any{
+		"id":           "mock-ipc",
+		"version":      "0.1.0",
+		"protocols":    []string{"mock"},
+		"capabilities": []string{"login", "channels", "live", "ptz", "snapshot", "arm", "disarm", "playback", "record_query", "config"},
+	})
+}
+
+// handleRecordQuery 返回固定两条录像，便于验证回放链路。
+func handleRecordQuery(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID string `json:"device_uid"`
+		ChannelID string `json:"channel_id"`
+		StartTime string `json:"start_time"`
+		EndTime   string `json:"end_time"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	log.Printf("record query device=%s channel=%s %s~%s", req.DeviceUID, req.ChannelID, req.StartTime, req.EndTime)
+	start := req.StartTime
+	if start == "" {
+		start = "2026-01-01T00:00:00.000"
+	}
+	writeOK(w, map[string]any{
+		"records": []map[string]any{
+			{"streamId": "mock-" + req.ChannelID + "-1", "startTime": start, "endTime": start, "type": "timing", "storage": "device"},
+		},
+	})
 }
 
 func transportsFromEnv() []string {

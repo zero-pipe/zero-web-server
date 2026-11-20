@@ -1,19 +1,19 @@
+# 示例插件清单（规范 v1，详见 docs/PLUGIN_PLATFORM.md）
+spec: 1
 id: hik-ipc
-instance_id: hik-ipc-01
 name: 海康 IPC
 vendor: hikvision
 version: 0.2.0
-protocols:
-  - hik.private.v5
+protocols: [hik.private.v5]
+rpc: v1
 executable:
-  windows: hik-ipc-plugin.exe
-  linux: hik-ipc-plugin
+  windows-amd64: hik-ipc-plugin.exe
+  linux-amd64: hik-ipc-plugin
 listen: 127.0.0.1:19091
 health: /health
-capabilities: [live, ptz, alarm, arming, snapshot, mqtt]
+capabilities: [login, channels, live, ptz, snapshot, arm, disarm, playback, record_query, config]
 stream_transports: [rtsp_url]
 event_types: [motion, line_crossing, intrusion, video_loss, tamper]
 config_schema: schema.json
 env:
   LD_LIBRARY_PATH: ${PLUGIN_DIR}/lib
-enabled: true

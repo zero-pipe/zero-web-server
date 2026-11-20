@@ -1,18 +1,18 @@
+# 示例插件清单（规范 v1，详见 docs/PLUGIN_PLATFORM.md）
+spec: 1
 id: mock-ipc
-instance_id: mock-ipc-01
 name: Mock IPC
 vendor: mock
-version: 0.1.0
-protocols:
-  - mock.ipc.v1
+version: 0.2.0
+protocols: [mock.ipc.v1]
+rpc: v1
 executable:
-  windows: mock-ipc-plugin.exe
-  linux: mock-ipc-plugin
-  darwin: mock-ipc-plugin
+  windows-amd64: mock-ipc-plugin.exe
+  linux-amd64: mock-ipc-plugin
+  darwin-arm64: mock-ipc-plugin
 listen: 127.0.0.1:19090
 health: /health
-capabilities: [live, ptz, alarm, arming]
-stream_transports: [rtsp_url]
+capabilities: [login, logout, channels, live, ptz, snapshot, arm, disarm, playback, record_query, config]
+stream_transports: [rtsp_url, rtp_push]
 event_types: [motion, line_crossing, intrusion, video_loss, tamper]
 config_schema: schema.json
-enabled: true

@@ -16,10 +16,10 @@ import (
 	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
-	"zero-web-server/internal/application/channeldrv"
 	appauth "zero-web-server/internal/application/auth"
 	cascadeapp "zero-web-server/internal/application/cascade"
 	channelapp "zero-web-server/internal/application/channel"
+	"zero-web-server/internal/application/channeldrv"
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
@@ -37,6 +37,7 @@ import (
 	playapp "zero-web-server/internal/application/play"
 	playbackapp "zero-web-server/internal/application/playback"
 	pluginapp "zero-web-server/internal/application/plugin"
+	pluginpkgapp "zero-web-server/internal/application/pluginpkgapp"
 	positionapp "zero-web-server/internal/application/position"
 	ptzapp "zero-web-server/internal/application/ptz"
 	publishauth "zero-web-server/internal/application/publishauth"
@@ -152,6 +153,7 @@ func main() {
 
 	pluginRepo := persistence.NewPluginRepository(db)
 	pluginService := pluginapp.NewService(pluginRepo)
+	pluginPackageRepo := persistence.NewPluginPackageRepository(db)
 	pluginToken := os.Getenv("ZWS_PLUGIN_TOKEN")
 	agentToken := os.Getenv("ZWS_AGENT_TOKEN")
 	agentRepo := persistence.NewAgentRepository(db)
@@ -167,6 +169,8 @@ func main() {
 	objectStoreRepo := persistence.NewObjectStoreConfigRepository(db)
 	objectStoreService := objectstoreapp.NewService(objectStoreRepo)
 	snapService := snapapp.NewService(objectStoreService)
+	pluginPackageService := pluginpkgapp.NewService(pluginPackageRepo, agentRepo, ipcService,
+		func() pluginpkgapp.Store { return objectStoreService.Store() }, agentToken)
 
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -307,53 +311,54 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 	router.Setup(r, router.Deps{
-		AuthService:         authService,
-		ONVIFService:        onvifService,
-		DeviceService:       deviceService,
-		DeviceAccessService: deviceAccessService,
-		PlayService:         playService,
-		PlaybackService:     playbackService,
-		PTZService:          ptzService,
-		AlarmService:        alarmService,
-		PlatformService:     platformService,
-		PlatformChannelSvc:  platformChannelSvc,
-		SubordinateService:  subordinateService,
-		PositionService:     positionService,
-		CloudRecordService:  cloudRecordService,
-		StreamPushService:   streamPushService,
-		StreamProxyService:  streamProxyService,
-		RecordPlanService:   recordPlanService,
-		MediaServerService:  mediaServerService,
-		CommonChannelSvc:    commonChannelService,
-		GroupService:        groupService,
-		RegionService:       regionService,
-		UserRepo:            userRepo,
-		PublishAuth:         publishAuth,
-		StreamOnDemand:      cfg.UserSettings.StreamOnDemand,
-		MediaBaseURL:        mediaBaseURL,
-		JWT:                 jwtManager,
-		ServerID:            cfg.UserSettings.ServerID,
-		Version:             version,
-		PlayTimeoutMs:       cfg.UserSettings.PlayTimeout,
-		RecordInfoTimeoutMs: cfg.UserSettings.RecordInfoTimeout,
-		SIPConfig:           sipCfg,
-		GbSipConfigService:  gbSipConfigService,
-		ObjectStoreService:  objectStoreService,
-		SnapService:         snapService,
-		ServerPort:          cfg.Server.Port,
-		MediaIP:             firstMediaIP(cfg, mediaCluster),
-		LogDir:              applog.LogDir(cfg.Log.File),
-		Metrics:             ops.DefaultMetrics,
-		Dashboard:           dashboard,
-		PluginService:       pluginService,
-		IPCService:          ipcService,
-		PluginToken:         pluginToken,
-		AgentService:        agentService,
-		AgentToken:          agentToken,
-		AssetService:        assetService,
-		InfraService:        infraService,
-		EventSubService:     eventSubService,
-		EventService:        eventIngest,
+		AuthService:          authService,
+		ONVIFService:         onvifService,
+		DeviceService:        deviceService,
+		DeviceAccessService:  deviceAccessService,
+		PlayService:          playService,
+		PlaybackService:      playbackService,
+		PTZService:           ptzService,
+		AlarmService:         alarmService,
+		PlatformService:      platformService,
+		PlatformChannelSvc:   platformChannelSvc,
+		SubordinateService:   subordinateService,
+		PositionService:      positionService,
+		CloudRecordService:   cloudRecordService,
+		StreamPushService:    streamPushService,
+		StreamProxyService:   streamProxyService,
+		RecordPlanService:    recordPlanService,
+		MediaServerService:   mediaServerService,
+		CommonChannelSvc:     commonChannelService,
+		GroupService:         groupService,
+		RegionService:        regionService,
+		UserRepo:             userRepo,
+		PublishAuth:          publishAuth,
+		StreamOnDemand:       cfg.UserSettings.StreamOnDemand,
+		MediaBaseURL:         mediaBaseURL,
+		JWT:                  jwtManager,
+		ServerID:             cfg.UserSettings.ServerID,
+		Version:              version,
+		PlayTimeoutMs:        cfg.UserSettings.PlayTimeout,
+		RecordInfoTimeoutMs:  cfg.UserSettings.RecordInfoTimeout,
+		SIPConfig:            sipCfg,
+		GbSipConfigService:   gbSipConfigService,
+		ObjectStoreService:   objectStoreService,
+		SnapService:          snapService,
+		ServerPort:           cfg.Server.Port,
+		MediaIP:              firstMediaIP(cfg, mediaCluster),
+		LogDir:               applog.LogDir(cfg.Log.File),
+		Metrics:              ops.DefaultMetrics,
+		Dashboard:            dashboard,
+		PluginService:        pluginService,
+		PluginPackageService: pluginPackageService,
+		IPCService:           ipcService,
+		PluginToken:          pluginToken,
+		AgentService:         agentService,
+		AgentToken:           agentToken,
+		AssetService:         assetService,
+		InfraService:         infraService,
+		EventSubService:      eventSubService,
+		EventService:         eventIngest,
 	})
 
 	go func() {

@@ -1,0 +1,427 @@
+# 插件化设备接入：平台 / Agent / 插件 规范与设计（草案）
+
+本文定义"插件包上传 → Agent 分发安装 → 平台启用 → 添加设备"的完整链路，以及插件与平台之间的接口规范。目标是：第三方拿着本文 + 一个 Mock 插件，就能在 1~2 天内完成一种私有协议/SDK 的接入，不改平台代码。
+
+> 状态：设计草案，待评审。评审通过后按第 10 节分批实施。
+
+## 1. 现状与目标
+
+**现状**
+- `zero-agent` 已实现：扫描本地 `plugins/*/plugin.yaml`、拉起子进程、健康探测、反向代理 RPC、注册/心跳上报、平台下发启停。
+- 平台已实现：`zws_agent`、`zws_agent_plugin`、`zws_plugin` 三张表与页面，启停插件、添加插件设备（`/api/v1/ipc/devices`）已可用。
+- 缺口：插件包只能手工拷贝到 Agent 主机；平台无法分发、无版本管理、无安装状态；RPC 契约只覆盖登录/通道/直播/云台/布撤防，缺回放、录像查询、抓拍、配置、事件格式定义。
+
+**目标**
+1. 平台上传插件包（zip），存 MinIO，入库（`zws_plugin_package`）。
+2. 平台指定 Agent 安装：Agent 从平台下载 URL 拉包，校验 sha256 后解压到本地版本目录。
+3. Agent 校验清单后自动上报，插件出现在平台"插件管理"页面，用户点"启用"。
+4. 启用后用户在"插件设备"页面登录添加设备（现有流程）。
+5. 一份稳定的 RPC 契约：登录/登出、配置、通道、直播取流、云台、抓拍、回放、录像查询、布撤防、事件上报。
+
+**非目标（v1）**
+- 不做插件市场/收费/签名 PKI（仅 sha256 完整性校验）。
+- 不做同一插件多版本并存运行（同一 Agent 上同一 plugin_id 仅一个活动版本）。
+- 不做插件包热升级中的业务无损切换（升级 = 停旧 → 装新 → 启新，设备配置按 deviceUid 保留）。
+- 不改现有 GB28181/ONVIF 接入链路。
+
+## 2. 总体架构
+
+```
+         ┌──────────── 平台 ────────────┐
+上传 ───▶│ 插件包管理  zws_plugin_package │──对象存储(MinIO): plugins/{pluginId}/{version}/{sha256}.zwplugin
+         │ 安装任务    zws_plugin_install │
+         │ 插件/设备/事件/告警（现有）     │
+         └───────▲──────────┬───────────┘
+   注册/心跳/上报 │          │ 安装指令(HTTP直连 Agent endpoint)
+                 │          ▼
+         ┌───────┴──── zero-agent ──────┐
+         │ 安装器：下载→校验→解压→切换    │
+         │ 进程托管 + 健康探测 + 反代     │  plugin_dir/{id}/{version}/
+         └───────┬──────────▲───────────┘
+                 │ 子进程    │ HTTP JSON RPC（localhost + Token）
+                 ▼          │
+         ┌───────┴──────────┴───────────┐
+         │  第三方插件（vendor SDK 封装）  │──▶ 设备 / MQTT 事件上报
+         └──────────────────────────────┘
+```
+
+- 平台永远不直连插件进程；插件只监听 localhost，由 Agent 反向代理 `/plugins/{pluginId}/*`。
+- 平台到 Agent 沿用现有 `X-Agent-Token` 鉴权（注册时下发）。
+- 事件上报沿用布防时下发的 MQTT 参数（插件在客户内网，MQTT 出站最稳定）。
+
+## 3. 插件安装包规范
+
+### 3.1 格式
+- 单个 ZIP 文件，扩展名 `.zwplugin`（本质 zip，方便 Windows 打包）。
+- 大小上限 500 MB，条目数上限 2000，不允许符号链接、硬链接、绝对路径、`..` 路径。
+- 必须包含 `plugin.yaml`（根目录）；二进制与资源路径由清单声明。
+- 禁止在包内携带设备配置/密钥（配置由平台下发，见第 8 节）。
+
+### 3.2 目录结构
+
+```
+plugin.yaml                      # 必需：插件清单
+config.schema.json               # 可选：设备配置 JSON Schema（manifest.config_schema 引用）
+bin/
+  windows-amd64/plugin.exe
+  linux-amd64/plugin
+  linux-arm64/plugin
+docs/README.md                   # 可选：使用说明，平台页面可展示
+```
+
+- 可执行文件按 `<goos>-<goarch>` 命名目录，与清单 `executable` 键一致。
+- Agent 解压后目录为 `{plugin_dir}/{plugin_id}/{version}/`，工作目录 `cmd.Dir` 指向该目录。
+
+### 3.3 平台侧上传校验（同步完成，失败拒绝入库）
+1. zip 条目安全检查（体积、路径、条目数、压缩比炸弹）。
+2. `plugin.yaml` 存在、YAML 合法、必填字段齐全、字段格式合法（第 4 节）。
+3. `executable` 声明的每个文件在包内存在（仅校验存在性，不校验二进制）。
+4. `config_schema` 存在时必须是合法 JSON Schema。
+5. 能力/传输/事件枚举值合法（第 5.6 节）。
+6. 计算 sha256；`(plugin_id, version)` 唯一，重复上传覆盖需显式确认。
+
+## 4. plugin.yaml 清单规范
+
+### 4.1 字段
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `spec` | 是 | 规范版本，当前固定 `1` |
+| `id` | 是 | 插件唯一标识，`[a-z0-9][a-z0-9-]{2,63}`，全局唯一且不可变 |
+| `name` | 是 | 展示名（中文可） |
+| `vendor` | 是 | 厂商 |
+| `version` | 是 | 语义化版本 `x.y.z`，递增 |
+| `protocols` | 是 | 该插件接入协议标识，如 `hik-ipc`、`dahua`,平台据此在添加设备时可选 |
+| `rpc` | 是 | RPC 规范版本，当前固定 `v1` |
+| `executable` | 是 | `goos-goarch` → 包内相对路径，至少一个 |
+| `args` | 否 | 启动参数数组 |
+| `listen` | 否 | 监听地址，默认 `127.0.0.1:0`；Agent 通过 `PLUGIN_LISTEN` 注入实际值（`0` 端口时插件须回填到 stdout 约定行或由 Agent 探测，见 8.3） |
+| `health` | 否 | 健康检查路径，默认 `/v1/health` |
+| `capabilities` | 是 | 能力集合，枚举见 5.6 |
+| `stream_transports` | 是 | 支持的取流方式：`rtsp_url` / `rtp_push` / `rtmp_push` |
+| `event_types` | 否 | 支持的事件类型（平台注册表事件码或 `vendor.xxx` 自定义码） |
+| `config_schema` | 否 | 设备配置 Schema：内联 JSON 或包内相对路径 |
+| `env` | 否 | 追加环境变量，支持 `${PLUGIN_DIR}` 占位 |
+| `min_platform` | 否 | 最低平台版本 |
+
+### 4.2 示例
+
+```yaml
+spec: 1
+id: hikvision-ipc
+name: 海康 IPC 接入
+vendor: Hikvision
+version: 1.0.0
+protocols: [hik-ipc]
+rpc: v1
+listen: 127.0.0.1:0
+health: /v1/health
+executable:
+  windows-amd64: bin/windows-amd64/hik-ipc.exe
+  linux-amd64: bin/linux-amd64/hik-ipc
+  linux-arm64: bin/linux-arm64/hik-ipc
+capabilities: [login, channels, live, ptz, snapshot, arm, disarm, playback, record_query, config]
+stream_transports: [rtsp_url, rtp_push]
+event_types: [motion, linecross, intrusion, tamper]
+config_schema: config.schema.json
+```
+
+> `listen` 推荐固定端口（如 `127.0.0.1:19101`），Agent 缺省用清单值；每插件一个固定端口便于排障。
+
+## 5. 插件 RPC 接口规范（`rpc: v1`）
+
+### 5.1 传输与约定
+- HTTP/1.1，JSON body，`Content-Type: application/json; charset=utf-8`。
+- 基础路径 `/v1`，Agent 反代后平台访问 `{agent.endpoint}/plugins/{pluginId}/v1/...`。
+- 鉴权：每个请求带 `X-Plugin-Token: ${PLUGIN_TOKEN}`（Agent 进程注入的环境变量），插件须校验。
+- 幂等：除取流/回放会话外，所有接口可安全重试；取流类以 `streamKey` 去重（同 key 重复 start 返回同一结果）。
+- 超时：平台侧 30 秒；插件内部对厂商 SDK 的阻塞调用必须有自身的超时，不得无限等待。
+- 错误格式：HTTP 200 + `{"code":"...","message":"..."}`，`code` 枚举：
+  `ok` / `invalid_param` / `unauthorized` / `device_offline` / `unsupported` / `busy` / `vendor_error` / `internal`。
+  平台把所有非 `ok` 视为失败并冻结对应能力（见 9.2）。
+- 时间格式：`2006-01-02T15:04:05.000`（北京时间，与国标一致）。
+- 通道号 `channelId`、设备号 `deviceUid` 均为字符串，由插件自行定义，平台透明存储。
+
+### 5.2 元信息
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/v1/health` | 返回 `{"status":"ok","version":"1.0.0"}`，供 Agent 健康探测 |
+| GET | `/v1/info` | 返回清单摘要（id/version/capabilities/protocols），供排障 |
+
+### 5.3 设备与配置
+
+| 方法 | 路径 | 请求 | 响应 |
+|---|---|---|---|
+| POST | `/v1/login` | `{deviceUid?, params}`，`params` 按 `config_schema` 校验 | `{deviceUid, manufacturer, model, firmware, serialNumber}` |
+| POST | `/v1/logout` | `{deviceUid}` | `{}` |
+| POST | `/v1/config/get` | `{deviceUid}` | `{config}` |
+| POST | `/v1/config/set` | `{deviceUid, config}` | `{}`，失败回滚 |
+| GET | `/v1/channels?deviceUid=` | — | `{channels:[{channelId,name,status,ptzType,hasAudio,streams:[{role,codec,resolution,fps}]}]}` |
+
+- `login` 成功后插件应保存会话并具备后续调用能力；重复 login 同 deviceUid 返回同一设备信息。
+- `deviceUid` 由平台生成（`pluginId + 参数摘要`）并传入，插件不得改变。
+
+### 5.4 取流与云台
+
+| 方法 | 路径 | 请求 | 响应 |
+|---|---|---|---|
+| POST | `/v1/live/start` | `{deviceUid, channelId, streamKey, profile:"main"\|"sub", preferTransport, push?}` | `{transport, rtspUrl?, pushUrl?}` |
+| POST | `/v1/live/stop` | `{deviceUid, channelId, streamKey}` | `{}` |
+| POST | `/v1/ptz` | `{deviceUid, channelId, action:"move"\|"stop"\|"preset"\|"zoom", direction?, speed?, zoom?, preset?}` | `{}` |
+| POST | `/v1/snapshot` | `{deviceUid, channelId}` | `{url}` 或 `image/jpeg` 原始字节 |
+
+- `direction` 枚举：`left/right/up/down/upleft/upright/downleft/downright`。
+- `speed`、`zoom` 归一化为 `0~1` 浮点（平台已在驱动层统一，插件按 SDK 量纲自行换算）。
+- `push` 非空时平台要求推流（`rtp_push`/`rtmp_push`），参数同现有 `IPCPushParams`（`sdpIp`/`rtpPort`/`mode`）。
+- `streamKey` 由平台生成，回放/直播不得复用同一 key。
+
+### 5.5 回放与录像查询
+
+| 方法 | 路径 | 请求 | 响应 |
+|---|---|---|---|
+| POST | `/v1/record/query` | `{deviceUid, channelId, startTime, endTime, type:"all"\|"timing"\|"manual"\|"alarm"}` | `{records:[{streamId, startTime, endTime, type, sizeBytes?, storage:"device"\|"platform"}]}` |
+| POST | `/v1/playback/start` | `{deviceUid, channelId, streamKey, streamId?` 或 `startTime,endTime`, `speed:1.0, preferTransport, push?}` | `{transport, rtspUrl?, pushUrl?}` |
+| POST | `/v1/playback/stop` | `{deviceUid, channelId, streamKey}` | `{}` |
+| POST | `/v1/playback/control` | `{deviceUid, channelId, streamKey, action:"pause"\|"resume"\|"seek"\|"setspeed", position?, speed?}` | `{}` |
+
+- 录像查询时间段按设备时间轴；平台按国标时间格式传参。
+- `streamId` 是插件内的录像片段标识；无 `streamId` 时按 `startTime/endTime` 回放。
+- 平台已有继承：回放 SSRC/媒体状态回调仍由平台处理，插件只负责给出流地址或推流。
+
+### 5.6 布防、撤防与事件
+
+| 方法 | 路径 | 请求 | 响应 |
+|---|---|---|---|
+| POST | `/v1/arm` | `{deviceUid, deviceInternalCode, channels:[{channelId,internalCode}], eventTypes, mqtt, objectStore}` | `{armed, subscriptionId}` |
+| POST | `/v1/disarm` | `{deviceUid, subscriptionId}` | `{}` |
+
+- `mqtt`、`objectStore` 结构沿用现有 `IPCArmMQTT` / `IPCArmObjectStore`。
+- 事件上报：插件发布到布防下发的 MQTT topic，QoS ≥ 1，载荷：
+
+```json
+{
+  "eventId": "uuid",
+  "deviceUid": "…",
+  "channelId": "101",
+  "internalCode": "C0123456789abcdef",
+  "eventType": "motion",
+  "occurTime": "2026-11-20T10:00:00.000",
+  "level": 1,
+  "data": { "bbox": [0.1, 0.2, 0.3, 0.4] },
+  "imageKey": "optional-object-key"
+}
+```
+
+- `eventType` 优先使用平台事件注册表事件码；厂商私有事件用 `vendor.<code>`，平台按未知事件入库并告警日志。
+- 事件入库/告警投影复用现有 `eventingest` 链路，不新增通道。
+
+### 5.7 能力枚举与平台映射
+
+| 插件能力 | 平台能力操作 | 说明 |
+|---|---|---|
+| `login` | `sync` | 添加/同步设备 |
+| `channels` | `sync` | 通道发现 |
+| `live` | `play` | 实时取流 |
+| `playback` / `record_query` | `playback` | 回放/录像查询 |
+| `ptz` | `ptz` | 云台 |
+| `snapshot` | `snapshot` | 抓拍 |
+| `arm` / `disarm` | `alarm` / `subscribe` | 布撤防 |
+| `config` | `config` | 配置读写 |
+| `audio` | `audio` | 音频开关 |
+
+平台按清单写入 `zws_capability`（`scope=device`），页面按能力展示按钮；调用失败走运行时熔断（同 GB/ONVIF 一致）。
+
+## 6. 配置规范
+
+- 设备参数由插件声明 `config_schema`（JSON Schema 子集：`type/required/properties/title/default/format/enum`），平台页面据此渲染表单。
+- 平台不解释 vendor 专属字段，只做 Schema 校验后透传。敏感字段用 `"format": "password"`，平台仅展示掩码。
+- 插件升级不得修改既有 `deviceUid` 对应的参数语义；新增字段必须给 `default`。
+
+## 7. 平台侧模型
+
+### 7.1 表
+
+**`zws_plugin_package`**（插件包）
+
+| 列 | 说明 |
+|---|---|
+| `id` | UUID |
+| `plugin_id` / `version` | 唯一键 |
+| `name` / `vendor` | 清单摘要 |
+| `object_key` / `sha256` / `size_bytes` | 存储与完整性 |
+| `manifest_json` / `config_schema` | 清单原文 / Schema |
+| `protocols` / `capabilities` / `stream_transports` / `event_types` | 冗余便于查询 |
+| `status` | `valid` / `invalid` |
+| `error_msg` | 校验失败原因 |
+| `create_time` / `update_time` | |
+
+**`zws_plugin_install`**（安装任务/状态）
+
+| 列 | 说明 |
+|---|---|
+| `id` | UUID |
+| `agent_id` / `package_id` | 目标 |
+| `plugin_id` / `version` | 冗余 |
+| `status` | `pending` / `downloading` / `installed` / `failed` / `uninstalled` |
+| `last_error` | |
+| `create_time` / `update_time` | |
+
+Agent 上报的 `zws_agent_plugin` 增加 `package_id`、`version`（已有）关联，页面据此显示「已安装版本」。
+
+### 7.2 API
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/plugin-packages` | multipart 上传，返回校验结果 |
+| GET | `/api/v1/plugin-packages` | 列表（筛选 pluginId/vendor/status） |
+| GET | `/api/v1/plugin-packages/:id` | 详情（含清单、Schema） |
+| DELETE | `/api/v1/plugin-packages/:id` | 删除（有安装记录时软删 object 延迟 7 天） |
+| POST | `/api/v1/plugin-packages/:id/install` | body `{agentId}`：创建任务并调用 Agent |
+| GET | `/api/v1/plugin-packages/:id/download` | **Agent 专用**：`X-Agent-Token` 鉴权，流式返回包（不必暴露 MinIO） |
+| GET | `/api/v1/plugin-installs` | 安装状态列表（按 agent/status） |
+| DELETE | `/api/v1/plugin-installs/:id` | 卸载（平台调 Agent，删除版本目录并上报） |
+
+### 7.3 完整流程
+
+1. **上传**：管理员上传 `.zwplugin` → 校验 → 存 `plugins/{pluginId}/{version}/{sha256}.zwplugin` → 入库 `valid`。
+2. **安装**：页面选目标 Agent → 创建 `zws_plugin_install(pending)` → 调 Agent `POST /api/v1/plugins/{pluginId}/install`，体：
+
+```json
+{"packageId":"…","pluginId":"hikvision-ipc","version":"1.0.0","url":"https://platform/api/v1/plugin-packages/{id}/download","sha256":"…","sizeBytes":12345678}
+```
+
+   Agent 下载校验解压成功后立即重新扫描并上报，平台把任务置 `installed`；超时/失败置 `failed` 并显示原因。
+3. **启用**：沿用现有 `POST /api/v1/agents/:id/plugins/:pluginId/enable|disable`；`zws_plugin` 运行时行随之出现，插件出现在「插件管理」页。
+4. **添加设备**：沿用现有 `/api/v1/ipc/devices`（按插件 config_schema 渲染表单 → 插件 login → 通道入库 → 统一资产回填 → 页面可选）。
+5. **卸载**：先禁用，再调 Agent 删除 `{plugin_dir}/{plugin_id}/{version}`（无设备引用才允许）；安装记录置 `uninstalled`。
+
+## 8. Agent 侧改造
+
+### 8.1 新增接口（Agent HTTP）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/plugins/{pluginId}/install` | 下载→校验→解压→扫描→上报；幂等（同版本已装直接返回） |
+| DELETE | `/api/v1/plugins/{pluginId}` | 卸载（须 desired=disabled 且无运行进程） |
+| GET | `/api/v1/plugins/installed` | 已安装版本清单（供平台对账） |
+
+### 8.2 安装流程（原子化）
+
+```
+temp/{pluginId}-{version}-{rand}/   下载中
+  └─ 校验 sha256、zip 结构、manifest(id/version 与请求一致)
+plugin_dir/{pluginId}/.staging-{version}/   解压
+  └─ 校验 executable 存在
+plugin_dir/{pluginId}/{version}/           rename 提交
+  └─ 更新 current 指针（plugin_dir/{pluginId}/current -> {version}）
+  └─ 删除旧版本目录（保留最近 2 个版本以便回滚）
+  └─ discover() 重新扫描并立即上报平台
+```
+
+- 解压采用"先建临时目录再 rename"；解压失败清理临时目录，不动现网版本。
+- `plugin_id` 在 Agent 上维度唯一，同一 id 只有 `current` 指向的版本会被加载。
+- 版本目录命名与 manifest 一致；`plugin.yaml` 由清单生成副本置于版本目录根，Agent 扫描该目录。
+- 旧逻辑 `plugins/*/plugin.yaml` 保持兼容（手工部署方式仍可用，标记为 `manual` 来源）。
+
+### 8.3 进程注入
+
+启动插件时注入（现有基础上新增）：
+- `PLUGIN_LISTEN`、`PLUGIN_ID`、`PLUGIN_INSTANCE_ID`、`PLUGIN_TOKEN`、`AGENT_RPC_URL`（已有）
+- `PLUGIN_VERSION`、`PLUGIN_DIR`（新增）
+- `PLUGIN_INSTALL_SOURCE=platform|manual`（新增，便于排障）
+
+`listen: 127.0.0.1:0` 时插件须在 stdio 输出一行 `PLUGIN_LISTEN=127.0.0.1:PORT`，Agent 读取后开始健康探测；否则建议固定端口。
+
+### 8.4 状态上报
+
+注册/心跳继续携带插件清单，新增字段：
+- `source: platform|manual`
+- `installPackageId` / `installVersion`
+
+平台将 `zws_plugin_install` 与上报做对账：Agent 上实际存在但平台无任务记录的版本标记为 `manual`；任务记录为 installed 但 Agent 无此版本则置 `failed(agent 丢失)`。
+
+## 9. 与统一接入模型的衔接
+
+1. 插件设备继续走 `ipcdevice`（统一资产回填已覆盖），无需新增模型。
+2. 插件能力按第 5.7 节写入 `zws_capability`，`channeldrv` 增加 `plugin` 驱动的回放/抓拍调用（当前驱动已覆盖实时/停止/同步/云台，本轮补齐）。
+3. 失败熔断复用 `SetCapabilityAvailable`，与 GB/ONVIF 同一套机制。
+4. 插件事件走现有 MQTT → `eventingest` → 事件/告警，无需新链路。
+
+## 10. 实施计划
+
+| 阶段 | 内容 | 预估 |
+|---|---|---|
+| P1 | 域名/表/对象存储上传校验、插件包管理 API 与页面、Agent 下载安装卸载、安装状态对账 | 2~3 天 |
+| P2 | RPC v1 契约补齐（回放/录像查询/抓拍/配置）、Mock 插件升级为全契约、plugin 驱动扩展 | 1~2 天 |
+| P3 | 规范文档定稿（打包/开发指南/示例工程）+ e2e（两进程 + Mock 插件全链路） | 1 天 |
+
+**验证方式**：起平台 + zero-agent，上传 Mock 插件包 → 安装 → 启用 → 用 Mock 插件添加设备 → 实时/云台/回放/抓拍/布防事件各跑一遍；重启 Agent 验证状态恢复；重复安装验证幂等；坏包（缺 manifest、哈希不符、路径穿越）验证拒绝。
+
+## 11. 风险与待确认
+
+1. **Agent 可达性**：安装是平台直连 Agent，Agent 在 NAT 后无法安装 —— 是否需要"Agent 心跳响应带待安装任务"的拉取模式？（建议 v1 直连，v2 再加拉取兜底）
+2. **插件互信**：仅 sha256 校验，不做代码签名；是否可接受（内网分发）。
+
+## 12. 已定决策（评审确认）
+
+- **下载通道**：平台代理下载。Agent 凭 `X-Agent-Token` 调 `/api/v1/plugin-packages/:id/download` 流式取包，不向 Agent 暴露 MinIO；预签名直链 v1 不做。
+- **事件通道**：维持 MQTT（布防下发的参数），事件载荷格式按 5.6 固定。
+- **目标机架构**：按需声明。清单 `executable` 声明了哪些架构就支持哪些；Agent 在目标机找不到当前 `goos-goarch` 的二进制时报 `error` 并在页面展示原因，不做上传强校验。
+- **卸载策略**：有设备引用时禁止卸载。平台先查 `zws_plugin_device`，存在该插件设备则拒绝并提示"请先删除设备"，v1 不做设备悬空保留。
+- **Agent 可达性**：v1 安装走平台直连 Agent（与现有启停一致）；Agent 位于 NAT 后无法直连的拉取模式列为 v2 备选，不在本轮实现。
+
+## 13. 实施记录与边界说明
+
+已按 P1/P2 落地，以下为实现细节与边界约定（与上文冲突时以本节为准）。
+
+### 13.1 已实现接口
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| POST | `/api/v1/plugin-packages` | JWT | multipart 字段 `file`，同步校验后入 MinIO |
+| GET | `/api/v1/plugin-packages` | JWT | 包列表 |
+| GET | `/api/v1/plugin-packages/:id` | JWT | 包详情（含清单原文） |
+| DELETE | `/api/v1/plugin-packages/:id` | JWT | 有未卸载安装记录时拒绝 |
+| POST | `/api/v1/plugin-packages/:id/install?agentId=` | JWT | 下发安装，登记 `zws_plugin_install` |
+| GET | `/api/v1/plugin-packages/:id/download` | `X-Agent-Token` | Agent 流式下载，响应头带 `X-Package-SHA256` |
+| GET | `/api/v1/plugin-installs?agentId=` | JWT | 安装记录 |
+| DELETE | `/api/v1/plugin-installs/:id` | JWT | 卸载（有设备引用先拒绝） |
+
+Agent 控制面新增：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/plugins/{pluginId}/install` | 下载→sha256/清单复核→原子解压→切换 `.current`→重扫→立即上报 |
+| POST | `/api/v1/plugins/{pluginId}/uninstall` | 停进程→删版本目录→重扫 |
+| GET | `/api/v1/plugins/installed` | 版本清单，供平台对账 |
+
+### 13.2 存储与校验边界
+
+- 对象键：`plugins/{pluginId}/{version}/{sha256}.zwplugin`；MinIO 未配置或为 `noop` 时上传直接报错，不落库。
+- 上传校验（`internal/domain/pluginpkg/inspect.go`）：zip 合法性、条目数 ≤2000、包体 ≤500MB、解压总量 ≤1GB、拒绝符号链接/绝对路径/`..` 穿越/反斜杠条目；`plugin.yaml` 必填字段与枚举；`config_schema` 规范化为内联 JSON。
+- 同 `(pluginId, version)` 重复上传：sha256 相同视为幂等返回旧记录，不同则拒绝，必须显式删除旧包。
+- Agent 侧复核：sha256 + 包体大小 + 清单 `id/version` 必须与安装指令一致；任何失败都在临时目录内结束，不影响现网版本。
+
+### 13.3 Agent 目录与版本
+
+```
+plugin_dir/
+  {pluginId}/
+    .current            # 当前生效版本（文本）
+    {version}/plugin.yaml + bin/...
+```
+
+- 扫描兼容两种布局：平台安装（版本目录 + `.current`）与手工部署（`plugin_dir/{pluginId}/plugin.yaml`）。
+- 同版本重扫保留进程状态；版本切换时旧进度停止并加载新版本；保留最近 2 个版本。
+- 可执行文件按 `{goos}-{goarch}` 键解析，兼容旧的仅 `goos` 键与 `default`。
+
+### 13.4 卸载与对账
+
+- 有 `zws_plugin_device` 引用时拒绝卸载（按运行时实例反查设备）。
+- 卸载成功后调用 Agent `/plugins/installed` 对账，同机同插件已不存在的安装记录自动置 `uninstalled`。
+
+### 13.5 尚未覆盖（P3 后续）
+
+- RPC v1 契约中的回放/录像查询/抓拍/配置：插件侧（Mock 已实现占位），平台 `channeldrv` 的 plugin 驱动尚未接入这些操作，当前凭插件设备走原有 `ipcdevice` 通道。
+- 插件设备的统一资产能力回填已补齐 `play/playback/ptz/snapshot/alarm/subscribe/sync`；`config/audio` 按 `hasAudio` 与清单能力在后续批次补齐。
