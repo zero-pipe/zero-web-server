@@ -173,9 +173,9 @@ export default {
   color: #303133;
 }
 .card:hover {
-  background: #409EFF;
+  background: #1A73E8;
   color: #fff;
-  box-shadow: 0 3px 10px rgba(64,158,255,0.4);
+  box-shadow: 0 3px 10px rgba(26,115,232,0.4);
   transform: scale(1.1);
 }
 .card:active {
@@ -193,9 +193,9 @@ export default {
   color: #a8abb2;
 }
 .diag:hover {
-  background: #409EFF;
+  background: #1A73E8;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(64,158,255,0.35);
+  box-shadow: 0 2px 8px rgba(26,115,232,0.35);
   transform: scale(1.1);
 }
 .diag:active {
@@ -214,13 +214,13 @@ export default {
   height: 40px;
   background: linear-gradient(135deg, #eef0f4, #e0e3e8);
   font-size: 20px;
-  color: #909399;
+  color: #80868B;
   line-height: 1;
 }
 .dpad-center:hover {
-  background: #409EFF;
+  background: #1A73E8;
   color: #fff;
-  box-shadow: 0 3px 10px rgba(64,158,255,0.4);
+  box-shadow: 0 3px 10px rgba(26,115,232,0.4);
   transform: translate(-50%, -50%) scale(1.1);
 }
 .dpad-center:active {
@@ -260,7 +260,7 @@ export default {
   font-size: 12px;
 }
 .ptz-func-btn:hover {
-  background: #409EFF;
+  background: #1A73E8;
   color: #fff;
 }
 .ptz-func-btn:active {

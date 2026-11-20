@@ -204,6 +204,6 @@ export default {
 .status-card { flex: 1 1 200px; background: #fff; border: 1px solid #e4e7ed; border-radius: 8px; padding: 12px 14px; }
 .status-head { display: flex; align-items: center; justify-content: space-between; }
 .status-name { font-weight: 600; color: #303133; }
-.status-sub { margin-top: 6px; color: #909399; font-size: 12px; word-break: break-all; }
-.hint { margin-left: 10px; color: #909399; font-size: 12px; }
+.status-sub { margin-top: 6px; color: #80868B; font-size: 12px; word-break: break-all; }
+.hint { margin-left: 10px; color: #80868B; font-size: 12px; }
 </style>

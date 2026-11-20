@@ -82,7 +82,7 @@
               size="medium"
               icon="el-icon-delete"
               type="text"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               @click="deleteUserApiKey(scope.row)"
             >
               删除

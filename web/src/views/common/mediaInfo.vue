@@ -187,7 +187,7 @@ export default {
   display: block;
   margin-top: 4px;
   font-size: 11px;
-  color: #909399;
+  color: #80868B;
 }
 .mi-section {
   background: #f5f7fa;
@@ -199,7 +199,7 @@ export default {
 .mi-section-title {
   font-size: 11px;
   font-weight: 600;
-  color: #909399;
+  color: #80868B;
   letter-spacing: 0.06em;
   margin-bottom: 8px;
 }
@@ -215,10 +215,10 @@ export default {
   font-size: 12px;
   line-height: 1.6;
 }
-.mi-k { color: #909399; }
+.mi-k { color: #80868B; }
 .mi-v { color: #303133; font-weight: 500; }
 .mi-empty {
-  color: #909399;
+  color: #80868B;
   font-size: 12px;
   text-align: center;
   padding: 28px 8px;

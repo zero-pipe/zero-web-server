@@ -70,7 +70,7 @@
         <el-table-column prop="name" label="名称" min-width="180" />
         <el-table-column label="开启音频" min-width="100">
           <template v-slot:default="scope">
-            <el-switch v-model="scope.row.hasAudio" active-color="#409EFF" @change="updateChannel(scope.row)" />
+            <el-switch v-model="scope.row.hasAudio" active-color="#1A73E8" @change="updateChannel(scope.row)" />
           </template>
         </el-table-column>
         <el-table-column label="码流类型" min-width="180">
@@ -115,7 +115,7 @@
               :disabled="device == null || device.online === 0"
               icon="el-icon-switch-button"
               type="text"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               @click="stopDevicePush(scope.row)"
             >停止
             </el-button>

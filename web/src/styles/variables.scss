@@ -1,18 +1,35 @@
-// sidebar — 蓝白双列主题
-$menuText: #64748b;
-$menuActiveText: #1565c0;
-$subMenuActiveText: #1565c0;
+// Zeroo 视觉主题（对齐 docs/Zeroo图标&配色规范.html）
+$brandBlue: #1A73E8;
+$brandBlueDark: #174EA6;
+$brandGreen: #34A853;
 
-$menuBg: #1565c0;
-$menuHover: #1976d2;
+$textMain: #202124;
+$textSub: #5F6368;
+$borderColor: #E8EAED;
+$surface: #FFFFFF;
+$pageBg: #F8F9FA;
 
-$subMenuBg: #f5f8fc;
-$subMenuHover: #e8f1fb;
+// sidebar
+$menuText: $textSub;
+$menuActiveText: $brandBlue;
+$subMenuActiveText: $brandBlue;
+
+$menuBg: $surface;
+$menuHover: #F1F3F4;
+
+$subMenuBg: $surface;
+$subMenuHover: #F1F3F4;
 
 // 默认展开宽度（一级 84 + 二级 176）
 $sideBarWidth: 260px;
 
 :export {
+  brandBlue: $brandBlue;
+  textMain: $textMain;
+  textSub: $textSub;
+  borderColor: $borderColor;
+  pageBg: $pageBg;
+
   menuText: $menuText;
   menuActiveText: $menuActiveText;
   subMenuActiveText: $subMenuActiveText;

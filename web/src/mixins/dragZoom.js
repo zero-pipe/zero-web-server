@@ -59,10 +59,10 @@ export default {
       if (this.dragGridEnabled) {
         console.log('加载网格背景')
         canvas.style.backgroundImage =
-          'linear-gradient(rgba(64, 158, 255, 0.3) 1px, transparent 2px),' +
-          'linear-gradient(90deg, rgba(64, 158, 255, 0.3) 1px, transparent 2px)'
+          'linear-gradient(rgba(26, 115, 232, 0.3) 1px, transparent 2px),' +
+          'linear-gradient(90deg, rgba(26, 115, 232, 0.3) 1px, transparent 2px)'
         canvas.style.backgroundSize = '25px 25px'
-        canvas.style.border = '2px solid #409EFF'
+        canvas.style.border = '2px solid #1A73E8'
       }
 
       this.$el.appendChild(canvas)
@@ -112,10 +112,10 @@ export default {
     _drawDragRect(ctx) {
       const r = this.dragRect
       if (!r) return
-      ctx.strokeStyle = '#409EFF'
+      ctx.strokeStyle = '#1A73E8'
       ctx.lineWidth = 2
       ctx.setLineDash([6, 3])
-      ctx.fillStyle = 'rgba(64, 158, 255, 0.15)'
+      ctx.fillStyle = 'rgba(26, 115, 232, 0.15)'
       ctx.beginPath()
       ctx.rect(r.left, r.top, r.width, r.height)
       ctx.fill()

@@ -80,10 +80,10 @@ export default {
   transition: background 0.15s;
 }
 .preset-item:hover {
-  background: #ecf5ff;
+  background: #E8F0FE;
 }
 .preset-item:active {
-  background: #d9ecff;
+  background: #D2E3FC;
 }
 .preset-idx {
   width: 28px;
@@ -103,7 +103,7 @@ export default {
 }
 .preset-empty {
   text-align: center;
-  color: #909399;
+  color: #80868B;
   font-size: 13px;
   padding: 20px 0;
 }

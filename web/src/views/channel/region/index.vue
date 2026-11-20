@@ -15,7 +15,7 @@
           <el-breadcrumb v-if="regionParents.length > 0" separator="/" style="display: ruby">
             <el-breadcrumb-item v-for="key in regionParents" :key="key">{{ key }}</el-breadcrumb-item>
           </el-breadcrumb>
-          <div v-else style="color: #1565c0">未选择行政区划</div>
+          <div v-else style="color: #1A73E8">未选择行政区划</div>
         </el-form-item>
         <div style="float: right;">
           <el-form-item label="搜索">
@@ -165,7 +165,7 @@
         <el-table-column prop="gbCode" label="对外国标码" />
         <el-table-column label="操作" width="80">
           <template v-slot:default="scope">
-            <el-button type="text" style="color:#f56c6c" @click="deleteMapping(scope.row)">删除</el-button>
+            <el-button type="text" style="color:#EA4335" @click="deleteMapping(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

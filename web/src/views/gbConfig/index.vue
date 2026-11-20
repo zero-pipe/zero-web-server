@@ -193,12 +193,12 @@ export default {
 }
 .gb-config-sub {
   font-size: 12px;
-  color: #909399;
+  color: #80868B;
   font-weight: normal;
 }
 .hint {
   margin-left: 12px;
   font-size: 12px;
-  color: #909399;
+  color: #80868B;
 }
 </style>

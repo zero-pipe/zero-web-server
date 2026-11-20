@@ -47,7 +47,7 @@
           <template v-slot:default="scope">
             <el-button type="text" size="medium" @click="openSubCatalog(scope.row)">目录</el-button>
             <el-button type="text" size="medium" @click="openSubEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="medium" style="color:#f56c6c" @click="deleteSub(scope.row)">删除</el-button>
+            <el-button type="text" size="medium" style="color:#EA4335" @click="deleteSub(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -195,7 +195,7 @@
               size="medium"
               icon="el-icon-delete"
               type="text"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               @click="deletePlatform(scope.row)"
             >删除
             </el-button>
@@ -481,7 +481,7 @@ export default {
 </script>
 <style>
 .subscribe-on {
-  color: #409EFF;
+  color: #1A73E8;
   font-size: 18px;
 }
 

@@ -101,7 +101,7 @@
             size="medium"
             icon="el-icon-delete"
             type="text"
-            style="color: #f56c6c"
+            style="color: #EA4335"
             @click="deleteDevice(scope.row)"
           >删除
           </el-button>

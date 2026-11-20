@@ -7,7 +7,7 @@
     <div class="primary-rail">
       <div class="brand" @click="goHome">
         <img v-if="logo" :src="logo" class="brand-logo" alt="logo">
-        <span v-if="!isCollapse" class="brand-text">ZWS</span>
+        <span v-if="!isCollapse" class="brand-text">Zeroo</span>
       </div>
       <el-scrollbar class="primary-scroll">
         <div
@@ -65,7 +65,7 @@ export default {
   data() {
     return {
       activePrimary: null,
-      logo: require('@/assets/brand/zero-logo-64.png'),
+      logo: require('@/assets/brand/zero-logo.svg'),
       resizing: false
     }
   },
@@ -185,7 +185,7 @@ export default {
   height: 100%;
   position: relative;
   background: #fff;
-  box-shadow: 2px 0 8px rgba(21, 101, 192, 0.08);
+  box-shadow: 2px 0 8px rgba(60, 64, 67, 0.06);
   overflow: hidden;
   user-select: none;
 }
@@ -193,10 +193,11 @@ export default {
 .primary-rail {
   width: var(--primary-width, 84px);
   flex-shrink: 0;
-  background: linear-gradient(180deg, #1565c0 0%, #0d47a1 100%);
+  background: #fff;
+  border-right: 1px solid #E8EAED;
   display: flex;
   flex-direction: column;
-  color: #fff;
+  color: #5F6368;
 }
 
 .brand {
@@ -206,22 +207,23 @@ export default {
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid #E8EAED;
   flex-shrink: 0;
 
   .brand-logo {
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
-    background: #fff;
+    width: 26px;
+    height: 26px;
+    border-radius: 0;
+    background: transparent;
     object-fit: contain;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+    box-shadow: none;
   }
 
   .brand-text {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: #202124;
   }
 }
 
@@ -243,18 +245,18 @@ export default {
   min-height: 64px;
   padding: 10px 6px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.78);
+  color: #5F6368;
   transition: background 0.2s, color 0.2s;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
+    background: #F1F3F4;
+    color: #202124;
   }
 
   &.active {
-    background: rgba(255, 255, 255, 0.18);
-    color: #fff;
-    box-shadow: inset 3px 0 0 #90caf9;
+    background: #E8F0FE;
+    color: #1A73E8;
+    box-shadow: inset 3px 0 0 #1A73E8;
   }
 
   .primary-icon {
@@ -274,8 +276,8 @@ export default {
 .secondary-panel {
   width: var(--secondary-width, 176px);
   flex-shrink: 0;
-  background: #f5f8fc;
-  border-right: 1px solid #e3ebf5;
+  background: #F8F9FA;
+  border-right: 1px solid #E8EAED;
   display: flex;
   flex-direction: column;
 }
@@ -285,13 +287,13 @@ export default {
   display: flex;
   align-items: center;
   padding: 0 16px;
-  border-bottom: 1px solid #e3ebf5;
+  border-bottom: 1px solid #E8EAED;
   flex-shrink: 0;
 
   .secondary-title {
     font-size: 14px;
     font-weight: 600;
-    color: #1565c0;
+    color: #202124;
   }
 }
 
@@ -317,7 +319,7 @@ export default {
   margin: 4px 10px;
   padding: 0 10px 0 8px;
   border-radius: 8px;
-  color: #4a5568;
+  color: #5F6368;
   font-size: 13px;
   font-weight: 400;
   line-height: 44px;
@@ -326,29 +328,29 @@ export default {
   transition: background 0.15s ease, color 0.15s ease;
 
   &:hover {
-    background: #eef4fb;
-    color: #1565c0;
+    background: #F1F3F4;
+    color: #202124;
 
     .icon-wrap {
-      background: #d9e8f8;
-      color: #1565c0;
+      background: #E8EAED;
+      color: #5F6368;
     }
   }
 
   &.active {
-    background: #dcecff;
-    color: #0d47a1;
+    background: #E8F0FE;
+    color: #1A73E8;
     font-weight: 600;
-    box-shadow: inset 3px 0 0 #1565c0;
+    box-shadow: inset 3px 0 0 #1A73E8;
 
     .icon-wrap {
-      background: #1565c0;
+      background: #1A73E8;
       color: #fff;
-      box-shadow: 0 2px 6px rgba(21, 101, 192, 0.28);
+      box-shadow: none;
     }
 
     .secondary-label {
-      color: #0d47a1;
+      color: #1A73E8;
     }
 
     .secondary-icon {
@@ -361,8 +363,8 @@ export default {
     width: 28px;
     height: 28px;
     border-radius: 7px;
-    background: #e7edf5;
-    color: #5f6f82;
+    background: #F1F3F4;
+    color: #5F6368;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -409,7 +411,7 @@ export default {
 
   &:hover,
   &:active {
-    background: rgba(21, 101, 192, 0.35);
+    background: rgba(26, 115, 232, 0.35);
   }
 }
 

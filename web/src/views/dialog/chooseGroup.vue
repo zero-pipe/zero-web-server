@@ -17,7 +17,7 @@
         :closable="false"
         style="margin-bottom: 10px"
       />
-      <div v-if="groupName" style="margin-bottom: 10px; color: #409EFF;">
+      <div v-if="groupName" style="margin-bottom: 10px; color: #1A73E8;">
         已选：{{ groupName }}（{{ groupDeviceId }}）
       </div>
       <GroupTree

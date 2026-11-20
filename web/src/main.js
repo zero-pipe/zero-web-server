@@ -40,11 +40,11 @@ Vue.use(VueClipboard)
 Vue.config.productionTip = false
 
 Vue.prototype.$channelTypeList = {
-  1: { id: 1, name: '国标设备', style: { color: '#409eff', borderColor: '#b3d8ff' } },
-  2: { id: 2, name: '推流设备', style: { color: '#67c23a', borderColor: '#c2e7b0' } },
-  3: { id: 3, name: '拉流代理', style: { color: '#e6a23c', borderColor: '#f5dab1' } },
+  1: { id: 1, name: '国标设备', style: { color: '#1A73E8', borderColor: '#AECBFA' } },
+  2: { id: 2, name: '推流设备', style: { color: '#34A853', borderColor: '#CEEAD6' } },
+  3: { id: 3, name: '拉流代理', style: { color: '#FBBC05', borderColor: '#FEEFC3' } },
   4: { id: 4, name: 'ONVIF设备', style: { color: '#7c3aed', borderColor: '#ddd6fe' } },
-  200: { id: 200, name: '部标设备', style: { color: '#fa6436', borderColor: '#f4997c' } }
+  200: { id: 200, name: '部标设备', style: { color: '#EA4335', borderColor: '#F6AEA9' } }
 }
 
 new Vue({

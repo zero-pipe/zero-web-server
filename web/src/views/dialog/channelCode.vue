@@ -462,7 +462,7 @@ export default {
   font-variant-numeric: tabular-nums;
 }
 .show-code-item.is-locked-code {
-  color: #e6a23c;
+  color: #FBBC05;
 }
 .show-code-label {
   text-align: center;
@@ -484,7 +484,7 @@ export default {
   padding-left: 1.2rem;
 }
 .locked-type-current {
-  color: #e6a23c;
+  color: #FBBC05;
 }
 .region-code-tabs {
   padding: 0 1rem;
@@ -497,7 +497,7 @@ export default {
 }
 .code-hint {
   font-size: 12px;
-  color: #909399;
+  color: #80868B;
 }
 .code-option-grid {
   display: grid;

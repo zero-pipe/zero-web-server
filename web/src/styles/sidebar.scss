@@ -5,7 +5,7 @@
     transition: margin-left .28s;
     margin-left: var(--sidebar-width, #{$sideBarWidth});
     position: relative;
-    background: #f0f4f8;
+    background: $pageBg;
   }
 
   .sidebar-container {

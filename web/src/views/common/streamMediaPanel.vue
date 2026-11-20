@@ -128,10 +128,10 @@ export default {
 .stream-media-panel {
   .copy-btn {
     cursor: pointer;
-    color: #1565c0;
+    color: #1A73E8;
 
     &:hover {
-      color: #0d47a1;
+      color: #174EA6;
     }
   }
 
@@ -140,7 +140,7 @@ export default {
   }
 
   .el-input.is-disabled .el-input__inner {
-    color: #334155;
+    color: #3C4043;
     cursor: text;
   }
 }
@@ -171,8 +171,8 @@ export default {
   min-height: 22px;
   padding: 0 8px;
   border-radius: 4px;
-  background: #e8f1fb;
-  color: #1565c0;
+  background: #E8F0FE;
+  color: #1A73E8;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -185,6 +185,6 @@ export default {
   white-space: nowrap;
   font-family: Consolas, 'Courier New', monospace;
   font-size: 12px;
-  color: #475569;
+  color: #5F6368;
 }
 </style>

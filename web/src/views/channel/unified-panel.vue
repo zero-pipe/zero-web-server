@@ -207,5 +207,5 @@ export default {
 </script>
 
 <style scoped>
-.unified-channel .sub-text { color: #909399; font-size: 12px; }
+.unified-channel .sub-text { color: #80868B; font-size: 12px; }
 </style>

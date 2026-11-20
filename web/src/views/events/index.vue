@@ -28,7 +28,7 @@
       <el-form-item>
         <el-button type="primary" icon="el-icon-search" @click="reload">查询</el-button>
         <el-button icon="el-icon-refresh" circle :loading="loading" @click="load" />
-        <el-button type="text" style="color:#f56c6c" @click="clearOld">清理 90 天前</el-button>
+        <el-button type="text" style="color:#EA4335" @click="clearOld">清理 90 天前</el-button>
       </el-form-item>
     </el-form>
 
@@ -134,7 +134,7 @@
         <i class="el-icon-loading" style="font-size:32px" />
         <div style="margin-top:10px;color:#606266">正在加载回放...</div>
       </div>
-      <div v-else-if="playbackError" style="text-align:center;padding:40px 0;color:#f56c6c">{{ playbackError }}</div>
+      <div v-else-if="playbackError" style="text-align:center;padding:40px 0;color:#EA4335">{{ playbackError }}</div>
       <div v-else-if="playbackStreamInfo" style="height:400px;">
         <playerTabs ref="playbackPlayer" :show-button="false" :showTab="true" :has-audio="true" />
       </div>
@@ -286,7 +286,7 @@ export default {
 </script>
 
 <style scoped>
-.sub { color: #909399; font-size: 12px; }
+.sub { color: #80868B; font-size: 12px; }
 .stats-row { margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 .section { margin-top: 14px; }
 .section-title { font-weight: 600; margin-bottom: 6px; }

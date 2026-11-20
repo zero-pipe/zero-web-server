@@ -6,7 +6,7 @@
         <el-switch
           v-model="showRegion"
           active-color="#13ce66"
-          inactive-color="rgb(64, 158, 255)"
+          inactive-color="rgb(26, 115, 232)"
           active-text="行政区划"
           inactive-text="业务分组"
         />

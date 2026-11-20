@@ -38,7 +38,7 @@
           <template v-slot:default="scope">
             <el-button size="medium" icon="el-icon-link" type="text" @click="link(scope.row)">关联通道</el-button>
             <el-button size="medium" icon="el-icon-edit" type="text" @click="edit(scope.row)">编辑</el-button>
-            <el-button size="medium" icon="el-icon-delete" style="color: #f56c6c" type="text" @click="deletePlan(scope.row)">删除</el-button>
+            <el-button size="medium" icon="el-icon-delete" style="color: #EA4335" type="text" @click="deletePlan(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

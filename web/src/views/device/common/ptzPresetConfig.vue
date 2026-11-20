@@ -32,7 +32,7 @@
       <el-table-column label="操作" min-width="140" align="center">
         <template v-slot="{ row }">
           <el-button size="mini" type="text" @click="callPreset(row)">调用</el-button>
-          <el-button size="mini" type="text" style="color: #F56C6C" :loading="deletingId === row.presetId" :disabled="deletingId !== null" @click="delPreset(row)">删除</el-button>
+          <el-button size="mini" type="text" style="color: #EA4335" :loading="deletingId === row.presetId" :disabled="deletingId !== null" @click="delPreset(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

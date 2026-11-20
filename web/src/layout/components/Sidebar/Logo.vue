@@ -24,8 +24,8 @@ export default {
   },
   data() {
     return {
-      title: 'ZWS',
-      logo: require('@/assets/brand/zero-logo-64.png')
+      title: 'Zeroo Web',
+      logo: require('@/assets/brand/zero-logo.svg')
     }
   }
 }

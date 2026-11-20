@@ -56,7 +56,7 @@
           <span class="custom-tree-node">
             <span
               v-if="node.data.type === 0 && chooseId !== node.data.deviceId"
-              style="color: #409EFF"
+              style="color: #1A73E8"
               class="iconfont icon-bianzubeifen3"
             />
             <span
@@ -66,7 +66,7 @@
             />
             <span
               v-if="node.data.type === 1 && node.data.status === 'ON'"
-              style="color: #409EFF"
+              style="color: #1A73E8"
               class="iconfont icon-shexiangtou2"
             />
             <span
@@ -89,7 +89,7 @@
         <li v-for="item in regionList" :key="item.id" class="channel-list-li" @click="listClickHandler(item)">
           <span
             v-if="chooseId !== item.deviceId"
-            style="color: #409EFF;  font-size: 20px"
+            style="color: #1A73E8;  font-size: 20px"
             class="iconfont icon-bianzubeifen3"
           />
           <span
@@ -108,7 +108,7 @@
         <li v-for="item in channelList" :key="item.id" class="channel-list-li" @click="channelLstClickHandler(item)" @contextmenu.prevent="contextmenuEventHandlerForLi($event, item)">
           <span
             v-if="item.gbStatus === 'ON'"
-            style="color: #409EFF; font-size: 20px"
+            style="color: #1A73E8; font-size: 20px"
             class="iconfont icon-shexiangtou2"
           />
           <span
@@ -554,9 +554,9 @@ export default {
   display: flex;
   flex-direction: column;
   background: #fff;
-  border: 1px solid #e3ebf5;
+  border: 1px solid #E8EAED;
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(21, 101, 192, 0.06);
+  box-shadow: 0 2px 10px rgba(26, 115, 232, 0.06);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -573,7 +573,7 @@ export default {
 }
 
 .org-tree-search ::v-deep .el-input__inner:focus {
-  border-color: #1565c0;
+  border-color: #1A73E8;
   background: #fff;
 }
 
@@ -600,7 +600,7 @@ export default {
   margin: 0 6px 8px;
   padding: 6px 8px;
   border-radius: 8px;
-  background: #f5f8fc;
+  background: #F8F9FA;
   font-size: 13px;
   color: #5a6a7a;
   flex-shrink: 0;
@@ -629,7 +629,7 @@ export default {
   margin: 0 6px 8px;
   padding: 0 2px;
   font-size: 12px;
-  color: #909399;
+  color: #80868B;
   flex-shrink: 0;
 }
 
@@ -673,6 +673,6 @@ export default {
 }
 
 .channel-list-li:hover {
-  background: #f0f6ff;
+  background: #E8F0FE;
 }
 </style>

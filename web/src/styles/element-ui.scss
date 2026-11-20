@@ -25,17 +25,17 @@
   border-radius: 10px;
   overflow: hidden;
   background: #ffffff;
-  border: 1px solid #e8eef6;
-  box-shadow: 0 12px 36px rgba(15, 40, 80, 0.14);
+  border: 1px solid #E8EAED;
+  box-shadow: 0 12px 36px rgba(60, 64, 67, 0.14);
 
   .el-dialog__header {
     padding: 14px 20px 12px;
-    background: #f7fafc;
-    border-bottom: 1px solid #e8eef6;
+    background: #F8F9FA;
+    border-bottom: 1px solid #E8EAED;
   }
 
   .el-dialog__title {
-    color: #1e293b;
+    color: #202124;
     font-size: 15px;
     font-weight: 600;
     line-height: 1.4;
@@ -46,23 +46,23 @@
     right: 16px;
 
     .el-dialog__close {
-      color: #94a3b8;
+      color: #80868B;
 
       &:hover {
-        color: #1565c0;
+        color: #1A73E8;
       }
     }
   }
 
   .el-dialog__body {
     padding: 18px 20px 8px;
-    color: #334155;
+    color: #3C4043;
   }
 
   .el-dialog__footer {
     padding: 12px 20px 16px;
-    border-top: 1px solid #eef2f7;
-    background: #fafbfc;
+    border-top: 1px solid #F1F3F4;
+    background: #FAFAFA;
   }
 }
 
@@ -73,7 +73,7 @@
   .el-input-group__append,
   .el-input-group__prepend {
     border-radius: 6px;
-    border-color: #d7e0ec;
+    border-color: #DADCE0;
   }
 
   .el-input-group--append .el-input__inner {
@@ -84,9 +84,9 @@
   .el-input-group__append {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
-    background: #f5f8fc;
-    color: #475569;
-    border-color: #d7e0ec;
+    background: #F8F9FA;
+    color: #5F6368;
+    border-color: #DADCE0;
   }
 
   .el-button {
@@ -94,13 +94,13 @@
   }
 
   .el-button--primary {
-    background-color: #1565c0;
-    border-color: #1565c0;
+    background-color: #1A73E8;
+    border-color: #1A73E8;
 
     &:hover,
     &:focus {
-      background-color: #1976d2;
-      border-color: #1976d2;
+      background-color: #1765CC;
+      border-color: #1765CC;
     }
   }
 
@@ -124,8 +124,8 @@
 // dropdown
 .el-dropdown-menu {
   border-radius: 8px;
-  border: 1px solid #e8eef6;
-  box-shadow: 0 8px 24px rgba(15, 40, 80, 0.1);
+  border: 1px solid #E8EAED;
+  box-shadow: 0 8px 24px rgba(60, 64, 67, 0.1);
 
   a {
     display: block
@@ -135,4 +135,88 @@
 // to fix el-date-picker css style
 .el-range-separator {
   box-sizing: content-box;
+}
+
+// Zeroo 主题：Element UI 主色统一为规范蓝 #1A73E8
+.el-button--primary {
+  background-color: $brandBlue;
+  border-color: $brandBlue;
+
+  &:hover,
+  &:focus {
+    background-color: #1765CC;
+    border-color: #1765CC;
+  }
+
+  &:active {
+    background-color: $brandBlueDark;
+    border-color: $brandBlueDark;
+  }
+
+  &.is-disabled,
+  &.is-disabled:hover,
+  &.is-disabled:focus {
+    background-color: #AECBFA;
+    border-color: #AECBFA;
+  }
+}
+
+.el-button--text {
+  color: $brandBlue;
+}
+
+.el-link.el-link--primary {
+  color: $brandBlue;
+}
+
+.el-input__inner:focus,
+.el-textarea__inner:focus,
+.el-select .el-input.is-focus .el-input__inner,
+.el-select .el-input__inner:focus {
+  border-color: $brandBlue;
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: $brandBlue;
+  border-color: $brandBlue;
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label {
+  color: $brandBlue;
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  background-color: $brandBlue;
+  border-color: $brandBlue;
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+  color: $brandBlue;
+}
+
+.el-switch.is-checked .el-switch__core {
+  background-color: $brandBlue;
+  border-color: $brandBlue;
+}
+
+.el-pagination.is-background .el-pager li:not(.disabled).active {
+  background-color: $brandBlue;
+}
+
+.el-pagination.is-background .el-pager li:not(.disabled):hover {
+  color: $brandBlue;
+}
+
+.el-tabs__item.is-active,
+.el-tabs__item:hover {
+  color: $brandBlue;
+}
+
+.el-tabs__active-bar {
+  background-color: $brandBlue;
+}
+
+.el-loading-spinner .path {
+  stroke: $brandBlue;
 }

@@ -20,7 +20,7 @@
       >
         <span slot-scope="{ node, data }" class="custom-tree-node">
           <span>{{ data.name || data.deviceId }}</span>
-          <span style="color:#909399; margin-left:8px; font-size:12px;">{{ data.deviceId }}</span>
+          <span style="color:#80868B; margin-left:8px; font-size:12px;">{{ data.deviceId }}</span>
           <el-tag v-if="data.typeCode === '215'" size="mini" style="margin-left:6px;">业务分组</el-tag>
           <el-tag v-else-if="data.typeCode === '216'" size="mini" type="success" style="margin-left:6px;">虚拟组织</el-tag>
         </span>
@@ -35,8 +35,8 @@
           style="margin: 0 6px 6px 0;"
           @close="unshare(id)"
         >{{ id }}</el-tag>
-        <div v-if="sharedList.length === 0" style="color:#909399; font-size:12px;">尚未共享任何业务目录节点</div>
-        <div style="margin-top:16px; color:#909399; font-size:12px; line-height:1.7;">
+        <div v-if="sharedList.length === 0" style="color:#80868B; font-size:12px;">尚未共享任何业务目录节点</div>
+        <div style="margin-top:16px; color:#80868B; font-size:12px; line-height:1.7;">
           勾选 = 共享该节点及其子树；取消勾选 = 取消共享。<br>
           取消共享后，下次推送会给上级发送该节点下通道的删除通知。
         </div>

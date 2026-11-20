@@ -175,7 +175,7 @@ export default {
 .history-log-page {
   padding: 16px 20px 24px;
   min-height: calc(100vh - 124px);
-  background: #f0f4f8;
+  background: #F8F9FA;
 }
 
 .history-log-shell {
@@ -188,22 +188,22 @@ export default {
   margin-bottom: 14px;
   padding: 16px 18px;
   background: #fff;
-  border: 1px solid #e3ebf5;
+  border: 1px solid #E8EAED;
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(15, 40, 80, 0.05);
+  box-shadow: 0 8px 24px rgba(60, 64, 67, 0.05);
 }
 
 .history-log-shell-title {
   font-size: 18px;
   font-weight: 650;
-  color: #1e293b;
+  color: #202124;
   line-height: 1.3;
 }
 
 .history-log-shell-desc {
   margin-top: 4px;
   font-size: 13px;
-  color: #64748b;
+  color: #5F6368;
 }
 
 .history-log-refresh {
@@ -215,7 +215,7 @@ export default {
 .history-log-empty {
   padding: 48px 16px;
   text-align: center;
-  color: #94a3b8;
+  color: #80868B;
   background: #fff;
   border: 1px dashed #dbe4ef;
   border-radius: 10px;
@@ -231,9 +231,9 @@ export default {
   display: flex;
   flex-direction: column;
   background: #fff;
-  border: 1px solid #e3ebf5;
+  border: 1px solid #E8EAED;
   border-radius: 10px;
-  box-shadow: 0 6px 18px rgba(15, 40, 80, 0.04);
+  box-shadow: 0 6px 18px rgba(60, 64, 67, 0.04);
   overflow: hidden;
 }
 
@@ -242,11 +242,11 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 14px 16px 10px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid #F1F3F4;
 }
 
 .history-log-card-icon {
-  color: #1565c0;
+  color: #1A73E8;
   font-size: 18px;
   flex-shrink: 0;
 }
@@ -256,7 +256,7 @@ export default {
   min-width: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #202124;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -277,13 +277,13 @@ export default {
 
 .history-log-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: #80868B;
 }
 
 .history-log-value {
   font-size: 13px;
   font-weight: 550;
-  color: #1e293b;
+  color: #202124;
 }
 
 .history-log-card-footer {
@@ -292,7 +292,7 @@ export default {
   gap: 4px;
   padding: 8px 12px 10px;
   border-top: 1px solid #f1f5f9;
-  background: #fafbfc;
+  background: #FAFAFA;
 }
 
 .history-log-viewer {

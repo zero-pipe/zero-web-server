@@ -123,7 +123,7 @@
               size="medium"
               icon="el-icon-switch-button"
               type="text"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               @click="stopDevicePush(scope.row)"
             >停止
             </el-button>

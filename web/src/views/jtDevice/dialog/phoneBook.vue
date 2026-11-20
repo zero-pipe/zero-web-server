@@ -48,7 +48,7 @@
             <el-button
               size="medium"
               type="text"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               icon="el-icon-delete"
               :loading="scope.row.addRegionLoading"
               @click="removeRow(scope.$index)"

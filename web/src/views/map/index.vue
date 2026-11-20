@@ -13,15 +13,15 @@
             <el-dropdown-menu slot="dropdown">
               <el-dropdown-item :command="0" >
                 <span v-if="layerType !== 0">图层关闭</span>
-                <span v-if="layerType === 0" style="color: rgb(64, 158, 255);">图层关闭</span>
+                <span v-if="layerType === 0" style="color: rgb(26, 115, 232);">图层关闭</span>
               </el-dropdown-item>
               <el-dropdown-item :command="1" >
                 <span v-if="layerType !== 1">直接展示</span>
-                <span v-if="layerType === 1" style="color: rgb(64, 158, 255);">直接展示</span>
+                <span v-if="layerType === 1" style="color: rgb(26, 115, 232);">直接展示</span>
               </el-dropdown-item>
               <el-dropdown-item :command="2">
                 <span v-if="layerType !== 2">抽稀图层</span>
-                <span v-if="layerType === 2" style="color: rgb(64, 158, 255);">抽稀图层</span>
+                <span v-if="layerType === 2" style="color: rgb(26, 115, 232);">抽稀图层</span>
               </el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>

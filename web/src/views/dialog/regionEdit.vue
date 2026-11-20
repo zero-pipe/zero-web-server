@@ -388,7 +388,7 @@ export default {
 }
 .code-hint {
   font-size: 12px;
-  color: #909399;
+  color: #80868B;
 }
 .code-option-grid {
   display: grid;

@@ -94,7 +94,7 @@
             <el-button type="text" size="mini" :disabled="!row.online" @click="toggleArm(row)">
               {{ row._armed ? '撤防' : '布防' }}
             </el-button>
-            <el-button type="text" size="mini" style="color:#f56c6c" @click="removeDevice(row)">删除</el-button>
+            <el-button type="text" size="mini" style="color:#EA4335" @click="removeDevice(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -333,8 +333,8 @@ export default {
 
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
-.hint { margin-top: 8px; color: #909399; font-size: 12px; }
-.sub-text { color: #909399; font-size: 12px; }
-.field-desc { color: #909399; font-size: 12px; line-height: 18px; }
+.hint { margin-top: 8px; color: #80868B; font-size: 12px; }
+.sub-text { color: #80868B; font-size: 12px; }
+.field-desc { color: #80868B; font-size: 12px; line-height: 18px; }
 .stream-links { margin-top: 10px; color: #606266; font-size: 12px; word-break: break-all; }
 </style>

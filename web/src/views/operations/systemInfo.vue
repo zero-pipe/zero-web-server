@@ -143,37 +143,37 @@ export default {
 .system-info-page {
   padding: 16px 20px 24px;
   min-height: calc(100vh - 124px);
-  background: #f0f4f8;
+  background: #F8F9FA;
 }
 
 .system-info-shell {
   max-width: 720px;
   margin: 0 auto;
   background: #fff;
-  border: 1px solid #e3ebf5;
+  border: 1px solid #E8EAED;
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(15, 40, 80, 0.06);
+  box-shadow: 0 8px 24px rgba(60, 64, 67, 0.06);
   overflow: hidden;
 }
 
 .system-info-shell-head {
   position: relative;
   padding: 18px 22px 16px;
-  border-bottom: 1px solid #e8eef6;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  border-bottom: 1px solid #E8EAED;
+  background: linear-gradient(180deg, #FFFFFF 0%, #ffffff 100%);
 }
 
 .system-info-shell-title {
   font-size: 18px;
   font-weight: 650;
-  color: #1e293b;
+  color: #202124;
   line-height: 1.3;
 }
 
 .system-info-shell-desc {
   margin-top: 4px;
   font-size: 13px;
-  color: #64748b;
+  color: #5F6368;
 }
 
 .system-info-refresh {
@@ -192,7 +192,7 @@ export default {
 
 .system-info-group + .system-info-group {
   margin-top: 8px;
-  border-top: 1px solid #eef2f7;
+  border-top: 1px solid #F1F3F4;
 }
 
 .system-info-group-title {
@@ -200,7 +200,7 @@ export default {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: #94a3b8;
+  color: #80868B;
   text-transform: none;
 }
 
@@ -216,7 +216,7 @@ export default {
 
 .system-info-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: #80868B;
   line-height: 1.3;
   margin-bottom: 4px;
 }
@@ -224,13 +224,13 @@ export default {
 .system-info-value {
   font-size: 14px;
   font-weight: 550;
-  color: #1e293b;
+  color: #202124;
   line-height: 1.45;
   word-break: break-all;
 }
 
 .system-info-value a {
-  color: #1565c0;
+  color: #1A73E8;
   text-decoration: none;
   font-weight: 500;
 }

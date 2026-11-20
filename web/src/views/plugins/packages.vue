@@ -56,7 +56,7 @@
           <template slot-scope="{ row }">
             <el-button type="text" size="mini" @click="openInstall(row)">安装</el-button>
             <el-button type="text" size="mini" @click="showDetail(row)">详情</el-button>
-            <el-button type="text" size="mini" style="color:#f56c6c" @click="removePackage(row)">删除</el-button>
+            <el-button type="text" size="mini" style="color:#EA4335" @click="removePackage(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -95,7 +95,7 @@
               v-if="row.status === 'installed'"
               type="text"
               size="mini"
-              style="color:#f56c6c"
+              style="color:#EA4335"
               @click="doUninstall(row)"
             >卸载</el-button>
           </template>
@@ -115,7 +115,7 @@
           :value="a.id"
         />
       </el-select>
-      <div v-if="!onlineAgents.length" class="hint" style="color:#e6a23c">暂无在线 Agent，请先启动 zero-agent 并完成注册。</div>
+      <div v-if="!onlineAgents.length" class="hint" style="color:#FBBC05">暂无在线 Agent，请先启动 zero-agent 并完成注册。</div>
       <div slot="footer">
         <el-button @click="installVisible = false">取消</el-button>
         <el-button type="primary" :loading="installing" :disabled="!installAgent" @click="doInstall">安装</el-button>
@@ -258,8 +258,8 @@ export default {
 
 <style scoped>
 .card-header { display: flex; justify-content: space-between; align-items: center; }
-.hint { font-size: 12px; color: #909399; margin-bottom: 10px; line-height: 1.6; }
-.sub-text { color: #909399; font-size: 12px; }
+.hint { font-size: 12px; color: #80868B; margin-bottom: 10px; line-height: 1.6; }
+.sub-text { color: #80868B; font-size: 12px; }
 .install-line { font-size: 14px; color: #303133; }
 .detail-pre {
   max-height: 420px;

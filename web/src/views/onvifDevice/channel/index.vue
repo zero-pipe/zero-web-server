@@ -35,7 +35,7 @@
         <template v-slot:default="scope">
           <el-switch
             v-model="scope.row.hasAudio"
-            active-color="#409EFF"
+            active-color="#1A73E8"
             @change="() => onAudioChange(scope.row)"
           />
         </template>
@@ -549,15 +549,15 @@ export default {
 
 .hint-text {
   font-size: 12px;
-  color: #909399;
+  color: #80868B;
 }
 
 .onvif-header-sub {
   margin-left: 4px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #e8f1fb;
-  color: #1565c0;
+  background: #E8F0FE;
+  color: #1A73E8;
   font-size: 12px;
   font-weight: 500;
 }
@@ -578,12 +578,12 @@ export default {
 }
 
 .onvif-meta-item .k {
-  color: #94a3b8;
+  color: #80868B;
   flex-shrink: 0;
 }
 
 .onvif-meta-item .v {
-  color: #334155;
+  color: #3C4043;
   font-weight: 500;
   text-align: right;
   word-break: break-all;

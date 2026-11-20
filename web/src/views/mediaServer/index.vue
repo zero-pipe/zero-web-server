@@ -140,7 +140,7 @@ export default {
 .server-card__banner {
   position: relative;
   height: 120px;
-  background: linear-gradient(180deg, #e3f2fd 0%, #f8fbff 100%);
+  background: linear-gradient(180deg, #E8F0FE 0%, #FFFFFF 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -184,13 +184,13 @@ export default {
 
 .server-card__label {
   font-size: 12px;
-  color: #94a3b8;
+  color: #80868B;
   line-height: 1.2;
 }
 
 .server-card__value {
   font-size: 14px;
-  color: #1e293b;
+  color: #202124;
   font-weight: 600;
   line-height: 1.4;
   word-break: break-all;
@@ -198,13 +198,13 @@ export default {
 
 .server-card__value--id {
   font-size: 16px;
-  color: #0d47a1;
+  color: #174EA6;
 }
 
 .server-card__value small {
   font-size: 12px;
   font-weight: 500;
-  color: #64748b;
+  color: #5F6368;
 }
 
 .server-card__meta {
@@ -213,7 +213,7 @@ export default {
   gap: 12px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #eef2f7;
+  border-top: 1px solid #F1F3F4;
 }
 
 .server-card__field--load {
@@ -227,12 +227,12 @@ export default {
   justify-content: space-between;
   padding: 10px 16px 12px;
   border-top: 1px solid #f1f5f9;
-  background: #fafbfc;
+  background: #FAFAFA;
 }
 
 .server-card__time {
   font-size: 12px;
-  color: #94a3b8;
+  color: #80868B;
 }
 
 .server-card__actions {

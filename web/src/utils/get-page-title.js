@@ -1,6 +1,6 @@
 import defaultSettings from '@/settings'
 
-const title = defaultSettings.title || 'ZWS'
+const title = defaultSettings.title || 'Zeroo Web'
 
 export default function getPageTitle(pageTitle) {
   if (pageTitle) {

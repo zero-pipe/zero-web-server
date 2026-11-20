@@ -68,7 +68,7 @@ export default {
           position: 'left',
           silent: true,
           name: 'Mbps',
-          nameTextStyle: { color: '#94a3b8', fontSize: 11 }
+          nameTextStyle: { color: '#80868B', fontSize: 11 }
         },
         tooltip: {
           trigger: 'axis',
@@ -140,7 +140,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.04);
 }
 .console-card__head {
   height: 44px;
@@ -149,7 +149,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid #F1F3F4;
 }
 .console-card__title {
   display: flex;
@@ -157,7 +157,7 @@ export default {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #202124;
 }
 .console-card__icon {
   width: 22px;
@@ -167,12 +167,12 @@ export default {
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #E8F0FE;
+  color: #1A73E8;
 }
 .console-card__hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: #80868B;
 }
 .console-card__body {
   flex: 1;

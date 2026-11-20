@@ -15,7 +15,7 @@
           <el-breadcrumb v-if="regionParents.length > 0" separator="/" style="display: ruby">
             <el-breadcrumb-item v-for="key in regionParents" :key="key">{{ key }}</el-breadcrumb-item>
           </el-breadcrumb>
-          <div v-else style="color: #1565c0">未选择虚拟组织</div>
+          <div v-else style="color: #1A73E8">未选择虚拟组织</div>
         </el-form-item>
         <div style="float: right;">
           <el-form-item label="搜索">

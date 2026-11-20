@@ -130,6 +130,6 @@ export default {
 
 <style scoped>
 .hdr { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.sub { font-size: 12px; color: #909399; font-weight: normal; }
-.hint { margin-left: 8px; font-size: 12px; color: #909399; }
+.sub { font-size: 12px; color: #80868B; font-weight: normal; }
+.hint { margin-left: 8px; font-size: 12px; color: #80868B; }
 </style>

@@ -34,7 +34,7 @@
               size="medium"
               type="text"
               icon="el-icon-delete"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               :disabled="scope.row.id === 1"
               @click="remove(scope.row)"
             >删除</el-button>
@@ -71,7 +71,7 @@
               >{{ item.title }}</el-checkbox>
             </el-checkbox-group>
           </div>
-          <div v-if="form.id === 1" style="color:#909399;font-size:12px;margin-top:6px;">
+          <div v-if="form.id === 1" style="color:#80868B;font-size:12px;margin-top:6px;">
             管理员角色固定拥有全部菜单权限
           </div>
         </el-form-item>

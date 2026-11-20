@@ -306,7 +306,7 @@ export default {
   border-radius: 8px;
   overflow: hidden;
   background: #1e1e1e;
-  border: 1px solid #1e293b;
+  border: 1px solid #202124;
 }
 
 .log-toolbar {
@@ -320,7 +320,7 @@ export default {
   gap: 6px;
   padding: 4px 6px 4px 8px;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(60, 64, 67, 0.82);
   border: 1px solid rgba(148, 163, 184, 0.22);
   backdrop-filter: blur(6px);
   max-width: calc(100% - 52px);
@@ -357,12 +357,12 @@ export default {
 }
 
 .log-filter-input >>> .el-input__inner::placeholder {
-  color: #94a3b8;
+  color: #80868B;
 }
 
 .log-filter-input >>> .el-input__prefix,
 .log-filter-input >>> .el-input__suffix {
-  color: #94a3b8;
+  color: #80868B;
 }
 
 .log-scroll-btn {
@@ -380,8 +380,8 @@ export default {
 }
 
 .log-scroll-btn:hover {
-  background: #1565c0;
-  border-color: #1565c0;
+  background: #1A73E8;
+  border-color: #1A73E8;
   color: #fff;
 }
 

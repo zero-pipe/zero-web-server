@@ -51,7 +51,7 @@
         </el-table-column>
         <el-table-column label="操作" width="60">
           <template v-slot="{ $index }">
-            <el-button size="mini" type="text" style="color: #F56C6C" @click="removePresetRow($index)">删除</el-button>
+            <el-button size="mini" type="text" style="color: #EA4335" @click="removePresetRow($index)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -62,15 +62,15 @@
         <el-table-column prop="name" label="巡航名称" />
         <el-table-column label="操作" min-width="150">
           <template v-slot:default="scope">
-            <el-button v-if="cruisingCruiseId === scope.row.id" size="mini" type="text" style="color: #F56C6C" :loading="operatingId === scope.row.id" :disabled="operatingId !== null" @click="stopCruise(scope.row)">停用</el-button>
-            <el-button v-else size="mini" type="text" :disabled="cruisingCruiseId !== null || operatingId !== null" style="color: #409EFF" :loading="operatingId === scope.row.id" @click="startCruise(scope.row)">启用</el-button>
-            <el-button size="mini" type="text" style="color: #409EFF" :disabled="operatingId !== null" @click="openEdit(scope.row)">编辑</el-button>
-            <el-button size="mini" type="text" style="color: #F56C6C" :loading="deletingId === scope.row.id" :disabled="operatingId !== null || deletingId !== null" @click="deleteCruise(scope.row)">删除</el-button>
+            <el-button v-if="cruisingCruiseId === scope.row.id" size="mini" type="text" style="color: #EA4335" :loading="operatingId === scope.row.id" :disabled="operatingId !== null" @click="stopCruise(scope.row)">停用</el-button>
+            <el-button v-else size="mini" type="text" :disabled="cruisingCruiseId !== null || operatingId !== null" style="color: #1A73E8" :loading="operatingId === scope.row.id" @click="startCruise(scope.row)">启用</el-button>
+            <el-button size="mini" type="text" style="color: #1A73E8" :disabled="operatingId !== null" @click="openEdit(scope.row)">编辑</el-button>
+            <el-button size="mini" type="text" style="color: #EA4335" :loading="deletingId === scope.row.id" :disabled="operatingId !== null || deletingId !== null" @click="deleteCruise(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
-    <div v-else style="color: #909399; font-size: 12px; margin-bottom: 8px;">暂无巡航路线</div>
+    <div v-else style="color: #80868B; font-size: 12px; margin-bottom: 8px;">暂无巡航路线</div>
   </div>
 </template>
 

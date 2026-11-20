@@ -500,7 +500,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #f0f4f8;
+  background: #F8F9FA;
 }
 
 .control-bar {
@@ -510,10 +510,10 @@ export default {
   justify-content: space-between;
   align-items: center;
   font-size: 15px;
-  color: #334155;
+  color: #3C4043;
   padding: 0 4px;
   background: #ffffff;
-  border-bottom: 1px solid #e3ebf5;
+  border-bottom: 1px solid #E8EAED;
 }
 
 .split-controls {
@@ -532,7 +532,7 @@ export default {
 }
 
 .ptz-toggle-control .btn.active {
-  color: #1565c0;
+  color: #1A73E8;
 }
 
 .ptz-panel {
@@ -558,11 +558,11 @@ export default {
 .ptz-panel-header .el-icon-close {
   cursor: pointer;
   font-size: 18px;
-  color: #909399;
+  color: #80868B;
 }
 
 .ptz-panel-header .el-icon-close:hover {
-  color: #409EFF;
+  color: #1A73E8;
 }
 
 .ptz-panel-body {
@@ -603,7 +603,7 @@ export default {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #909399;
+  color: #80868B;
   font-size: 14px;
 }
 
@@ -621,7 +621,7 @@ export default {
   align-items: center;
   padding: 14px 16px 16px;
   overflow: hidden;
-  background: #f0f4f8;
+  background: #F8F9FA;
 }
 
 .play-grid {
@@ -638,16 +638,16 @@ export default {
 .btn {
   margin: 0 10px;
   cursor: pointer;
-  color: #64748b;
+  color: #5F6368;
   transition: color 0.15s ease;
 }
 
 .btn:hover {
-  color: #1565c0;
+  color: #1A73E8;
 }
 
 .btn.active {
-  color: #1565c0;
+  color: #1A73E8;
 }
 
 .sidebar-toggle {
@@ -667,7 +667,7 @@ export default {
 
 .play-box {
   /* 独立圆角卡片 + 中性灰蓝，减少「黑窗贴浅蓝缝」的割裂感 */
-  background: linear-gradient(165deg, #4a5568 0%, #3a4556 46%, #323c4b 100%);
+  background: linear-gradient(165deg, #5F6368 0%, #3a4556 46%, #323c4b 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -675,7 +675,7 @@ export default {
   position: relative;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.04), 0 8px 20px rgba(60, 64, 67, 0.06);
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -692,11 +692,11 @@ export default {
 
 /* 内侧选中环：不受 overflow:hidden 裁切，空窗/有画面都可见 */
 .play-box.redborder {
-  border-color: rgba(21, 101, 192, 0.55);
+  border-color: rgba(26, 115, 232, 0.55);
   z-index: 2;
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 8px 20px rgba(21, 101, 192, 0.14);
+    0 1px 2px rgba(60, 64, 67, 0.04),
+    0 8px 20px rgba(26, 115, 232, 0.14);
 }
 
 .play-box.redborder::after {
@@ -704,7 +704,7 @@ export default {
   position: absolute;
   inset: 3px;
   border-radius: 9px;
-  border: 2.5px solid #1565c0;
+  border: 2.5px solid #1A73E8;
   box-shadow:
     0 0 0 1.5px rgba(255, 255, 255, 0.92),
     inset 0 0 0 1px rgba(255, 255, 255, 0.35);
@@ -778,7 +778,7 @@ export default {
   font-weight: 620;
   letter-spacing: -0.04em;
   color: #ffffff;
-  text-shadow: 0 8px 28px rgba(15, 23, 42, 0.28);
+  text-shadow: 0 8px 28px rgba(60, 64, 67, 0.28);
   font-variant-numeric: tabular-nums;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   animation: pull-count-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1);

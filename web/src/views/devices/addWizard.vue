@@ -302,7 +302,7 @@ export default {
   gap: 8px;
   margin-bottom: 14px;
   font-size: 12px;
-  color: #64748b;
+  color: #5F6368;
 }
 .steps span {
   padding: 4px 10px;
@@ -310,8 +310,8 @@ export default {
   background: #f1f5f9;
 }
 .steps span.on {
-  background: #e8f1fb;
-  color: #1565c0;
+  background: #E8F0FE;
+  color: #1A73E8;
   font-weight: 600;
 }
 .mode-cards {
@@ -320,7 +320,7 @@ export default {
   gap: 12px;
 }
 .mode-card {
-  border: 2px solid #e8eef6;
+  border: 2px solid #E8EAED;
   border-radius: 8px;
   padding: 14px;
   cursor: pointer;
@@ -328,8 +328,8 @@ export default {
 }
 .mode-card:hover { border-color: #93c5fd; }
 .mode-card.selected {
-  border-color: #1565c0;
-  background: #e8f1fb;
+  border-color: #1A73E8;
+  background: #E8F0FE;
 }
 .mode-card h4 {
   font-size: 14px;
@@ -337,12 +337,12 @@ export default {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #1e293b;
+  color: #202124;
 }
 .mode-card p {
   margin: 0;
   font-size: 12px;
-  color: #64748b;
+  color: #5F6368;
   line-height: 1.5;
 }
 </style>

@@ -7,7 +7,7 @@
     <div class="right-menu">
       <el-dropdown class="avatar-container" trigger="click">
         <div class="avatar-wrapper">
-          欢迎，{{ name }}
+          {{ name }}
           <i class="el-icon-caret-bottom" />
         </div>
         <el-dropdown-menu slot="dropdown" class="user-dropdown">
@@ -64,8 +64,8 @@ export default {
   overflow: hidden;
   position: relative;
   background: #fff;
-  border-bottom: 1px solid #e3ebf5;
-  box-shadow: 0 1px 4px rgba(21, 101, 192, 0.06);
+  border-bottom: 1px solid #E8EAED;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, 0.06);
 
   .hamburger-container {
     line-height: 46px;
@@ -98,7 +98,7 @@ export default {
       padding: 0 8px;
       height: 100%;
       font-size: 18px;
-      color: #5a5e66;
+      color: #5F6368;
       vertical-align: text-bottom;
 
       &.hover-effect {

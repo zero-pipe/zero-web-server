@@ -21,7 +21,7 @@
               <li v-for="(item,index) in detailFiles" :key="index" class="infinite-list-item record-list-item">
                 <el-tag
                   v-if="chooseFileIndex !== index"
-                  style="background-color: #ecf5ff; color: #017690; "
+                  style="background-color: #E8F0FE; color: #1A73E8; "
                   @click="chooseFile(index)"
                 >
                   <i class="el-icon-video-camera" />
@@ -33,7 +33,7 @@
                 </el-tag>
                 <a
                   class="el-icon-download"
-                  style="color: #409EFF;font-weight: 600;margin-left: 10px;"
+                  style="color: #1A73E8;font-weight: 600;margin-left: 10px;"
                   target="_blank"
                   @click="downloadFile(item)"
                 />
@@ -437,7 +437,7 @@ export default {
             this.timeSegments.push({
               beginTime: new Date(this.detailFiles[i].startTime).getTime(),
               endTime: new Date(this.detailFiles[i].endTime).getTime(),
-              color: '#017690',
+              color: '#1A73E8',
               startRatio: 0.7,
               endRatio: 0.85,
               index: i

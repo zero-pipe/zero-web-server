@@ -1,6 +1,6 @@
 module.exports = {
 
-  title: 'ZWS',
+  title: 'Zeroo Web',
 
   /**
    * @type {boolean} true | false

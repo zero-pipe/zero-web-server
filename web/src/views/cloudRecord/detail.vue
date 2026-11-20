@@ -35,7 +35,7 @@
                 </el-tag>
                 <a
                   class="el-icon-download"
-                  style="color: #409EFF;font-weight: 600;margin-left: 10px;"
+                  style="color: #1A73E8;font-weight: 600;margin-left: 10px;"
                   target="_blank"
                   @click="downloadFile(item)"
                 />

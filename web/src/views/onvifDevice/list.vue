@@ -57,7 +57,7 @@
             type="text"
             size="medium"
             icon="el-icon-delete"
-            style="color: #f56c6c"
+            style="color: #EA4335"
             @click="handleDelete(scope.row.id)"
           >删除
           </el-button>

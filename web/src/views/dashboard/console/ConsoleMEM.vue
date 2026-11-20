@@ -134,7 +134,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.04);
 }
 .console-card__head {
   height: 44px;
@@ -143,7 +143,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid #F1F3F4;
 }
 .console-card__title {
   display: flex;
@@ -151,7 +151,7 @@ export default {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #202124;
 }
 .console-card__icon {
   width: 22px;

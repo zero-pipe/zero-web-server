@@ -70,7 +70,7 @@ export default {
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #909399;
+  color: #80868B;
   font-size: 16px;
 }
 </style>

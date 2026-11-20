@@ -133,7 +133,7 @@
             <el-button
               size="medium"
               icon="el-icon-delete"
-              style="color: #f56c6c"
+              style="color: #EA4335"
               type="text"
               @click="deleteSingle(scope.row)"
             >删除</el-button>
@@ -164,7 +164,7 @@
         <i class="el-icon-loading" style="font-size: 32px;" />
         <div style="margin-top: 10px; color: #606266;">正在加载回放...</div>
       </div>
-      <div v-else-if="playbackError" style="text-align: center; padding: 40px 0; color: #f56c6c;">
+      <div v-else-if="playbackError" style="text-align: center; padding: 40px 0; color: #EA4335;">
         <i class="el-icon-warning-outline" style="font-size: 32px;" />
         <div style="margin-top: 10px;">{{ playbackError }}</div>
       </div>
@@ -521,7 +521,7 @@ export default {
 </script>
 
 <style scoped>
-.sub-text { color: #909399; font-size: 11px; line-height: 14px; }
+.sub-text { color: #80868B; font-size: 11px; line-height: 14px; }
 .section-title { font-weight: 600; margin-bottom: 6px; color: #303133; }
 .json { background: #f5f7fa; padding: 10px; border-radius: 6px; max-height: 240px; overflow: auto; font-size: 12px; }
 </style>

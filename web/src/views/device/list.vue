@@ -159,7 +159,7 @@
               操作<i class="el-icon-arrow-down el-icon--right" />
             </el-button>
             <el-dropdown-menu>
-              <el-dropdown-item command="delete" style="color: #f56c6c">
+              <el-dropdown-item command="delete" style="color: #EA4335">
                 删除
               </el-dropdown-item>
               <el-dropdown-item command="setGuard" :disabled="!scope.row.onLine">

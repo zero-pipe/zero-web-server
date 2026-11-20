@@ -15,7 +15,7 @@
           :width="88"
           :stroke-width="8"
           :percentage="pct(deviceInfo)"
-          :color="pct(deviceInfo) > 0 ? '#1565c0' : '#c0c4cc'"
+          :color="pct(deviceInfo) > 0 ? '#1A73E8' : '#c0c4cc'"
         />
         <div class="resource-item__meta">{{ deviceInfo.online }} / {{ deviceInfo.total }}</div>
       </div>
@@ -26,7 +26,7 @@
           :width="88"
           :stroke-width="8"
           :percentage="pct(channelInfo)"
-          :color="pct(channelInfo) > 0 ? '#1565c0' : '#c0c4cc'"
+          :color="pct(channelInfo) > 0 ? '#1A73E8' : '#c0c4cc'"
         />
         <div class="resource-item__meta">{{ channelInfo.online }} / {{ channelInfo.total }}</div>
       </div>
@@ -92,7 +92,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.04);
 }
 .console-card__head {
   height: 44px;
@@ -101,7 +101,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid #F1F3F4;
 }
 .console-card__title {
   display: flex;
@@ -109,7 +109,7 @@ export default {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #202124;
 }
 .console-card__icon {
   width: 22px;
@@ -124,7 +124,7 @@ export default {
 }
 .console-card__hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: #80868B;
 }
 .console-card__body {
   flex: 1;
@@ -145,14 +145,14 @@ export default {
 }
 .resource-item__label {
   font-size: 12px;
-  color: #64748b;
+  color: #5F6368;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .resource-item__meta {
   font-size: 12px;
-  color: #334155;
+  color: #3C4043;
   font-weight: 600;
 }
 .console-resource ::v-deep .el-progress__text {

@@ -10,7 +10,7 @@
       <el-form-item label="接入模式">
         <el-tag v-if="row && row.accessMode === 'passive'" size="mini" type="success">被动</el-tag>
         <el-tag v-else size="mini" type="warning">主动</el-tag>
-        <span style="margin-left: 8px; color: #64748b; font-size: 12px;">
+        <span style="margin-left: 8px; color: #5F6368; font-size: 12px;">
           {{ row && row.protocol === 'gb28181' ? 'GB28181' : 'ONVIF' }}
         </span>
       </el-form-item>

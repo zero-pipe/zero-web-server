@@ -80,7 +80,7 @@ export default {
         },
         series: {
           name: 'CPU',
-          itemStyle: { color: '#1565c0' },
+          itemStyle: { color: '#1A73E8' },
           areaStyle: {
             color: {
               type: 'linear',
@@ -89,8 +89,8 @@ export default {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(21,101,192,0.45)' },
-                { offset: 1, color: 'rgba(21,101,192,0.05)' }
+                { offset: 0, color: 'rgba(26,115,232,0.45)' },
+                { offset: 1, color: 'rgba(26,115,232,0.05)' }
               ]
             }
           }
@@ -134,7 +134,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.04);
 }
 .console-card__head {
   height: 44px;
@@ -143,7 +143,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid #F1F3F4;
 }
 .console-card__title {
   display: flex;
@@ -151,7 +151,7 @@ export default {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #202124;
 }
 .console-card__icon {
   width: 22px;
@@ -161,14 +161,14 @@ export default {
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  background: #e3f2fd;
-  color: #1565c0;
+  background: #E8F0FE;
+  color: #1A73E8;
 }
 .console-card__value {
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: #1565c0;
+  color: #1A73E8;
 }
 .console-card__body {
   flex: 1;

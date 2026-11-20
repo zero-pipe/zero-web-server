@@ -18,7 +18,7 @@
         <el-table-column label="左边界" min-width="90">
           <template v-slot="{ row }">
             <el-button type="text"
-                       :style="{ color: row.leftBoundary ? '#67C23A' : '#409EFF' }"
+                       :style="{ color: row.leftBoundary ? '#34A853' : '#1A73E8' }"
                        :loading="boundaryLoading.index === row.index && boundaryLoading.side === 'Left'"
                        :disabled="operatingId !== null"
                        @click="setBoundary(row, 'Left')">
@@ -29,7 +29,7 @@
         <el-table-column label="右边界" min-width="90">
           <template v-slot="{ row }">
             <el-button type="text"
-                       :style="{ color: row.rightBoundary ? '#67C23A' : '#409EFF' }"
+                       :style="{ color: row.rightBoundary ? '#34A853' : '#1A73E8' }"
                        :loading="boundaryLoading.index === row.index && boundaryLoading.side === 'Right'"
                        :disabled="operatingId !== null"
                        @click="setBoundary(row, 'Right')">
@@ -46,14 +46,14 @@
         </el-table-column>
         <el-table-column label="操作" min-width="120">
           <template v-slot="{ row, $index }">
-            <el-button v-if="$index === cruisingScanIndex" type="text" style="color: #F56C6C" :loading="operatingId === row.index" :disabled="operatingId !== null" @click="stopScan(row)">停用</el-button>
-            <el-button v-else type="text" style="color: #409EFF" :disabled="operatingId !== null" :loading="operatingId === row.index" @click="startScan(row, $index)">启用</el-button>
-            <el-button type="text" style="color: #F56C6C" :disabled="operatingId !== null" @click="deleteScan(row)">删除</el-button>
+            <el-button v-if="$index === cruisingScanIndex" type="text" style="color: #EA4335" :loading="operatingId === row.index" :disabled="operatingId !== null" @click="stopScan(row)">停用</el-button>
+            <el-button v-else type="text" style="color: #1A73E8" :disabled="operatingId !== null" :loading="operatingId === row.index" @click="startScan(row, $index)">启用</el-button>
+            <el-button type="text" style="color: #EA4335" :disabled="operatingId !== null" @click="deleteScan(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
-    <div v-else style="color: #909399; font-size: 12px; margin-bottom: 8px;">暂无线扫区域</div>
+    <div v-else style="color: #80868B; font-size: 12px; margin-bottom: 8px;">暂无线扫区域</div>
   </div>
 </template>
 

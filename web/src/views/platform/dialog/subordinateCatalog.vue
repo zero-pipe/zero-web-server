@@ -29,7 +29,7 @@
               <el-tag v-if="data.itemType === 'channel'" size="mini" type="success">点位</el-tag>
               <el-tag v-else size="mini">目录</el-tag>
               <span style="margin: 0 8px;">{{ data.name }}</span>
-              <span style="color:#909399; font-size:12px;">{{ data.deviceId }}</span>
+              <span style="color:#80868B; font-size:12px;">{{ data.deviceId }}</span>
             </span>
           </el-tree>
         </el-tab-pane>

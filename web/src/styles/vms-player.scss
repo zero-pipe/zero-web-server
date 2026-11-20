@@ -1,19 +1,19 @@
 /* 播放弹窗 — 蓝白主题，与主站一致 */
 
 .vms-player-dialog {
-  --vms-bg: #f0f4f8;
+  --vms-bg: #F8F9FA;
   --vms-panel: #ffffff;
-  --vms-panel-2: #f5f8fc;
-  --vms-border: #e3ebf5;
-  --vms-text: #1e293b;
-  --vms-muted: #64748b;
-  --vms-accent: #1565c0;
-  --vms-live: #16a34a;
-  --vms-danger: #ef4444;
+  --vms-panel-2: #F8F9FA;
+  --vms-border: #E8EAED;
+  --vms-text: #202124;
+  --vms-muted: #5F6368;
+  --vms-accent: #1A73E8;
+  --vms-live: #34A853;
+  --vms-danger: #EA4335;
   background: var(--vms-bg) !important;
   border-radius: 12px !important;
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(21, 101, 192, 0.18) !important;
+  box-shadow: 0 16px 40px rgba(60, 64, 67, 0.18) !important;
   margin-bottom: 0 !important;
 
   .el-dialog__header {
@@ -121,11 +121,11 @@
   width: 100%;
   flex: 0 0 auto;
   display: block;
-  background: linear-gradient(165deg, #4a5568 0%, #3a4556 46%, #323c4b 100%);
+  background: linear-gradient(165deg, #5F6368 0%, #3a4556 46%, #323c4b 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.05);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.05);
   line-height: 0;
 }
 
@@ -146,7 +146,7 @@
   border-radius: 10px;
   padding: 4px 12px 10px;
   overflow: auto;
-  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.05);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.05);
 }
 
 .vms-player-dialog .player-tabs-wrapper {
@@ -244,7 +244,7 @@
 
 .vms-player-dialog .player-tabs-wrapper .el-tabs--card > .el-tabs__header .el-tabs__item:hover:not(.is-active) {
   color: var(--vms-accent);
-  background: #e8f1fb;
+  background: #E8F0FE;
 }
 
 /* 右侧控制栏：编码 + 云台常驻 */
@@ -262,7 +262,7 @@
   border: 1px solid var(--vms-border);
   border-radius: 10px;
   padding: 12px;
-  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.05);
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.05);
 }
 
 .vms-player-dialog .player-under.panel-block {

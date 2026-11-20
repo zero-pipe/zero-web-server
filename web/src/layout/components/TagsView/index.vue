@@ -201,8 +201,8 @@ export default {
   height: 40px;
   width: 100%;
   /* 与主内容区同色，选中页签才能“连”下去 */
-  background: #f0f4f8;
-  border-bottom: 1px solid #e3ebf5;
+  background: #F8F9FA;
+  border-bottom: 1px solid #E8EAED;
   box-shadow: none;
   position: relative;
   z-index: 1;
@@ -216,7 +216,7 @@ export default {
       height: 40px;
       line-height: 40px;
       border: none;
-      color: #64748b;
+      color: #5F6368;
       background: transparent;
       padding: 0 18px;
       font-size: 13px;
@@ -233,17 +233,17 @@ export default {
       }
 
       &:hover {
-        color: #1565c0;
+        color: #1A73E8;
       }
 
       /* 与下方内容同色并盖住底部分割线，形成一体 */
       &.active {
-        background: #f0f4f8;
-        color: #1565c0;
+        background: #F8F9FA;
+        color: #1A73E8;
         font-weight: 600;
         z-index: 2;
         margin-bottom: -1px;
-        border-bottom: 1px solid #f0f4f8;
+        border-bottom: 1px solid #F8F9FA;
 
         &::before,
         &::after {
@@ -251,10 +251,10 @@ export default {
         }
 
         .tags-view-close {
-          color: #5b8fd9;
+          color: #8AB4F8;
 
           &:hover {
-            background: #1565c0;
+            background: #1A73E8;
             color: #fff;
           }
         }
@@ -275,7 +275,7 @@ export default {
         text-align: center;
         line-height: 16px;
         font-size: 12px;
-        color: #94a3b8;
+        color: #80868B;
         transition: all 0.15s ease;
 
         &:before {
@@ -284,7 +284,7 @@ export default {
         }
 
         &:hover {
-          background: #cbd5e1;
+          background: #DADCE0;
           color: #fff;
         }
       }
@@ -301,9 +301,9 @@ export default {
     border-radius: 8px;
     font-size: 13px;
     font-weight: 400;
-    color: #334155;
-    border: 1px solid #e3ebf5;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    color: #3C4043;
+    border: 1px solid #E8EAED;
+    box-shadow: 0 8px 24px rgba(60, 64, 67, 0.12);
 
     li {
       margin: 0;
@@ -311,8 +311,8 @@ export default {
       cursor: pointer;
 
       &:hover {
-        background: #f0f6ff;
-        color: #1565c0;
+        background: #E8F0FE;
+        color: #1A73E8;
       }
     }
   }

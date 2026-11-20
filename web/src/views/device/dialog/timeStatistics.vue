@@ -97,7 +97,7 @@ export default {
           }
         },
         series: {
-          itemStyle: { color: '#409EFF' }
+          itemStyle: { color: '#1A73E8' }
         }
       }
     }
