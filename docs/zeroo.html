@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zeroo 设备/视频接入管理 - 字体排版设计优化演示</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind Config -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Custom Dynamic Font Control System -->
+  <style id="dynamic-typography-styles">
+    /* 预设方案 A：现代清爽型 (默认) */
+    :root {
+      --ui-font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+      --code-font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --numeric-feature: tabular-nums;
+      --table-header-weight: 600;
+      --table-data-size: 13px;
+      --header-bg-color: #f9fafb;
+    }
+
+    /* 渲染应用规则 */
+    body {
+      font-family: var(--ui-font-family);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .font-code {
+      font-family: var(--code-font-family);
+    }
+
+    .font-tabular {
+      font-variant-numeric: var(--numeric-feature);
+    }
+
+    .table-header-custom {
+      font-weight: var(--table-header-weight);
+    }
+
+    .table-data-custom {
+      font-size: var(--table-data-size);
+    }
+
+    /* 提示高亮样式（用于分析） */
+    .highlight-mode .font-code {
+      outline: 1.5px dashed #8b5cf6 !important;
+      background-color: rgba(139, 92, 246, 0.08) !important;
+      position: relative;
+    }
+    .highlight-mode .font-code::after {
+      content: 'Mono';
+      position: absolute;
+      top: -8px;
+      right: -4px;
+      font-size: 9px;
+      background: #8b5cf6;
+      color: white;
+      padding: 0 3px;
+      border-radius: 2px;
+      font-family: sans-serif;
+      pointer-events: none;
+    }
+
+    .highlight-mode .font-tabular:not(.font-code) {
+      outline: 1.5px dashed #10b981 !important;
+      background-color: rgba(16, 185, 129, 0.08) !important;
+    }
+
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 text-gray-800 h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- 顶部 App Header -->
+  <header class="bg-white border-b border-gray-200 h-12 flex items-center justify-between px-4 z-20 flex-shrink-0">
+    <div class="flex items-center space-x-3">
+      <!-- Zeroo Logo -->
+      <div class="flex items-center space-x-2">
+        <div class="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" stroke-width="2.5"></circle>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 7v5l3 3"></path>
+          </svg>
+        </div>
+        <span class="font-bold text-gray-900 text-base tracking-tight">Zeroo</span>
+      </div>
+      <span class="text-gray-300">|</span>
+      <span class="text-xs text-gray-600 font-medium">接入管理</span>
+    </div>
+
+    <!-- User Profile & Action Header right -->
+    <div class="flex items-center space-x-4 text-xs text-gray-500">
+      <div class="flex items-center space-x-1 cursor-pointer hover:text-blue-600 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+        <span>通知</span>
+      </div>
+      <div class="flex items-center space-x-1 cursor-pointer hover:text-blue-600 transition-colors">
+        <div class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-semibold">ad</div>
+        <span>admin</span>
+        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主体工作区双栏布局 -->
+  <div class="flex flex-1 overflow-hidden relative">
+
+    <!-- 左侧一、二级混合导航 -->
+    <aside class="flex flex-shrink-0 bg-white border-r border-gray-200 z-10">
+      <!-- 一级图标导航栏 -->
+      <div class="w-16 bg-white border-r border-gray-100 flex flex-col items-center py-3 space-y-6 text-gray-500">
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+          <span class="text-[10px] scale-90 origin-center">应用管理</span>
+        </button>
+
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg bg-blue-50 text-blue-600 shadow-sm">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          <span class="text-[10px] scale-90 origin-center font-medium">接入管理</span>
+        </button>
+
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          <span class="text-[10px] scale-90 origin-center">媒体管理</span>
+        </button>
+
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+          <span class="text-[10px] scale-90 origin-center">存储管理</span>
+        </button>
+
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          <span class="text-[10px] scale-90 origin-center">组织管理</span>
+        </button>
+
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          <span class="text-[10px] scale-90 origin-center">运维管理</span>
+        </button>
+
+        <button class="flex flex-col items-center justify-center w-12 h-12 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-all">
+          <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          <span class="text-[10px] scale-90 origin-center">用户管理</span>
+        </button>
+      </div>
+
+      <!-- 二级菜单栏 -->
+      <div class="w-40 bg-white py-3 px-2 text-xs text-gray-600 space-y-1">
+        <div class="px-3 py-2 text-gray-400 font-semibold text-[11px]">接入控制</div>
+        
+        <a href="#" class="flex items-center px-3 py-2 rounded-md bg-blue-50 text-blue-600 font-medium">
+          <svg class="w-3.5 h-3.5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          标准接入
+        </a>
+        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-3.5 h-3.5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a2 2 0 01-2 2h-3a2 2 0 01-2-2V5a2 2 0 012-2zM4 11a2 2 0 012-2h1a2 2 0 012 2v3a2 2 0 01-2 2H6a2 2 0 01-2-2v-3z"></path></svg>
+          插件接入
+        </a>
+        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-3.5 h-3.5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+          插件包管理
+        </a>
+        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-3.5 h-3.5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+          设备资产
+        </a>
+        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-3.5 h-3.5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+          通道列表
+        </a>
+
+        <div class="px-3 pt-4 pb-2 text-gray-400 font-semibold text-[11px]">国标协议</div>
+        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-3.5 h-3.5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
+          国标配置
+        </a>
+        <a href="#" class="flex items-center px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors">
+          <svg class="w-3.5 h-3.5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+          国标级联
+        </a>
+      </div>
+    </aside>
+
+    <!-- 右侧内容主区 -->
+    <main class="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+
+      <!-- 1. 面包屑与 Tabs 标签页导航 -->
+      <div class="bg-white border-b border-gray-200 flex-shrink-0">
+        <!-- 面包屑 Breadcrumb -->
+        <div class="px-5 py-2 flex items-center space-x-2 text-xs text-gray-500 border-b border-gray-100">
+          <button class="hover:text-blue-600 flex items-center">
+            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+          </button>
+          <span>电子地图</span>
+          <span class="text-gray-300">/</span>
+          <span class="text-gray-800 font-medium">标准接入</span>
+        </div>
+
+        <!-- 多标签页 Tab bar -->
+        <div class="px-4 flex items-center space-x-1 pt-1.5 text-xs">
+          <div class="px-3 py-1.5 text-gray-500 hover:bg-gray-100 rounded-t-md cursor-pointer transition-colors flex items-center space-x-1">
+            <span>电子地图</span>
+          </div>
+          <div class="px-3 py-1.5 bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600 rounded-t-md cursor-pointer flex items-center space-x-2 shadow-xs">
+            <span>标准接入</span>
+            <svg class="w-3 h-3 text-blue-400 hover:text-blue-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. 筛选搜索与功能操作栏 -->
+      <div class="p-4 bg-white m-3 rounded-lg border border-gray-200 shadow-xs flex-shrink-0">
+        <div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <!-- 筛选条件组 -->
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- 搜索框 -->
+            <div class="flex items-center space-x-2">
+              <span class="text-gray-600 font-medium">搜索</span>
+              <div class="relative">
+                <input type="text" id="searchInput" placeholder="名称 / IP" class="w-44 pl-7 pr-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-code font-tabular transition-all" value="" />
+                <svg class="w-3.5 h-3.5 text-gray-400 absolute left-2 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              </div>
+            </div>
+
+            <!-- 接入模式下拉 -->
+            <div class="flex items-center space-x-2">
+              <span class="text-gray-600">接入模式</span>
+              <select id="modeSelect" class="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="all">全部</option>
+                <option value="passive">被动 (Passive)</option>
+                <option value="active">主动 (Active)</option>
+              </select>
+            </div>
+
+            <!-- 协议下拉 -->
+            <div class="flex items-center space-x-2">
+              <span class="text-gray-600">协议</span>
+              <select id="protocolSelect" class="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none font-code">
+                <option value="all">全部</option>
+                <option value="GB28181">GB28181</option>
+                <option value="RTSP">RTSP</option>
+                <option value="ONVIF">ONVIF</option>
+                <option value="RTMP">RTMP</option>
+              </select>
+            </div>
+
+            <!-- 状态下拉 -->
+            <div class="flex items-center space-x-2">
+              <span class="text-gray-600">状态</span>
+              <select id="statusSelect" class="bg-white border border-gray-300 rounded-md px-2.5 py-1.5 text-xs text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none">
+                <option value="all">全部</option>
+                <option value="online">在线</option>
+                <option value="offline">离线</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 按钮组 -->
+          <div class="flex items-center space-x-2">
+            <button onclick="addNewDevice()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium flex items-center space-x-1 transition-all shadow-xs active:scale-95">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+              <span>+ 添加设备</span>
+            </button>
+
+            <button class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md font-medium flex items-center space-x-1 transition-colors">
+              <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              <span>接入信息</span>
+            </button>
+
+            <button class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-md font-medium flex items-center space-x-1 transition-colors">
+              <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              <span>局域网发现</span>
+            </button>
+
+            <button onclick="refreshData()" title="刷新表格" class="p-1.5 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 设备数据表格区 -->
+      <div class="flex-1 mx-3 mb-3 bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden shadow-xs">
+        <div class="overflow-x-auto flex-1">
+          <table class="w-full text-left border-collapse">
+            <!-- 表头 -->
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-200 text-gray-600 table-header-custom text-xs">
+                <th class="py-3 px-4 w-12 text-center">
+                  <input type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                </th>
+                <th class="py-3 px-4 min-w-[120px]">名称</th>
+                <th class="py-3 px-4 w-20">模式</th>
+                <th class="py-3 px-4 w-28">协议</th>
+                <th class="py-3 px-4 min-w-[180px]">地址 / 注册信息</th>
+                <th class="py-3 px-4 w-24">厂商</th>
+                <th class="py-3 px-4 w-28">流传输模式</th>
+                <th class="py-3 px-4 w-20 text-center">通道数</th>
+                <th class="py-3 px-4 w-20">状态</th>
+                <th class="py-3 px-4 min-w-[140px]">订阅</th>
+                <th class="py-3 px-4 min-w-[140px]">统计</th>
+                <th class="py-3 px-4 min-w-[210px] text-right">操作</th>
+              </tr>
+            </thead>
+            
+            <!-- 表格内容（由 JS 动态生成） -->
+            <tbody id="deviceTableBody" class="divide-y divide-gray-100 table-data-custom text-gray-700">
+              <!-- JS Injected Content -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 表格底部分页器 -->
+        <div class="bg-white px-4 py-2.5 border-t border-gray-200 flex items-center justify-between text-xs text-gray-500 flex-shrink-0">
+          <div class="flex items-center space-x-2">
+            <span>共 <strong id="totalCount" class="font-code font-tabular text-gray-800">5</strong> 条数据</span>
+          </div>
+          <div class="flex items-center space-x-1 font-code font-tabular">
+            <button class="px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 text-gray-400 cursor-not-allowed">上一页</button>
+            <button class="px-2.5 py-1 border border-blue-500 bg-blue-50 text-blue-600 font-medium rounded">1</button>
+            <button class="px-2 py-1 border border-gray-200 rounded hover:bg-gray-50 text-gray-600">下一页</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- 4. 浮动控制面板：字体设计实时对比与调试器 -->
+  <div id="inspectorPanel" class="fixed bottom-4 right-4 z-50 bg-white border border-gray-300 shadow-2xl rounded-xl w-80 overflow-hidden transition-all duration-300">
+    <!-- 面板头部 -->
+    <div class="bg-gray-900 text-white px-3.5 py-2.5 flex items-center justify-between cursor-pointer" onclick="toggleInspector()">
+      <div class="flex items-center space-x-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+        <span class="font-semibold text-xs tracking-wide">字体设计优化与对比调谐</span>
+      </div>
+      <div class="flex items-center space-x-1">
+        <span id="panelStatusTag" class="text-[10px] bg-blue-600 px-1.5 py-0.5 rounded text-white font-mono">方案 A</span>
+        <svg id="chevronIcon" class="w-4 h-4 text-gray-400 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </div>
+    </div>
+
+    <!-- 面板展开内容 -->
+    <div id="inspectorContent" class="p-4 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
+      
+      <!-- 预设方案选择器 -->
+      <div>
+        <label class="block text-gray-500 font-semibold mb-1.5 uppercase text-[10px] tracking-wider">选择视觉字体方案</label>
+        <div class="grid grid-cols-1 gap-2">
+          
+          <button onclick="applyPreset('A')" id="btnPresetA" class="flex flex-col items-start p-2 border-2 border-blue-500 bg-blue-50/50 rounded-lg text-left transition-all">
+            <div class="flex items-center justify-between w-full">
+              <span class="font-semibold text-gray-800">方案 A：现代清爽型 (推荐)</span>
+              <span class="text-[10px] text-blue-600 font-mono">Inter + 系统黑体</span>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-0.5">西文采用 Inter，数字开 tabular-nums，表格排版轻盈透亮。</p>
+          </button>
+
+          <button onclick="applyPreset('B')" id="btnPresetB" class="flex flex-col items-start p-2 border border-gray-200 hover:border-gray-300 rounded-lg text-left transition-all">
+            <div class="flex items-center justify-between w-full">
+              <span class="font-semibold text-gray-800">方案 B：硬核工程监控风</span>
+              <span class="text-[10px] text-purple-600 font-mono">Inter + JetBrains Mono</span>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-0.5">GB28181、UDP、IP 及通道数强制为 JetBrains Mono 等宽字体。</p>
+          </button>
+
+          <button onclick="applyPreset('C')" id="btnPresetC" class="flex flex-col items-start p-2 border border-gray-200 hover:border-gray-300 rounded-lg text-left transition-all">
+            <div class="flex items-center justify-between w-full">
+              <span class="font-semibold text-gray-800">对比 C：优化前 (传统系统默认)</span>
+              <span class="text-[10px] text-gray-500 font-mono">全常规黑体 / 无等宽</span>
+            </div>
+            <p class="text-[11px] text-gray-500 mt-0.5">模拟普通浏览器无字体优化，数字错位、英文字形偏紧松散。</p>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- 细粒度调节微调关 -->
+      <div class="border-t border-gray-100 pt-3 space-y-2.5">
+        <label class="block text-gray-500 font-semibold mb-1 uppercase text-[10px] tracking-wider">细节排版微调</label>
+
+        <!-- 开启 JetBrains Mono 专项参数字体 -->
+        <div class="flex items-center justify-between">
+          <span class="text-gray-700">技术参数采用 JetBrains Mono</span>
+          <input type="checkbox" id="toggleMono" onchange="updateCustomSettings()" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" checked>
+        </div>
+
+        <!-- 开启 tabular-nums 数字等宽 -->
+        <div class="flex items-center justify-between">
+          <span class="text-gray-700">开启 Tabular-nums 表格数字对齐</span>
+          <input type="checkbox" id="toggleTabular" onchange="updateCustomSettings()" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" checked>
+        </div>
+
+        <!-- 表格正文字号调节 -->
+        <div class="flex items-center justify-between">
+          <span class="text-gray-700">表格正文字号</span>
+          <select id="fontSizeSelect" onchange="updateCustomSettings()" class="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white">
+            <option value="12px">12px (紧凑)</option>
+            <option value="13px" selected>13px (推荐标准)</option>
+            <option value="14px">14px (宽松)</option>
+          </select>
+        </div>
+
+        <!-- 表头字重拉开 -->
+        <div class="flex items-center justify-between">
+          <span class="text-gray-700">表头视觉加粗对比</span>
+          <select id="headerWeightSelect" onchange="updateCustomSettings()" class="border border-gray-300 rounded px-1.5 py-0.5 text-xs bg-white">
+            <option value="400">400 (常规)</option>
+            <option value="600" selected>600 (半粗/推荐)</option>
+            <option value="700">700 (强对比)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 调试辅助：开启字体作用域高亮标注 -->
+      <div class="border-t border-gray-100 pt-3">
+        <button onclick="toggleHighlightMode()" id="btnHighlight" class="w-full py-1.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded font-medium text-[11px] flex items-center justify-center space-x-1.5 transition-colors">
+          <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+          <span id="highlightText">开启“字体生效区域”高亮标注</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 模拟数据与 JS 逻辑脚本 -->
+  <script>
+    // 模拟的丰富设备数据
+    const mockDevices = [
+      {
+        id: "1",
+        name: "ipc-north-gate-01",
+        mode: "被动",
+        modeType: "passive",
+        protocol: "GB28181",
+        address: "34020000001320000001",
+        ip: "192.168.1.101:5060",
+        vendor: "海康威视",
+        streamMode: "UDP",
+        channels: 1,
+        status: "离线",
+        statusType: "offline",
+        subscribe: { catalog: true, location: false, alarm: true },
+        stats: { heartbeat: "12ms", register: "0.2s" }
+      },
+      {
+        id: "2",
+        name: "nvr-building-a-core",
+        mode: "主动",
+        modeType: "active",
+        protocol: "GB28181",
+        address: "34020000001320000002",
+        ip: "10.200.4.15:5060",
+        vendor: "大华技术",
+        streamMode: "TCP (Passive)",
+        channels: 32,
+        status: "在线",
+        statusType: "online",
+        subscribe: { catalog: true, location: true, alarm: true },
+        stats: { heartbeat: "4ms", register: "0.05s" }
+      },
+      {
+        id: "3",
+        name: "camera-hall-rtsp-hd",
+        mode: "主动",
+        modeType: "active",
+        protocol: "RTSP",
+        address: "rtsp://admin:123456@192.168.10.88:554/live/main",
+        ip: "192.168.10.88:554",
+        vendor: "宇视科技",
+        streamMode: "RTP over RTSP",
+        channels: 1,
+        status: "在线",
+        statusType: "online",
+        subscribe: { catalog: false, location: false, alarm: false },
+        stats: { heartbeat: "8ms", register: "-" }
+      },
+      {
+        id: "4",
+        name: "ipc-south-perimeter-08",
+        mode: "被动",
+        modeType: "passive",
+        protocol: "ONVIF",
+        address: "http://192.168.1.140/onvif/device_service",
+        ip: "192.168.1.140:80",
+        vendor: "Axis",
+        streamMode: "HTTP/UDP",
+        channels: 2,
+        status: "在线",
+        statusType: "online",
+        subscribe: { catalog: true, location: false, alarm: true },
+        stats: { heartbeat: "15ms", register: "0.1s" }
+      },
+      {
+        id: "5",
+        name: "backup-stream-rtmp-01",
+        mode: "主动",
+        modeType: "active",
+        protocol: "RTMP",
+        address: "rtmp://live.zeroo.internal/live/cam_05",
+        ip: "172.16.0.44:1935",
+        vendor: "Zeroo Native",
+        streamMode: "FLV-Stream",
+        channels: 1,
+        status: "离线",
+        statusType: "offline",
+        subscribe: { catalog: false, location: false, alarm: false },
+        stats: { heartbeat: "-", register: "-" }
+      }
+    ];
+
+    let currentDevices = [...mockDevices];
+    let isHighlightMode = false;
+
+    // 渲染表格
+    function renderTable(data) {
+      const tbody = document.getElementById('deviceTableBody');
+      document.getElementById('totalCount').innerText = data.length;
+
+      if (data.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="12" class="py-8 text-center text-gray-400 text-xs">
+              暂无匹配的设备接入数据
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = data.map(item => {
+        const statusBadge = item.statusType === 'online'
+          ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-700 border border-green-200">
+               <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5"></span>在线
+             </span>`
+          : `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-500 border border-gray-200">
+               <span class="w-1.5 h-1.5 rounded-full bg-gray-400 mr-1.5"></span>离线
+             </span>`;
+
+        const modeBadge = item.modeType === 'passive'
+          ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-50 text-green-600 border border-green-200">被动</span>`
+          : `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-600 border border-blue-200">主动</span>`;
+
+        const protocolBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 font-code tracking-tight">${item.protocol}</span>`;
+
+        return `
+          <tr class="hover:bg-blue-50/30 transition-colors group">
+            <td class="py-3 px-4 text-center">
+              <input type="checkbox" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            </td>
+
+            <!-- 名称 -->
+            <td class="py-3 px-4 font-medium text-gray-900 font-code">
+              ${item.name}
+            </td>
+
+            <!-- 模式 -->
+            <td class="py-3 px-4">
+              ${modeBadge}
+            </td>
+
+            <!-- 协议 -->
+            <td class="py-3 px-4">
+              ${protocolBadge}
+            </td>
+
+            <!-- 地址 / 注册信息 -->
+            <td class="py-3 px-4 text-gray-600">
+              <div class="font-code font-tabular text-xs text-gray-800">${item.address}</div>
+              <div class="font-code font-tabular text-[11px] text-gray-400 mt-0.5">${item.ip}</div>
+            </td>
+
+            <!-- 厂商 -->
+            <td class="py-3 px-4 text-gray-700 font-medium">
+              ${item.vendor}
+            </td>
+
+            <!-- 流传输模式 -->
+            <td class="py-3 px-4">
+              <div class="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded border border-gray-200 font-code">${item.streamMode}</div>
+            </td>
+
+            <!-- 通道数 -->
+            <td class="py-3 px-4 text-center font-code font-tabular font-semibold text-gray-800">
+              ${item.channels}
+            </td>
+
+            <!-- 状态 -->
+            <td class="py-3 px-4">
+              ${statusBadge}
+            </td>
+
+            <!-- 订阅复选 -->
+            <td class="py-3 px-4">
+              <div class="flex items-center space-x-2 text-[11px] text-gray-600">
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="checkbox" ${item.subscribe.catalog ? 'checked' : ''} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3" />
+                  <span class="ml-1">目录</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="checkbox" ${item.subscribe.location ? 'checked' : ''} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3" />
+                  <span class="ml-1">位置</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                  <input type="checkbox" ${item.subscribe.alarm ? 'checked' : ''} class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-3 h-3" />
+                  <span class="ml-1">报警</span>
+                </label>
+              </div>
+            </td>
+
+            <!-- 统计 -->
+            <td class="py-3 px-4 text-xs">
+              <div class="flex items-center space-x-2 text-gray-500 font-code font-tabular">
+                <span class="flex items-center" title="心跳延迟">
+                  <svg class="w-3 h-3 mr-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                  ${item.stats.heartbeat}
+                </span>
+                <span class="flex items-center" title="注册耗时">
+                  <svg class="w-3 h-3 mr-0.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                  ${item.stats.register}
+                </span>
+              </div>
+            </td>
+
+            <!-- 操作 -->
+            <td class="py-3 px-4 text-right">
+              <div class="flex items-center justify-end space-x-2 text-xs">
+                <button onclick="triggerToast('数据已刷新')" class="text-gray-500 hover:text-blue-600 flex items-center transition-colors">
+                  <svg class="w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  刷新
+                </button>
+                <span class="text-gray-300">|</span>
+                <button onclick="triggerToast('正在打开通道列表...')" class="text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors">
+                  <svg class="w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                  通道
+                </button>
+                <span class="text-gray-300">|</span>
+                <button onclick="triggerToast('编辑设备配置')" class="text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors">
+                  <svg class="w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                  编辑
+                </button>
+                <span class="text-gray-300">|</span>
+                <button onclick="triggerToast('更多高级选项')" class="text-gray-600 hover:text-blue-600 font-medium flex items-center transition-colors">
+                  操作
+                  <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 搜索过滤逻辑
+    function filterData() {
+      const searchVal = document.getElementById('searchInput').value.toLowerCase().trim();
+      const modeVal = document.getElementById('modeSelect').value;
+      const protocolVal = document.getElementById('protocolSelect').value;
+      const statusVal = document.getElementById('statusSelect').value;
+
+      const filtered = mockDevices.filter(item => {
+        const matchesSearch = !searchVal || 
+          item.name.toLowerCase().includes(searchVal) || 
+          item.ip.toLowerCase().includes(searchVal) ||
+          item.address.toLowerCase().includes(searchVal);
+
+        const matchesMode = modeVal === 'all' || item.modeType === modeVal;
+        const matchesProtocol = protocolVal === 'all' || item.protocol === protocolVal;
+        const matchesStatus = statusVal === 'all' || item.statusType === statusVal;
+
+        return matchesSearch && matchesMode && matchesProtocol && matchesStatus;
+      });
+
+      renderTable(filtered);
+    }
+
+    // 绑定事件监听
+    document.getElementById('searchInput').addEventListener('input', filterData);
+    document.getElementById('modeSelect').addEventListener('change', filterData);
+    document.getElementById('protocolSelect').addEventListener('change', filterData);
+    document.getElementById('statusSelect').addEventListener('change', filterData);
+
+    // 浮动控制面板逻辑
+    let isPanelOpen = true;
+    function toggleInspector() {
+      const content = document.getElementById('inspectorContent');
+      const chevron = document.getElementById('chevronIcon');
+      isPanelOpen = !isPanelOpen;
+      
+      if (isPanelOpen) {
+        content.classList.remove('hidden');
+        chevron.classList.remove('rotate-180');
+      } else {
+        content.classList.add('hidden');
+        chevron.classList.add('rotate-180');
+      }
+    }
+
+    // 预设应用
+    function applyPreset(preset) {
+      const root = document.documentElement;
+      const toggleMono = document.getElementById('toggleMono');
+      const toggleTabular = document.getElementById('toggleTabular');
+      const fontSizeSelect = document.getElementById('fontSizeSelect');
+      const headerWeightSelect = document.getElementById('headerWeightSelect');
+
+      // 重置按钮边框样式
+      ['A', 'B', 'C'].forEach(p => {
+        const btn = document.getElementById(`btnPreset${p}`);
+        btn.className = `flex flex-col items-start p-2 border ${p === preset ? 'border-2 border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'} rounded-lg text-left transition-all`;
+      });
+
+      const tag = document.getElementById('panelStatusTag');
+      tag.innerText = `方案 ${preset}`;
+
+      if (preset === 'A') {
+        // 现代清爽型 (Inter + 系统黑体, tabular-nums 开启, monospace 仅辅助)
+        root.style.setProperty('--ui-font-family', "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif");
+        root.style.setProperty('--code-font-family', "'Inter', sans-serif");
+        root.style.setProperty('--numeric-feature', 'tabular-nums');
+        root.style.setProperty('--table-header-weight', '600');
+        root.style.setProperty('--table-data-size', '13px');
+
+        toggleMono.checked = false;
+        toggleTabular.checked = true;
+        fontSizeSelect.value = '13px';
+        headerWeightSelect.value = '600';
+      } 
+      else if (preset === 'B') {
+        // 硬核工程监控风 (Inter + JetBrains Mono)
+        root.style.setProperty('--ui-font-family', "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', sans-serif");
+        root.style.setProperty('--code-font-family', "'JetBrains Mono', monospace");
+        root.style.setProperty('--numeric-feature', 'tabular-nums');
+        root.style.setProperty('--table-header-weight', '600');
+        root.style.setProperty('--table-data-size', '13px');
+
+        toggleMono.checked = true;
+        toggleTabular.checked = true;
+        fontSizeSelect.value = '13px';
+        headerWeightSelect.value = '600';
+      } 
+      else if (preset === 'C') {
+        // 传统无优化方案 (系统默认，无 tabular-nums)
+        root.style.setProperty('--ui-font-family', "'Microsoft YaHei', SimSun, sans-serif");
+        root.style.setProperty('--code-font-family', "'Microsoft YaHei', SimSun, sans-serif");
+        root.style.setProperty('--numeric-feature', 'normal');
+        root.style.setProperty('--table-header-weight', '400');
+        root.style.setProperty('--table-data-size', '13px');
+
+        toggleMono.checked = false;
+        toggleTabular.checked = false;
+        fontSizeSelect.value = '13px';
+        headerWeightSelect.value = '400';
+      }
+    }
+
+    // 自定义微调更新
+    function updateCustomSettings() {
+      const root = document.documentElement;
+      const useMono = document.getElementById('toggleMono').checked;
+      const useTabular = document.getElementById('toggleTabular').checked;
+      const fontSize = document.getElementById('fontSizeSelect').value;
+      const headerWeight = document.getElementById('headerWeightSelect').value;
+
+      root.style.setProperty('--code-font-family', useMono ? "'JetBrains Mono', monospace" : "'Inter', sans-serif");
+      root.style.setProperty('--numeric-feature', useTabular ? 'tabular-nums' : 'normal');
+      root.style.setProperty('--table-data-size', fontSize);
+      root.style.setProperty('--table-header-weight', headerWeight);
+    }
+
+    // 切换视觉作用域标注模式
+    function toggleHighlightMode() {
+      isHighlightMode = !isHighlightMode;
+      const btnText = document.getElementById('highlightText');
+      if (isHighlightMode) {
+        document.body.classList.add('highlight-mode');
+        btnText.innerText = '关闭“字体生效区域”高亮标注';
+      } else {
+        document.body.classList.remove('highlight-mode');
+        btnText.innerText = '开启“字体生效区域”高亮标注';
+      }
+    }
+
+    // Toast 浮动提示框 (代替 alert)
+    function triggerToast(message) {
+      const existing = document.getElementById('custom-toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'custom-toast';
+      toast.className = 'fixed top-16 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-xl text-xs font-medium z-50 flex items-center space-x-2 transition-all animate-bounce';
+      toast.innerHTML = `
+        <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        <span>${message}</span>
+      `;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 2500);
+    }
+
+    // 添加设备测试逻辑
+    function addNewDevice() {
+      const newId = String(mockDevices.length + 1);
+      const newDev = {
+        id: newId,
+        name: `camera-new-node-0${newId}`,
+        mode: "主动",
+        modeType: "active",
+        protocol: "GB28181",
+        address: `3402000000132000000${newId}`,
+        ip: `192.168.1.${120 + parseInt(newId)}:5060`,
+        vendor: "宇视科技",
+        streamMode: "UDP",
+        channels: 4,
+        status: "在线",
+        statusType: "online",
+        subscribe: { catalog: true, location: true, alarm: false },
+        stats: { heartbeat: "6ms", register: "0.08s" }
+      };
+      mockDevices.unshift(newDev);
+      filterData();
+      triggerToast('新 GB28181 节点已添加接入');
+    }
+
+    function refreshData() {
+      filterData();
+      triggerToast('列表数据刷新成功');
+    }
+
+    // 初始渲染
+    window.onload = function() {
+      renderTable(mockDevices);
+    };
+  </script>
+</body>
+</html>
