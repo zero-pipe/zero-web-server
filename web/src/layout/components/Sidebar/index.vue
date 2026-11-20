@@ -332,20 +332,19 @@ export default {
     color: #202124;
 
     .icon-wrap {
-      background: #E8EAED;
-      color: #5F6368;
+      background: transparent;
+      color: #202124;
     }
   }
 
   &.active {
     background: #E8F0FE;
     color: #1A73E8;
-    font-weight: 600;
     box-shadow: inset 3px 0 0 #1A73E8;
 
     .icon-wrap {
-      background: #1A73E8;
-      color: #fff;
+      background: transparent;
+      color: inherit;
       box-shadow: none;
     }
 
@@ -354,7 +353,7 @@ export default {
     }
 
     .secondary-icon {
-      color: #fff;
+      color: inherit;
       fill: currentColor;
     }
   }
@@ -363,7 +362,7 @@ export default {
     width: 28px;
     height: 28px;
     border-radius: 7px;
-    background: #F1F3F4;
+    background: transparent;
     color: #5F6368;
     display: inline-flex;
     align-items: center;
@@ -372,7 +371,7 @@ export default {
     margin: 0;
     padding: 0;
     line-height: 1;
-    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    transition: color 0.15s ease;
   }
 
   .secondary-icon {
