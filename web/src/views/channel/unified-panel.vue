@@ -4,7 +4,7 @@
       <el-form-item v-if="embedded" style="margin-right: 2rem">
         <el-page-header content="通道列表" @back="$emit('back')" />
       </el-form-item>
-      <el-form-item label="搜索">
+      <el-form-item>
         <el-input
           v-model="query"
           clearable
@@ -27,7 +27,7 @@
         <el-tag size="mini" closable @close="clearDevice">设备：{{ deviceName || '已选择' }}</el-tag>
       </el-form-item>
       <el-form-item>
-        <el-button size="mini" icon="el-icon-refresh-right" @click="load">刷新</el-button>
+        <el-button size="mini" icon="el-icon-refresh-right" circle title="刷新" aria-label="刷新" @click="load" />
       </el-form-item>
     </el-form>
 
@@ -57,16 +57,19 @@
           <el-tag size="mini" :type="row.online ? 'success' : 'info'">{{ row.online ? '在线' : '离线' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="90" fixed="right">
         <template slot-scope="{ row }">
           <el-button
             type="text"
             size="mini"
+            icon="el-icon-video-play"
+            title="播放"
+            aria-label="播放"
             :disabled="!row.online"
             :loading="row._loading"
             @click="play(row)"
-          >播放</el-button>
-          <el-button type="text" size="mini" @click="openDevice(row)">设备</el-button>
+          />
+          <el-button type="text" size="mini" icon="el-icon-monitor" title="设备" aria-label="设备" @click="openDevice(row)" />
         </template>
       </el-table-column>
     </el-table>

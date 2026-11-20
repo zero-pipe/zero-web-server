@@ -13,7 +13,7 @@
     >
       <div>
         重复国标ID:
-        <el-button v-clipboard="gbIds.join(',')" style="float: right;" type="primary" size="mini" icon="el-icon-document-copy" title="点击拷贝" @success="$message({type:'success', message:'成功拷贝到粘贴板'})">复制</el-button>
+        <el-button v-clipboard="gbIds.join(',')" style="float: right;" type="primary" size="mini" icon="el-icon-document-copy" title="复制" aria-label="复制" @success="$message({type:'success', message:'成功拷贝到粘贴板'})" />
         <ul class="errDataBox">
           <li v-for="id in gbIds">
             {{ id }}
@@ -23,7 +23,7 @@
 
       <div>
         重复App/stream:
-        <el-button v-clipboard="streams.join(',')" style="float: right;" type="primary" size="mini" icon="el-icon-document-copy" title="点击拷贝" @success="$message({type:'success', message:'成功拷贝到粘贴板'})">复制</el-button>
+        <el-button v-clipboard="streams.join(',')" style="float: right;" type="primary" size="mini" icon="el-icon-document-copy" title="复制" aria-label="复制" @success="$message({type:'success', message:'成功拷贝到粘贴板'})" />
         <ul class="errDataBox">
           <li v-for="id in streams">
             {{ id }}

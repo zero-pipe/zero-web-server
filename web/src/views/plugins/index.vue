@@ -14,7 +14,7 @@
     <el-card shadow="never">
       <div slot="header" class="card-header">
         <span>Agent 与插件</span>
-        <el-button type="text" icon="el-icon-refresh" @click="loadAll">刷新</el-button>
+        <el-button type="text" icon="el-icon-refresh" title="刷新" aria-label="刷新" @click="loadAll" />
       </div>
       <el-table v-loading="loading" :data="agentPlugins" size="small" border>
         <el-table-column label="Agent" min-width="150">
@@ -50,11 +50,11 @@
         <el-table-column label="最后上报" width="170">
           <template slot-scope="{ row }">{{ formatTime(row.lastSeen) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="110" fixed="right">
           <template slot-scope="{ row }">
-            <el-button v-if="row.desiredState !== 'enabled'" type="text" size="mini" @click="setState(row, 'enable')">启用</el-button>
-            <el-button v-else type="text" size="mini" @click="setState(row, 'disable')">禁用</el-button>
-            <el-button type="text" size="mini" @click="setState(row, 'restart')">重启</el-button>
+            <el-button v-if="row.desiredState !== 'enabled'" type="text" size="mini" icon="el-icon-check" title="启用" aria-label="启用" @click="setState(row, 'enable')" />
+            <el-button v-else type="text" size="mini" icon="el-icon-close" title="禁用" aria-label="禁用" @click="setState(row, 'disable')" />
+            <el-button type="text" size="mini" icon="el-icon-refresh-left" title="重启" aria-label="重启" @click="setState(row, 'restart')" />
           </template>
         </el-table-column>
       </el-table>
@@ -87,14 +87,12 @@
             <el-tag v-else size="mini" type="info">未布防</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="330">
+        <el-table-column label="操作" width="170">
           <template slot-scope="{ row }">
-            <el-button type="text" size="mini" @click="goChannels(row)">通道</el-button>
-            <el-button type="text" size="mini" @click="syncDevice(row)">同步</el-button>
-            <el-button type="text" size="mini" :disabled="!row.online" @click="toggleArm(row)">
-              {{ row._armed ? '撤防' : '布防' }}
-            </el-button>
-            <el-button type="text" size="mini" style="color:#EA4335" @click="removeDevice(row)">删除</el-button>
+            <el-button type="text" size="mini" icon="el-icon-video-camera" title="通道" aria-label="通道" @click="goChannels(row)" />
+            <el-button type="text" size="mini" icon="el-icon-refresh" title="同步" aria-label="同步" @click="syncDevice(row)" />
+            <el-button type="text" size="mini" :icon="row._armed ? 'el-icon-unlock' : 'el-icon-lock'" :title="row._armed ? '撤防' : '布防'" :aria-label="row._armed ? '撤防' : '布防'" :disabled="!row.online" @click="toggleArm(row)" />
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#EA4335" title="删除" aria-label="删除" @click="removeDevice(row)" />
           </template>
         </el-table-column>
       </el-table>

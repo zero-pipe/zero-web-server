@@ -49,13 +49,17 @@
             <el-button
               type="text"
               icon="el-icon-view"
+              title="查看"
+              aria-label="查看"
               @click="showLogView(file)"
-            >查看</el-button>
+            />
             <el-button
               type="text"
               icon="el-icon-download"
+              title="下载"
+              aria-label="下载"
               @click="downloadFile(file)"
-            >下载</el-button>
+            />
           </div>
         </div>
       </div>

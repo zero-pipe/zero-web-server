@@ -2,7 +2,7 @@
   <div id="streamProxyList" class="app-container">
     <div v-if="!streamProxy" style="height: calc(100vh - 124px);">
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
@@ -92,19 +92,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" min-width="150" show-overflow-tooltip />
-        <el-table-column label="操作" width="370" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" :loading="scope.row.playLoading" icon="el-icon-video-play" type="text" @click="play(scope.row)">播放</el-button>
+            <el-button size="medium" :loading="scope.row.playLoading" icon="el-icon-video-play" type="text" title="播放" aria-label="播放" @click="play(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button v-if="scope.row.pulling" size="medium" icon="el-icon-switch-button" style="color: #EA4335" type="text" @click="stopPlay(scope.row)">停止</el-button>
+            <el-button v-if="scope.row.pulling" size="medium" icon="el-icon-switch-button" style="color: #EA4335" type="text" title="停止" aria-label="停止" @click="stopPlay(scope.row)" />
             <el-divider v-if="scope.row.pulling" direction="vertical" />
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="edit(scope.row)">
-              编辑
-            </el-button>
+            <el-button size="medium" icon="el-icon-edit" type="text" title="编辑" aria-label="编辑" @click="edit(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-cloudy" type="text" @click="queryCloudRecords(scope.row)">云端录像</el-button>
+            <el-button size="medium" icon="el-icon-cloudy" type="text" title="云端录像" aria-label="云端录像" @click="queryCloudRecords(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-delete" type="text" style="color: #EA4335" @click="deleteStreamProxy(scope.row)">删除</el-button>
+            <el-button size="medium" icon="el-icon-delete" type="text" style="color: #EA4335" title="删除" aria-label="删除" @click="deleteStreamProxy(scope.row)" />
           </template>
         </el-table-column>
       </el-table>

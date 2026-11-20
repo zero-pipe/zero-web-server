@@ -66,6 +66,8 @@ export default {
   background: #fff;
   border-bottom: 1px solid #E8EAED;
   box-shadow: 0 1px 4px rgba(60, 64, 67, 0.06);
+  font-size: 13px;
+  color: #5F6368;
 
   .hamburger-container {
     line-height: 46px;
@@ -118,6 +120,9 @@ export default {
         margin-top: 5px;
         position: relative;
         cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: #3C4043;
         .user-avatar {
           cursor: pointer;
           width: 40px;

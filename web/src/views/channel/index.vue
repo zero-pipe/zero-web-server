@@ -2,7 +2,7 @@
   <div id="channelList" class="app-container" style="height: calc(100vh - 124px);">
     <div v-if="!editId && !showPtzConfig" style="height: 100%">
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
@@ -107,41 +107,41 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="210" fixed="right">
+        <el-table-column label="操作" min-width="150" fixed="right">
           <template v-slot:default="scope">
             <el-button
               size="medium"
               :disabled="scope.row.gbStatus !== 'ON'"
               icon="el-icon-video-play"
               type="text"
+              title="播放"
+              aria-label="播放"
               :loading="scope.row.playLoading"
               @click="sendDevicePush(scope.row)"
-            >播放
-            </el-button>
+            />
             <el-button
               v-if="!!scope.row.streamId"
               size="medium"
               icon="el-icon-switch-button"
               type="text"
               style="color: #EA4335"
+              title="停止"
+              aria-label="停止"
               @click="stopDevicePush(scope.row)"
-            >停止
-            </el-button>
+            />
             <el-divider direction="vertical" />
             <el-button
               size="medium"
               type="text"
               icon="el-icon-edit"
+              title="编辑"
+              aria-label="编辑"
               v-if="$store.getters.authority !== 2"
               @click="handleEdit(scope.row)"
-            >
-              编辑
-            </el-button>
+            />
             <el-divider direction="vertical" />
             <el-dropdown @command="(command)=>{moreClick(command, scope.row)}">
-              <el-button size="medium" type="text">
-                更多<i class="el-icon-arrow-down el-icon--right" />
-              </el-button>
+              <el-button size="medium" type="text" icon="el-icon-more" title="更多" aria-label="更多" />
               <el-dropdown-menu>
                 <el-dropdown-item command="records" :disabled="scope.row.gbStatus !== 'ON'">
                   设备录像</el-dropdown-item>

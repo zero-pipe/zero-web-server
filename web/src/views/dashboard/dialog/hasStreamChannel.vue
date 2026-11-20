@@ -11,7 +11,7 @@
       :close-on-click-modal="false"
     >
       <el-form :inline="true" size="mini" @submit.native.prevent>
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="query"
             placeholder="关键字"
@@ -32,24 +32,26 @@
             <div>{{ scope.row.ptzTypeText }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="120" fixed="right">
+        <el-table-column label="操作" min-width="100" fixed="right">
           <template v-slot:default="scope">
             <el-button
               size="medium"
               icon="el-icon-video-play"
               type="text"
+              title="播放"
+              aria-label="播放"
               :loading="scope.row.playing"
               @click="sendDevicePush(scope.row)"
-            >播放
-            </el-button>
+            />
             <el-button
               size="medium"
               icon="el-icon-switch-button"
               type="text"
               style="color: #EA4335"
+              title="停止"
+              aria-label="停止"
               @click="stopDevicePush(scope.row)"
-            >停止
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

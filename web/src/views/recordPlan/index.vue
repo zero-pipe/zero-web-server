@@ -2,7 +2,7 @@
   <div id="recordPLan" class="app-container">
     <div style="height: calc(100vh - 124px);">
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
@@ -34,11 +34,11 @@
         <el-table-column prop="channelCount" label="关联通道" />
         <el-table-column prop="updateTime" label="更新时间" />
         <el-table-column prop="createTime" label="创建时间" />
-        <el-table-column label="操作" width="300" fixed="right">
+        <el-table-column label="操作" width="150" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-link" type="text" @click="link(scope.row)">关联通道</el-button>
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="edit(scope.row)">编辑</el-button>
-            <el-button size="medium" icon="el-icon-delete" style="color: #EA4335" type="text" @click="deletePlan(scope.row)">删除</el-button>
+            <el-button size="medium" icon="el-icon-link" type="text" title="关联通道" aria-label="关联通道" @click="link(scope.row)" />
+            <el-button size="medium" icon="el-icon-edit" type="text" title="编辑" aria-label="编辑" @click="edit(scope.row)" />
+            <el-button size="medium" icon="el-icon-delete" style="color: #EA4335" type="text" title="删除" aria-label="删除" @click="deletePlan(scope.row)" />
           </template>
         </el-table-column>
       </el-table>

@@ -17,7 +17,7 @@
               <el-button type="primary" :plain="viewMode !== 'table'" size="mini" @click="viewMode = 'table'">表格</el-button>
               <el-button type="primary" :plain="viewMode !== 'chart'" size="mini" @click="viewMode = 'chart'">折线图</el-button>
             </el-button-group>
-            <el-button icon="el-icon-refresh" size="mini" @click="fetchData" style="margin-left: 8px;">刷新</el-button>
+            <el-button icon="el-icon-refresh" size="mini" circle title="刷新" aria-label="刷新" @click="fetchData" style="margin-left: 8px;" />
           </div>
           <el-form :inline="true" size="mini">
             <el-form-item label="数量">

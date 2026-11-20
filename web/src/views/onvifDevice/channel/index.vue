@@ -4,7 +4,7 @@
       <el-form-item style="margin-right: 2rem">
         <el-page-header content="通道列表" @back="$emit('show-device')" />
       </el-form-item>
-      <el-form-item label="搜索">
+      <el-form-item>
         <el-input
           v-model="searchStr"
           style="margin-right: 1rem; width: auto;"
@@ -15,7 +15,7 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button icon="el-icon-refresh-right" @click="handleSync">同步通道</el-button>
+        <el-button icon="el-icon-refresh-right" title="同步通道" aria-label="同步通道" @click="handleSync" />
       </el-form-item>
       <el-form-item style="float: right;">
         <el-button icon="el-icon-refresh-right" circle :loading="loading" @click="loadChannels" />
@@ -64,22 +64,21 @@
           <el-tag v-else size="medium" type="info">离线</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="200" fixed="right">
+      <el-table-column label="操作" min-width="120" fixed="right">
         <template v-slot:default="scope">
           <el-button
             size="medium"
             type="text"
             icon="el-icon-video-play"
+            title="播放"
+            aria-label="播放"
             :loading="scope.row.playLoading"
             @click="handlePlay(scope.row)"
-          >播放
-          </el-button>
+          />
           <template v-if="scope.row.hasPtz">
             <el-divider direction="vertical" />
             <el-dropdown @command="(cmd) => handlePtz(scope.row, cmd)">
-              <el-button size="medium" type="text">
-                云台<i class="el-icon-arrow-down el-icon--right" />
-              </el-button>
+              <el-button size="medium" type="text" icon="el-icon-s-tools" title="云台" aria-label="云台" />
               <el-dropdown-menu>
                 <el-dropdown-item command="LEFT">左转</el-dropdown-item>
                 <el-dropdown-item command="RIGHT">右转</el-dropdown-item>

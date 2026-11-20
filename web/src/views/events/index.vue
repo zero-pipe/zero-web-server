@@ -26,7 +26,7 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="el-icon-search" @click="reload">查询</el-button>
+        <el-button type="primary" icon="el-icon-search" circle title="查询" aria-label="查询" @click="reload" />
         <el-button icon="el-icon-refresh" circle :loading="loading" @click="load" />
         <el-button type="text" style="color:#EA4335" @click="clearOld">清理 90 天前</el-button>
       </el-form-item>
@@ -78,10 +78,10 @@
           <span v-else class="sub">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="100" fixed="right">
         <template slot-scope="{ row }">
-          <el-button type="text" size="mini" @click="openDetail(row)">详情</el-button>
-          <el-button type="text" size="mini" :disabled="!row.playback || !row.playback.supported" @click="openPlayback(row)">回放</el-button>
+          <el-button type="text" size="mini" icon="el-icon-view" title="详情" aria-label="详情" @click="openDetail(row)" />
+          <el-button type="text" size="mini" icon="el-icon-video-play" title="回放" aria-label="回放" :disabled="!row.playback || !row.playback.supported" @click="openPlayback(row)" />
         </template>
       </el-table-column>
     </el-table>

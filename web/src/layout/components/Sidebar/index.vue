@@ -83,6 +83,20 @@ export default {
     secondaryItems() {
       return (this.activePrimary && this.activePrimary.children) || []
     },
+    activeSecondaryPath() {
+      const current = this.$route.path
+      let matched = ''
+      this.secondaryItems.forEach(item => {
+        if (!item.path) {
+          return
+        }
+        const isMatch = current === item.path || current.startsWith(item.path + '/')
+        if (isMatch && item.path.length > matched.length) {
+          matched = item.path
+        }
+      })
+      return matched
+    },
     primaryWidth() {
       return this.isCollapse ? 64 : 84
     },
@@ -137,8 +151,7 @@ export default {
       return icon && icon.indexOf('el-icon') === 0
     },
     isSecondaryActive(path) {
-      const current = this.$route.path
-      return current === path || current.startsWith(path + '/')
+      return path === this.activeSecondaryPath
     },
     onPrimaryClick(item) {
       this.activePrimary = item
@@ -266,7 +279,7 @@ export default {
   }
 
   .primary-label {
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.2;
     text-align: center;
     max-width: 72px;
@@ -291,7 +304,7 @@ export default {
   flex-shrink: 0;
 
   .secondary-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: #202124;
   }

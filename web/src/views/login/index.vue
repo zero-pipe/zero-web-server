@@ -144,6 +144,7 @@ export default {
       border: 0;
       border-radius: 0;
       padding: 12px 8px 12px 10px;
+      font-size: 13px;
       color: #202124;
       height: 46px;
       caret-color: #1A73E8;
@@ -209,16 +210,16 @@ $bg: #F8F9FA;
 }
 
 .stage-logo {
-  width: 96px;
-  height: 96px;
+  width: 80px;
+  height: 80px;
   display: block;
   object-fit: contain;
 }
 
 .stage-wordmark {
-  font-size: 40px;
+  font-size: 32px;
   font-weight: 600;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.4px;
   color: $text;
 
   span {
@@ -269,9 +270,9 @@ $bg: #F8F9FA;
   border: none;
   border-radius: 8px;
   background: $accent;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   box-shadow: none;
 
   &:hover,
@@ -300,7 +301,7 @@ $bg: #F8F9FA;
   }
 
   .stage-wordmark {
-    font-size: 28px;
+    font-size: 24px;
   }
 
   .login-panel {

@@ -44,11 +44,11 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="120">
+        <el-table-column label="操作" min-width="100">
           <template v-slot="{ row, $index }">
-            <el-button v-if="$index === cruisingScanIndex" type="text" style="color: #EA4335" :loading="operatingId === row.index" :disabled="operatingId !== null" @click="stopScan(row)">停用</el-button>
-            <el-button v-else type="text" style="color: #1A73E8" :disabled="operatingId !== null" :loading="operatingId === row.index" @click="startScan(row, $index)">启用</el-button>
-            <el-button type="text" style="color: #EA4335" :disabled="operatingId !== null" @click="deleteScan(row)">删除</el-button>
+            <el-button v-if="$index === cruisingScanIndex" type="text" icon="el-icon-video-pause" style="color: #EA4335" title="停用" aria-label="停用" :loading="operatingId === row.index" :disabled="operatingId !== null" @click="stopScan(row)" />
+            <el-button v-else type="text" icon="el-icon-video-play" style="color: #1A73E8" title="启用" aria-label="启用" :disabled="operatingId !== null" :loading="operatingId === row.index" @click="startScan(row, $index)" />
+            <el-button type="text" icon="el-icon-delete" style="color: #EA4335" title="删除" aria-label="删除" :disabled="operatingId !== null" @click="deleteScan(row)" />
           </template>
         </el-table-column>
       </el-table>

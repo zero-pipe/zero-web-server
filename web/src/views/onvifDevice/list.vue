@@ -1,7 +1,7 @@
 <template>
   <div style="height: calc(100vh - 124px);">
     <el-form :inline="true" size="mini">
-      <el-form-item label="搜索">
+      <el-form-item>
         <el-input
           v-model="searchStr"
           placeholder="名称/IP"
@@ -41,26 +41,29 @@
             type="text"
             size="medium"
             icon="el-icon-video-camera"
+            title="通道"
+            aria-label="通道"
             @click="$emit('show-channel', scope.row.id)"
-          >通道
-          </el-button>
+          />
           <el-divider direction="vertical" />
           <el-button
             type="text"
             size="medium"
             icon="el-icon-refresh"
+            title="同步"
+            aria-label="同步"
             @click="handleSync(scope.row.id)"
-          >同步
-          </el-button>
+          />
           <el-divider direction="vertical" />
           <el-button
             type="text"
             size="medium"
             icon="el-icon-delete"
             style="color: #EA4335"
+            title="删除"
+            aria-label="删除"
             @click="handleDelete(scope.row.id)"
-          >删除
-          </el-button>
+          />
         </template>
       </el-table-column>
     </el-table>
@@ -96,15 +99,16 @@
           <template v-slot:default="scope">{{ scope.row.ip }}:{{ scope.row.port }}</template>
         </el-table-column>
         <el-table-column prop="location" label="位置" />
-        <el-table-column label="操作" width="100">
+        <el-table-column label="操作" width="70">
           <template v-slot:default="scope">
             <el-button
               type="text"
               size="medium"
               icon="el-icon-plus"
+              title="添加"
+              aria-label="添加"
               @click="addDiscovered(scope.row)"
-            >添加
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

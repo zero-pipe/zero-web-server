@@ -44,7 +44,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
-          <el-button @click="load">重置</el-button>
+          <el-button icon="el-icon-refresh-left" title="重置" aria-label="重置" @click="load" />
         </el-form-item>
       </el-form>
     </el-card>
@@ -52,7 +52,7 @@
     <el-card shadow="never" class="gb-config-card" style="margin-top: 16px;">
       <div slot="header" class="gb-config-header">
         <span>接入信息（填到摄像机 / 下级）</span>
-        <el-button type="text" icon="el-icon-document-copy" @click="copyAccess">一键复制</el-button>
+        <el-button type="text" icon="el-icon-document-copy" title="一键复制" aria-label="一键复制" @click="copyAccess" />
       </div>
       <el-descriptions :column="1" border size="small" style="max-width: 720px;">
         <el-descriptions-item label="上级平台 IP">{{ form.ip }}</el-descriptions-item>

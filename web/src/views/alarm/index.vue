@@ -40,9 +40,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button size="mini" type="primary" icon="el-icon-search" @click="search">
-            查询
-          </el-button>
+          <el-button size="mini" type="primary" icon="el-icon-search" circle title="查询" aria-label="查询" @click="search" />
         </el-form-item>
         <el-form-item>
           <el-button
@@ -124,19 +122,21 @@
             {{ formatTime(scope.row.alarmTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-view" type="text" @click="openDetail(scope.row)">详情</el-button>
-            <el-button size="medium" icon="el-icon-video-play" type="text" @click="openPlayback(scope.row)">回放</el-button>
-            <el-button v-if="scope.row.status !== 'handled'" size="medium" type="text" @click="setStatus(scope.row, 'handled')">确认</el-button>
-            <el-button v-if="scope.row.status !== 'ignored'" size="medium" type="text" @click="setStatus(scope.row, 'ignored')">忽略</el-button>
+            <el-button size="medium" icon="el-icon-view" type="text" title="详情" aria-label="详情" @click="openDetail(scope.row)" />
+            <el-button size="medium" icon="el-icon-video-play" type="text" title="回放" aria-label="回放" @click="openPlayback(scope.row)" />
+            <el-button v-if="scope.row.status !== 'handled'" size="medium" icon="el-icon-check" type="text" title="确认" aria-label="确认" @click="setStatus(scope.row, 'handled')" />
+            <el-button v-if="scope.row.status !== 'ignored'" size="medium" icon="el-icon-close" type="text" title="忽略" aria-label="忽略" @click="setStatus(scope.row, 'ignored')" />
             <el-button
               size="medium"
               icon="el-icon-delete"
               style="color: #EA4335"
               type="text"
+              title="删除"
+              aria-label="删除"
               @click="deleteSingle(scope.row)"
-            >删除</el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

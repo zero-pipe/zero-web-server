@@ -30,7 +30,7 @@
           </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
-            <el-button :loading="loading" @click="handleRefresh">刷新</el-button>
+            <el-button icon="el-icon-refresh-right" :loading="loading" title="刷新" aria-label="刷新" @click="handleRefresh" />
           </el-form-item>
         </el-form>
       </div>

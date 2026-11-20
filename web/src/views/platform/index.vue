@@ -13,7 +13,7 @@
         title="预登记允许接入的下级平台国标编号与密码；下级平台注册成功后可在此查看在线状态。"
       />
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input v-model="subSearch" size="mini" placeholder="名称/编号" clearable @input="loadSubordinates" />
         </el-form-item>
         <el-form-item>
@@ -43,11 +43,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="transport" label="传输" width="80" />
-        <el-table-column label="操作" width="210" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template v-slot:default="scope">
-            <el-button type="text" size="medium" @click="openSubCatalog(scope.row)">目录</el-button>
-            <el-button type="text" size="medium" @click="openSubEdit(scope.row)">编辑</el-button>
-            <el-button type="text" size="medium" style="color:#EA4335" @click="deleteSub(scope.row)">删除</el-button>
+            <el-button type="text" size="medium" icon="el-icon-folder-opened" title="目录" aria-label="目录" @click="openSubCatalog(scope.row)" />
+            <el-button type="text" size="medium" icon="el-icon-edit" title="编辑" aria-label="编辑" @click="openSubEdit(scope.row)" />
+            <el-button type="text" size="medium" icon="el-icon-delete" style="color:#EA4335" title="删除" aria-label="删除" @click="deleteSub(scope.row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -87,7 +87,7 @@
         title="本级作为下级：向上级平台 REGISTER。上级平台编号填对端国标编号；本级 DeviceGBID 填本级向上注册身份（可与本级国标配置编号相同或按上级要求）。"
       />
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
@@ -178,27 +178,28 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" min-width="260" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="editPlatform(scope.row)">编辑</el-button>
-            <el-button size="medium" icon="el-icon-share" type="text" @click="chooseChannel(scope.row)">通道共享
-            </el-button>
+            <el-button size="medium" icon="el-icon-edit" type="text" title="编辑" aria-label="编辑" @click="editPlatform(scope.row)" />
+            <el-button size="medium" icon="el-icon-share" type="text" title="通道共享" aria-label="通道共享" @click="chooseChannel(scope.row)" />
             <el-button
               size="medium"
               icon="el-icon-top"
               type="text"
               :loading="pushChannelLoading"
+              title="推送通道"
+              aria-label="推送通道"
               @click="pushChannel(scope.row)"
-            >推送通道
-            </el-button>
+            />
             <el-button
               size="medium"
               icon="el-icon-delete"
               type="text"
               style="color: #EA4335"
+              title="删除"
+              aria-label="删除"
               @click="deletePlatform(scope.row)"
-            >删除
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

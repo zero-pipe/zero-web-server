@@ -50,11 +50,11 @@
               type="text"
               style="color: #EA4335"
               icon="el-icon-delete"
+              title="移除"
+              aria-label="移除"
               :loading="scope.row.addRegionLoading"
               @click="removeRow(scope.$index)"
-            >
-              移除
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

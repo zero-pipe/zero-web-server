@@ -2,7 +2,7 @@
   <div id="app" class="app-container">
     <div style="height: calc(100vh - 124px);">
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="search"
             style="margin-right: 1rem; width: auto;"
@@ -97,22 +97,20 @@
         </el-table-column>
         <el-table-column prop="fileName" label="文件名称" width="200" />
         <el-table-column prop="mediaServerId" label="流媒体" />
-        <el-table-column label="操作" fixed="right" width="260">
+        <el-table-column label="操作" fixed="right" width="170">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-video-play" type="text" @click="play(scope.row)">播放
-            </el-button>
-            <el-button size="medium" icon="el-icon-download" type="text" @click="downloadFile(scope.row)">下载
-            </el-button>
-            <el-button size="medium" icon="el-icon-info" type="text" @click="showDetail(scope.row)">详情
-            </el-button>
+            <el-button size="medium" icon="el-icon-video-play" type="text" title="播放" aria-label="播放" @click="play(scope.row)" />
+            <el-button size="medium" icon="el-icon-download" type="text" title="下载" aria-label="下载" @click="downloadFile(scope.row)" />
+            <el-button size="medium" icon="el-icon-info" type="text" title="详情" aria-label="详情" @click="showDetail(scope.row)" />
             <el-button
               size="medium"
               icon="el-icon-delete"
               type="text"
               style="color: #EA4335"
+              title="删除"
+              aria-label="删除"
               @click="deleteOneRecord(scope.row)"
-            >删除
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

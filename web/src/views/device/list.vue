@@ -1,7 +1,7 @@
 <template>
   <div id="app" style="height: calc(100vh - 124px);">
     <el-form :inline="true" size="mini">
-      <el-form-item label="搜索">
+      <el-form-item>
         <el-input
           v-model="searchStr"
           style="margin-right: 1rem; width: auto;"
@@ -118,46 +118,46 @@
             :disabled="scope.row.online===0"
             icon="iconfont-14 icon-xintiao"
             title="心跳时间统计"
+            aria-label="心跳时间统计"
             @click="getKeepaliveTimeStatistics(scope.row.deviceId)"
-          >心跳
-          </el-button>
+          />
           <el-button
             type="text"
             size="mini"
             :disabled="scope.row.online===0"
             icon="iconfont-14 icon-register"
             title="注册时间统计"
+            aria-label="注册时间统计"
             @click="getRegisterTimeStatistics(scope.row.deviceId)"
-          >注册
-          </el-button>
+          />
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="300" fixed="right">
+      <el-table-column label="操作" min-width="200" fixed="right">
         <template v-slot:default="scope">
           <el-button
             type="text"
             size="medium"
             :disabled="scope.row.online===0"
             icon="el-icon-refresh"
+            title="刷新"
+            aria-label="刷新"
             @click="refDevice(scope.row)"
             @mouseover="getTooltipContent(scope.row.deviceId)"
-          >刷新
-          </el-button>
+          />
           <el-divider direction="vertical" />
           <el-button
             type="text"
             size="medium"
             icon="el-icon-video-camera"
+            title="通道"
+            aria-label="通道"
             @click="showChannelList(scope.row)"
-          >通道
-          </el-button>
+          />
           <el-divider direction="vertical" />
-          <el-button size="medium" icon="el-icon-edit" type="text" @click="edit(scope.row)">编辑</el-button>
+          <el-button size="medium" icon="el-icon-edit" type="text" title="编辑" aria-label="编辑" @click="edit(scope.row)" />
           <el-divider direction="vertical" />
           <el-dropdown @command="(command)=>{moreClick(command, scope.row)}">
-            <el-button size="medium" type="text">
-              操作<i class="el-icon-arrow-down el-icon--right" />
-            </el-button>
+            <el-button size="medium" type="text" icon="el-icon-more" title="更多操作" aria-label="更多操作" />
             <el-dropdown-menu>
               <el-dropdown-item command="delete" style="color: #EA4335">
                 删除

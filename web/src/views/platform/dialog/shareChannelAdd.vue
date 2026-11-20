@@ -6,7 +6,7 @@
     </el-tabs>
     <div style="padding: 0 2rem">
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"

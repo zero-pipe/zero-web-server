@@ -13,7 +13,7 @@
           >
             <el-button type="primary" size="small" icon="el-icon-upload" :loading="uploading">上传插件包</el-button>
           </el-upload>
-          <el-button type="text" icon="el-icon-refresh" @click="loadAll">刷新</el-button>
+          <el-button type="text" icon="el-icon-refresh" title="刷新" aria-label="刷新" @click="loadAll" />
         </div>
       </div>
       <div class="hint">
@@ -52,11 +52,11 @@
             <el-tag :type="row.status === 'valid' ? 'success' : 'danger'" size="mini">{{ row.status === 'valid' ? '有效' : '无效' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template slot-scope="{ row }">
-            <el-button type="text" size="mini" @click="openInstall(row)">安装</el-button>
-            <el-button type="text" size="mini" @click="showDetail(row)">详情</el-button>
-            <el-button type="text" size="mini" style="color:#EA4335" @click="removePackage(row)">删除</el-button>
+            <el-button type="text" size="mini" icon="el-icon-download" title="安装" aria-label="安装" @click="openInstall(row)" />
+            <el-button type="text" size="mini" icon="el-icon-view" title="详情" aria-label="详情" @click="showDetail(row)" />
+            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#EA4335" title="删除" aria-label="删除" @click="removePackage(row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -89,15 +89,18 @@
         <el-table-column label="更新时间" width="170">
           <template slot-scope="{ row }">{{ row.updateTime || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right">
           <template slot-scope="{ row }">
             <el-button
               v-if="row.status === 'installed'"
               type="text"
               size="mini"
+              icon="el-icon-delete"
               style="color:#EA4335"
+              title="卸载"
+              aria-label="卸载"
               @click="doUninstall(row)"
-            >卸载</el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

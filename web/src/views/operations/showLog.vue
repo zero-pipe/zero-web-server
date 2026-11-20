@@ -43,7 +43,7 @@
       />
     </div>
     <div class="log-actions">
-      <el-button size="mini" icon="el-icon-download" @click="downloadFile()">下载</el-button>
+      <el-button size="mini" icon="el-icon-download" title="下载" aria-label="下载" @click="downloadFile()" />
     </div>
   </div>
 </template>

@@ -49,44 +49,40 @@
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注信息" min-width="160" />
-        <el-table-column label="操作" min-width="260" fixed="right">
+        <el-table-column label="操作" min-width="170" fixed="right">
           <template #default="scope">
             <el-button
               v-if="scope.row.enable"
               size="medium"
               icon="el-icon-circle-close"
               type="text"
+              title="停用"
+              aria-label="停用"
               @click="disableUserApiKey(scope.row)"
-            >
-              停用
-            </el-button>
+            />
             <el-button
               v-else
               size="medium"
               icon="el-icon-circle-check"
               type="text"
+              title="启用"
+              aria-label="启用"
               @click="enableUserApiKey(scope.row)"
-            >
-              启用
-            </el-button>
+            />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-refresh" type="text" @click="resetUserApiKey(scope.row)">
-              重置
-            </el-button>
+            <el-button size="medium" icon="el-icon-refresh" type="text" title="重置" aria-label="重置" @click="resetUserApiKey(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="remarkUserApiKey(scope.row)">
-              备注
-            </el-button>
+            <el-button size="medium" icon="el-icon-edit" type="text" title="备注" aria-label="备注" @click="remarkUserApiKey(scope.row)" />
             <el-divider direction="vertical" />
             <el-button
               size="medium"
               icon="el-icon-delete"
               type="text"
               style="color: #EA4335"
+              title="删除"
+              aria-label="删除"
               @click="deleteUserApiKey(scope.row)"
-            >
-              删除
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

@@ -12,7 +12,7 @@
       @close="close()"
     >
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
@@ -104,17 +104,17 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="140" fixed="right">
+        <el-table-column label="操作" min-width="70" fixed="right">
           <template v-slot:default="scope">
             <el-button
               size="medium"
               type="text"
               icon="el-icon-plus"
+              title="添加"
+              aria-label="添加"
               :loading="scope.row.addRegionLoading"
               @click="addRegion(scope.row)"
-            >
-              添加
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

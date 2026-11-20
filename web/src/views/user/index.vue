@@ -22,22 +22,23 @@
         <el-table-column prop="username" label="用户名" min-width="160" />
         <el-table-column prop="pushKey" label="pushkey" min-width="160" />
         <el-table-column prop="role.name" label="类型" min-width="160" />
-        <el-table-column label="操作" min-width="450" fixed="right">
+        <el-table-column label="操作" min-width="170" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="edit(scope.row)">修改密码</el-button>
+            <el-button size="medium" icon="el-icon-lock" type="text" title="修改密码" aria-label="修改密码" @click="edit(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="changePushKey(scope.row)">修改pushkey</el-button>
+            <el-button size="medium" icon="el-icon-key" type="text" title="修改 pushkey" aria-label="修改 pushkey" @click="changePushKey(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-edit" type="text" @click="showUserApiKeyManager(scope.row)">管理ApiKey</el-button>
+            <el-button size="medium" icon="el-icon-s-tools" type="text" title="管理 ApiKey" aria-label="管理 ApiKey" @click="showUserApiKeyManager(scope.row)" />
             <el-divider direction="vertical" />
             <el-button
               size="medium"
               icon="el-icon-delete"
               type="text"
               style="color: #EA4335"
+              title="删除"
+              aria-label="删除"
               @click="deleteUser(scope.row)"
-            >删除
-            </el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

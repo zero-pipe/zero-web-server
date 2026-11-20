@@ -220,3 +220,107 @@
 .el-loading-spinner .path {
   stroke: $brandBlue;
 }
+
+// Zeroo 字体与字号体系：正文 14 / 控件 13 / 辅助 12
+.el-button {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.el-button--medium {
+  font-size: 13px;
+}
+
+.el-button--small,
+.el-button--mini {
+  font-size: 12px;
+}
+
+.el-input__inner,
+.el-textarea__inner,
+.el-select-dropdown__item,
+.el-dropdown-menu__item {
+  font-size: 13px;
+}
+
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder {
+  color: #80868B;
+}
+
+.el-form-item__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: $textSub;
+}
+
+.el-form-item__content {
+  font-size: 14px;
+}
+
+.el-table {
+  font-size: 13px;
+  color: #3C4043;
+}
+
+.el-table th.el-table__cell {
+  font-size: 12px;
+  font-weight: 600;
+  color: $textSub;
+  background: $pageBg;
+}
+
+.el-table td.el-table__cell {
+  font-size: 13px;
+}
+
+.el-table .cell {
+  line-height: 1.5;
+}
+
+.el-tag {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.el-pagination,
+.el-pagination button,
+.el-pager li {
+  font-size: 13px;
+}
+
+.el-radio__label,
+.el-checkbox__label,
+.el-tabs__item,
+.el-breadcrumb {
+  font-size: 13px;
+}
+
+.el-breadcrumb__inner,
+.el-breadcrumb__inner a {
+  color: $textSub;
+}
+
+.el-message,
+.el-message-box__message,
+.el-alert__title {
+  font-size: 13px;
+}
+
+.el-message-box__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: $textMain;
+}
+
+.el-card__header {
+  font-size: 15px;
+  font-weight: 600;
+  color: $textMain;
+}
+
+.el-descriptions__title,
+.el-descriptions-item__label,
+.el-descriptions-item__content {
+  font-size: 13px;
+}

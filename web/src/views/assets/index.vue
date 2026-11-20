@@ -1,8 +1,8 @@
 <template>
   <div class="app-container asset-page">
     <el-form :inline="true" size="mini" class="asset-filter">
-      <el-form-item label="搜索">
-        <el-input v-model="query" clearable placeholder="名称 / 序列号 / IP" style="width:220px" @input="reload" />
+      <el-form-item>
+        <el-input v-model="query" clearable placeholder="名称 / 序列号 / IP" prefix-icon="el-icon-search" style="width:220px" @input="reload" />
       </el-form-item>
       <el-form-item label="接入">
         <el-select v-model="protocol" clearable placeholder="全部" style="width:130px" @change="reload">
@@ -110,10 +110,10 @@
                 <el-tag v-for="c in row.capabilities" :key="c.id" size="mini" style="margin-right:3px">{{ c.operation }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="110">
+            <el-table-column label="操作" width="90">
               <template slot-scope="{ row }">
-                <el-button type="text" size="mini" @click="selectResource(row)">编辑</el-button>
-                <el-button v-if="row.resource.kind === 'video_sensor'" type="text" size="mini" @click="playResource(row)">播放</el-button>
+                <el-button type="text" size="mini" icon="el-icon-edit" title="编辑" aria-label="编辑" @click="selectResource(row)" />
+                <el-button v-if="row.resource.kind === 'video_sensor'" type="text" size="mini" icon="el-icon-video-play" title="播放" aria-label="播放" @click="playResource(row)" />
               </template>
             </el-table-column>
           </el-table>

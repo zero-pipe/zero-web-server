@@ -2,7 +2,7 @@
   <div id="pushList" class="app-container">
     <div v-if="!streamPush" style="height: calc(100vh - 124px);">
       <el-form :inline="true" size="mini">
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchStr"
             style="margin-right: 1rem; width: auto;"
@@ -65,7 +65,7 @@
             @click="batchDel"
           >移除
           </el-button>
-          <el-button icon="el-icon-chicken" @click="buildPushStream">生成推流地址</el-button>
+          <el-button icon="el-icon-link" @click="buildPushStream">生成推流地址</el-button>
         </el-form-item>
         <el-form-item style="float: right;">
           <el-button icon="el-icon-refresh-right" circle @click="refresh()" />
@@ -114,18 +114,14 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" min-width="300" fixed="right">
+        <el-table-column label="操作" min-width="200" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" :loading="scope.row.playLoading" icon="el-icon-video-play" type="text" @click="playPush(scope.row)">播放
-            </el-button>
+            <el-button size="medium" :loading="scope.row.playLoading" icon="el-icon-video-play" type="text" title="播放" aria-label="播放" @click="playPush(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-delete" type="text" style="color: #EA4335" @click="deletePush(scope.row.id)">删除</el-button>
+            <el-button size="medium" icon="el-icon-delete" type="text" style="color: #EA4335" title="删除" aria-label="删除" @click="deletePush(scope.row.id)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-position" type="text" @click="edit(scope.row)">
-              编辑
-            </el-button>
-            <el-button size="medium" icon="el-icon-cloudy" type="text" @click="queryCloudRecords(scope.row)">云端录像
-            </el-button>
+            <el-button size="medium" icon="el-icon-edit" type="text" title="编辑" aria-label="编辑" @click="edit(scope.row)" />
+            <el-button size="medium" icon="el-icon-cloudy" type="text" title="云端录像" aria-label="云端录像" @click="queryCloudRecords(scope.row)" />
           </template>
         </el-table-column>
       </el-table>

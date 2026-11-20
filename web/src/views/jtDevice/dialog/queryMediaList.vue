@@ -70,20 +70,20 @@
             size="medium"
             type="text"
             icon="el-icon-location-information"
+            title="位置汇报"
+            aria-label="位置汇报"
             :loading="scope.row.addRegionLoading"
             @click="showPositionInfo(scope.row)"
-          >
-            位置汇报
-          </el-button>
+          />
           <el-button
             size="medium"
             type="text"
             icon="el-icon-download"
+            title="下载"
+            aria-label="下载"
             :loading="scope.row.addRegionLoading"
             @click="download(scope.row)"
-          >
-            下载
-          </el-button>
+          />
         </template>
       </el-table-column>
     </el-table>

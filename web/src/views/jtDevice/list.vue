@@ -1,7 +1,7 @@
 <template>
   <div id="app" style="height: calc(100vh - 124px);">
     <el-form :inline="true" size="mini">
-      <el-form-item label="搜索">
+      <el-form-item>
         <el-input
           v-model="searchStr"
           style="margin-right: 1rem; width: auto;"
@@ -84,32 +84,32 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="340" fixed="right">
+      <el-table-column label="操作" min-width="200" fixed="right">
         <template slot-scope="scope">
           <el-divider direction="vertical" />
           <el-button
             type="text"
             size="medium"
             icon="el-icon-video-camera"
+            title="通道"
+            aria-label="通道"
             @click="showChannelList(scope.row)"
-          >通道
-          </el-button>
+          />
           <el-divider direction="vertical" />
-          <el-button size="medium" icon="el-icon-edit" type="text" @click="edit(scope.row)">编辑</el-button>
+          <el-button size="medium" icon="el-icon-edit" type="text" title="编辑" aria-label="编辑" @click="edit(scope.row)" />
           <el-divider direction="vertical" />
           <el-button
             size="medium"
             icon="el-icon-delete"
             type="text"
             style="color: #EA4335"
+            title="删除"
+            aria-label="删除"
             @click="deleteDevice(scope.row)"
-          >删除
-          </el-button>
+          />
           <el-divider direction="vertical" />
           <el-dropdown @command="(command)=>{moreClick(command, scope.row)}">
-            <el-button size="medium" type="text">
-              更多功能<i class="el-icon-arrow-down el-icon--right" />
-            </el-button>
+            <el-button size="medium" type="text" icon="el-icon-more" title="更多功能" aria-label="更多功能" />
             <el-dropdown-menu slot="dropdown">
               <el-dropdown-item command="params" :disabled="!scope.row.status">
                 终端参数</el-dropdown-item>

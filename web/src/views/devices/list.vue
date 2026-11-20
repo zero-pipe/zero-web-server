@@ -140,14 +140,7 @@
             <el-divider direction="vertical" />
             <el-button type="text" size="medium" icon="el-icon-edit" @click="openEdit(row)">编辑</el-button>
             <el-divider direction="vertical" />
-            <el-dropdown @command="(cmd) => moreClick(cmd, row)">
-              <el-button type="text" size="medium">操作<i class="el-icon-arrow-down el-icon--right" /></el-button>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item command="delete" style="color:#EA4335">删除</el-dropdown-item>
-                <el-dropdown-item command="setGuard" :disabled="row.status !== 'online'">布防</el-dropdown-item>
-                <el-dropdown-item command="resetGuard" :disabled="row.status !== 'online'">撤防</el-dropdown-item>
-              </el-dropdown-menu>
-            </el-dropdown>
+            <el-button type="text" size="medium" style="color:#EA4335" @click="handleDelete(row)">删除</el-button>
           </template>
           <!-- ONVIF 操作 -->
           <template v-else-if="row.protocol === 'onvif'">

@@ -18,7 +18,7 @@
           <div v-else style="color: #1A73E8">未选择虚拟组织</div>
         </el-form-item>
         <div style="float: right;">
-          <el-form-item label="搜索">
+          <el-form-item>
             <el-input
               v-model="searchStr"
               style="margin-right: 1rem; width: 10rem; "

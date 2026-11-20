@@ -29,10 +29,10 @@
           <span>{{ row.presetName || ('预置点' + row.presetId) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="140" align="center">
+      <el-table-column label="操作" min-width="100" align="center">
         <template v-slot="{ row }">
-          <el-button size="mini" type="text" @click="callPreset(row)">调用</el-button>
-          <el-button size="mini" type="text" style="color: #EA4335" :loading="deletingId === row.presetId" :disabled="deletingId !== null" @click="delPreset(row)">删除</el-button>
+          <el-button size="mini" type="text" icon="el-icon-position" title="调用" aria-label="调用" @click="callPreset(row)" />
+          <el-button size="mini" type="text" icon="el-icon-delete" style="color: #EA4335" title="删除" aria-label="删除" :loading="deletingId === row.presetId" :disabled="deletingId !== null" @click="delPreset(row)" />
         </template>
       </el-table-column>
     </el-table>

@@ -26,18 +26,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="updateTime" label="更新时间" min-width="160" />
-        <el-table-column label="操作" min-width="180" fixed="right">
+        <el-table-column label="操作" min-width="90" fixed="right">
           <template v-slot:default="scope">
-            <el-button size="medium" type="text" icon="el-icon-edit" @click="openEdit(scope.row)">编辑</el-button>
+            <el-button size="medium" type="text" icon="el-icon-edit" title="编辑" aria-label="编辑" @click="openEdit(scope.row)" />
             <el-divider direction="vertical" />
             <el-button
               size="medium"
               type="text"
               icon="el-icon-delete"
               style="color: #EA4335"
+              title="删除"
+              aria-label="删除"
               :disabled="scope.row.id === 1"
               @click="remove(scope.row)"
-            >删除</el-button>
+            />
           </template>
         </el-table-column>
       </el-table>

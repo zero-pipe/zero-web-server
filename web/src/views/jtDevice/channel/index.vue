@@ -5,7 +5,7 @@
         <el-form-item style="margin-right: 2rem">
           <el-page-header content="通道列表" @back="showDevice" />
         </el-form-item>
-        <el-form-item label="搜索">
+        <el-form-item>
           <el-input
             v-model="searchSrt"
             style="margin-right: 1rem; width: auto;"
@@ -53,16 +53,17 @@
                 <el-switch v-model="scope.row.hasAudio" active-color="#1A73E8" @change="updateChannel(scope.row)" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" min-width="340" fixed="right">
+            <el-table-column label="操作" min-width="200" fixed="right">
               <template slot-scope="scope">
                 <el-button
                   size="medium"
                   :disabled="device == null || !device.status"
                   icon="el-icon-video-play"
                   type="text"
+                  title="播放"
+                  aria-label="播放"
                   @click="sendDevicePush(scope.row)"
-                >播放
-                </el-button>
+                />
                 <el-button
                   v-if="!!scope.row.stream"
                   size="medium"
@@ -70,31 +71,31 @@
                   icon="el-icon-switch-button"
                   type="text"
                   style="color: #EA4335"
+                  title="停止"
+                  aria-label="停止"
                   @click="stopDevicePush(scope.row)"
-                >停止
-                </el-button>
+                />
                 <el-button
                   size="medium"
                   :disabled="device == null || !device.status"
                   icon="el-icon-camera"
                   type="text"
+                  title="抓图"
+                  aria-label="抓图"
                   @click="shooting(scope.row)"
-                >抓图
-                </el-button>
+                />
                 <el-divider direction="vertical" />
                 <el-button
                   size="medium"
                   type="text"
                   icon="el-icon-edit"
+                  title="编辑"
+                  aria-label="编辑"
                   @click="handleEdit(scope.row)"
-                >
-                  编辑
-                </el-button>
+                />
                 <el-divider direction="vertical" />
                 <el-dropdown @command="(command)=>{moreClick(command, scope.row)}">
-                  <el-button size="medium" type="text">
-                    更多功能<i class="el-icon-arrow-down el-icon--right" />
-                  </el-button>
+                  <el-button size="medium" type="text" icon="el-icon-more" title="更多功能" aria-label="更多功能" />
                   <el-dropdown-menu slot="dropdown">
                     <el-dropdown-item command="records" :disabled="device == null || !device.status">
                       设备录像</el-dropdown-item>

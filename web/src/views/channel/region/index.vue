@@ -18,7 +18,7 @@
           <div v-else style="color: #1A73E8">未选择行政区划</div>
         </el-form-item>
         <div style="float: right;">
-          <el-form-item label="搜索">
+          <el-form-item>
             <el-input
               v-model="searchStr"
               style="width: 10rem; margin-right: 1rem;"
@@ -165,7 +165,7 @@
         <el-table-column prop="gbCode" label="对外国标码" />
         <el-table-column label="操作" width="80">
           <template v-slot:default="scope">
-            <el-button type="text" style="color:#EA4335" @click="deleteMapping(scope.row)">删除</el-button>
+            <el-button type="text" icon="el-icon-delete" style="color:#EA4335" title="删除" aria-label="删除" @click="deleteMapping(scope.row)" />
           </template>
         </el-table-column>
       </el-table>
