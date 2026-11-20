@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeroo 系列 · 极简品牌与界面规范</title>
+<style>
+  :root {
+    --bg: #F8F9FA;
+    --surface: #FFFFFF;
+    --border: #E8EAED;
+    --text-main: #202124;
+    --text-sub: #5F6368;
+    --blue: #1A73E8;
+    --red: #EA4335;
+    --green: #34A853;
+    --yellow: #FBBC05;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text-main);
+    line-height: 1.5;
+    padding: 40px 24px;
+  }
+  .container { max-width: 1120px; margin: 0 auto; }
+  
+  /* 顶部极简标题 */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  header h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; }
+  header p { font-size: 14px; color: var(--text-sub); margin-top: 4px; }
+  .badge {
+    font-size: 12px;
+    color: var(--text-sub);
+    background: #EFEFEF;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  /* 第一部分：三套核心 Logo 矩阵 */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 16px;
+  }
+  .logo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    transition: box-shadow 0.2s;
+  }
+  .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .card-header h2 { font-size: 16px; font-weight: 600; }
+  .card-header span { font-size: 12px; color: var(--text-sub); }
+
+  /* 横版组合 Logo 展示区 */
+  .lockup-box {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
+    background: #FAFAFA;
+    border: 1px solid #F1F3F4;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  .lockup-text { font-size: 20px; font-weight: 600; letter-spacing: -0.4px; color: #202124; }
+  .lockup-text span { font-weight: 400; color: #5F6368; }
+
+  /* 多尺寸图标预览 */
+  .sizes-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-top: 16px;
+    border-top: 1px solid #F1F3F4;
+  }
+  .size-item { text-align: center; }
+  .size-item label { display: block; font-size: 11px; color: var(--text-sub); margin-top: 8px; }
+  
+  .copy-btn {
+    margin-top: 18px;
+    width: 100%;
+    padding: 8px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text-main);
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .copy-btn:hover { background: #F1F3F4; }
+
+  /* 第二部分：真实应用场景还原 */
+  .ui-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  /* 1. Qt 客户端登录窗口 */
+  .qt-window {
+    background: #FFFFFF;
+    border: 1px solid #DADCE0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .qt-titlebar {
+    height: 36px;
+    background: #F8F9FA;
+    border-bottom: 1px solid #E8EAED;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-size: 12px;
+    color: var(--text-sub);
+  }
+  .qt-title-left { display: flex; align-items: center; gap: 8px; font-weight: 500; color: #3C4043; }
+  .qt-controls { display: flex; gap: 12px; font-size: 13px; color: #80868B; }
+  .qt-body { padding: 36px 32px; }
+  .qt-brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 28px; }
+  .qt-brand h3 { font-size: 18px; font-weight: 600; margin-top: 12px; color: #202124; }
+  .qt-input {
+    width: 100%;
+    height: 38px;
+    border: 1px solid #DADCE0;
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    color: #202124;
+    background: #FFFFFF;
+  }
+  .qt-input:focus { outline: none; border-color: var(--blue); }
+  .qt-btn {
+    width: 100%;
+    height: 38px;
+    background: #202124;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-top: 6px;
+    cursor: pointer;
+  }
+  .qt-btn:hover { background: #3C4043; }
+
+  /* 2. Web 物联平台后台框架 */
+  .web-window {
+    background: #FFFFFF;
+    border: 1px solid #DADCE0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .browser-bar {
+    height: 36px;
+    background: #F1F3F4;
+    border-bottom: 1px solid #E8EAED;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 12px;
+  }
+  .browser-tab {
+    background: #FFFFFF;
+    height: 26px;
+    padding: 0 12px;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #3C4043;
+    margin-top: 10px;
+    border: 1px solid #E8EAED;
+    border-bottom: none;
+  }
+  .web-layout { display: flex; flex: 1; min-height: 340px; }
+  .web-sidebar {
+    width: 190px;
+    border-right: 1px solid #E8EAED;
+    padding: 16px 12px;
+    background: #FAFAFA;
+  }
+  .web-logo-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 20px 8px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .menu-item {
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #5F6368;
+    margin-bottom: 4px;
+    cursor: pointer;
+  }
+  .menu-item.active {
+    background: #E8F0FE;
+    color: var(--blue);
+    font-weight: 500;
+  }
+  .web-main { flex: 1; padding: 24px; }
+  .web-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-box {
+    border: 1px solid #E8EAED;
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .stat-box .num { font-size: 20px; font-weight: 600; margin-top: 4px; }
+  .stat-box .lbl { font-size: 12px; color: var(--text-sub); }
+  
+  /* 3. 流媒体状态条 */
+  .media-bar {
+    background: #FFFFFF;
+    border: 1px solid #DADCE0;
+    border-radius: 10px;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .media-left { display: flex; align-items: center; gap: 14px; }
+  .media-metrics { display: flex; gap: 32px; font-size: 13px; }
+  .media-metrics div span { color: var(--text-sub); margin-right: 6px; }
+  .media-metrics div strong { font-weight: 600; font-family: monospace; font-size: 14px; }
+
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #202124; color: #fff; padding: 10px 18px;
+    border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  @media (max-width: 900px) {
+    .logo-grid, .ui-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <h1>Zeroo 系列 · 极简视觉规范</h1>
+      <p>母品牌建议：NullBit（零比特） · 统一几何圆环基因 · Google 级克制配色</p>
+    </div>
+    <div class="badge">纯几何 SVG · 零装饰元素</div>
+  </header>
+
+  <!-- 第一部分：三套图标规范 -->
+  <div class="section-title">01 / 核心图标与字体规范</div>
+  <div class="logo-grid">
+
+    <!-- 1. Zeroo Player -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Zeroo Player</h2>
+        <span>Qt 客户端</span>
+      </div>
+      <div class="lockup-box">
+        <svg id="svg-player" width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="12" stroke="#202124" stroke-width="3.2"/>
+          <path d="M13.8 11.6C13.8 11.1 14.35 10.8 14.78 11.06L21.5 15.16C21.91 15.41 21.91 16.01 21.5 16.26L14.78 20.36C14.35 20.62 13.8 20.32 13.8 19.82V11.6Z" fill="#EA4335"/>
+        </svg>
+        <div class="lockup-text">Zeroo <span>Player</span></div>
+      </div>
+      <div class="sizes-row">
+        <div class="size-item">
+          <svg width="56" height="56" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#202124"/>
+            <circle cx="16" cy="16" r="9.5" stroke="#FFFFFF" stroke-width="2.6"/>
+            <path d="M14.2 12.6C14.2 12.2 14.65 11.95 15 12.16L20.2 15.32C20.52 15.52 20.52 15.98 20.2 16.18L15 19.34C14.65 19.55 14.2 19.3 14.2 18.9V12.6Z" fill="#EA4335"/>
+          </svg>
+          <label>桌面图标 64px</label>
+        </div>
+        <div class="size-item">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="12" stroke="#202124" stroke-width="3.2"/>
+            <path d="M13.8 11.6C13.8 11.1 14.35 10.8 14.78 11.06L21.5 15.16C21.91 15.41 21.91 16.01 21.5 16.26L14.78 20.36C14.35 20.62 13.8 20.32 13.8 19.82V11.6Z" fill="#EA4335"/>
+          </svg>
+          <label>窗口顶栏 32px</label>
+        </div>
+        <div class="size-item">
+          <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="12" stroke="#202124" stroke-width="4"/>
+            <path d="M14 11.5L21.5 16L14 20.5V11.5Z" fill="#EA4335"/>
+          </svg>
+          <label>托盘 16px</label>
+        </div>
+      </div>
+      <button class="copy-btn" onclick="copySvg('svg-player')">复制 SVG 代码</button>
+    </div>
+
+    <!-- 2. Zeroo Web Server -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Zeroo Web Server</h2>
+        <span>智能物联管理平台</span>
+      </div>
+      <div class="lockup-box">
+        <svg id="svg-web" width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="15" cy="17" r="11" stroke="#1A73E8" stroke-width="3.2"/>
+          <circle cx="24.5" cy="7.5" r="4" fill="#34A853" stroke="#FFFFFF" stroke-width="1.5"/>
+        </svg>
+        <div class="lockup-text">Zeroo <span>Web</span></div>
+      </div>
+      <div class="sizes-row">
+        <div class="size-item">
+          <svg width="56" height="56" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#1A73E8"/>
+            <circle cx="15" cy="17" r="8.5" stroke="#FFFFFF" stroke-width="2.6"/>
+            <circle cx="22.5" cy="9.5" r="3.2" fill="#34A853" stroke="#1A73E8" stroke-width="1.2"/>
+          </svg>
+          <label>登录页大标</label>
+        </div>
+        <div class="size-item">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="15" cy="17" r="11" stroke="#1A73E8" stroke-width="3.2"/>
+            <circle cx="24.5" cy="7.5" r="4" fill="#34A853"/>
+          </svg>
+          <label>侧边栏 32px</label>
+        </div>
+        <div class="size-item">
+          <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
+            <circle cx="15" cy="17" r="11" stroke="#1A73E8" stroke-width="4"/>
+            <circle cx="24.5" cy="7.5" r="4.5" fill="#34A853"/>
+          </svg>
+          <label>Favicon 16px</label>
+        </div>
+      </div>
+      <button class="copy-btn" onclick="copySvg('svg-web')">复制 SVG 代码</button>
+    </div>
+
+    <!-- 3. Zeroo Media Server -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Zeroo Media Server</h2>
+        <span>流媒体转发引擎</span>
+      </div>
+      <div class="lockup-box">
+        <svg id="svg-media" width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12.5" cy="16" r="8.5" stroke="#1A73E8" stroke-width="3"/>
+          <circle cx="19.5" cy="16" r="8.5" stroke="#FBBC05" stroke-width="3"/>
+        </svg>
+        <div class="lockup-text">Zeroo <span>Media</span></div>
+      </div>
+      <div class="sizes-row">
+        <div class="size-item">
+          <svg width="56" height="56" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#F1F3F4"/>
+            <circle cx="13" cy="16" r="7" stroke="#1A73E8" stroke-width="2.6"/>
+            <circle cx="19" cy="16" r="7" stroke="#FBBC05" stroke-width="2.6"/>
+          </svg>
+          <label>服务图标</label>
+        </div>
+        <div class="size-item">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <circle cx="12.5" cy="16" r="8.5" stroke="#1A73E8" stroke-width="3"/>
+            <circle cx="19.5" cy="16" r="8.5" stroke="#FBBC05" stroke-width="3"/>
+          </svg>
+          <label>节点标 32px</label>
+        </div>
+        <div class="size-item">
+          <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
+            <circle cx="12.5" cy="16" r="8.5" stroke="#1A73E8" stroke-width="3.8"/>
+            <circle cx="19.5" cy="16" r="8.5" stroke="#FBBC05" stroke-width="3.8"/>
+          </svg>
+          <label>状态 16px</label>
+        </div>
+      </div>
+      <button class="copy-btn" onclick="copySvg('svg-media')">复制 SVG 代码</button>
+    </div>
+
+  </div>
+
+  <!-- 第二部分：实际界面落地效果 -->
+  <div class="section-title">02 / 真实软件界面效果</div>
+  <div class="ui-grid">
+
+    <!-- Qt 客户端登录框 -->
+    <div class="qt-window">
+      <div class="qt-titlebar">
+        <div class="qt-title-left">
+          <svg width="14" height="14" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="12" stroke="#202124" stroke-width="4"/>
+            <path d="M14 11.5L21.5 16L14 20.5V11.5Z" fill="#EA4335"/>
+          </svg>
+          <span>Zeroo Player</span>
+        </div>
+        <div class="qt-controls">
+          <span>—</span><span>□</span><span>✕</span>
+        </div>
+      </div>
+      <div class="qt-body">
+        <div class="qt-brand">
+          <svg width="48" height="48" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#202124"/>
+            <circle cx="16" cy="16" r="9.5" stroke="#FFFFFF" stroke-width="2.6"/>
+            <path d="M14.2 12.6C14.2 12.2 14.65 11.95 15 12.16L20.2 15.32C20.52 15.52 20.52 15.98 20.2 16.18L15 19.34C14.65 19.55 14.2 19.3 14.2 18.9V12.6Z" fill="#EA4335"/>
+          </svg>
+          <h3>Zeroo Player</h3>
+        </div>
+        <input class="qt-input" type="text" value="192.168.1.100:8080" placeholder="服务器地址">
+        <input class="qt-input" type="text" value="admin" placeholder="账号">
+        <input class="qt-input" type="password" value="123456" placeholder="密码">
+        <button class="qt-btn">登录</button>
+      </div>
+    </div>
+
+    <!-- Web 平台主界面 -->
+    <div class="web-window">
+      <div class="browser-bar">
+        <div class="browser-tab">
+          <svg width="12" height="12" viewBox="0 0 32 32" fill="none">
+            <circle cx="15" cy="17" r="11" stroke="#1A73E8" stroke-width="4"/>
+            <circle cx="24.5" cy="7.5" r="4.5" fill="#34A853"/>
+          </svg>
+          <span>Zeroo Web - 设备管理</span>
+        </div>
+      </div>
+      <div class="web-layout">
+        <div class="web-sidebar">
+          <div class="web-logo-row">
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+              <circle cx="15" cy="17" r="11" stroke="#1A73E8" stroke-width="3.2"/>
+              <circle cx="24.5" cy="7.5" r="4" fill="#34A853"/>
+            </svg>
+            <span>Zeroo Web</span>
+          </div>
+          <div class="menu-item active">设备列表</div>
+          <div class="menu-item">实时监控</div>
+          <div class="menu-item">录像回放</div>
+          <div class="menu-item">流媒体节点</div>
+          <div class="menu-item">系统设置</div>
+        </div>
+        <div class="web-main">
+          <div class="web-stats">
+            <div class="stat-box">
+              <div class="lbl">在线设备</div>
+              <div class="num">128 <span style="font-size:12px;color:#34A853;font-weight:400">/ 132</span></div>
+            </div>
+            <div class="stat-box">
+              <div class="lbl">国标通道</div>
+              <div class="num">1,024</div>
+            </div>
+            <div class="stat-box">
+              <div class="lbl">活跃拉流</div>
+              <div class="num">46</div>
+            </div>
+          </div>
+          <div style="border:1px solid #E8EAED; border-radius:8px; height:170px; display:flex; align-items:center; justify-content:center; color:#80868B; font-size:13px; background:#FAFAFA;">
+            GB28181 设备与通道列表区域
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 第三部分：流媒体服务节点 -->
+  <div class="media-bar">
+    <div class="media-left">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+        <circle cx="12.5" cy="16" r="8.5" stroke="#1A73E8" stroke-width="3"/>
+        <circle cx="19.5" cy="16" r="8.5" stroke="#FBBC05" stroke-width="3"/>
+      </svg>
+      <div>
+        <div style="font-weight:600; font-size:15px;">Zeroo Media Server <span style="font-weight:400; color:#5F6368; font-size:13px;">· v1.0.0</span></div>
+        <div style="font-size:12px; color:#5F6368;">RTSP / RTMP / WebRTC / GB28181-PS</div>
+      </div>
+    </div>
+    <div class="media-metrics">
+      <div><span>状态</span><strong style="color:#34A853;">运行中</strong></div>
+      <div><span>推流数</span><strong>64</strong></div>
+      <div><span>转发带宽</span><strong>412 Mbps</strong></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast">已复制 SVG 代码</div>
+
+<script>
+  function copySvg(id) {
+    const svg = document.getElementById(id).outerHTML;
+    navigator.clipboard.writeText(svg).then(() => {
+      const toast = document.getElementById('toast');
+      toast.style.opacity = '1';
+      setTimeout(() => { toast.style.opacity = '0'; }, 1800);
+    });
+  }
+</script>
+</body>
+</html>
