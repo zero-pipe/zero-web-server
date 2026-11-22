@@ -1087,3 +1087,17 @@ CREATE TABLE IF NOT EXISTS zws_event
     KEY idx_event_channel_internal (channel_internal_code),
     KEY idx_event_type_time (event_type, occurred_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台事件记录';
+
+-- 对外接入密钥（可视化配置的外部集成凭证；平台只做存在+启用校验，不区分接口权限、不限流）
+CREATE TABLE IF NOT EXISTS `zws_access_token` (
+    `id`          BIGINT NOT NULL AUTO_INCREMENT,
+    `name`        VARCHAR(128) NOT NULL DEFAULT '' COMMENT '集成方名称',
+    `token`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '携带的密钥串',
+    `enabled`     TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `remark`      VARCHAR(255) NOT NULL DEFAULT '' COMMENT '备注',
+    `create_time` VARCHAR(50),
+    `update_time` VARCHAR(50),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_access_token_token` (`token`),
+    KEY `idx_access_token_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对外接入密钥';

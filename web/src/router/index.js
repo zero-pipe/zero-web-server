@@ -274,6 +274,19 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/accessToken',
+    component: Layout,
+    redirect: '/accessToken',
+    children: [
+      {
+        path: '',
+        name: 'AccessToken',
+        component: () => import('@/views/accessToken/index'),
+        meta: { title: '接入鉴权', icon: 'el-icon-key' }
+      }
+    ]
+  },
+  {
     path: '/gbConfig',
     component: Layout,
     redirect: '/gbConfig',

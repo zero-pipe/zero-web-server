@@ -110,6 +110,14 @@ type Service struct {
 	streamNode map[string]string // app/stream -> nodeID
 	onlineAt   map[string]time.Time
 	onlineOK   map[string]bool
+
+	// onRegistered 节点自注册成功后的回调（用于把接入 token 同步到该节点）。
+	onRegistered func(id string)
+}
+
+// SetOnRegistered 注册节点自注册后的回调。
+func (s *Service) SetOnRegistered(fn func(id string)) {
+	s.onRegistered = fn
 }
 
 const onlineProbeTTL = 3 * time.Second
@@ -295,6 +303,9 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (string, er
 	s.mu.Unlock()
 	applog.Infof("[media] %s 自注册成功 ip=%s http=%d rtsp=%d(%v) rtmp=%d(%v) hls=%v webrtc=%v",
 		id, ip, m.HTTPPort, m.RTSPPort, m.EnableRTSP, m.RTMPPort, m.EnableRTMP, m.EnableHLS, m.EnableWebRTC)
+	if s.onRegistered != nil {
+		go s.onRegistered(id)
+	}
 	return id, nil
 }
 

@@ -174,7 +174,7 @@ func (s *Service) GetPlayPath(recordID int) (map[string]string, error) {
 		return nil, err
 	}
 	base := node.BaseURL()
-	download := fmt.Sprintf("%s/index/api/downloadFile?secret=%s&file_path=%s",
+	download := fmt.Sprintf("%s/index/api/record/download?secret=%s&file_path=%s",
 		base, url.QueryEscape(node.Secret()), url.QueryEscape(rec.FilePath))
 	out["httpPath"] = download
 	out["httpsPath"] = download

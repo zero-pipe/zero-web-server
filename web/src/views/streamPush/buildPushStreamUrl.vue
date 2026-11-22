@@ -72,6 +72,7 @@
 
 import elDragDialog from '@/directive/el-drag-dialog'
 import crypto from "crypto";
+import { first as firstAccessToken } from '@/api/accessToken'
 
 
 export default {
@@ -87,10 +88,14 @@ export default {
       mediaServer: null,
       mediaServerList: [],
       pushKey: null,
+      accessToken: '',
       endCallback: null
     }
   },
   computed: {
+    tokenQuery(){
+      return this.accessToken ? `&token=${this.accessToken}` : ''
+    },
     sign(){
       if (!this.pushKey) {
         return ''
@@ -109,7 +114,7 @@ export default {
       }
       crypto.createHash('md5').update(this.pushKey, 'utf8').digest('hex')
       if (this.callId) {
-        return `rtsp://${this.mediaServer.streamIp}:${this.mediaServer.rtspPort}/${this.app}/${this.stream}?callId=${this.callId}&sign=${this.sign}`
+        return `rtsp://${this.mediaServer.streamIp}:${this.mediaServer.rtspPort}/${this.app}/${this.stream}?callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
       }else {
         return `rtsp://${this.mediaServer.streamIp}:${this.mediaServer.rtspPort}/${this.app}/${this.stream}?sign=${this.sign}`
       }
@@ -119,7 +124,7 @@ export default {
         return ''
       }
       if (this.callId) {
-        return `rtmp://${this.mediaServer.streamIp}:${this.mediaServer.rtmpPort}/${this.app}/${this.stream}?callId=${this.callId}&sign=${this.sign}`
+        return `rtmp://${this.mediaServer.streamIp}:${this.mediaServer.rtmpPort}/${this.app}/${this.stream}?callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
       }else {
         return `rtmp://${this.mediaServer.streamIp}:${this.mediaServer.rtmpPort}/${this.app}/${this.stream}?sign=${this.sign}`
       }
@@ -129,9 +134,9 @@ export default {
         return ''
       }
       if (this.callId) {
-        return `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&callId=${this.callId}&sign=${this.sign}`
+        return `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
       }else {
-        return `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&sign=${this.sign}`
+        return `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&sign=${this.sign}${this.tokenQuery}`
       }
 
     },
@@ -140,9 +145,9 @@ export default {
         return ''
       }
       if (this.callId) {
-        return `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&callId=${this.callId}&sign=${this.sign}`
+        return `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
       }else {
-        return `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&sign=${this.sign}`
+        return `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&sign=${this.sign}${this.tokenQuery}`
       }
 
     }
@@ -171,6 +176,10 @@ export default {
       this.$store.dispatch('user/getUserInfo').then(data => {
         this.pushKey = data.pushKey
       })
+      // 接入鉴权启用时，推流 URL 带上 ?token=，ZMS 本地白名单校验。
+      firstAccessToken().then(data => {
+        this.accessToken = (data && data.token) || ''
+      }).catch(() => { this.accessToken = '' })
     },
     copyUrl: function(dropdownItem) {
       console.log(dropdownItem)

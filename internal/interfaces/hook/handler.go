@@ -29,6 +29,8 @@ type Handler struct {
 	publishAuth    *publishauth.PublishAuth
 	mediaServer    *mediaserverapp.Service
 	streamOnDemand bool
+	// accessTokenCheck(token) → (有效, 是否已启用校验)；nil 表示不做接入 token 校验。
+	accessTokenCheck func(token string) (bool, bool)
 }
 
 func NewHandler(
@@ -41,6 +43,7 @@ func NewHandler(
 	mediaServer *mediaserverapp.Service,
 	publishAuth *publishauth.PublishAuth,
 	streamOnDemand bool,
+	accessTokenCheck func(token string) (bool, bool),
 ) *Handler {
 	notifiers := make([]StreamNotifier, 0, 4)
 	for _, n := range []StreamNotifier{play, playback, cloud, push, proxy} {
@@ -51,8 +54,10 @@ func NewHandler(
 	return &Handler{
 		notifiers: notifiers, play: play, cloudRecord: cloud,
 		streamPush: push, streamProxy: proxy, recordPlan: plan,
-		mediaServer: mediaServer,
-		publishAuth: publishAuth, streamOnDemand: streamOnDemand,
+		mediaServer:       mediaServer,
+		publishAuth:       publishAuth,
+		streamOnDemand:    streamOnDemand,
+		accessTokenCheck:  accessTokenCheck,
 	}
 }
 
@@ -127,6 +132,14 @@ func (h *Handler) onPublish(c *gin.Context) {
 		mediaServerID = c.Query("mediaServerId")
 	}
 	params := c.PostForm("params")
+	if token := extractHookToken(c, params); token != "" && h.accessTokenCheck != nil {
+		// 接入 token 已在平台登记并启用时，推流必须携带有效 token。
+		valid, enforcing := h.accessTokenCheck(token)
+		if enforcing && !valid {
+			c.JSON(200, gin.H{"code": -1, "msg": "invalid access token"})
+			return
+		}
+	}
 	if h.streamPush != nil {
 		h.streamPush.OnPublish(app, stream, mediaServerID)
 	}

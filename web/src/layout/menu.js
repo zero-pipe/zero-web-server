@@ -40,6 +40,7 @@ export const primaryMenus = [
     icon: 'menu-media',
     children: [
       { title: '媒体节点', path: '/mediaServer', icon: 'media-node' },
+      { title: '接入鉴权', path: '/accessToken', icon: 'el-icon-key' },
       { title: '推流列表', path: '/push', icon: 'streamPush' },
       { title: '拉流代理', path: '/proxy', icon: 'streamProxy' }
     ]

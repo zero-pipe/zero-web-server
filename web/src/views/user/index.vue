@@ -28,8 +28,6 @@
             <el-divider direction="vertical" />
             <el-button size="medium" icon="el-icon-key" type="text" title="修改 pushkey" aria-label="修改 pushkey" @click="changePushKey(scope.row)" />
             <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-s-tools" type="text" title="管理 ApiKey" aria-label="管理 ApiKey" @click="showUserApiKeyManager(scope.row)" />
-            <el-divider direction="vertical" />
             <el-button
               size="medium"
               icon="el-icon-delete"
@@ -56,7 +54,6 @@
     <changePasswordForAdmin ref="changePasswordForAdmin" />
     <changePushKey ref="changePushKey" />
     <addUser ref="addUser" />
-    <apiKeyManager ref="apiKeyManager" />
   </div>
 </template>
 
@@ -64,15 +61,13 @@
 import changePasswordForAdmin from './dialog/changePasswordForAdmin.vue'
 import changePushKey from './dialog/changePushKey.vue'
 import addUser from './dialog/addUser.vue'
-import apiKeyManager from './apiKeyManager.vue'
 
 export default {
   name: 'User',
   components: {
     changePasswordForAdmin,
     changePushKey,
-    addUser,
-    apiKeyManager
+    addUser
   },
   data() {
     return {
@@ -179,9 +174,6 @@ export default {
         })
         setTimeout(this.getUserList, 200)
       })
-    },
-    showUserApiKeyManager: function(row) {
-      this.$refs.apiKeyManager.openDialog(row.id)
     }
   }
 }

@@ -14,6 +14,7 @@ import (
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	"zero-web-server/internal/adapter/mqttbus"
 	agentapp "zero-web-server/internal/application/agent"
+	accesstokenapp "zero-web-server/internal/application/accesstoken"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
@@ -31,6 +32,7 @@ import (
 	infraconfigapp "zero-web-server/internal/application/infraconfig"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
+	"zero-web-server/internal/mediakit"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	onvifapp "zero-web-server/internal/application/onvif"
 	"zero-web-server/internal/application/ops"
@@ -150,6 +152,41 @@ func main() {
 	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加
 	mediaServerService := mediaserverapp.NewService(mediaServerRepo, cfg.UserSettings.ServerID)
 	mediaCluster := mediacluster.New(mediaServerService)
+
+	// 对外接入密钥：可视化配置 + 同步到媒体节点本地验签。
+	accessTokenRepo := persistence.NewAccessTokenRepository(db)
+	accessTokenService := accesstokenapp.NewService(accessTokenRepo)
+	syncTokensToNode := func(nodeID string) {
+		if nodeID == "" {
+			return
+		}
+		node, err := mediaServerService.Lookup(nodeID)
+		if err != nil || node == nil || node.Client == nil {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := node.Client.SetAuthTokens(ctx, accessTokenService.EnabledTokens()); err != nil {
+			applog.Warnf("[access-token] 同步 token 到媒体节点 %s 失败: %v", nodeID, err)
+		}
+	}
+	syncTokensToAll := func(tokens []string) {
+		nodes, err := mediaServerService.ListOnline()
+		if err != nil {
+			return
+		}
+		for _, v := range nodes {
+			go func(ip string, port int, secret string) {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if _, err := mediakit.NewClientAddr(ip, port, secret).SetAuthTokens(ctx, tokens); err != nil {
+					applog.Warnf("[access-token] 同步 token 到节点 %s:%d 失败: %v", ip, port, err)
+				}
+			}(v.IP, v.HTTPPort, v.Secret)
+		}
+	}
+	accessTokenService.SetOnChange(syncTokensToAll)
+	mediaServerService.SetOnRegistered(syncTokensToNode)
 
 	pluginRepo := persistence.NewPluginRepository(db)
 	pluginService := pluginapp.NewService(pluginRepo)
@@ -359,6 +396,7 @@ func main() {
 		InfraService:         infraService,
 		EventSubService:      eventSubService,
 		EventService:         eventIngest,
+		AccessTokenService:   accessTokenService,
 	})
 
 	go func() {

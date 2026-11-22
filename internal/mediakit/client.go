@@ -41,11 +41,11 @@ type APIResponse struct {
 }
 
 func (c *Client) GetMediaList(ctx context.Context) (*APIResponse, error) {
-	return c.get(ctx, "getMediaList", nil)
+	return c.get(ctx, "media/list", nil)
 }
 
 func (c *Client) GetServerConfig(ctx context.Context) (*APIResponse, error) {
-	return c.get(ctx, "getServerConfig", nil)
+	return c.get(ctx, "system/config", nil)
 }
 
 func (c *Client) Ping(ctx context.Context) error {
@@ -53,7 +53,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	if err == nil && resp != nil && resp.Code == 0 {
 		return nil
 	}
-	resp, err = c.get(ctx, "version", nil)
+	resp, err = c.get(ctx, "system/version", nil)
 	if err != nil {
 		return err
 	}
@@ -80,12 +80,12 @@ func (c *Client) AddStreamProxy(ctx context.Context, vhost, app, stream, streamU
 		"add_mute_audio": {"0"},
 		"auto_close":     {boolStr(autoClose)},
 	}
-	return c.get(ctx, "addStreamProxy", params)
+	return c.get(ctx, "proxy/add", params)
 }
 
 func (c *Client) DelStreamProxy(ctx context.Context, key string) (*APIResponse, error) {
 	params := url.Values{"key": {key}}
-	return c.get(ctx, "delStreamProxy", params)
+	return c.get(ctx, "proxy/del", params)
 }
 
 func (c *Client) LoadMP4File(ctx context.Context, app, stream, filePath string) (*APIResponse, error) {
@@ -97,14 +97,14 @@ func (c *Client) LoadMP4File(ctx context.Context, app, stream, filePath string) 
 		"file_repeat": {"0"},
 	}
 	// ZMS webapi 目前只解析 URL query；与 openRtpServer 一样走 GET
-	return c.get(ctx, "loadMP4File", params)
+	return c.get(ctx, "record/load", params)
 }
 
 func (c *Client) DeleteRecordFile(ctx context.Context, filePath string) (*APIResponse, error) {
 	params := url.Values{
 		"file_path": {filePath},
 	}
-	return c.get(ctx, "deleteRecordFile", params)
+	return c.get(ctx, "record/delete", params)
 }
 
 func (c *Client) SeekRecordStamp(ctx context.Context, app, stream string, stamp float64, schema string) (*APIResponse, error) {
@@ -118,7 +118,7 @@ func (c *Client) SeekRecordStamp(ctx context.Context, app, stream string, stamp 
 		"stamp":  {strconv.FormatFloat(stamp, 'f', -1, 64)},
 		"schema": {schema},
 	}
-	return c.get(ctx, "seekRecordStamp", params)
+	return c.get(ctx, "record/seek", params)
 }
 
 func (c *Client) SetRecordSpeed(ctx context.Context, app, stream string, speed int, schema string) (*APIResponse, error) {
@@ -132,7 +132,7 @@ func (c *Client) SetRecordSpeed(ctx context.Context, app, stream string, speed i
 		"speed":  {strconv.Itoa(speed)},
 		"schema": {schema},
 	}
-	return c.get(ctx, "setRecordSpeed", params)
+	return c.get(ctx, "record/speed", params)
 }
 
 func (c *Client) CloseStreams(ctx context.Context, vhost, app, stream string) (*APIResponse, error) {
@@ -142,7 +142,7 @@ func (c *Client) CloseStreams(ctx context.Context, vhost, app, stream string) (*
 		"stream": {stream},
 		"force":  {"1"},
 	}
-	return c.get(ctx, "close_streams", params)
+	return c.get(ctx, "media/close_all", params)
 }
 
 type OpenRtpResult struct {
@@ -156,10 +156,10 @@ func (c *Client) OpenRtpServer(ctx context.Context, app, stream string, port, tc
 		"port":      {strconv.Itoa(port)},
 		"tcp_mode":  {strconv.Itoa(tcpMode)},
 	}
-	resp, err := c.get(ctx, "openRtpServer", params)
+	resp, err := c.get(ctx, "rtp/open", params)
 	if err != nil {
 		applog.Warnf("[mediakit-api] openRtpServer HTTP error app=%s stream=%s url=%s err=%v",
-			app, stream, c.baseURL+"/index/api/openRtpServer", err)
+			app, stream, c.baseURL+"/index/api/rtp/open", err)
 		return nil, err
 	}
 	if resp.Code != 0 {
@@ -195,7 +195,7 @@ func (c *Client) ConnectRtpServer(ctx context.Context, app, stream, host string,
 		"dst_url":   {host},
 		"dst_port":  {strconv.Itoa(port)},
 	}
-	resp, err := c.post(ctx, "connectRtpServer", params)
+	resp, err := c.post(ctx, "rtp/connect", params)
 	if err != nil {
 		applog.Warnf("[mediakit-api] connectRtpServer HTTP error app=%s stream=%s dst=%s:%d err=%v",
 			app, stream, host, port, err)
@@ -208,6 +208,13 @@ func (c *Client) ConnectRtpServer(ctx context.Context, app, stream, host string,
 	}
 	applog.Debugf("[mediakit-api] connectRtpServer OK app=%s stream=%s -> %s:%d", app, stream, host, port)
 	return nil
+}
+
+// SetAuthTokens 把当前启用中的接入 token 同步到 ZMS（本地验签用）。
+// tokens 为空表示清除（ZMS 侧随之关闭推拉流鉴权）。
+func (c *Client) SetAuthTokens(ctx context.Context, tokens []string) (*APIResponse, error) {
+	params := url.Values{"tokens": {strings.Join(tokens, ",")}}
+	return c.get(ctx, "auth/tokens", params)
 }
 
 func (c *Client) post(ctx context.Context, api string, params url.Values) (*APIResponse, error) {
@@ -268,7 +275,7 @@ func (c *Client) GetMediaInfo(ctx context.Context, schema, app, stream string) (
 		"stream": {stream},
 	}
 	params.Set("secret", c.secret)
-	reqURL := fmt.Sprintf("%s/index/api/getMediaInfo?%s", strings.TrimRight(c.baseURL, "/"), params.Encode())
+	reqURL := fmt.Sprintf("%s/index/api/media/info?%s", strings.TrimRight(c.baseURL, "/"), params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, err

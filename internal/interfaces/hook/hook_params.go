@@ -3,11 +3,27 @@ package hook
 import (
 	"encoding/json"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
+
+// extractHookToken 从 on_publish 的 params 查询串（或表单/查询参数）中取接入 token。
+func extractHookToken(c *gin.Context, params string) string {
+	if params != "" {
+		if vals, err := url.ParseQuery(params); err == nil {
+			if t := strings.TrimSpace(vals.Get("token")); t != "" {
+				return t
+			}
+		}
+	}
+	if t := strings.TrimSpace(c.PostForm("token")); t != "" {
+		return t
+	}
+	return strings.TrimSpace(c.Query("token"))
+}
 
 type hookFields struct {
 	App    string

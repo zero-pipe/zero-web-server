@@ -818,3 +818,16 @@ type UnifiedRef struct {
 }
 
 func (UnifiedRef) TableName() string { return "zws_unified_ref" }
+
+// AccessToken 对外接入密钥（可视化配置的外部集成凭证）。
+type AccessToken struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name       string `gorm:"column:name;size:128" json:"name"`
+	Token      string `gorm:"column:token;size:128;uniqueIndex:uk_access_token_token" json:"token"`
+	Enabled    bool   `gorm:"column:enabled;index" json:"enabled"`
+	Remark     string `gorm:"column:remark;size:255" json:"remark"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (AccessToken) TableName() string { return "zws_access_token" }

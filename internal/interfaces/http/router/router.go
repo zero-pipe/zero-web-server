@@ -1,6 +1,7 @@
 package router
 
 import (
+	accesstokenapp "zero-web-server/internal/application/accesstoken"
 	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
@@ -92,6 +93,7 @@ type Deps struct {
 	InfraService         *infraconfigapp.Service
 	EventSubService      *eventsubapp.Service
 	EventService         *eventingest.Service
+	AccessTokenService   *accesstokenapp.Service
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -157,10 +159,19 @@ func Setup(r *gin.Engine, deps Deps) {
 	eventHandler := handler.NewEventHandler(deps.EventService)
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
 	infraHandler := handler.NewInfraHandler(deps.InfraService)
+	accessTokenHandler := handler.NewAccessTokenHandler(deps.AccessTokenService)
+	var accessTokenCheck func(token string) (bool, bool)
+	if deps.AccessTokenService != nil {
+		accessTokenCheck = func(token string) (bool, bool) {
+			enforcing := len(deps.AccessTokenService.EnabledTokens()) > 0
+			return deps.AccessTokenService.Verify(token), enforcing
+		}
+	}
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
 		deps.MediaServerService, deps.PublishAuth, deps.StreamOnDemand,
+		accessTokenCheck,
 	)
 
 	r.GET("/health", healthHandler.Health)
@@ -196,6 +207,8 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerUserMgmt(auth, userHandler, roleHandler)
 
 		registerServerAPI(auth, mediaServerHandler, gbSipConfigHandler, objectStoreHandler)
+
+		registerAccessToken(auth, accessTokenHandler)
 
 		registerOnvif(auth, onvifHandler)
 

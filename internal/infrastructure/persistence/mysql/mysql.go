@@ -141,6 +141,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.AssetCapability{},
 		&model.AssetEventSource{},
 		&model.UnifiedRef{},
+		&model.AccessToken{},
 	}
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)
