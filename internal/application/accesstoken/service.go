@@ -49,6 +49,9 @@ func (s *Service) Create(name, token, remark string, enabled bool) (*domainacces
 	if len(token) > 128 {
 		return nil, errBadReq("token 长度不能超过 128")
 	}
+	if strings.Contains(token, ",") {
+		return nil, errBadReq("token 不能包含英文逗号")
+	}
 	row := &domainaccesstoken.AccessToken{
 		Name:    name,
 		Token:   token,
