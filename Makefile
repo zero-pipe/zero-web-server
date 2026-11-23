@@ -33,11 +33,9 @@ mock-plugin:
 	go run ./tools/mock-ipc-plugin
 
 # 构建 zero-agent 与本地 mock 插件目录，用于联调。
+# 构建 zero-agent + 内置插件（mock 必建；hik 仅在 SDK+64位工具链时真编）到 bin/agent-plugins/。
 agent-build:
-	go build -o bin/zero-agent$(EXE) ./cmd/zero-agent
-	mkdir -p $(AGENT_PLUGIN_DIR)/mock-ipc
-	go build -o $(AGENT_PLUGIN_DIR)/mock-ipc/mock-ipc-plugin$(EXE) ./tools/mock-ipc-plugin
-	cp tools/mock-ipc-plugin/plugin.yaml tools/mock-ipc-plugin/schema.json $(AGENT_PLUGIN_DIR)/mock-ipc/
+	bash tools/build-builtins.sh
 
 agent-run:
 	go run ./cmd/zero-agent -config configs/agent.yaml

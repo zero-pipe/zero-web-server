@@ -6,6 +6,7 @@
 #   .\tools\dev.ps1 start -Docker   # optional: docker compose up MySQL/Redis first
 #   .\tools\dev.ps1 start -Media    # optional: ../zms/demo_media_server
 #   .\tools\dev.ps1 start -SkipBuild   # skip go build, use existing bin/zero-web-server.exe
+#   .\tools\dev.ps1 start -SkipAgent   # 不构建/启动 zero-agent（默认会构建并运行 agent + 内置插件）
 #   .\tools\dev.ps1 stop | status | restart
 
 param(
@@ -20,6 +21,7 @@ param(
     [switch]$RequireDeps,
     [switch]$SkipDepsCheck,
     [switch]$SkipBuild,
+    [switch]$SkipAgent,
     [string]$Config = "configs\config.yaml"
 )
 
@@ -30,6 +32,7 @@ $StateFile = Join-Path $DevDir "state.json"
 $LogDir = Join-Path $DevDir "logs"
 $BackendPort = 18080
 $FrontendPort = 9528
+$AgentPort = 19000
 
 function Write-Title($msg) {
     Write-Host ""
@@ -86,11 +89,12 @@ function Stop-AllDev {
     $st = Get-DevState
     if ($st) {
         if ($st.media) { Stop-ProcessTree ([int]$st.media) "media" | Out-Null }
+        if ($st.agent) { Stop-ProcessTree ([int]$st.agent) "agent" | Out-Null }
         if ($st.frontend) { Stop-ProcessTree ([int]$st.frontend) "frontend" | Out-Null }
         if ($st.backend) { Stop-ProcessTree ([int]$st.backend) "backend" | Out-Null }
     }
     # Start-Process 记录的常是 cmd/go 包装进程；真正监听的是 node / server 子进程
-    Stop-PortListeners @(18080, 9528)
+    Stop-PortListeners @(18080, 9528, 19000)
     if ($st -and [int]$st.media -gt 0) {
         Stop-PortListeners @(8080)
     }
@@ -366,6 +370,38 @@ function Do-Start {
     }
     Write-Host "Frontend ready (pid $($frontend.Id))" -ForegroundColor Green
 
+    $agentPid = 0
+    if (-not $SkipAgent) {
+        if (-not $SkipBuild) {
+            Write-Title "Building zero-agent + built-in plugins"
+            $bash = Get-Command bash.exe -ErrorAction SilentlyContinue
+            if (-not $bash) { $bash = Get-Command bash -ErrorAction SilentlyContinue }
+            if ($bash) {
+                & $bash.Source (Join-Path $Root "tools/build-builtins.sh")
+                if ($LASTEXITCODE -ne 0) { Write-Warning "builtins build had issues (continue)" }
+            } else {
+                Write-Warning "bash not found — skip built-in plugin build; using existing bin/agent-plugins"
+            }
+        }
+        $agentExe = Join-Path $Root "bin\zero-agent.exe"
+        if (-not (Test-Path $agentExe)) { $agentExe = Join-Path $Root "bin/zero-agent" }
+        if (Test-Path $agentExe) {
+            $dataDir = Join-Path $Root "data"
+            if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir -Force | Out-Null }
+            Write-Title "Starting zero-agent :$AgentPort"
+            $agent = Start-BackgroundLogged -Tag "agent" -FileName $agentExe `
+                -ArgumentList @("-config", (Join-Path $Root "configs\agent.yaml")) -WorkingDirectory $Root
+            if (Wait-TcpPort $AgentPort 30) {
+                Write-Host "Agent ready (pid $($agent.Id)) — built-in plugins auto-enable" -ForegroundColor Green
+                $agentPid = $agent.Id
+            } else {
+                Write-Warning "Agent not listening on :$AgentPort — see .dev/logs/agent.err.log"
+            }
+        } else {
+            Write-Warning "zero-agent not built — skip agent (run tools/build-builtins.sh)"
+        }
+    }
+
     $mediaPid = 0
     if ($Media) {
         $zms = Find-MediaServer
@@ -388,6 +424,7 @@ function Do-Start {
         backend  = $backendListenPid
         frontend = $frontendListenPid
         media    = $mediaPid
+        agent    = $agentPid
         started  = (Get-Date).ToString("o")
     }
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # zero-web-server dev orchestrator (Linux / macOS)
 # Usage:
-#   ./tools/dev.sh                  # backend + frontend (local MySQL/Redis if already running)
+#   ./tools/dev.sh                  # backend + frontend + zero-agent(内置插件) (local MySQL/Redis if already running)
 #   ./tools/dev.sh start --docker   # optional: docker compose up MySQL/Redis
 #   ./tools/dev.sh start --media
+#   ./tools/dev.sh start --skip-agent  # 不构建/启动 zero-agent（默认会构建并运行 agent + 内置插件）
 #   ./tools/dev.sh check            # probe MySQL/Redis/Docker
 #   ./tools/dev.sh stop | status | restart
 
@@ -15,6 +16,7 @@ STATE_FILE="$DEV_DIR/state.json"
 LOG_DIR="$DEV_DIR/logs"
 BACKEND_PORT=18080
 FRONTEND_PORT=9528
+AGENT_PORT=19000
 CONFIG="${CONFIG:-configs/config.yaml}"
 
 ACTION="${1:-start}"
@@ -28,6 +30,7 @@ QUIET=0
 REQUIRE_DEPS=0
 SKIP_DEPS=0
 SKIP_BUILD=0
+SKIP_AGENT=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --docker) DOCKER=1 ;;
@@ -38,6 +41,7 @@ while [[ $# -gt 0 ]]; do
         --require-deps) REQUIRE_DEPS=1 ;;
         --skip-deps-check) SKIP_DEPS=1 ;;
         --skip-build) SKIP_BUILD=1 ;;
+        --skip-agent) SKIP_AGENT=1 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
     shift
@@ -177,11 +181,13 @@ stop_port_listeners() {
 stop_all() {
     if [[ -f "$STATE_FILE" ]]; then
         stop_pid "$(read_state_pid media)" media
+        stop_pid "$(read_state_pid agent)" agent
         stop_pid "$(read_state_pid frontend)" frontend
         stop_pid "$(read_state_pid backend)" backend
     fi
     stop_port_listeners 18080
     stop_port_listeners 9528
+    stop_port_listeners 19000
     if [[ -f "$STATE_FILE" ]] && [[ "$(read_state_pid media)" -gt 0 ]]; then
         stop_port_listeners 8080
     fi
@@ -240,10 +246,10 @@ find_media() {
 }
 
 save_state() {
-    local b=$1 f=$2 m=${3:-0}
+    local b=$1 f=$2 m=${3:-0} a=${4:-0}
     ensure_dirs
-    printf '{"backend":%s,"frontend":%s,"media":%s,"started":"%s"}\n' \
-        "$b" "$f" "$m" "$(date -Iseconds 2>/dev/null || date)" >"$STATE_FILE"
+    printf '{"backend":%s,"frontend":%s,"media":%s,"agent":%s,"started":"%s"}\n' \
+        "$b" "$f" "$m" "$a" "$(date -Iseconds 2>/dev/null || date)" >"$STATE_FILE"
 }
 
 do_check() {
@@ -262,7 +268,7 @@ do_status() {
     if [[ ! -f "$STATE_FILE" ]]; then
         echo "  Not started via dev.sh"
     else
-        for row in "backend:$BACKEND_PORT" "frontend:$FRONTEND_PORT" "media:8080"; do
+        for row in "backend:$BACKEND_PORT" "frontend:$FRONTEND_PORT" "agent:$AGENT_PORT" "media:8080"; do
             name="${row%%:*}"; port="${row##*:}"
             pid="$(read_state_pid "$name")"
             [[ "$pid" -gt 0 ]] 2>/dev/null || continue
@@ -312,6 +318,28 @@ do_start() {
     fi
     green "Frontend ready (pid $frontend)"
 
+    local agent=0
+    if [[ "$SKIP_AGENT" -eq 0 ]]; then
+        if [[ "$SKIP_BUILD" -ne 1 ]]; then
+            cyan "== Building zero-agent + built-in plugins =="
+            bash "$ROOT/tools/build-builtins.sh" || yellow "builtins build had issues (continue)"
+        fi
+        local agent_exe="$ROOT/bin/zero-agent"
+        [[ -f "$agent_exe.exe" ]] && agent_exe="$agent_exe.exe"
+        if [[ -x "$agent_exe" || -f "$agent_exe" ]]; then
+            mkdir -p "$ROOT/data"
+            cyan "== Starting zero-agent :$AGENT_PORT =="
+            agent=$(start_bg agent bash -c "cd '$ROOT' && exec '$agent_exe' -config '$ROOT/configs/agent.yaml'")
+            if wait_port "$AGENT_PORT" 30; then
+                green "Agent ready (pid $agent) — built-in plugins auto-enable"
+            else
+                yellow "Agent not listening on :$AGENT_PORT — see $LOG_DIR/agent.err.log"
+            fi
+        else
+            yellow "zero-agent not built — skip agent (run tools/build-builtins.sh)"
+        fi
+    fi
+
     local media=0
     if [[ "$MEDIA" -eq 1 ]]; then
         if info=$(find_media); then
@@ -326,7 +354,7 @@ do_start() {
         fi
     fi
 
-    save_state "$backend" "$frontend" "$media"
+    save_state "$backend" "$frontend" "$media" "$agent"
 
     cyan "== Dev stack running =="
     echo "  UI:    http://localhost:$FRONTEND_PORT"
@@ -371,5 +399,5 @@ case "$ACTION" in
     status) do_status ;;
     restart) stop_all; do_start ;;
     check) do_check ;;
-    *) echo "Usage: $0 {start|stop|status|restart|check} [--docker] [--media] [--detach]"; exit 1 ;;
+    *) echo "Usage: $0 {start|stop|status|restart|check} [--docker] [--media] [--detach] [--skip-agent]"; exit 1 ;;
 esac
