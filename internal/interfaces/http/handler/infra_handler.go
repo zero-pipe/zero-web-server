@@ -7,6 +7,7 @@ import (
 	infraapp "zero-web-server/internal/application/infraconfig"
 	domaininfra "zero-web-server/internal/domain/infraconfig"
 	"zero-web-server/internal/infrastructure/config"
+	"zero-web-server/internal/interfaces/http/middleware"
 	"zero-web-server/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,9 @@ func NewInfraHandler(svc *infraapp.Service) *InfraHandler {
 }
 
 func (h *InfraHandler) Overview(c *gin.Context) {
-	response.OK(c, h.svc.Overview(c.Request.Context()))
+	// 仅管理员可见真实密码，其它角色仍脱敏（保存时按“不修改”处理）。
+	reveal := middleware.GetRoleID(c) == 1
+	response.OK(c, h.svc.Overview(c.Request.Context(), reveal))
 }
 
 func (h *InfraHandler) SaveMySQL(c *gin.Context) {

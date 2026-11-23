@@ -164,15 +164,27 @@ func (s *Service) getMQTT() (*domaininfra.MQTTConfig, error) {
 	return row, nil
 }
 
-// Overview 汇总四项基础设施状态与配置（密码脱敏）。
-func (s *Service) Overview(ctx context.Context) map[string]any {
+// Overview 汇总四项基础设施状态与配置。revealPassword=true（仅管理员）时返回真实密码，
+// 否则以 ****** 脱敏（前端保存时据此识别“不修改”）。
+func (s *Service) Overview(ctx context.Context, revealPassword bool) map[string]any {
 	return map[string]any{
 		"restartRequired": s.RestartRequired(),
-		"mysql":           s.mysqlOverview(ctx),
-		"redis":           s.redisOverview(ctx),
-		"mqtt":            s.mqttOverview(),
+		"mysql":           s.mysqlOverview(ctx, revealPassword),
+		"redis":           s.redisOverview(ctx, revealPassword),
+		"mqtt":            s.mqttOverview(revealPassword),
 		"objectStore":     s.objectStoreOverview(ctx),
 	}
+}
+
+// secretValue 按是否允许显示明文返回密码或脱敏占位。
+func secretValue(pwd string, reveal bool) string {
+	if reveal {
+		return pwd
+	}
+	if strings.TrimSpace(pwd) == "" {
+		return ""
+	}
+	return maskedSecret
 }
 
 type status struct {
@@ -180,28 +192,28 @@ type status struct {
 	Error  string `json:"error"`
 }
 
-func (s *Service) mysqlOverview(ctx context.Context) map[string]any {
+func (s *Service) mysqlOverview(ctx context.Context, reveal bool) map[string]any {
 	cfg := s.cfg.MySQL
 	online, errMsg := ping(ctx, s.mysqlPing)
 	return map[string]any{
 		"host": cfg.Host, "port": cfg.Port, "user": cfg.User,
-		"password": mask(cfg.Password), "database": cfg.Database, "charset": cfg.Charset,
+		"password": secretValue(cfg.Password, reveal), "database": cfg.Database, "charset": cfg.Charset,
 		"maxIdleConns": cfg.MaxIdleConns, "maxOpenConns": cfg.MaxOpenConns,
 		"status": status{Online: online, Error: errMsg},
 	}
 }
 
-func (s *Service) redisOverview(ctx context.Context) map[string]any {
+func (s *Service) redisOverview(ctx context.Context, reveal bool) map[string]any {
 	cfg := s.cfg.Redis
 	online, errMsg := ping(ctx, s.redisPing)
 	return map[string]any{
-		"host": cfg.Host, "port": cfg.Port, "password": mask(cfg.Password),
+		"host": cfg.Host, "port": cfg.Port, "password": secretValue(cfg.Password, reveal),
 		"database": cfg.Database, "poolSize": cfg.PoolSize,
 		"status": status{Online: online, Error: errMsg},
 	}
 }
 
-func (s *Service) mqttOverview() map[string]any {
+func (s *Service) mqttOverview(reveal bool) map[string]any {
 	row, err := s.getMQTT()
 	if err != nil || row == nil {
 		row = domaininfra.Default()
@@ -214,7 +226,7 @@ func (s *Service) mqttOverview() map[string]any {
 	}
 	return map[string]any{
 		"enabled": row.Enabled, "broker": row.Broker, "clientIdPrefix": row.ClientIDPrefix,
-		"username": row.Username, "password": mask(row.Password),
+		"username": row.Username, "password": secretValue(row.Password, reveal),
 		"topicPrefix": row.TopicPrefix, "qos": row.QoS, "keepAliveSec": row.KeepAliveSec,
 		"tlsEnabled": row.TLSEnabled, "caCert": row.CACert,
 		"clientCert": row.ClientCert, "clientKey": row.ClientKey,
@@ -434,11 +446,4 @@ func (s *Service) setRestartRequired() {
 func (s *Service) localOverrideWarning() string {
 	local := filepath.Join(filepath.Dir(s.configPath), "config.local.yaml")
 	return "配置文件已更新；如存在 " + local + "，其同名配置会覆盖本次修改。重启服务后生效。"
-}
-
-func mask(secret string) string {
-	if strings.TrimSpace(secret) == "" {
-		return ""
-	}
-	return maskedSecret
 }

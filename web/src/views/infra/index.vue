@@ -32,7 +32,7 @@
           <el-form-item label="Host"><el-input v-model="mysql.host" /></el-form-item>
           <el-form-item label="Port"><el-input-number v-model="mysql.port" :min="1" :max="65535" /></el-form-item>
           <el-form-item label="User"><el-input v-model="mysql.user" /></el-form-item>
-          <el-form-item label="Password"><el-input v-model="mysql.password" show-password placeholder="****** 表示不修改" /></el-form-item>
+          <el-form-item label="Password"><el-input v-model="mysql.password" show-password placeholder="数据库密码" /></el-form-item>
           <el-form-item label="Database"><el-input v-model="mysql.database" /></el-form-item>
           <el-form-item label="Charset"><el-input v-model="mysql.charset" /></el-form-item>
           <el-form-item label="MaxIdleConns"><el-input-number v-model="mysql.maxIdleConns" :min="1" /></el-form-item>
@@ -48,7 +48,7 @@
         <el-form v-loading="loading" :model="redis" label-width="140px" style="max-width: 680px;" @submit.native.prevent>
           <el-form-item label="Host"><el-input v-model="redis.host" /></el-form-item>
           <el-form-item label="Port"><el-input-number v-model="redis.port" :min="1" :max="65535" /></el-form-item>
-          <el-form-item label="Password"><el-input v-model="redis.password" show-password placeholder="****** 表示不修改" /></el-form-item>
+          <el-form-item label="Password"><el-input v-model="redis.password" show-password placeholder="Redis 密码" /></el-form-item>
           <el-form-item label="Database"><el-input-number v-model="redis.database" :min="0" /></el-form-item>
           <el-form-item label="PoolSize"><el-input-number v-model="redis.poolSize" :min="1" /></el-form-item>
           <el-form-item>
@@ -64,7 +64,7 @@
           <el-form-item label="Broker"><el-input v-model="mqtt.broker" placeholder="tcp://192.168.1.10:1883 或 ssl://..." /></el-form-item>
           <el-form-item label="ClientID 前缀"><el-input v-model="mqtt.clientIdPrefix" /></el-form-item>
           <el-form-item label="用户名"><el-input v-model="mqtt.username" /></el-form-item>
-          <el-form-item label="密码"><el-input v-model="mqtt.password" show-password placeholder="****** 表示不修改" /></el-form-item>
+          <el-form-item label="密码"><el-input v-model="mqtt.password" show-password placeholder="MQTT 密码" /></el-form-item>
           <el-form-item label="Topic 前缀"><el-input v-model="mqtt.topicPrefix" placeholder="zws/events" /></el-form-item>
           <el-form-item label="QoS">
             <el-select v-model="mqtt.qos" style="width: 120px;">
