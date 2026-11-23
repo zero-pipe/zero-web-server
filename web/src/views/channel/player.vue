@@ -42,7 +42,10 @@
 
           <div class="player-under panel-block control-extra">
             <div class="panel-block-title">预置位</div>
-            <channelPreset :channel-id="channelId" />
+            <div v-if="cameraCategory === 'gun'" class="preset-muted">
+              该通道为{{ ptzTypeText }}，不支持预置位
+            </div>
+            <channelPreset v-else-if="channelId" :channel-id="channelId" />
           </div>
         </div>
 
@@ -124,6 +127,16 @@ export default {
     },
     ptzEnabled() {
       return isDomeCamera(this.ptzType)
+    },
+    // 依据国标目录应答的 PTZType（1球机 2半球 3固定枪机 4遥控枪机，0未上报）区分形态
+    cameraCategory() {
+      const t = Number(this.ptzType)
+      if (t === 1 || t === 2) return 'dome'
+      if (t === 3 || t === 4) return 'gun'
+      return 'unknown'
+    },
+    ptzTypeText() {
+      return { 1: '球机', 2: '半球', 3: '固定枪机', 4: '遥控枪机' }[Number(this.ptzType)] || '枪机'
     },
     isStreaming() {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
@@ -222,3 +235,11 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.preset-muted {
+  padding: 8px 4px;
+  color: #80868b;
+  font-size: 13px;
+}
+</style>

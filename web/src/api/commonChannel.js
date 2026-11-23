@@ -367,6 +367,8 @@ export function queryPreset(channelId) {
   return request({
     method: 'get',
     url: '/api/v1/common/channel/front-end/preset/query',
+    // 预置位为只读辅助功能：失败（设备多为枪机不应答）不弹全局错误，由组件内联提示
+    silent: true,
     params: {
       channelId: channelId
     }
