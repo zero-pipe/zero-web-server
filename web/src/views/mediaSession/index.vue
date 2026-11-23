@@ -77,34 +77,45 @@
           <span class="ms-sub">{{ nodeName(scope.row.mediaServerId) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="170" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template slot-scope="scope">
           <el-button type="text" size="mini" icon="el-icon-link" @click="openAddress(scope.row)">地址</el-button>
-          <el-button
-            type="text"
-            size="mini"
-            icon="el-icon-video-pause"
-            class="ms-danger"
-            @click="stop(scope.row)"
-          >停止</el-button>
+          <el-tooltip content="在媒体节点上关闭该路流；若仍有客户端观看或设备仍在推流，可能被自动重新拉起。" placement="top">
+            <el-button
+              type="text"
+              size="mini"
+              icon="el-icon-switch-button"
+              class="ms-danger"
+              @click="stop(scope.row)"
+            >关闭</el-button>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 地址 / 直链（不暴露分享页，仅协议直链） -->
-    <el-dialog :visible.sync="addrVisible" title="流地址" width="640px" append-to-body>
-      <template v-if="addrRow">
-        <div class="ms-addr-head">
-          <span class="ms-name">{{ addrRow.deviceName || addrRow.stream }}</span>
-          <span class="ms-sub">{{ addrRow.app }}/{{ addrRow.stream }}</span>
+    <!-- 地址 / 直链（仅协议直链，不暴露分享页） -->
+    <el-dialog :visible.sync="addrVisible" width="720px" append-to-body custom-class="ms-addr-dialog">
+      <div slot="title" class="ms-dlg-title">
+        <i class="el-icon-link" />
+        <span>流地址</span>
+      </div>
+      <div v-if="addrRow" class="ms-addr-body">
+        <div class="ms-addr-meta">
+          <span class="ms-addr-name">{{ addrRow.deviceName || addrRow.stream }}</span>
+          <span class="ms-addr-stream">{{ addrRow.app }}/{{ addrRow.stream }}</span>
         </div>
-        <div v-if="!addrRow.addresses || !addrRow.addresses.length" class="ms-empty">暂无可用地址（节点离线或流未就绪）</div>
-        <div v-for="a in addrRow.addresses" :key="a.protocol" class="ms-addr-row">
-          <span class="ms-addr-proto">{{ a.label }}</span>
-          <span class="ms-addr-url" :title="a.url">{{ a.url }}</span>
-          <el-button size="mini" icon="el-icon-document-copy" circle @click="copy(a.url)" />
+        <div v-if="!addrRow.addresses || !addrRow.addresses.length" class="ms-addr-empty">
+          <i class="el-icon-warning-outline" /> 暂无可用地址（节点离线或流未就绪）
         </div>
-      </template>
+        <div v-else class="ms-addr-list">
+          <div v-for="a in addrRow.addresses" :key="a.protocol" class="ms-addr-item">
+            <span class="ms-proto" :class="'proto-' + a.protocol">{{ a.label }}</span>
+            <span class="ms-url" :title="a.url">{{ a.url }}</span>
+            <el-button class="ms-copy" type="text" size="mini" icon="el-icon-document-copy" @click="copy(a.url)">复制</el-button>
+          </div>
+        </div>
+        <div class="ms-addr-tip">直链可在播放器或第三方工具中直接拉流；地址含内网信息，请勿随意外泄。</div>
+      </div>
     </el-dialog>
 
     <!-- 新建临时拉流代理 -->
@@ -208,14 +219,18 @@ export default {
       )
     },
     stop(row) {
-      this.$confirm(`停止流 ${row.app}/${row.stream}？点播会按需重新拉起。`, '提示', {
-        confirmButtonText: '停止',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
+      this.$confirm(
+        `在媒体节点上关闭流 ${row.app}/${row.stream}？若仍有客户端观看或设备仍在推流，可能被自动重新拉起。`,
+        '关闭流',
+        {
+          confirmButtonText: '关闭',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      ).then(() => {
         stopMediaSession({ nodeId: row.mediaServerId, app: row.app, stream: row.stream })
           .then(() => {
-            this.$message.success('已停止')
+            this.$message.success('已关闭')
             this.load()
           })
           .catch(() => {})
@@ -316,45 +331,110 @@ export default {
     color: #3c4043;
   }
   .ms-danger { color: #ea4335; }
+}
 
-  .ms-addr-head {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-  .ms-empty {
-    color: #80868b;
-    font-size: 13px;
-    padding: 8px 0;
-  }
-  .ms-addr-row {
-    display: grid;
-    grid-template-columns: 108px minmax(0, 1fr) 40px;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 0;
-    border-bottom: 1px solid #f1f3f4;
-  }
-  .ms-addr-proto {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 22px;
-    border-radius: 4px;
-    background: #e8f0fe;
-    color: #1a73e8;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .ms-addr-url {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: Consolas, 'Courier New', monospace;
-    font-size: 12px;
-    color: #5f6368;
-  }
+/* 地址弹窗：append-to-body 后 DOM 挂在 body 下，
+   因此这些样式必须是顶层选择器（不能嵌在 .media-session 内），否则 scoped 后代选择器失效。 */
+.ms-dlg-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #202124;
+
+  i { color: #1a73e8; font-size: 16px; }
+}
+
+.ms-addr-body { padding: 2px 2px 4px; }
+
+.ms-addr-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 0 2px 12px;
+  border-bottom: 1px solid #f1f3f4;
+  margin-bottom: 8px;
+}
+.ms-addr-name { font-size: 14px; font-weight: 600; color: #202124; }
+.ms-addr-stream {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  color: #80868b;
+}
+
+.ms-addr-empty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 4px;
+  color: #80868b;
+  font-size: 13px;
+}
+
+.ms-addr-list {
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.ms-addr-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+
+  &:hover { background: #f8f9fa; }
+}
+.ms-addr-item:hover .ms-url { color: #174ea6; }
+
+.ms-proto {
+  flex: none;
+  min-width: 76px;
+  height: 24px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #e8f0fe;
+  color: #1a73e8;
+
+  &.proto-flv, &.proto-ws_flv { background: #e6f4ea; color: #137333; }
+  &.proto-hls { background: #fef7e0; color: #b06000; }
+  &.proto-rtmp { background: #fce8e6; color: #c5221f; }
+  &.proto-rtsp { background: #f3e8fd; color: #8430ce; }
+  &.proto-rtc, &.proto-rtcs { background: #e8f0fe; color: #1a73e8; }
+}
+
+.ms-url {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  color: #3c4043;
+}
+
+.ms-copy {
+  flex: none;
+  padding: 0 6px !important;
+}
+
+.ms-addr-tip {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #80868b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>
