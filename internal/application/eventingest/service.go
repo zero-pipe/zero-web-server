@@ -12,6 +12,7 @@ import (
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	domainalarm "zero-web-server/internal/domain/alarm"
 	domainasset "zero-web-server/internal/domain/asset"
+	domaincustomevent "zero-web-server/internal/domain/customevent"
 	domainevent "zero-web-server/internal/domain/event"
 	"zero-web-server/internal/eventtype"
 	applog "zero-web-server/pkg/log"
@@ -21,6 +22,7 @@ type Service struct {
 	repo        domainevent.Repository
 	assets      domainasset.Repository
 	alarms      domainalarm.Repository
+	custom      domaincustomevent.Repository
 	objectStore *objectstoreapp.Service
 
 	received  atomic.Uint64
@@ -31,8 +33,8 @@ type Service struct {
 	unmapped  atomic.Uint64
 }
 
-func NewService(repo domainevent.Repository, assets domainasset.Repository, alarms domainalarm.Repository, objectStore *objectstoreapp.Service) *Service {
-	return &Service{repo: repo, assets: assets, alarms: alarms, objectStore: objectStore}
+func NewService(repo domainevent.Repository, assets domainasset.Repository, alarms domainalarm.Repository, objectStore *objectstoreapp.Service, custom domaincustomevent.Repository) *Service {
+	return &Service{repo: repo, assets: assets, alarms: alarms, objectStore: objectStore, custom: custom}
 }
 
 type payload struct {
@@ -44,6 +46,9 @@ type payload struct {
 	ChannelInternalCode string `json:"channelInternalCode"`
 	EventType           string `json:"eventType"`
 	Severity            string `json:"severity"`
+	Level               string `json:"level"`
+	MajorType           string `json:"majorType"`
+	MinorType           string `json:"minorType"`
 	OccurredAt          int64  `json:"occurredAt"`
 	ReceivedAt          int64  `json:"receivedAt"`
 	Image               *struct {
@@ -74,6 +79,10 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 		s.invalid.Add(1)
 		applog.Warn("event payload missing required fields", "topic", topic)
 		return fmt.Errorf("event payload missing required fields")
+	}
+	// 平台未登记的事件类型 → 自定义事件表（与 zws_event 隔离，不再归一成 other）。
+	if !eventtype.IsKnown(p.EventType) {
+		return s.storeCustom(topic, &p, body)
 	}
 	exists, err := s.repo.Exists(p.EventID)
 	if err != nil {
@@ -178,6 +187,62 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 	}
 	applog.Info("event stored", "event", p.EventID, "type", p.EventType,
 		"device", e.DeviceID, "internal", e.DeviceInternalCode, "status", e.Status)
+	return nil
+}
+
+// storeCustom 落自定义事件表：平台只保证内码关联与基础信封，raw 原样保存。
+func (s *Service) storeCustom(topic string, p *payload, body []byte) error {
+	if s.custom == nil {
+		s.unmapped.Add(1)
+		applog.Debugf("custom event ignored (no store) event=%s type=%s", p.EventID, p.EventType)
+		return nil
+	}
+	exists, err := s.custom.Exists(p.EventID)
+	if err != nil {
+		s.failed.Add(1)
+		return fmt.Errorf("check custom event duplicate: %w", err)
+	}
+	if exists {
+		s.duplicate.Add(1)
+		return nil
+	}
+	major := firstNonEmpty(p.MajorType, "custom")
+	minor := firstNonEmpty(p.MinorType, p.EventType)
+	e := &domaincustomevent.CustomEvent{
+		EventID: p.EventID, DeviceInternalCode: p.DeviceInternalCode,
+		ChannelInternalCode: strings.TrimSpace(p.ChannelInternalCode),
+		MajorType:           major, MinorType: minor,
+		OccurAt: p.OccurredAt,
+		Level:   firstNonEmpty(p.Level, p.Severity, "info"),
+		RawJSON: string(body),
+	}
+	if p.Image != nil {
+		e.ImageKey = p.Image.Key
+		e.ImageURL = p.Image.URL
+	}
+	if s.assets != nil {
+		if dev, derr := s.assets.GetDeviceByInternalCode(p.DeviceInternalCode); derr == nil && dev != nil {
+			e.DeviceID = dev.ID
+			if resources, rerr := s.assets.ListResources(dev.ID); rerr == nil {
+				if r := findResourceByCode(resources, e.ChannelInternalCode); r != nil {
+					e.ResourceID = r.ID
+					if e.ChannelInternalCode == "" {
+						e.ChannelInternalCode = r.InternalCode
+					}
+				}
+			}
+		}
+	}
+	if e.OccurAt <= 0 {
+		e.OccurAt = time.Now().UnixMilli()
+	}
+	if err := s.custom.Create(e); err != nil {
+		s.failed.Add(1)
+		applog.Warn("custom event persist failed", "event", p.EventID, "err", err)
+		return fmt.Errorf("persist custom event: %w", err)
+	}
+	s.stored.Add(1)
+	applog.Info("custom event stored", "event", p.EventID, "major", major, "minor", minor, "device", e.DeviceInternalCode)
 	return nil
 }
 

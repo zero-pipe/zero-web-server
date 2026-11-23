@@ -49,6 +49,17 @@ func Builtins() []Type {
 	}
 }
 
+// IsKnown 判断是否为平台已登记的规范事件类型（用于事件分流：已知→zws_event，未知→自定义事件）。
+func IsKnown(code string) bool {
+	code = strings.ToLower(strings.TrimSpace(code))
+	for _, t := range Builtins() {
+		if t.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
 // Normalize 返回规范类型；未登记类型回落 other。
 func Normalize(code string) Type {
 	code = strings.ToLower(strings.TrimSpace(code))

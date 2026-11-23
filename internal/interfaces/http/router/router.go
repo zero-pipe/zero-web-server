@@ -8,6 +8,7 @@ import (
 	appauth "zero-web-server/internal/application/auth"
 	channelapp "zero-web-server/internal/application/channel"
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
+	customeventapp "zero-web-server/internal/application/customevent"
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
@@ -93,6 +94,7 @@ type Deps struct {
 	InfraService         *infraconfigapp.Service
 	EventSubService      *eventsubapp.Service
 	EventService         *eventingest.Service
+	CustomEventService   *customeventapp.Service
 	AccessTokenService   *accesstokenapp.Service
 }
 
@@ -157,6 +159,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	agentHandler := handler.NewAgentHandler(deps.AgentService, deps.AgentToken)
 	eventSubHandler := handler.NewEventSubHandler(deps.EventSubService, deps.InfraService)
 	eventHandler := handler.NewEventHandler(deps.EventService)
+	customEventHandler := handler.NewCustomEventHandler(deps.CustomEventService)
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
 	infraHandler := handler.NewInfraHandler(deps.InfraService)
 	accessTokenHandler := handler.NewAccessTokenHandler(deps.AccessTokenService)
@@ -201,6 +204,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerAgents(auth, agentHandler)
 		registerEventSub(auth, eventSubHandler)
 		registerEvents(auth, eventHandler)
+		registerCustomEvents(auth, customEventHandler)
 		registerAssets(auth, assetHandler)
 		registerInfra(auth, infraHandler)
 

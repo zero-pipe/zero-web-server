@@ -672,6 +672,26 @@ type EventType struct {
 
 func (EventType) TableName() string { return "zws_event_type" }
 
+// CustomEvent 是自定义事件（平台不理解语义，只按基础字段存 raw）。与 zws_event 隔离。
+type CustomEvent struct {
+	ID                  string `gorm:"column:id;primaryKey;size:36" json:"id"`
+	EventID             string `gorm:"column:event_id;size:64;uniqueIndex:uk_custom_event_id" json:"eventId"`
+	DeviceInternalCode  string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
+	ChannelInternalCode string `gorm:"column:channel_internal_code;size:32;index" json:"channelInternalCode"`
+	DeviceID            string `gorm:"column:device_id;size:36;index" json:"deviceId"`
+	ResourceID          string `gorm:"column:resource_id;size:36;index" json:"resourceId"`
+	MajorType           string `gorm:"column:major_type;size:64;index" json:"majorType"`
+	MinorType           string `gorm:"column:minor_type;size:128;index" json:"minorType"`
+	OccurAt             int64  `gorm:"column:occur_at;index" json:"occurAt"`
+	Level               string `gorm:"column:level;size:16" json:"level"`
+	ImageKey            string `gorm:"column:image_key;size:512" json:"imageKey"`
+	ImageURL            string `gorm:"column:image_url;size:1024" json:"imageUrl"`
+	RawJSON             string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
+	CreateTime          string `gorm:"column:create_time;size:50" json:"createTime"`
+}
+
+func (CustomEvent) TableName() string { return "zws_custom_event" }
+
 // PluginDevice 是通过插件接入的设备。
 type PluginDevice struct {
 	ID           int    `gorm:"column:id;primaryKey;autoIncrement"`

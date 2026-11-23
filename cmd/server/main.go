@@ -15,8 +15,8 @@ import (
 	ipcplugin "zero-web-server/internal/adapter/ipcplugin"
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	"zero-web-server/internal/adapter/mqttbus"
-	agentapp "zero-web-server/internal/application/agent"
 	accesstokenapp "zero-web-server/internal/application/accesstoken"
+	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
 	appauth "zero-web-server/internal/application/auth"
@@ -24,6 +24,7 @@ import (
 	channelapp "zero-web-server/internal/application/channel"
 	"zero-web-server/internal/application/channeldrv"
 	cloudrecordapp "zero-web-server/internal/application/cloudrecord"
+	customeventapp "zero-web-server/internal/application/customevent"
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
@@ -34,7 +35,6 @@ import (
 	infraconfigapp "zero-web-server/internal/application/infraconfig"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
-	"zero-web-server/internal/mediakit"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	onvifapp "zero-web-server/internal/application/onvif"
 	"zero-web-server/internal/application/ops"
@@ -59,6 +59,7 @@ import (
 	redisinfra "zero-web-server/internal/infrastructure/redis"
 	sipinfra "zero-web-server/internal/infrastructure/sip"
 	"zero-web-server/internal/interfaces/http/router"
+	"zero-web-server/internal/mediakit"
 	"zero-web-server/internal/port"
 	jwtmgr "zero-web-server/pkg/jwt"
 	applog "zero-web-server/pkg/log"
@@ -245,7 +246,9 @@ func main() {
 		redisPing, objectStoreService, cfg.UserSettings.ServerID,
 	)
 	eventRepo := persistence.NewEventRepository(db)
-	eventIngest := eventingestapp.NewService(eventRepo, assetRepo, alarmRepo, objectStoreService)
+	customEventRepo := persistence.NewCustomEventRepository(db)
+	customEventService := customeventapp.NewService(customEventRepo)
+	eventIngest := eventingestapp.NewService(eventRepo, assetRepo, alarmRepo, objectStoreService, customEventRepo)
 	infraService.SetMessageHandler(eventIngest.HandleMessage)
 
 	eventSubRepo := persistence.NewEventSubscriptionRepository(db)
@@ -417,6 +420,7 @@ func main() {
 		InfraService:         infraService,
 		EventSubService:      eventSubService,
 		EventService:         eventIngest,
+		CustomEventService:   customEventService,
 		AccessTokenService:   accessTokenService,
 	})
 

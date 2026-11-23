@@ -127,6 +127,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.EventSubscription{},
 		&model.Event{},
 		&model.EventType{},
+		&model.CustomEvent{},
 		&model.Plugin{},
 		&model.Agent{},
 		&model.AgentPlugin{},

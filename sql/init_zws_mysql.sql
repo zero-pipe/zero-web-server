@@ -1087,6 +1087,30 @@ CREATE TABLE IF NOT EXISTS zws_event
     KEY idx_event_type_time (event_type, occurred_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台事件记录';
 
+-- 自定义事件：平台未登记的事件类型（driver 自定义语义）。平台只保证内码关联与基础信封，raw 原样保存。
+DROP TABLE IF EXISTS zws_custom_event;
+CREATE TABLE IF NOT EXISTS zws_custom_event
+(
+    id                    VARCHAR(36) NOT NULL PRIMARY KEY,
+    event_id              VARCHAR(64) NOT NULL,
+    device_internal_code  VARCHAR(64),
+    channel_internal_code VARCHAR(32),
+    device_id             VARCHAR(36),
+    resource_id           VARCHAR(36),
+    major_type            VARCHAR(64),
+    minor_type            VARCHAR(128),
+    occur_at              BIGINT NOT NULL DEFAULT 0,
+    level                 VARCHAR(16),
+    image_key             VARCHAR(512),
+    image_url             VARCHAR(1024),
+    raw_json              LONGTEXT,
+    create_time           VARCHAR(50),
+    UNIQUE KEY uk_custom_event_id (event_id),
+    KEY idx_custom_event_device_time (device_internal_code, occur_at),
+    KEY idx_custom_event_channel (channel_internal_code),
+    KEY idx_custom_event_type (major_type, minor_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='自定义事件记录';
+
 -- 对外接入密钥（可视化配置的外部集成凭证；平台只做存在+启用校验，不区分接口权限、不限流）
 CREATE TABLE IF NOT EXISTS `zws_access_token` (
     `id`          BIGINT NOT NULL AUTO_INCREMENT,
