@@ -16,15 +16,22 @@ import (
 	"zero-web-server/internal/port"
 )
 
+// LiveStopper 设备侧断开能力（由 asset.Service 实现）：
+// GB28181 发 BYE、ONVIF 停拉流、插件停推流；内部通常也会关闭该路 ZMS 流。
+type LiveStopper interface {
+	StopLive(ctx context.Context, resourceID string) error
+}
+
 type Service struct {
 	nodes      *mediaserverapp.Service
 	assets     domainasset.Repository
+	stopper    LiveStopper
 	cluster    port.MediaCluster
 	serverPort int
 }
 
-func NewService(nodes *mediaserverapp.Service, assets domainasset.Repository, cluster port.MediaCluster, serverPort int) *Service {
-	return &Service{nodes: nodes, assets: assets, cluster: cluster, serverPort: serverPort}
+func NewService(nodes *mediaserverapp.Service, assets domainasset.Repository, stopper LiveStopper, cluster port.MediaCluster, serverPort int) *Service {
+	return &Service{nodes: nodes, assets: assets, stopper: stopper, cluster: cluster, serverPort: serverPort}
 }
 
 // StreamAddress 一路流的直链地址（协议 + 人读标签 + URL）。
@@ -226,7 +233,9 @@ func pluginTransportLabel(origin string) string {
 	}
 }
 
-// Stop 停止一路流（close_stream），点播会按需重新拉起。
+// Stop 关闭一路流。设备绑定的实时流（live/<D>_<C> 且能反查到资源）走"设备感知断开"：
+// GB28181 发 BYE、ONVIF 停拉流、插件停推流——这些路径通常已同时关闭 ZMS 流；
+// 手动代理/无法反查的流只做节点级 close_stream。
 func (s *Service) Stop(ctx context.Context, nodeID, app, stream string) error {
 	if nodeID == "" || app == "" || stream == "" {
 		return fmt.Errorf("参数不完整")
@@ -235,8 +244,27 @@ func (s *Service) Stop(ctx context.Context, nodeID, app, stream string) error {
 	if err != nil {
 		return fmt.Errorf("媒体节点不存在")
 	}
+
+	// 1) 设备感知断开
+	if app == "live" && s.assets != nil && s.stopper != nil {
+		_, chCode := splitStream(stream)
+		if chCode != "" {
+			if res, rerr := s.assets.GetResourceByInternalCode(chCode); rerr == nil && res != nil {
+				if terr := s.stopper.StopLive(ctx, res.ID); terr != nil {
+					// 设备断开失败：仍尽力关闭节点流，避免残留，并把原因带回。
+					_, _ = client.CloseStreams(ctx, "__defaultVhost__", app, stream)
+					return fmt.Errorf("已尝试关流，但断开设备失败: %w", terr)
+				}
+				// 设备侧已断开，节点流通常随之结束；兜底关一次并忽略"已不存在"。
+				_, _ = client.CloseStreams(ctx, "__defaultVhost__", app, stream)
+				return nil
+			}
+		}
+	}
+
+	// 2) 手动代理 / 无法反查资源：直接关节点流
 	if _, err := client.CloseStreams(ctx, "__defaultVhost__", app, stream); err != nil {
-		return fmt.Errorf("停止流失败: %w", err)
+		return fmt.Errorf("关闭流失败: %w", err)
 	}
 	return nil
 }

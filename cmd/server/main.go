@@ -221,7 +221,6 @@ func main() {
 	ipcService := ipcdevice.NewService(pluginService, pluginRepo, mediaCluster, ipcplugin.NewFactory(pluginToken), cfg.UserSettings.ServerID)
 
 	assetRepo := persistence.NewAssetRepository(db)
-	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, mediaCluster, cfg.Server.Port)
 	assetProjector := persistence.NewAssetProjector(db)
 	if err := assetProjector.Backfill(); err != nil {
 		applog.Warn("asset backfill", "err", err)
@@ -324,6 +323,7 @@ func main() {
 	sipServer.SetCascadeInbound(cascadeInbound)
 	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
 	assetService := assetapp.NewService(assetRepo, assetProjector, drivers)
+	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, assetService, mediaCluster, cfg.Server.Port)
 
 	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)

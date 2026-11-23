@@ -80,7 +80,7 @@
       <el-table-column label="操作" width="180" fixed="right">
         <template slot-scope="scope">
           <el-button type="text" size="mini" icon="el-icon-link" @click="openAddress(scope.row)">地址</el-button>
-          <el-tooltip content="在媒体节点上关闭该路流；若仍有客户端观看或设备仍在推流，可能被自动重新拉起。" placement="top">
+          <el-tooltip content="设备感知断开：GB28181 发 BYE、ONVIF/插件停止拉/推流，并关闭节点流。若仍有客户端在观看，会被重新拉起。" placement="top">
             <el-button
               type="text"
               size="mini"
@@ -220,7 +220,7 @@ export default {
     },
     stop(row) {
       this.$confirm(
-        `在媒体节点上关闭流 ${row.app}/${row.stream}？若仍有客户端观看或设备仍在推流，可能被自动重新拉起。`,
+        `设备感知断开 ${row.app}/${row.stream}：GB28181 将发送 BYE，ONVIF/插件停止拉/推流，并关闭节点流。若仍有客户端在观看，会被重新拉起。`,
         '关闭流',
         {
           confirmButtonText: '关闭',
