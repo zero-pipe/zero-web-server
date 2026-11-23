@@ -55,6 +55,7 @@ type Repository interface {
 	UpsertPlugin(p *Plugin) error
 	UpdatePluginSeen(id string, ts int64, online bool) error
 	MarkPluginOffline(id string) error
+	DeletePlugin(id string) error
 	ListPlugins() ([]*Plugin, error)
 	GetPlugin(id string) (*Plugin, error)
 	ResolvePlugin(protocol string) (*Plugin, error)

@@ -92,3 +92,12 @@ func (h *AgentHandler) SetPluginState(c *gin.Context) {
 	}
 	response.OK(c, gin.H{"list": list, "total": len(list)})
 }
+
+// DeletePlugin 删除内置/本地插件（须先删设备、再禁用）。
+func (h *AgentHandler) DeletePlugin(c *gin.Context) {
+	if err := h.svc.DeleteBuiltinPlugin(c.Request.Context(), c.Param("id"), c.Param("pluginId")); err != nil {
+		response.Error(c, response.CodeBadReq, err.Error())
+		return
+	}
+	response.OK(c, nil)
+}

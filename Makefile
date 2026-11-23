@@ -1,4 +1,4 @@
-.PHONY: run build tidy frontend test docker-up docker-down frontend-install frontend-dev frontend-build dev dev-stop dev-status verify-local mock-plugin agent-build agent-mock
+.PHONY: run build tidy frontend test docker-up docker-down frontend-install frontend-dev frontend-build dev dev-stop dev-status verify-local agent-build agent-run
 
 EXE := $(shell if [ "$$(go env GOOS)" = "windows" ]; then echo .exe; fi)
 AGENT_PLUGIN_DIR ?= bin/agent-plugins
@@ -28,12 +28,7 @@ tidy:
 test:
 	go test ./...
 
-# 启动 mock IPC 插件（用于验证插件接入链路）
-mock-plugin:
-	go run ./tools/mock-ipc-plugin
-
-# 构建 zero-agent 与本地 mock 插件目录，用于联调。
-# 构建 zero-agent + 内置插件（mock 必建；hik 仅在 SDK+64位工具链时真编）到 bin/agent-plugins/。
+# 构建 zero-agent + 内置插件（hik 仅在 SDK+64位工具链时真编）到 bin/agent-plugins/。
 agent-build:
 	bash tools/build-builtins.sh
 

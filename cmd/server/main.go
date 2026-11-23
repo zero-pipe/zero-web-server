@@ -219,6 +219,7 @@ func main() {
 	agentRepo := persistence.NewAgentRepository(db)
 	agentService := agentapp.NewService(agentRepo, pluginRepo, agentToken)
 	ipcService := ipcdevice.NewService(pluginService, pluginRepo, mediaCluster, ipcplugin.NewFactory(pluginToken), cfg.UserSettings.ServerID)
+	agentService.SetDeviceCounter(ipcService)
 
 	assetRepo := persistence.NewAssetRepository(db)
 	assetProjector := persistence.NewAssetProjector(db)

@@ -30,6 +30,7 @@ type Plugin struct {
 	Enabled          bool     `json:"enabled"`
 	DesiredState     string   `json:"desiredState"` // enabled | disabled
 	ActualState      string   `json:"actualState"`  // discovered | starting | running | stopped | error
+	Source           string   `json:"source"`       // platform | manual（manual 即随 Agent 分发的内置/本地插件）
 	LastError        string   `json:"lastError"`
 	LastSeen         int64    `json:"lastSeen"`
 	CreateTime       string   `json:"createTime"`
@@ -53,4 +54,5 @@ type Repository interface {
 	GetPlugin(agentID, pluginID string) (*Plugin, error)
 	UpdatePluginReport(agentID, pluginID, actualState, lastError string, ts int64) error
 	UpdatePluginDesired(agentID, pluginID, desiredState string) error
+	DeletePlugin(agentID, pluginID string) error
 }

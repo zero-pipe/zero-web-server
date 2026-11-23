@@ -72,6 +72,11 @@ func (r *PluginRepository) MarkPluginOffline(id string) error {
 	})
 }
 
+// DeletePlugin 删除插件运行时记录（内置插件被移除后清理）。
+func (r *PluginRepository) DeletePlugin(id string) error {
+	return r.db.Where("id = ?", id).Delete(&model.Plugin{}).Error
+}
+
 func (r *PluginRepository) ListPlugins() ([]*domainplugin.Plugin, error) {
 	var rows []model.Plugin
 	if err := r.db.Order("update_time DESC").Find(&rows).Error; err != nil {

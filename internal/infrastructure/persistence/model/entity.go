@@ -608,6 +608,7 @@ type AgentPlugin struct {
 	Enabled          bool   `gorm:"column:enabled"`
 	DesiredState     string `gorm:"column:desired_state;size:32"`
 	ActualState      string `gorm:"column:actual_state;size:32"`
+	Source           string `gorm:"column:source;size:32"`
 	LastError        string `gorm:"column:last_error;type:text"`
 	LastSeen         int64  `gorm:"column:last_seen"`
 	CreateTime       string `gorm:"column:create_time;size:50"`

@@ -21,6 +21,12 @@ type Service struct {
 	token   string
 	http    *http.Client
 	onStart func(ctx context.Context, pluginID string)
+	devices DeviceCounter
+}
+
+// DeviceCounter 统计插件设备引用（由 ipcdevice 服务实现），用于禁用/删除前检查。
+type DeviceCounter interface {
+	CountByPlugin(pluginID string) (int, error)
 }
 
 func NewService(repo domainagent.Repository, plugins domainplugin.Repository, token string) *Service {
@@ -29,6 +35,9 @@ func NewService(repo domainagent.Repository, plugins domainplugin.Repository, to
 		http: &http.Client{Timeout: 10 * time.Second},
 	}
 }
+
+// SetDeviceCounter 注入设备计数器，用于「先删设备→再禁用→再删除」的门控。
+func (s *Service) SetDeviceCounter(d DeviceCounter) { s.devices = d }
 
 // SetPluginStartedHook 在插件由离线转为运行态时触发，用于补布防等恢复动作。
 func (s *Service) SetPluginStartedHook(fn func(ctx context.Context, pluginID string)) {
@@ -60,6 +69,7 @@ type PluginRequest struct {
 	Enabled          bool     `json:"enabled"`
 	DesiredState     string   `json:"desiredState"`
 	ActualState      string   `json:"actualState"`
+	Source           string   `json:"source"`
 	LastError        string   `json:"lastError"`
 }
 
@@ -143,7 +153,7 @@ func (s *Service) upsertPlugin(agentID, endpoint string, p PluginRequest, now in
 		Protocols: p.Protocols, Capabilities: p.Capabilities,
 		StreamTransports: p.StreamTransports, EventTypes: p.EventTypes,
 		ConfigSchema: p.ConfigSchema, Enabled: desired == domainagent.StateEnabled,
-		DesiredState: desired, ActualState: actual, LastError: p.LastError, LastSeen: now,
+		DesiredState: desired, ActualState: actual, Source: p.Source, LastError: p.LastError, LastSeen: now,
 	}
 	if err := s.repo.UpsertPlugin(item); err != nil {
 		return err
@@ -206,6 +216,12 @@ func (s *Service) SetPluginState(ctx context.Context, agentID, pluginID, action 
 	if agent.Status != "online" {
 		return nil, fmt.Errorf("Agent 离线")
 	}
+	// 门控：禁用/重启插件前要求该插件下已无设备（先删设备，再停插件）。
+	if action == "disable" && s.devices != nil {
+		if n, err := s.devices.CountByPlugin(pluginID); err == nil && n > 0 {
+			return nil, fmt.Errorf("该插件下仍有 %d 个设备，请先删除设备后再禁用", n)
+		}
+	}
 	body, err := s.callAgent(ctx, agent, pluginID, action)
 	if err != nil {
 		return nil, err
@@ -232,6 +248,68 @@ func (s *Service) SetPluginState(ctx context.Context, agentID, pluginID, action 
 		}
 	}
 	return s.repo.ListPlugins(agentID)
+}
+
+// DeleteBuiltinPlugin 删除内置/本地插件：要求已无设备且插件已禁用，随后让 Agent 删除插件目录。
+func (s *Service) DeleteBuiltinPlugin(ctx context.Context, agentID, pluginID string) error {
+	agentID = strings.TrimSpace(agentID)
+	pluginID = strings.TrimSpace(pluginID)
+	if agentID == "" || pluginID == "" {
+		return fmt.Errorf("agentId/pluginId 不能为空")
+	}
+	p, err := s.repo.GetPlugin(agentID, pluginID)
+	if err != nil || p == nil {
+		return fmt.Errorf("插件不存在")
+	}
+	// 门控：先删设备。
+	if s.devices != nil {
+		if n, err := s.devices.CountByPlugin(pluginID); err == nil && n > 0 {
+			return fmt.Errorf("该插件下仍有 %d 个设备，请先删除设备", n)
+		}
+	}
+	// 门控：停用了插件才能删除插件包（插件须已禁用且未在运行）。
+	if p.DesiredState == domainagent.StateEnabled || p.ActualState == "running" || p.ActualState == "starting" {
+		return fmt.Errorf("请先禁用插件，再删除插件包")
+	}
+	agent, err := s.repo.GetAgent(agentID)
+	if err != nil || agent == nil {
+		return fmt.Errorf("Agent 不存在")
+	}
+	if agent.Status != "online" {
+		return fmt.Errorf("Agent 离线，无法删除")
+	}
+	if err := s.callAgentRemove(ctx, agent, pluginID); err != nil {
+		return err
+	}
+	// 清理平台侧记录：运行时实例 + Agent 插件清单。
+	_ = s.plugins.DeletePlugin(p.ID)
+	if err := s.repo.DeletePlugin(agentID, pluginID); err != nil {
+		return err
+	}
+	applog.Infof("[agent] 已删除内置插件 %s（Agent %s）", pluginID, agentID)
+	return nil
+}
+
+func (s *Service) callAgentRemove(ctx context.Context, agent *domainagent.Agent, pluginID string) error {
+	url := strings.TrimRight(agent.Endpoint, "/") + "/api/v1/plugins/" + pluginID + "/remove"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if s.token != "" {
+		req.Header.Set("X-Agent-Token", s.token)
+	}
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("调用 Agent 失败: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return fmt.Errorf("Agent 返回 %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+	return nil
 }
 
 type agentStatus struct {

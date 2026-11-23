@@ -93,7 +93,7 @@ func (r *AgentRepository) UpsertPlugin(p *domainagent.Plugin) error {
 			Protocols: string(protocols), Capabilities: string(caps),
 			StreamTransports: string(transports), EventTypes: string(events),
 			ConfigSchema: p.ConfigSchema, Enabled: p.Enabled,
-			DesiredState: p.DesiredState, ActualState: p.ActualState,
+			DesiredState: p.DesiredState, ActualState: p.ActualState, Source: p.Source,
 			LastError: p.LastError, LastSeen: p.LastSeen, CreateTime: now, UpdateTime: now,
 		}).Error
 	}
@@ -113,6 +113,7 @@ func (r *AgentRepository) UpsertPlugin(p *domainagent.Plugin) error {
 		"config_schema":     p.ConfigSchema,
 		"enabled":           p.Enabled,
 		"actual_state":      p.ActualState,
+		"source":            p.Source,
 		"last_error":        p.LastError,
 		"last_seen":         p.LastSeen,
 		"update_time":       now,
@@ -167,6 +168,12 @@ func (r *AgentRepository) UpdatePluginDesired(agentID, pluginID, desiredState st
 		}).Error
 }
 
+// DeletePlugin 删除某 Agent 上的插件记录（内置插件被移除后清理）。
+func (r *AgentRepository) DeletePlugin(agentID, pluginID string) error {
+	return r.db.Where("agent_id = ? AND plugin_id = ?", agentID, pluginID).
+		Delete(&model.AgentPlugin{}).Error
+}
+
 func toDomainAgentPlugin(row *model.AgentPlugin) *domainagent.Plugin {
 	return &domainagent.Plugin{
 		ID: row.ID, AgentID: row.AgentID, PluginID: row.PluginID, Name: row.Name,
@@ -174,7 +181,7 @@ func toDomainAgentPlugin(row *model.AgentPlugin) *domainagent.Plugin {
 		Protocols: decodeStrings(row.Protocols), Capabilities: decodeStrings(row.Capabilities),
 		StreamTransports: decodeStrings(row.StreamTransports), EventTypes: decodeStrings(row.EventTypes),
 		ConfigSchema: row.ConfigSchema, Enabled: row.Enabled,
-		DesiredState: row.DesiredState, ActualState: row.ActualState,
+		DesiredState: row.DesiredState, ActualState: row.ActualState, Source: row.Source,
 		LastError: row.LastError, LastSeen: row.LastSeen,
 		CreateTime: row.CreateTime, UpdateTime: row.UpdateTime,
 	}

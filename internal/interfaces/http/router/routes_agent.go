@@ -16,4 +16,5 @@ func registerAgents(g *gin.RouterGroup, h *handler.AgentHandler) {
 	g.GET("/agents", h.List)
 	g.GET("/agents/:id/plugins", h.Plugins)
 	g.POST("/agents/:id/plugins/:pluginId/:action", h.SetPluginState)
+	g.DELETE("/agents/:id/plugins/:pluginId", h.DeletePlugin)
 }

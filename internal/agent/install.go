@@ -22,6 +22,30 @@ import (
 // currentFile 记录某插件当前生效版本（相对 plugin_dir/{pluginId}）。
 const currentFile = ".current"
 
+// removedDir 存放「已删除内置插件」的墓碑（相对 plugin_dir）。
+// 重建目录（如 dev 每次构建内置插件）后，agent 依据墓碑跳过、不再自动发现。
+const removedDir = ".removed"
+
+// isRemoved 判断插件是否已被墓碑标记删除。
+func (a *Agent) isRemoved(pluginID string) bool {
+	_, err := os.Stat(filepath.Join(a.cfg.PluginDir, removedDir, pluginID))
+	return err == nil
+}
+
+// markRemoved 写入墓碑；清除墓碑见 clearRemoved。
+func (a *Agent) markRemoved(pluginID string) {
+	dir := filepath.Join(a.cfg.PluginDir, removedDir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	_ = os.WriteFile(filepath.Join(dir, pluginID), []byte("removed by platform\n"), 0o644)
+}
+
+// clearRemoved 清除墓碑（重新安装该插件时调用）。
+func (a *Agent) clearRemoved(pluginID string) {
+	_ = os.Remove(filepath.Join(a.cfg.PluginDir, removedDir, pluginID))
+}
+
 // installRequest 是平台下发的安装指令。
 type installRequest struct {
 	PackageID string `json:"packageId"`
@@ -92,6 +116,8 @@ func (a *Agent) install(ctx context.Context, req installRequest) error {
 	}
 	// 保留最近两个版本，其余清理。
 	pruneVersions(pluginRoot, req.Version, 2)
+	// 平台重新安装时清除墓碑，允许再次被发现。
+	a.clearRemoved(req.PluginID)
 
 	a.rescan()
 	a.saveState()
@@ -339,6 +365,36 @@ func (p *plugin) source() string {
 		return "platform"
 	}
 	return "manual"
+}
+
+// removePlugin 删除内置/手工部署插件：先停进程，再删除整个插件目录并重扫。
+// 仅用于平台判定「无设备且已禁用」后的清理；平台安装的版本插件走 uninstall。
+func (a *Agent) removePlugin(pluginID string) error {
+	pluginID = strings.TrimSpace(pluginID)
+	if !validID(pluginID) {
+		return fmt.Errorf("pluginId 非法")
+	}
+	root := filepath.Join(a.cfg.PluginDir, pluginID)
+	if _, err := os.Stat(root); err != nil {
+		return fmt.Errorf("插件目录不存在: %s", pluginID)
+	}
+	a.mu.Lock()
+	p := a.plugins[pluginID]
+	a.mu.Unlock()
+	if p != nil {
+		a.stop(p, "removed by platform")
+		p.mu.Lock()
+		p.desired = "disabled"
+		p.mu.Unlock()
+	}
+	if err := os.RemoveAll(root); err != nil {
+		return fmt.Errorf("删除插件目录失败: %w", err)
+	}
+	a.markRemoved(pluginID)
+	a.rescan()
+	a.saveState()
+	log.Printf("[remove] %s deleted", pluginID)
+	return nil
 }
 
 // rescan 重新加载插件目录，并让既有进程状态保持不变。

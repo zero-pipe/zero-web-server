@@ -137,6 +137,12 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+	// 门控：先删设备，再删插件包。
+	if s.devices != nil {
+		if n, err := s.devices.CountByPlugin(p.PluginID); err == nil && n > 0 {
+			return fmt.Errorf("插件仍有 %d 个设备接入，请先删除设备", n)
+		}
+	}
 	installs, err := s.packages.ListInstalls()
 	if err != nil {
 		return err

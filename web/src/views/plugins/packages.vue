@@ -2,6 +2,64 @@
   <div class="app-container">
     <el-card shadow="never">
       <div slot="header" class="card-header">
+        <span>内置插件</span>
+        <el-button type="text" icon="el-icon-refresh" title="刷新" aria-label="刷新" @click="loadBuiltins" />
+      </div>
+      <div class="hint">
+        随 zero-agent 分发的内置插件，发现即默认启用。停用生命周期：<b>删除设备 → 禁用插件（停进程）→ 删除插件包</b>。
+      </div>
+      <el-table v-loading="builtinLoading" :data="builtins" size="small" border>
+        <el-table-column label="Agent" min-width="140">
+          <template slot-scope="{ row }">
+            <div>{{ row.agent.hostname || row.agent.id }}</div>
+            <el-tag :type="row.agent.status === 'online' ? 'success' : 'info'" size="mini">
+              {{ row.agent.status === 'online' ? '在线' : '离线' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="插件" min-width="160">
+          <template slot-scope="{ row }">
+            <div>{{ row.name || row.pluginId }}</div>
+            <span class="sub-text">{{ row.pluginId }} · v{{ row.version }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="协议" min-width="120">
+          <template slot-scope="{ row }">
+            <el-tag v-for="p in row.protocols" :key="p" size="mini" style="margin-right:4px">{{ p }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="120">
+          <template slot-scope="{ row }">
+            <el-tag :type="stateType(row.actualState)" size="mini">{{ stateLabel(row.actualState) }}</el-tag>
+            <el-tag v-if="row.desiredState === 'disabled'" type="warning" size="mini" style="margin-left:4px">已禁用</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template slot-scope="{ row }">
+            <el-button
+              v-if="row.desiredState !== 'enabled'"
+              type="text" size="mini" icon="el-icon-check" title="启用" aria-label="启用"
+              @click="setBuiltinState(row, 'enable')"
+            />
+            <el-button
+              v-else
+              type="text" size="mini" icon="el-icon-close" title="禁用（停止进程）" aria-label="禁用"
+              @click="setBuiltinState(row, 'disable')"
+            />
+            <el-button
+              type="text" size="mini" icon="el-icon-delete" style="color:#EA4335"
+              :disabled="row.desiredState === 'enabled' || row.actualState === 'running'"
+              :title="row.desiredState === 'enabled' || row.actualState === 'running' ? '请先禁用插件再删除' : '删除插件包'"
+              aria-label="删除" @click="removeBuiltin(row)"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="!builtins.length" class="hint">未发现内置插件（随 zero-agent 分发到插件目录的插件会在此显示）。</div>
+    </el-card>
+
+    <el-card shadow="never" style="margin-top:16px">
+      <div slot="header" class="card-header">
         <span>插件包</span>
         <div>
           <el-upload
@@ -136,7 +194,7 @@ import {
   queryPluginPackages, uploadPluginPackage, deletePluginPackage,
   installPluginPackage, queryPluginInstalls, uninstallPlugin
 } from '@/api/pluginPackage'
-import { queryAgents } from '@/api/agent'
+import { queryAgents, queryAgentPlugins, setAgentPluginState, deleteAgentPlugin } from '@/api/agent'
 
 export default {
   name: 'PluginPackages',
@@ -146,9 +204,11 @@ export default {
       uploading: false,
       installLoading: false,
       installing: false,
+      builtinLoading: false,
       packages: [],
       installs: [],
       agents: [],
+      builtins: [],
       filterAgent: '',
       installVisible: false,
       detailVisible: false,
@@ -168,7 +228,7 @@ export default {
   methods: {
     loadAll() {
       this.loadPackages()
-      this.loadAgents()
+      this.loadBuiltins()
       this.loadInstalls()
     },
     loadPackages() {
@@ -177,10 +237,42 @@ export default {
         this.packages = (res.data && res.data.list) || []
       }).finally(() => { this.loading = false })
     },
-    loadAgents() {
+    loadBuiltins() {
+      this.builtinLoading = true
       queryAgents().then(res => {
-        this.agents = (res.data && res.data.list) || []
-      }).catch(() => { this.agents = [] })
+        const agents = (res.data && res.data.list) || []
+        this.agents = agents
+        return Promise.all(agents.map(a => queryAgentPlugins(a.id).then(r => {
+          const list = (r.data && r.data.list) || []
+          return list
+            .filter(p => p.source !== 'platform')
+            .map(p => ({ ...p, agent: a, agentId: a.id }))
+        }).catch(() => [])))
+      }).then(rows => {
+        this.builtins = rows.reduce((all, cur) => all.concat(cur), [])
+      }).catch(() => { this.builtins = [] })
+        .finally(() => { this.builtinLoading = false })
+    },
+    setBuiltinState(row, action) {
+      const label = action === 'enable' ? '启用' : '禁用'
+      setAgentPluginState(row.agentId, row.pluginId, action).then(() => {
+        this.$message.success(label + '命令已下发')
+        this.loadBuiltins()
+      }).catch(e => this.$message.error(e || (label + '失败')))
+    },
+    removeBuiltin(row) {
+      this.$confirm(`删除内置插件 ${row.pluginId}？将停止进程并移除插件包（须已禁用且无设备）。`, '提示', { type: 'warning' }).then(() => {
+        deleteAgentPlugin(row.agentId, row.pluginId).then(() => {
+          this.$message.success('已删除插件包')
+          this.loadBuiltins()
+        }).catch(e => this.$message.error(e || '删除失败'))
+      }).catch(() => {})
+    },
+    stateLabel(state) {
+      return { running: '运行中', starting: '启动中', stopped: '已停止', error: '异常', discovered: '已发现', offline: '离线' }[state] || state || '-'
+    },
+    stateType(state) {
+      return state === 'running' ? 'success' : (state === 'error' ? 'danger' : 'info')
     },
     loadInstalls() {
       this.installLoading = true

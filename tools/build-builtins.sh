@@ -2,7 +2,6 @@
 # 构建 zero-agent 与内置插件到 bin/agent-plugins/<id>/（best-effort）。
 #
 # 内置插件：
-#   - mock-ipc：始终构建（开发联调用）。
 #   - hik-ipc ：仅在检测到 HCNetSDK + 64 位 MinGW 工具链时用 -tags hik + cgo 真编；
 #               否则跳过并告警（不放入桩，避免“内置已启用但跑的是桩”）。
 #
@@ -30,16 +29,6 @@ if ! (cd "$ROOT" && go build -o "$BIN/zero-agent$EXE" ./cmd/zero-agent); then
   warn "zero-agent 构建失败"
   exit 1
 fi
-
-# ---- mock 插件（始终构建）----
-build_mock() {
-  say "build mock-ipc"
-  local out="$PLUGDIR/mock-ipc"
-  mkdir -p "$out"
-  (cd "$ROOT" && go build -o "$out/mock-ipc-plugin$EXE" ./tools/mock-ipc-plugin) || { warn "mock 构建失败"; return 1; }
-  cp -f "$ROOT/tools/mock-ipc-plugin/plugin.yaml" "$ROOT/tools/mock-ipc-plugin/schema.json" "$out/"
-  say "  -> $out"
-}
 
 # ---- hik 插件（仅真编成功才放入）----
 find_hik_sdk() {
@@ -70,6 +59,11 @@ pick_toolchain() {
 
 build_hik() {
   local sdk tc cc cxx
+  # 平台已删除该内置插件：保留墓碑，重建也不放回（如需恢复，删除 .removed/hik-ipc 后重跑）。
+  if [ -f "$PLUGDIR/.removed/hik-ipc" ]; then
+    say "hik-ipc 已被平台删除（存在 .removed/hik-ipc 墓碑），跳过构建"
+    return 0
+  fi
   if ! sdk="$(find_hik_sdk)"; then
     warn "未找到 HCNetSDK（设置 HIK_SDK_DIR 指向含 头文件/库文件 的目录），跳过 hik 内置插件"
     return 0
@@ -93,7 +87,6 @@ build_hik() {
   say "  -> $PLUGDIR/hik-ipc"
 }
 
-build_mock
 build_hik
 
 say "done. 插件目录：$PLUGDIR"

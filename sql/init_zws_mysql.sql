@@ -774,6 +774,7 @@ CREATE TABLE IF NOT EXISTS zws_agent_plugin
     enabled           TINYINT NOT NULL DEFAULT 1,
     desired_state     VARCHAR(32) NOT NULL DEFAULT 'enabled',
     actual_state      VARCHAR(32) NOT NULL DEFAULT 'discovered',
+    source            VARCHAR(32) COMMENT '来源 platform|manual',
     last_error        TEXT,
     last_seen         BIGINT NOT NULL DEFAULT 0,
     create_time       VARCHAR(50),

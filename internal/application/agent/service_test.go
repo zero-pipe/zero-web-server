@@ -84,6 +84,13 @@ func (r *fakeAgentRepo) UpdatePluginDesired(agentID, pluginID, desiredState stri
 	return nil
 }
 
+func (r *fakeAgentRepo) DeletePlugin(agentID, pluginID string) error {
+	if p, _ := r.GetPlugin(agentID, pluginID); p != nil {
+		delete(r.plugins, p.ID)
+	}
+	return nil
+}
+
 type fakePluginRepo struct {
 	plugins map[string]*domainplugin.Plugin
 }
@@ -109,6 +116,10 @@ func (r *fakePluginRepo) MarkPluginOffline(id string) error {
 	if p := r.plugins[id]; p != nil {
 		p.Online = false
 	}
+	return nil
+}
+func (r *fakePluginRepo) DeletePlugin(id string) error {
+	delete(r.plugins, id)
 	return nil
 }
 func (r *fakePluginRepo) ListPlugins() ([]*domainplugin.Plugin, error) {

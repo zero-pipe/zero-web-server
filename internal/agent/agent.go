@@ -187,6 +187,10 @@ func (a *Agent) pluginRoots() []string {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
+		// 已删除的内置插件：保留墓碑，重建目录后也不再自动发现。
+		if a.isRemoved(e.Name()) {
+			continue
+		}
 		base := filepath.Join(a.cfg.PluginDir, e.Name())
 		root := base
 		if cur, err := readCurrent(base); err == nil && cur != "" {
@@ -519,6 +523,14 @@ func (a *Agent) handlePluginAction(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req)
 		if err := a.uninstall(pluginID, req.Version); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"plugins": a.report()})
+		return
+	case "remove":
+		// 删除内置/手工部署插件：停进程并删除整个插件目录。
+		if err := a.removePlugin(pluginID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

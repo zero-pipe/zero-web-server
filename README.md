@@ -111,7 +111,7 @@ make run            # 运行后端
 make build          # 编译到 bin/zero-web-server
 make test           # go test ./...
 make verify-local   # 本机 Go 版本低于 go.mod 要求时的本地构建/测试
-make mock-plugin    # 启动 mock IPC 插件，验证插件接入链路
+make agent-build    # 构建 zero-agent + 内置插件到 bin/agent-plugins/
 make docker-up      # 启动 MySQL + Redis
 make frontend-dev   # 前端开发模式
 make frontend-build # 前端构建
