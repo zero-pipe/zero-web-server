@@ -236,13 +236,7 @@ export default {
         return
       }
 
-      this.$store.dispatch('user/getUserInfo').then(user => {
-        if (user && user.pushKey) {
-          url += '&sign=' + user.pushKey
-        } else {
-          console.warn('[ChAudioTalk] 未获取到pushKey，推流鉴权可能失败')
-        }
-
+      this.$store.dispatch('user/getUserInfo').then(() => {
         if (this.broadcastRtc) {
           this.broadcastRtc.close()
         }
@@ -279,7 +273,7 @@ export default {
           }
         })
       }).catch(e => {
-        console.warn('[ChAudioTalk] 获取用户pushKey失败', e)
+        console.warn('[ChAudioTalk] 获取用户信息失败', e)
         this.talkStatus = -1
       })
     },

@@ -206,7 +206,6 @@ type UserSettingsConfig struct {
 	PlayTimeout       int    `mapstructure:"play_timeout"`
 	RecordInfoTimeout int    `mapstructure:"record_info_timeout"`
 	StreamOnDemand    bool   `mapstructure:"stream_on_demand"`
-	PushAuthority     bool   `mapstructure:"push_authority"`
 	RecordPushLive    bool   `mapstructure:"record_push_live"`
 	ServerID          string `mapstructure:"server_id"`
 	LoginTimeout      int64  `mapstructure:"login_timeout"`

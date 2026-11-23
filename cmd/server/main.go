@@ -145,8 +145,8 @@ func main() {
 	deviceService.SetRequirePreRegister(requirePreRegister)
 	publishRegistry := publishauth.NewPublishRegistry()
 	publishAuth := publishauth.NewPublishAuth(
-		userRepo, streamPushRepo, streamProxyRepo,
-		cfg.UserSettings.PushAuthority, cfg.UserSettings.RecordPushLive,
+		streamPushRepo, streamProxyRepo,
+		cfg.UserSettings.RecordPushLive,
 		publishRegistry,
 	)
 	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加

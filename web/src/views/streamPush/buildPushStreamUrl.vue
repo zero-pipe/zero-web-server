@@ -18,9 +18,6 @@
           <el-form-item label="流ID" prop="stream">
             <el-input v-model="stream" autocomplete="off" />
           </el-form-item>
-          <el-form-item label="CallID" prop="stream">
-            <el-input v-model="callId" autocomplete="off" />
-          </el-form-item>
           <el-form-item label="媒体节点" prop="mediaServerId">
             <el-select v-model="mediaServer" placeholder="请选择" style="width: 100%">
               <el-option
@@ -71,7 +68,6 @@
 <script>
 
 import elDragDialog from '@/directive/el-drag-dialog'
-import crypto from "crypto";
 import { first as firstAccessToken } from '@/api/accessToken'
 
 
@@ -84,72 +80,44 @@ export default {
       showDialog: false,
       app: null,
       stream: null,
-      callId: null,
       mediaServer: null,
       mediaServerList: [],
-      pushKey: null,
       accessToken: '',
       endCallback: null
     }
   },
   computed: {
-    tokenQuery(){
-      return this.accessToken ? `&token=${this.accessToken}` : ''
+    // 接入鉴权启用时，推流 URL 带上 token，ZMS 本地白名单校验。
+    tokenParam() {
+      return this.accessToken ? `token=${this.accessToken}` : ''
     },
-    sign(){
-      if (!this.pushKey) {
-        return ''
-      }
-      if (this.callId) {
-        return crypto.createHash('md5').update(this.callId + '_' + this.pushKey, 'utf8').digest('hex')
-
-      }else {
-        return crypto.createHash('md5').update(this.pushKey, 'utf8').digest('hex')
-      }
-
-    },
-    rtsp(){
+    rtsp() {
       if (!this.mediaServer || !this.stream || !this.app) {
         return ''
       }
-      crypto.createHash('md5').update(this.pushKey, 'utf8').digest('hex')
-      if (this.callId) {
-        return `rtsp://${this.mediaServer.streamIp}:${this.mediaServer.rtspPort}/${this.app}/${this.stream}?callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
-      }else {
-        return `rtsp://${this.mediaServer.streamIp}:${this.mediaServer.rtspPort}/${this.app}/${this.stream}?sign=${this.sign}`
-      }
+      const base = `rtsp://${this.mediaServer.streamIp}:${this.mediaServer.rtspPort}/${this.app}/${this.stream}`
+      return this.tokenParam ? `${base}?${this.tokenParam}` : base
     },
-    rtmp(){
+    rtmp() {
       if (!this.mediaServer || !this.stream || !this.app) {
         return ''
       }
-      if (this.callId) {
-        return `rtmp://${this.mediaServer.streamIp}:${this.mediaServer.rtmpPort}/${this.app}/${this.stream}?callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
-      }else {
-        return `rtmp://${this.mediaServer.streamIp}:${this.mediaServer.rtmpPort}/${this.app}/${this.stream}?sign=${this.sign}`
-      }
+      const base = `rtmp://${this.mediaServer.streamIp}:${this.mediaServer.rtmpPort}/${this.app}/${this.stream}`
+      return this.tokenParam ? `${base}?${this.tokenParam}` : base
     },
-    rtc(){
+    rtc() {
       if (!this.mediaServer || !this.stream || !this.app) {
         return ''
       }
-      if (this.callId) {
-        return `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
-      }else {
-        return `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&sign=${this.sign}${this.tokenQuery}`
-      }
-
+      const base = `http://${this.mediaServer.streamIp}:${this.mediaServer.httpPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}`
+      return this.tokenParam ? `${base}&${this.tokenParam}` : base
     },
-    rtcs(){
+    rtcs() {
       if (!this.mediaServer || !this.stream || !this.app) {
         return ''
       }
-      if (this.callId) {
-        return `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&callId=${this.callId}&sign=${this.sign}${this.tokenQuery}`
-      }else {
-        return `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}&sign=${this.sign}${this.tokenQuery}`
-      }
-
+      const base = `https://${this.mediaServer.streamIp}:${this.mediaServer.httpSSlPort}/index/api/webrtc?app=${this.app}&stream=${this.stream}`
+      return this.tokenParam ? `${base}&${this.tokenParam}` : base
     }
   },
   created() {
@@ -173,25 +141,18 @@ export default {
       this.$store.dispatch('server/getMediaServerList').then(data => {
         this.mediaServerList = data
       })
-      this.$store.dispatch('user/getUserInfo').then(data => {
-        this.pushKey = data.pushKey
-      })
-      // 接入鉴权启用时，推流 URL 带上 ?token=，ZMS 本地白名单校验。
       firstAccessToken().then(data => {
         this.accessToken = (data && data.token) || ''
       }).catch(() => { this.accessToken = '' })
     },
     copyUrl: function(dropdownItem) {
-      console.log(dropdownItem)
-      this.$copyText(dropdownItem).then((e) => {
+      this.$copyText(dropdownItem).then(() => {
         this.$message.success({
           showClose: true,
           message: '成功拷贝到粘贴板'
         })
-      }, (e) => {
-
-      })
-    },
+      }, () => {})
+    }
   }
 }
 </script>

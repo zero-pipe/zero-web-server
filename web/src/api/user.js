@@ -21,18 +21,6 @@ export function getUserInfo() {
   })
 }
 
-export function changePushKey(params) {
-  const { pushKey, userId } = params
-  return request({
-    method: 'post',
-    url: '/api/v1/user/changePushKey',
-    params: {
-      pushKey: pushKey,
-      userId: userId
-    }
-  })
-}
-
 export function queryList(params) {
   const { page, count } = params
   return request({

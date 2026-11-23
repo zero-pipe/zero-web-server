@@ -329,7 +329,6 @@ func seedAdminIfEmpty(db *gorm.DB) error {
 			Password:   "21232f297a57a5a743894a0e4a801fc3", // admin
 			RoleID:     1,
 			CreateTime: now, UpdateTime: now,
-			PushKey: "3e80d1762a324d5b0ff636e0bd16f1e3",
 		}
 		if err := db.Create(user).Error; err != nil {
 			return err

@@ -1,8 +1,6 @@
 package persistence
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"time"
 
 	domainuser "zero-web-server/internal/domain/user"
@@ -47,31 +45,6 @@ func (r *UserRepository) ListAll() ([]*domainuser.User, error) {
 	return out, nil
 }
 
-func (r *UserRepository) CheckPushAuthority(callID, sign string) bool {
-	users, err := r.ListAll()
-	if err != nil || len(users) == 0 {
-		return false
-	}
-	for _, u := range users {
-		if u.PushKey == "" {
-			continue
-		}
-		checkStr := u.PushKey
-		if callID != "" {
-			checkStr = callID + "_" + u.PushKey
-		}
-		if md5Hex(checkStr) == sign {
-			return true
-		}
-	}
-	return false
-}
-
-func md5Hex(s string) string {
-	sum := md5.Sum([]byte(s))
-	return hex.EncodeToString(sum[:])
-}
-
 func (r *UserRepository) List(page, count int) ([]*domainuser.User, int64, error) {
 	if page <= 0 {
 		page = 1
@@ -110,12 +83,6 @@ func (r *UserRepository) Delete(id int) error {
 func (r *UserRepository) UpdatePassword(id int, password string) error {
 	return r.db.Model(&model.User{}).Where("id = ?", id).Updates(map[string]any{
 		"password": password, "update_time": time.Now().Format("2006-01-02 15:04:05"),
-	}).Error
-}
-
-func (r *UserRepository) ChangePushKey(id int, pushKey string) error {
-	return r.db.Model(&model.User{}).Where("id = ?", id).Updates(map[string]any{
-		"push_key": pushKey, "update_time": time.Now().Format("2006-01-02 15:04:05"),
 	}).Error
 }
 
@@ -177,7 +144,6 @@ func toDomainUser(m *model.User) *domainuser.User {
 		Password:   m.Password,
 		CreateTime: m.CreateTime,
 		UpdateTime: m.UpdateTime,
-		PushKey:    m.PushKey,
 	}
 	if m.Role.ID > 0 {
 		u.Role = toDomainRole(&m.Role)

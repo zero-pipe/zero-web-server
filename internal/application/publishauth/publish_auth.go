@@ -1,12 +1,8 @@
 package publishauth
 
 import (
-	"net/url"
-	"strings"
-
 	domainstreamproxy "zero-web-server/internal/domain/streamproxy"
 	domainstreampush "zero-web-server/internal/domain/streampush"
-	domainuser "zero-web-server/internal/domain/user"
 )
 
 const (
@@ -25,25 +21,22 @@ func IsGBLiveApp(app string) bool {
 }
 
 type PublishAuth struct {
-	userRepo       domainuser.Repository
 	pushRepo       domainstreampush.Repository
 	proxyRepo      domainstreamproxy.Repository
-	pushAuthority  bool
 	recordPushLive bool
 	publish        *PublishRegistry
 }
 
 func NewPublishAuth(
-	userRepo domainuser.Repository,
 	pushRepo domainstreampush.Repository,
 	proxyRepo domainstreamproxy.Repository,
-	pushAuthority, recordPushLive bool,
+	recordPushLive bool,
 	publish *PublishRegistry,
 ) *PublishAuth {
 	return &PublishAuth{
-		userRepo: userRepo, pushRepo: pushRepo, proxyRepo: proxyRepo,
-		pushAuthority: pushAuthority, recordPushLive: recordPushLive,
-		publish: publish,
+		pushRepo: pushRepo, proxyRepo: proxyRepo,
+		recordPushLive: recordPushLive,
+		publish:        publish,
 	}
 }
 
@@ -53,7 +46,7 @@ type PublishResult struct {
 	EnableAudio bool
 }
 
-func (a *PublishAuth) Authenticate(app, stream, params string) PublishResult {
+func (a *PublishAuth) Authenticate(app, stream string) PublishResult {
 	res := PublishResult{Allowed: true, EnableAudio: true}
 	if IsGBLiveApp(app) {
 		if a.publish != nil && a.publish.ShouldMP4(app, stream) {
@@ -75,35 +68,8 @@ func (a *PublishAuth) Authenticate(app, stream, params string) PublishResult {
 		}
 		return res
 	}
-	if a.pushAuthority {
-		callID, sign := parseParams(params)
-		if sign == "" || !a.userRepo.CheckPushAuthority(callID, sign) {
-			return PublishResult{Allowed: false}
-		}
-	}
 	if a.recordPushLive {
 		res.EnableMP4 = true
 	}
 	return res
-}
-
-func parseParams(raw string) (callID, sign string) {
-	if raw == "" {
-		return "", ""
-	}
-	vals, err := url.ParseQuery(raw)
-	if err != nil {
-		if strings.Contains(raw, "sign=") {
-			for _, part := range strings.Split(raw, "&") {
-				if strings.HasPrefix(part, "sign=") {
-					sign = strings.TrimPrefix(part, "sign=")
-				}
-				if strings.HasPrefix(part, "callId=") {
-					callID = strings.TrimPrefix(part, "callId=")
-				}
-			}
-		}
-		return callID, sign
-	}
-	return vals.Get("callId"), vals.Get("sign")
 }

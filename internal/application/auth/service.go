@@ -100,10 +100,6 @@ func (s *Service) ChangePasswordForAdmin(userID int, password string) error {
 	return s.userRepo.UpdatePassword(userID, password)
 }
 
-func (s *Service) ChangePushKey(userID int, pushKey string) error {
-	return s.userRepo.ChangePushKey(userID, pushKey)
-}
-
 func (s *Service) ListRoles() ([]*domainuser.Role, error) {
 	return s.userRepo.ListRoles()
 }

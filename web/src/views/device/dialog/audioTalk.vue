@@ -174,8 +174,6 @@ export default {
       this.$store.dispatch('user/getUserInfo')
         .then((data) => {
           if (data === null) { this.talkStatus = -1; return }
-          const pushKey = data.pushKey
-          url += '&sign=' + pushKey
 
           if (this.broadcastRtc) {
             this.broadcastRtc.close()

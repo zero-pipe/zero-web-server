@@ -70,17 +70,3 @@ func (h *UserHandler) ChangePasswordForAdmin(c *gin.Context) {
 	}
 	response.OK(c, nil)
 }
-
-func (h *UserHandler) ChangePushKey(c *gin.Context) {
-	userID := parseIntQuery(c, "userId", 0)
-	pushKey := c.Query("pushKey")
-	if userID <= 0 {
-		response.Error(c, response.CodeBadReq, "参数错误")
-		return
-	}
-	if err := h.auth.ChangePushKey(userID, pushKey); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.OK(c, nil)
-}

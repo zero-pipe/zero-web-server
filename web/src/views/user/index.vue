@@ -20,13 +20,10 @@
         header-row-class-name="table-header"
       >
         <el-table-column prop="username" label="用户名" min-width="160" />
-        <el-table-column prop="pushKey" label="pushkey" min-width="160" />
         <el-table-column prop="role.name" label="类型" min-width="160" />
         <el-table-column label="操作" min-width="170" fixed="right">
           <template v-slot:default="scope">
             <el-button size="medium" icon="el-icon-lock" type="text" title="修改密码" aria-label="修改密码" @click="edit(scope.row)" />
-            <el-divider direction="vertical" />
-            <el-button size="medium" icon="el-icon-key" type="text" title="修改 pushkey" aria-label="修改 pushkey" @click="changePushKey(scope.row)" />
             <el-divider direction="vertical" />
             <el-button
               size="medium"
@@ -52,21 +49,18 @@
       />
     </div>
     <changePasswordForAdmin ref="changePasswordForAdmin" />
-    <changePushKey ref="changePushKey" />
     <addUser ref="addUser" />
   </div>
 </template>
 
 <script>
 import changePasswordForAdmin from './dialog/changePasswordForAdmin.vue'
-import changePushKey from './dialog/changePushKey.vue'
 import addUser from './dialog/addUser.vue'
 
 export default {
   name: 'User',
   components: {
     changePasswordForAdmin,
-    changePushKey,
     addUser
   },
   data() {
@@ -152,17 +146,6 @@ export default {
       })
     },
 
-    changePushKey: function(row) {
-      this.$refs.changePushKey.openDialog(row, () => {
-        this.$refs.changePushKey.close()
-        this.$message({
-          showClose: true,
-          message: 'pushKey修改成功',
-          type: 'success'
-        })
-        setTimeout(this.getUserList, 200)
-      })
-    },
     addUser: function() {
       // this.$refs.addUser.openDialog()
       this.$refs.addUser.openDialog(() => {

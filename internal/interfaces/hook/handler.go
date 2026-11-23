@@ -147,7 +147,7 @@ func (h *Handler) onPublish(c *gin.Context) {
 		c.JSON(200, gin.H{"code": 0, "msg": "success", "enable_audio": true, "enable_mp4": false})
 		return
 	}
-	result := h.publishAuth.Authenticate(app, stream, params)
+	result := h.publishAuth.Authenticate(app, stream)
 	if !result.Allowed {
 		c.JSON(200, gin.H{"code": -1, "msg": "Unauthorized"})
 		return

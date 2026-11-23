@@ -3,7 +3,6 @@ import {
   add,
   changePassword,
   changePasswordForAdmin,
-  changePushKey,
   getUserInfo,
   login,
   logout,
@@ -136,14 +135,6 @@ const actions = {
       }).catch(error => {
         reject(error)
       })
-    })
-  },
-
-  changePushKey({ commit }, params) {
-    return new Promise((resolve, reject) => {
-      changePushKey(params).then(response => {
-        resolve(response.data)
-      }).catch(reject)
     })
   },
 

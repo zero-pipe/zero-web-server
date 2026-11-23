@@ -14,7 +14,6 @@ func registerUserMgmt(parent *gin.RouterGroup, userHandler *handler.UserHandler,
 	g.POST("/user/add", userHandler.AddUser)
 	g.DELETE("/user/delete", userHandler.DeleteUser)
 	g.POST("/user/changePasswordForAdmin", userHandler.ChangePasswordForAdmin)
-	g.POST("/user/changePushKey", userHandler.ChangePushKey)
 
 	g.GET("/role/all", roleHandler.All)
 	g.GET("/role/menus", roleHandler.Menus)

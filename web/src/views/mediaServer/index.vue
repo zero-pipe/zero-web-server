@@ -1,8 +1,5 @@
 <template>
   <div id="mediaServerManger" class="app-container media-server-page">
-    <el-form :inline="true" size="mini" class="media-server-toolbar">
-      <el-button icon="el-icon-plus" size="mini" type="primary" @click="add">添加节点</el-button>
-    </el-form>
     <el-row :gutter="16">
       <el-col v-for="item in mediaServerList" :key="item.id" :span="getNumberByWidth()">
         <el-card shadow="hover" :body-style="{ padding: '0' }" class="server-card">
@@ -85,9 +82,6 @@ export default {
       if (this.isZms(item)) return 'ZMS'
       if ((item.type || '').toLowerCase() === 'abl') return 'ABL'
       return (item.type || '节点').toUpperCase()
-    },
-    add() {
-      this.$refs.edit.openDialog(null, this.initData)
     },
     edit(row) {
       this.$refs.edit.openDialog(row, this.initData)

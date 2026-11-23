@@ -14,7 +14,6 @@ type User struct {
 	Password   string `json:"password,omitempty"`
 	CreateTime string `json:"createTime"`
 	UpdateTime string `json:"updateTime"`
-	PushKey    string `json:"pushKey"`
 	Role       *Role  `json:"role"`
 }
 
@@ -22,7 +21,6 @@ type LoginUser struct {
 	Username    string   `json:"username"`
 	AccessToken string   `json:"accessToken"`
 	ServerID    string   `json:"serverId"`
-	PushKey     string   `json:"pushKey,omitempty"`
 	Role        *Role    `json:"role,omitempty"`
 	Menus       []string `json:"menus"`
 }
@@ -32,7 +30,6 @@ func NewLoginUser(u *User, token, serverID string, menus []string) *LoginUser {
 		Username:    u.Username,
 		AccessToken: token,
 		ServerID:    serverID,
-		PushKey:     u.PushKey,
 		Menus:       menus,
 	}
 	if lu.Menus == nil {
@@ -48,12 +45,10 @@ type Repository interface {
 	FindByUsername(username string) (*User, error)
 	FindByID(id int) (*User, error)
 	ListAll() ([]*User, error)
-	CheckPushAuthority(callID, sign string) bool
 	List(page, count int) ([]*User, int64, error)
 	Create(username, password string, roleID int) error
 	Delete(id int) error
 	UpdatePassword(id int, password string) error
-	ChangePushKey(id int, pushKey string) error
 	ListRoles() ([]*Role, error)
 	CreateRole(name, authority string) (*Role, error)
 	UpdateRole(id int, name, authority string) error

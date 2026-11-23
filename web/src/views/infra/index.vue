@@ -89,21 +89,32 @@
       </el-tab-pane>
 
       <el-tab-pane label="对象存储" name="objectStore">
-        <el-descriptions :column="2" size="small" border style="max-width: 760px;">
-          <el-descriptions-item label="启用">{{ objectStore.enabled ? '是' : '否' }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="objectStore.status && objectStore.status.online ? 'success' : 'info'" size="mini">
-              {{ objectStore.status && objectStore.status.online ? '在线' : '离线' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="驱动">{{ objectStore.provider || 'noop' }}</el-descriptions-item>
-          <el-descriptions-item label="Bucket">{{ objectStore.bucket || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="Endpoint">{{ objectStore.endpoint || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="公网前缀">{{ objectStore.publicBase || '—' }}</el-descriptions-item>
-        </el-descriptions>
-        <div style="margin-top: 12px;">
-          <el-button type="primary" @click="$router.push('/objectStore')">前往对象存储配置</el-button>
-        </div>
+        <el-form v-loading="loading" :model="objectStoreForm" label-width="120px" style="max-width: 640px;" @submit.native.prevent>
+          <el-form-item label="启用"><el-switch v-model="objectStoreForm.enabled" /></el-form-item>
+          <el-form-item label="驱动">
+            <el-select v-model="objectStoreForm.provider" style="width: 100%;">
+              <el-option label="noop（未对接）" value="noop" />
+              <el-option label="MinIO" value="minio" />
+              <el-option label="S3 兼容" value="s3" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="Endpoint"><el-input v-model="objectStoreForm.endpoint" placeholder="如 192.168.1.10:9000" /></el-form-item>
+          <el-form-item label="Region"><el-input v-model="objectStoreForm.region" placeholder="S3 区域，MinIO 可空" /></el-form-item>
+          <el-form-item label="Bucket"><el-input v-model="objectStoreForm.bucket" /></el-form-item>
+          <el-form-item label="AccessKey"><el-input v-model="objectStoreForm.accessKey" /></el-form-item>
+          <el-form-item label="SecretKey"><el-input v-model="objectStoreForm.secretKey" show-password /></el-form-item>
+          <el-form-item label="HTTPS"><el-switch v-model="objectStoreForm.useSSL" /></el-form-item>
+          <el-form-item label="PathStyle">
+            <el-switch v-model="objectStoreForm.pathStyle" />
+            <span class="hint">MinIO 建议开启</span>
+          </el-form-item>
+          <el-form-item label="公网前缀"><el-input v-model="objectStoreForm.publicBase" placeholder="可选，用于拼直链" /></el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="osSaving" @click="saveObjectStore">保存</el-button>
+            <el-button :loading="osChecking" @click="checkObjectStore">连通性检查</el-button>
+          </el-form-item>
+        </el-form>
+        <el-alert v-if="osHealthMsg" :type="osHealthOk ? 'success' : 'warning'" :closable="false" :title="osHealthMsg" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -111,6 +122,7 @@
 
 <script>
 import { getInfraOverview, saveMySQLConfig, saveRedisConfig, saveMQTTConfig, checkMQTTHealth, getPipelineStatus } from '@/api/infra'
+import { getObjectStoreConfig, saveObjectStoreConfig, checkObjectStoreHealth } from '@/api/server'
 
 export default {
   name: 'Infrastructure',
@@ -124,6 +136,23 @@ export default {
       redis: { host: '', port: 6379, password: '', database: 0, poolSize: 10 },
       mqtt: { enabled: false, broker: '', clientIdPrefix: 'zws', username: '', password: '', topicPrefix: 'zws/events', qos: 1, keepAliveSec: 30, tlsEnabled: false, caCert: '', clientCert: '', clientKey: '' },
       objectStore: {},
+      objectStoreForm: {
+        id: 1,
+        enabled: false,
+        provider: 'noop',
+        endpoint: '',
+        region: '',
+        bucket: '',
+        accessKey: '',
+        secretKey: '',
+        useSSL: false,
+        pathStyle: true,
+        publicBase: ''
+      },
+      osSaving: false,
+      osChecking: false,
+      osHealthOk: false,
+      osHealthMsg: '',
       pipeline: { ready: false },
       restartRequired: false,
       statusCards: []
@@ -147,6 +176,22 @@ export default {
         .finally(() => { this.loading = false })
       getPipelineStatus().then(res => {
         this.pipeline = (res && res.data) || { ready: false }
+      }).catch(() => {})
+      getObjectStoreConfig().then(res => {
+        const d = (res && res.data) || res || {}
+        this.objectStoreForm = {
+          id: d.id || 1,
+          enabled: !!d.enabled,
+          provider: d.provider || 'noop',
+          endpoint: d.endpoint || '',
+          region: d.region || '',
+          bucket: d.bucket || '',
+          accessKey: d.accessKey || '',
+          secretKey: d.secretKey || '',
+          useSSL: !!d.useSSL,
+          pathStyle: d.pathStyle !== false,
+          publicBase: d.publicBase || ''
+        }
       }).catch(() => {})
     },
     buildStatusCards(d) {
@@ -193,6 +238,28 @@ export default {
         else this.$message.warning('MQTT 未连接：' + (d.error || '未知错误'))
       }).catch(e => this.$message.error(e || '检查失败'))
         .finally(() => { this.checking = false })
+    },
+    saveObjectStore() {
+      this.osSaving = true
+      saveObjectStoreConfig(this.objectStoreForm).then(res => {
+        const d = (res && res.data) || {}
+        this.$message.success(d.message || '保存成功')
+        this.load()
+      }).catch(e => this.$message.error(e || '保存失败'))
+        .finally(() => { this.osSaving = false })
+    },
+    checkObjectStore() {
+      this.osChecking = true
+      checkObjectStoreHealth().then(res => {
+        const d = (res && res.data) || {}
+        this.osHealthOk = !!d.ok
+        this.osHealthMsg = d.ok
+          ? `连通正常（provider=${d.provider}）`
+          : `未连通：${d.error || 'unknown'}（provider=${d.provider}）`
+      }).catch(e => {
+        this.osHealthOk = false
+        this.osHealthMsg = String(e || '检查失败')
+      }).finally(() => { this.osChecking = false })
     }
   }
 }

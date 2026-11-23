@@ -17,7 +17,6 @@ type User struct {
 	RoleID     int      `gorm:"column:role_id"`
 	CreateTime string   `gorm:"column:create_time;size:50"`
 	UpdateTime string   `gorm:"column:update_time;size:50"`
-	PushKey    string   `gorm:"column:push_key;size:50"`
 	Role       UserRole `gorm:"foreignKey:RoleID;references:ID"`
 }
 

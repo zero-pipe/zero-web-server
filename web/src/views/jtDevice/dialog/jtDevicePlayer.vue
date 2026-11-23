@@ -71,7 +71,6 @@ import playerTabs from '../../common/playerTabs.vue'
 import streamMediaPanel from '../../common/streamMediaPanel.vue'
 import jtDevicePtzPanel from '../common/jtDevicePtzPanel.vue'
 import elDragDialog from '@/directive/el-drag-dialog'
-import crypto from 'crypto'
 import mediaInfo from '../../common/mediaInfo.vue'
 
 export default {
@@ -209,8 +208,6 @@ export default {
             this.broadcastStatus = -1
             return
           }
-          const pushKey = data.pushKey
-          url += '&sign=' + crypto.createHash('md5').update(pushKey, 'utf8').digest('hex')
           console.log('开始语音喊话： ' + url)
           this.broadcastRtc = new ZLMRTCClient.Endpoint({
             debug: true,

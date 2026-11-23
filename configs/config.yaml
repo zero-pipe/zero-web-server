@@ -62,7 +62,6 @@ user_settings:
   play_timeout: 180000
   record_info_timeout: 30000
   stream_on_demand: true
-  push_authority: false
   record_push_live: false
   server_id: "000000"
   login_timeout: 60 # minutes

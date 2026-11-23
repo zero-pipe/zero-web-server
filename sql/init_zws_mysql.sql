@@ -394,7 +394,6 @@ CREATE TABLE IF NOT EXISTS zws_user
     role_id     INT COMMENT '角色ID',
     create_time VARCHAR(50) COMMENT '创建时间',
     update_time VARCHAR(50) COMMENT '更新时间',
-    push_key    VARCHAR(50) COMMENT '推送密钥',
     UNIQUE KEY uk_user_username (username)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
