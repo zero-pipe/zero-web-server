@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	domainchannel "zero-web-server/internal/domain/channel"
 	domaindevice "zero-web-server/internal/domain/device"
@@ -140,9 +141,19 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 		mediaurl.LogPlayStreamPaths("[GB28181 play] reuse live URLs", app, stream, "", node.PlayURLs(app, stream))
 		return content, nil
 	}
-	// INVITE 会话还在但媒体未就绪（常见于设备重启）：清掉僵死会话后重新 INVITE。
+	// INVITE 会话还在但媒体未就绪：可能是设备重启后的僵死会话，也可能只是正在起流
+	// （GB 从 INVITE 到首帧 SPS 到达有数秒窗口）。先给一小段宽限期等它自己就绪，
+	// 避免把正在起流的会话误杀、反复 openRtpServer 导致“第一次播放失败”。
 	if _, hasInvite := s.sip.InviteManager().Get(stream); hasInvite {
-		applog.Warnf("[GB28181 play] stale invite without media, close and re-INVITE stream=%s", stream)
+		if info := s.waitGBStreamReady(ctx, node, app, stream, gbInviteGraceWait); info != nil {
+			applog.Infof("[GB28181 play] pending invite became ready, reuse stream=%s bytesSpeed=%d fps=%d %dx%d",
+				stream, info.BytesSpeed, info.VideoFps, info.Width, info.Height)
+			s.media.BindStream(node.ID(), app, stream)
+			content := s.buildStreamContent(app, stream, node)
+			mediaurl.LogPlayStreamPaths("[GB28181 play] reuse live URLs", app, stream, "", node.PlayURLs(app, stream))
+			return content, nil
+		}
+		applog.Warnf("[GB28181 play] stale invite without media after grace, close and re-INVITE stream=%s", stream)
 		_ = s.sip.CloseInviteSession(stream)
 		_ = node.CloseStreams(ctx, "__defaultVhost__", app, stream)
 	}
@@ -185,9 +196,45 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 	}()
 
 	pushURL := mediaurl.BuildGB28181PushURL(sdpIP, rtpPort, tcpMode)
+	// INVITE 之后 ZMS 要等摄像头发 RTP/PS 并解析出 SPS 才有可播的 SDP。这个窗口内
+	// RTSP DESCRIBE 会返回 404（active_sources=1 但 Video=false），客户端立即连接就会
+	//“第一次播放失败、第二次才成功”。这里等媒体真正就绪再返回播放地址。
+	if info := s.waitGBStreamReady(ctx, node, app, stream, gbFirstFrameWait); info != nil {
+		applog.Infof("[GB28181 play 5/6] stream ready stream=%s bytesSpeed=%d fps=%d %dx%d",
+			stream, info.BytesSpeed, info.VideoFps, info.Width, info.Height)
+	} else {
+		applog.Warnf("[GB28181 play 5/6] stream not ready within wait, return URLs anyway stream=%s", stream)
+	}
 	content := s.buildStreamContent(app, stream, node)
 	mediaurl.LogPlayStreamPaths("[GB28181 play 6/6] URLs ready (invite async)", app, stream, pushURL, node.PlayURLs(app, stream))
 	return content, nil
+}
+
+const (
+	// gbFirstFrameWait: INVITE 到首帧 SPS 到达的就绪等待上限（实测约 10s，留裕量）。
+	// 客户端 HTTP 超时 30s，此处留出连接余量。
+	gbFirstFrameWait = 20 * time.Second
+	// gbInviteGraceWait: 已有 invite 会话但媒体未就绪时的宽限期，避免误杀正在起流的会话。
+	gbInviteGraceWait = 3 * time.Second
+	gbReadyPollTick   = 200 * time.Millisecond
+)
+
+// waitGBStreamReady 轮询探测直到该流可播或到达 maxWait；ctx 取消则提前返回 nil。
+func (s *Service) waitGBStreamReady(ctx context.Context, node port.MediaEndpoint, app, stream string, maxWait time.Duration) *port.StreamProbe {
+	deadline := time.Now().Add(maxWait)
+	for {
+		if info := node.LookupStream(ctx, app, stream); gbLiveStreamReady(info) {
+			return info
+		}
+		if time.Now().After(deadline) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(gbReadyPollTick):
+		}
+	}
 }
 
 func gbLiveStreamReady(info *port.StreamProbe) bool {

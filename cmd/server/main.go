@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -156,6 +158,12 @@ func main() {
 	// 对外接入密钥：可视化配置 + 同步到媒体节点本地验签。
 	accessTokenRepo := persistence.NewAccessTokenRepository(db)
 	accessTokenService := accesstokenapp.NewService(accessTokenRepo)
+	// token 只在启用集合变化时推送：节点每次心跳都会触发重推，若每 30s 都推一遍空列表，
+	// ZMS 会持续打 "token list cleared" 噪声日志。
+	var (
+		tokenMu   sync.Mutex
+		tokenSeen = map[string]string{}
+	)
 	syncTokensToNode := func(nodeID string) {
 		if nodeID == "" {
 			return
@@ -164,9 +172,22 @@ func main() {
 		if err != nil || node == nil || node.Client == nil {
 			return
 		}
+		tokens := accessTokenService.EnabledTokens()
+		sig := strings.Join(tokens, ",")
+		tokenMu.Lock()
+		if tokenSeen[nodeID] == sig {
+			tokenMu.Unlock()
+			return
+		}
+		tokenSeen[nodeID] = sig
+		tokenMu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if _, err := node.Client.SetAuthTokens(ctx, accessTokenService.EnabledTokens()); err != nil {
+		if _, err := node.Client.SetAuthTokens(ctx, tokens); err != nil {
+			// 推送失败则清掉记录，下次心跳重试。
+			tokenMu.Lock()
+			delete(tokenSeen, nodeID)
+			tokenMu.Unlock()
 			applog.Warnf("[access-token] 同步 token 到媒体节点 %s 失败: %v", nodeID, err)
 		}
 	}
