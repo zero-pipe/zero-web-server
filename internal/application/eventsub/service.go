@@ -217,10 +217,14 @@ func (s *Service) rearmOne(ctx context.Context, sub *domainevent.Subscription) b
 	return false
 }
 
+// supportsAlarm 判断插件能否接收布防/事件订阅。
+// 能力枚举以插件规范 5.6 为准：arm / disarm（见 pluginpkg 的 capabilitySet，
+// 与资产投影 asset_backfill.pluginOpSupported 同口径）。alarm / arming 仅为
+// 早期口语写法，已无插件使用，保留兼容。
 func supportsAlarm(p *domainplugin.Plugin) bool {
 	for _, c := range p.Capabilities {
 		switch strings.ToLower(strings.TrimSpace(c)) {
-		case "alarm", "arming":
+		case "arm", "disarm", "alarm", "arming":
 			return true
 		}
 	}
