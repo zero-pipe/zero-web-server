@@ -41,22 +41,8 @@
           </div>
 
           <div class="player-under panel-block control-extra">
-            <el-tabs v-model="extraTab">
-              <el-tab-pane label="实时视频" name="media">
-                <streamMediaPanel
-                  v-if="extraTab === 'media'"
-                  :player-url="playerUrlInfo.playerUrl"
-                  :play-url="playerUrlInfo.playUrl"
-                  :stream-info="streamInfo"
-                />
-              </el-tab-pane>
-              <el-tab-pane label="预置位" name="preset">
-                <channelPreset
-                  v-if="extraTab === 'preset'"
-                  :channel-id="channelId"
-                />
-              </el-tab-pane>
-            </el-tabs>
+            <div class="panel-block-title">预置位</div>
+            <channelPreset :channel-id="channelId" />
           </div>
         </div>
 
@@ -100,7 +86,6 @@ import { modeToPreferredPlayer } from '@/utils/playerStrategy'
 import channelPtzPanel from './common/channelPtzPanel.vue'
 import channelPreset from './common/ptzPreset.vue'
 import mediaInfo from '../common/mediaInfo.vue'
-import streamMediaPanel from '../common/streamMediaPanel.vue'
 
 function isDomeCamera(ptzType) {
   const t = Number(ptzType)
@@ -110,7 +95,7 @@ function isDomeCamera(ptzType) {
 export default {
   name: 'ChannelPlayer',
   directives: { elDragDialog },
-  components: { playerTabs, playerModeSelect, channelPtzPanel, channelPreset, mediaInfo, streamMediaPanel },
+  components: { playerTabs, playerModeSelect, channelPtzPanel, channelPreset, mediaInfo },
   data() {
     return {
       videoUrl: '',

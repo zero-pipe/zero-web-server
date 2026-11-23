@@ -170,16 +170,10 @@ export const constantRoutes = [
         meta: { title: '部标录像' }
       },
       {
-        path: '/push',
-        name: 'PushList',
-        component: () => import('@/views/streamPush/index'),
-        meta: { title: '推流列表', icon: 'streamPush' }
-      },
-      {
-        path: '/proxy',
-        name: 'Proxy',
-        component: () => import('@/views/streamProxy/index'),
-        meta: { title: '拉流代理', icon: 'streamProxy' }
+        path: '/mediaSession',
+        name: 'MediaSession',
+        component: () => import('@/views/mediaSession/index'),
+        meta: { title: '媒体会话', icon: 'streamPush' }
       }
     ]
   },

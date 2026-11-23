@@ -41,8 +41,7 @@ export const primaryMenus = [
     icon: 'menu-media',
     children: [
       { title: '媒体节点', path: '/mediaServer', icon: 'media-node' },
-      { title: '推流列表', path: '/push', icon: 'streamPush' },
-      { title: '拉流代理', path: '/proxy', icon: 'streamProxy' }
+      { title: '媒体会话', path: '/mediaSession', icon: 'streamPush' }
     ]
   },
   {

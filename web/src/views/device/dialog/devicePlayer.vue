@@ -41,24 +41,9 @@
             </div>
           </div>
 
-          <div class="player-under panel-block control-extra">
-            <el-tabs v-model="extraTab" @tab-click="extraTabClick">
-              <el-tab-pane label="实时视频" name="media">
-                <streamMediaPanel
-                  v-if="extraTab === 'media'"
-                  :player-url="playerUrlInfo.playerUrl"
-                  :play-url="playerUrlInfo.playUrl"
-                  :stream-info="streamInfo"
-                />
-              </el-tab-pane>
-              <el-tab-pane v-if="showPtz" label="预置位" name="preset">
-                <ptzPreset
-                  v-if="extraTab === 'preset'"
-                  :device-id="deviceId"
-                  :channel-device-id="channelId"
-                />
-              </el-tab-pane>
-            </el-tabs>
+          <div v-if="showPtz" class="player-under panel-block control-extra">
+            <div class="panel-block-title">预置位</div>
+            <ptzPreset :device-id="deviceId" :channel-device-id="channelId" />
           </div>
         </div>
 
@@ -103,7 +88,7 @@ import playerModeSelect from '../../common/playerModeSelect.vue'
 import devicePtzPanel from '../common/devicePtzPanel.vue'
 import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
-import streamMediaPanel from '../../common/streamMediaPanel.vue'
+
 import { modeToPreferredPlayer } from '@/utils/playerStrategy'
 
 function isDomeCamera(ptzType) {
@@ -114,7 +99,7 @@ function isDomeCamera(ptzType) {
 export default {
   name: 'DevicePlayer',
   directives: { elDragDialog },
-  components: { playerTabs, playerModeSelect, devicePtzPanel, PtzPreset, mediaInfo, streamMediaPanel },
+  components: { playerTabs, playerModeSelect, devicePtzPanel, PtzPreset, mediaInfo },
   data() {
     return {
       videoUrl: '',

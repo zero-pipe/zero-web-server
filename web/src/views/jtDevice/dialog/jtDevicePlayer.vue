@@ -22,9 +22,6 @@
         <div class="control-side">
           <jtDevicePtzPanel v-if="showPtz" :device-id="deviceId" :channel-id="channelId" />
           <el-tabs v-model="tabActiveName" @tab-click="tabHandleClick" class="control-tabs">
-            <el-tab-pane label="实时视频" name="media">
-              <streamMediaPanel v-if="tabActiveName === 'media'" :player-url="playerUrlInfo.playerUrl" :play-url="playerUrlInfo.playUrl" :stream-info="streamInfo" />
-            </el-tab-pane>
             <el-tab-pane label="编码信息" name="codec">
               <mediaInfo v-if="tabActiveName === 'codec'" ref="mediaInfo" :app="app" :stream="streamId" :media-server-id="mediaServerId" />
             </el-tab-pane>
@@ -68,7 +65,6 @@
 
 <script>
 import playerTabs from '../../common/playerTabs.vue'
-import streamMediaPanel from '../../common/streamMediaPanel.vue'
 import jtDevicePtzPanel from '../common/jtDevicePtzPanel.vue'
 import elDragDialog from '@/directive/el-drag-dialog'
 import mediaInfo from '../../common/mediaInfo.vue'
@@ -76,7 +72,7 @@ import mediaInfo from '../../common/mediaInfo.vue'
 export default {
   name: 'JtDevicePlayer',
   directives: { elDragDialog },
-  components: { playerTabs, streamMediaPanel, jtDevicePtzPanel, mediaInfo },
+  components: { playerTabs, jtDevicePtzPanel, mediaInfo },
   props: {},
   data() {
     return {
@@ -87,7 +83,7 @@ export default {
       mediaServerId: '',
       deviceId: '',
       channelId: '',
-      tabActiveName: 'media',
+      tabActiveName: 'codec',
       hasAudio: false,
       isLoging: false,
       showPtz: true,
@@ -111,10 +107,10 @@ export default {
     },
     openDialog(tab, deviceId, channelId, param) {
       if (this.showVideoDialog) return
-      this.tabActiveName = tab || 'media'
+      this.tabActiveName = tab || 'codec'
       if (tab === 'streamPlay') {
         this.showPtz = false
-        this.tabActiveName = 'media'
+        this.tabActiveName = 'codec'
       } else {
         this.showPtz = true
       }

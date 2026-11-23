@@ -34,6 +34,7 @@ import (
 	snapapp "zero-web-server/internal/application/snap"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
 	streampushapp "zero-web-server/internal/application/streampush"
+	mediasessionapp "zero-web-server/internal/application/mediasession"
 	upstreamapp "zero-web-server/internal/application/upstream"
 	"zero-web-server/internal/infrastructure/config"
 	"zero-web-server/internal/infrastructure/persistence"
@@ -61,6 +62,7 @@ type Deps struct {
 	CloudRecordService   *cloudrecordapp.Service
 	StreamPushService    *streampushapp.Service
 	StreamProxyService   *streamproxyapp.Service
+	MediaSessionService  *mediasessionapp.Service
 	RecordPlanService    *recordplanapp.Service
 	MediaServerService   *mediaserverapp.Service
 	CommonChannelSvc     *channelapp.Service
@@ -134,6 +136,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	cloudRecordHandler := handler.NewCloudRecordHandler(deps.CloudRecordService, deps.PlayTimeoutMs)
 	streamPushHandler := handler.NewStreamPushHandler(deps.StreamPushService, deps.PlayTimeoutMs)
 	streamProxyHandler := handler.NewStreamProxyHandler(deps.StreamProxyService, deps.PlayTimeoutMs)
+	mediaSessionHandler := handler.NewMediaSessionHandler(deps.MediaSessionService)
 	recordPlanHandler := handler.NewRecordPlanHandler(deps.RecordPlanService)
 	mediaServerHandler := handler.NewMediaServerHandler(
 		deps.MediaServerService,
@@ -250,6 +253,8 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerPush(auth, streamPushHandler)
 
 		registerProxy(auth, streamProxyHandler)
+
+		registerMediaSessions(auth, mediaSessionHandler)
 
 		registerRecordPlan(auth, recordPlanHandler)
 

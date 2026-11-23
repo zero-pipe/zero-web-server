@@ -50,6 +50,7 @@ import (
 	snapapp "zero-web-server/internal/application/snap"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
 	streampushapp "zero-web-server/internal/application/streampush"
+	mediasessionapp "zero-web-server/internal/application/mediasession"
 	upstreamapp "zero-web-server/internal/application/upstream"
 	"zero-web-server/internal/civilcode"
 	"zero-web-server/internal/infrastructure/config"
@@ -220,6 +221,7 @@ func main() {
 	ipcService := ipcdevice.NewService(pluginService, pluginRepo, mediaCluster, ipcplugin.NewFactory(pluginToken), cfg.UserSettings.ServerID)
 
 	assetRepo := persistence.NewAssetRepository(db)
+	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, mediaCluster, cfg.Server.Port)
 	assetProjector := persistence.NewAssetProjector(db)
 	if err := assetProjector.Backfill(); err != nil {
 		applog.Warn("asset backfill", "err", err)
@@ -387,6 +389,7 @@ func main() {
 		CloudRecordService:   cloudRecordService,
 		StreamPushService:    streamPushService,
 		StreamProxyService:   streamProxyService,
+		MediaSessionService:  mediaSessionService,
 		RecordPlanService:    recordPlanService,
 		MediaServerService:   mediaServerService,
 		CommonChannelSvc:     commonChannelService,

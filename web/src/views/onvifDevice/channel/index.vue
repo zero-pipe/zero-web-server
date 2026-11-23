@@ -131,14 +131,6 @@
 
           <div class="player-under panel-block control-extra">
             <el-tabs v-model="extraTab">
-              <el-tab-pane label="实时视频" name="media">
-                <streamMediaPanel
-                  v-if="extraTab === 'media'"
-                  :player-url="playerUrlInfo.playerUrl"
-                  :play-url="playerUrlInfo.playUrl"
-                  :stream-info="streamInfo"
-                />
-              </el-tab-pane>
               <el-tab-pane label="码流信息" name="meta">
                 <div class="onvif-meta-grid">
                   <div class="onvif-meta-item">
@@ -212,7 +204,6 @@
 <script>
 import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '@/views/common/playerTabs.vue'
-import streamMediaPanel from '@/views/common/streamMediaPanel.vue'
 import mediaInfo from '@/views/common/mediaInfo.vue'
 import ptzControls from '@/views/common/ptzControls.vue'
 import { ptzControl, queryChannels, startPlay, stopPlay, syncDevice, updateChannel } from '@/api/onvif'
@@ -229,7 +220,7 @@ const PTZ_CMD_MAP = {
 export default {
   name: 'OnvifChannelList',
   directives: { elDragDialog },
-  components: { playerTabs, streamMediaPanel, mediaInfo, ptzControls },
+  components: { playerTabs, mediaInfo, ptzControls },
   props: {
     deviceId: {
       type: Number,
@@ -255,7 +246,7 @@ export default {
       app: '',
       streamId: '',
       mediaServerId: '',
-      extraTab: 'media',
+      extraTab: 'meta',
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
