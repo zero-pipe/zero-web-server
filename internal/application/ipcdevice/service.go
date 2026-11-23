@@ -12,6 +12,7 @@ import (
 	"zero-web-server/internal/dto"
 	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/port"
+	applog "zero-web-server/pkg/log"
 )
 
 var streamApp = mediaurl.LiveApp
@@ -139,8 +140,14 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 	if err != nil {
 		return nil, err
 	}
-	if s.getActive(stream) != nil {
-		return s.buildContent(ctx, stream)
+	// active 只说明「平台认为这路流活着」。ZMS 侧可能已经没了（拉流被对端断开、
+	// 媒体节点重启）或卡死（连着但不来帧）。直接返回旧地址会让播放器一直停在
+	// “加载中”，所以先探活，不可用就清干净重建。
+	if act := s.getActive(stream); act != nil {
+		if s.activeStreamHealthy(ctx, act.NodeID, act.App, act.Stream) {
+			return s.buildContent(ctx, stream)
+		}
+		s.dropStaleStream(ctx, act.NodeID, act.App, act.Stream)
 	}
 	node, err := s.media.ResolveForStream(ctx, streamApp, stream, "")
 	if err != nil {
@@ -171,8 +178,18 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 		if src == nil || strings.TrimSpace(src.RTSPURL) == "" {
 			return nil, fmt.Errorf("插件未返回可用的 RTSP 流源")
 		}
-		if _, err := node.AddStreamProxy(ctx, "__defaultVhost__", streamApp, stream, src.RTSPURL, "1", false, false, true); err != nil {
-			return nil, fmt.Errorf("创建拉流代理失败: %w", err)
+		// ZMS 里可能已有这路流（平台重启后内存 active 丢失、或多客户端同时点播）。
+		// 此时再 AddStreamProxy 会让 ZMS 踢掉现有发布者并清空 GOP 缓存，正在观看的
+		// 客户端会被断流。已有且可用就直接接管；卡死的旧流先清掉再重建。
+		if probe := node.LookupStream(ctx, streamApp, stream); probe != nil && !streamStalled(probe) {
+			applog.Infof("[ipc] 复用 ZMS 已有直播流: app=%s stream=%s", streamApp, stream)
+		} else {
+			if probe != nil {
+				_ = node.CloseStreams(ctx, "__defaultVhost__", streamApp, stream)
+			}
+			if _, err := node.AddStreamProxy(ctx, "__defaultVhost__", streamApp, stream, src.RTSPURL, "1", false, false, true); err != nil {
+				return nil, fmt.Errorf("创建拉流代理失败: %w", err)
+			}
 		}
 	default:
 		return nil, fmt.Errorf("不支持的流传输方式: %s", actual)
@@ -239,6 +256,39 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 	s.media.UnbindStream(act.App, act.Stream)
 	s.setActive(stream, nil)
 	return nil
+}
+
+// streamStalled 判断探针结果是否表示“流在、但长时间不出数据”。
+// 起播阶段本来就没有帧，用 AliveSecond 做宽限，避免误判正常慢启动的流。
+func streamStalled(p *port.StreamProbe) bool {
+	return p != nil && p.AliveSecond > 10 && p.VideoFps == 0 && p.BytesSpeed == 0
+}
+
+// activeStreamHealthy 校验内存 active 标记对应的流在 ZMS 是否仍然可用。
+//   - 流已不在 ZMS：拉流被对端断开、代理被自动关闭、媒体节点重启等
+//   - 流在但长时间零帧零码率：拉流卡死（连接还在，数据不来）
+//
+// 探测本身失败（节点不可达、接口异常）时按“可用”处理，避免误杀正在播的流。
+func (s *Service) activeStreamHealthy(ctx context.Context, nodeID, app, stream string) bool {
+	node, err := s.media.Resolve(ctx, nodeID)
+	if err != nil || node == nil {
+		return true
+	}
+	probe := node.LookupStream(ctx, app, stream)
+	if probe == nil {
+		return false
+	}
+	return !streamStalled(probe)
+}
+
+// dropStaleStream 清掉失效的 active 标记与 ZMS 残留流，为重建拉流做准备。
+func (s *Service) dropStaleStream(ctx context.Context, nodeID, app, stream string) {
+	applog.Warnf("[ipc] 直播流已失效，重建拉流: app=%s stream=%s node=%s", app, stream, nodeID)
+	if node, err := s.media.Resolve(ctx, nodeID); err == nil && node != nil {
+		_ = node.CloseStreams(ctx, "__defaultVhost__", app, stream)
+	}
+	s.media.UnbindStream(app, stream)
+	s.setActive(stream, nil)
 }
 
 func (s *Service) GetDevice(deviceID int) (*domainplugin.Device, error) {

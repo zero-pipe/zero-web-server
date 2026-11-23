@@ -5,7 +5,15 @@
         <el-page-header content="编辑通道" @back="close" />
       </div>
     </div>
-    <CommonChannelEdit :id="id" ref="commonChannelEdit" :showCancel="true" @submitSuccess="close" @cancel="close" />
+    <CommonChannelEdit
+      :id="id"
+      :internal-code="internalCode"
+      :protocol="protocol"
+      ref="commonChannelEdit"
+      :showCancel="true"
+      @submitSuccess="close"
+      @cancel="close"
+    />
   </div>
 </template>
 
@@ -17,7 +25,13 @@ export default {
   components: {
     CommonChannelEdit
   },
-  props: ['id', 'closeEdit'],
+  // id：国标通道主键；internalCode + protocol：统一通道列表进入时使用
+  props: {
+    id: { type: [Number, String], default: null },
+    internalCode: { type: String, default: '' },
+    protocol: { type: String, default: 'gb28181' },
+    closeEdit: { type: Function, required: true }
+  },
   data() {
     return {}
   },

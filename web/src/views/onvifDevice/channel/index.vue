@@ -1,6 +1,14 @@
 <template>
   <div id="channelList" style="height: calc(100vh - 124px);">
-    <el-form :inline="true" size="mini">
+    <!-- 与国标通道编辑完全复用整页表单；差异只有国标通道编码默认为空、需手工填写 -->
+    <channel-edit
+      v-if="editCode"
+      :internal-code="editCode"
+      protocol="onvif"
+      :close-edit="closeEdit"
+    />
+    <template v-else>
+      <el-form :inline="true" size="mini">
       <el-form-item style="margin-right: 2rem">
         <el-page-header content="通道列表" @back="$emit('show-device')" />
       </el-form-item>
@@ -40,7 +48,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="码流类型" min-width="200">
+      <el-table-column label="码流类型" min-width="180">
         <template v-slot:default="scope">
           <el-select
             v-model="scope.row.selectedProfileToken"
@@ -58,13 +66,13 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="状态" min-width="90">
+      <el-table-column label="状态" min-width="100">
         <template v-slot:default="scope">
           <el-tag v-if="scope.row.status === 'ON'" size="medium">在线</el-tag>
           <el-tag v-else size="medium" type="info">离线</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="240" fixed="right" align="center">
+      <el-table-column label="操作" min-width="360" fixed="right">
         <template v-slot:default="scope">
           <el-button
             size="medium"
@@ -205,60 +213,7 @@
         </div>
       </div>
     </el-dialog>
-
-    <el-dialog title="编辑通道信息" :visible.sync="editVisible" width="560px">
-      <el-form :model="editForm" label-width="110px" size="small">
-        <el-form-item label="通道">
-          <span>{{ editForm.name || editForm.code }}</span>
-          <span class="hint-text" style="margin-left:8px">{{ editForm.code }}</span>
-        </el-form-item>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="经度">
-              <el-input-number v-model="editForm.longitude" :precision="6" :step="0.000001" style="width:100%" controls-position="right" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="纬度">
-              <el-input-number v-model="editForm.latitude" :precision="6" :step="0.000001" style="width:100%" controls-position="right" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="地图层级">
-              <el-input-number v-model="editForm.mapLevel" :min="0" :max="30" style="width:100%" controls-position="right" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="摄像机类型">
-              <el-select v-model="editForm.ptzType" style="width:100%" placeholder="请选择">
-                <el-option label="未知" :value="0" />
-                <el-option label="球机" :value="1" />
-                <el-option label="半球" :value="2" />
-                <el-option label="固定枪机" :value="3" />
-                <el-option label="遥控枪机" :value="4" />
-                <el-option label="遥控半球" :value="5" />
-                <el-option label="多目设备全景/拼接通道" :value="6" />
-                <el-option label="多目设备分割通道" :value="7" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="启用">
-              <el-switch v-model="editForm.enabled" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="标签">
-              <el-input v-model="editForm.tags" placeholder="逗号分隔" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-      <div slot="footer">
-        <el-button size="small" @click="editVisible = false">取消</el-button>
-        <el-button size="small" type="primary" :loading="editSaving" @click="saveEdit">保存</el-button>
-      </div>
-    </el-dialog>
+    </template>
   </div>
 </template>
 
@@ -267,8 +222,8 @@ import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '@/views/common/playerTabs.vue'
 import mediaInfo from '@/views/common/mediaInfo.vue'
 import ptzControls from '@/views/common/ptzControls.vue'
+import channelEdit from '@/views/device/channel/edit.vue'
 import { ptzControl, queryChannels, startPlay, stopPlay, syncDevice, updateChannel } from '@/api/onvif'
-import { queryChannels as queryUnifiedChannels, updateChannel as updateUnifiedChannel } from '@/api/asset'
 import { getMediaServerList } from '@/api/server'
 import { isH265Codec, resolvePlayerStrategy } from '@/utils/playerStrategy'
 
@@ -282,7 +237,7 @@ const PTZ_CMD_MAP = {
 export default {
   name: 'OnvifChannelList',
   directives: { elDragDialog },
-  components: { playerTabs, mediaInfo, ptzControls },
+  components: { playerTabs, mediaInfo, ptzControls, channelEdit },
   props: {
     deviceId: {
       type: Number,
@@ -309,11 +264,7 @@ export default {
       streamId: '',
       mediaServerId: '',
       extraTab: 'meta',
-      editVisible: false,
-      editSaving: false,
-      editForm: {
-        code: '', name: '', longitude: 0, latitude: 0, mapLevel: 0, ptzType: 0, enabled: true, tags: ''
-      },
+      editCode: '',
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
@@ -420,49 +371,11 @@ export default {
         this.$message.warning('该通道缺少内码，无法编辑')
         return
       }
-      this.editForm = {
-        code: row.internalCode,
-        name: row.name,
-        longitude: 0,
-        latitude: 0,
-        mapLevel: 0,
-        ptzType: 0,
-        enabled: true,
-        tags: ''
-      }
-      // 通道附加信息（经纬度等）存于统一资源的 attrs，按内码回读后再填充。
-      queryUnifiedChannels({ page: 1, count: 10, query: row.internalCode })
-        .then(res => {
-          const list = (res.data && res.data.list) || []
-          const c = list.find(x => x.internalCode === row.internalCode)
-          if (c) {
-            this.editForm = {
-              code: c.internalCode,
-              name: c.name || row.name,
-              longitude: Number(c.longitude) || 0,
-              latitude: Number(c.latitude) || 0,
-              mapLevel: Number(c.mapLevel) || 0,
-              ptzType: Number(c.ptzType) || 0,
-              enabled: c.enabled !== false,
-              tags: c.tags || ''
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => { this.editVisible = true })
+      this.editCode = row.internalCode
     },
-    saveEdit() {
-      if (!this.editForm.code) return
-      this.editSaving = true
-      const { longitude, latitude, mapLevel, ptzType, enabled, tags } = this.editForm
-      updateUnifiedChannel(this.editForm.code, { longitude, latitude, mapLevel, ptzType, enabled, tags })
-        .then(() => {
-          this.$message.success('通道信息已保存')
-          this.editVisible = false
-          this.loadChannels()
-        })
-        .catch(err => this.$message.error((err && err.message) || '保存失败'))
-        .finally(() => { this.editSaving = false })
+    closeEdit() {
+      this.editCode = ''
+      this.loadChannels()
     },
     handleSync() {
       syncDevice(this.deviceId).then(res => {

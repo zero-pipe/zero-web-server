@@ -1,5 +1,13 @@
 <template>
   <div class="unified-channel">
+    <!-- 编辑与国标通道完全复用整页表单：国标码默认为空、需手工填写 -->
+    <channel-edit
+      v-if="editCtx"
+      :internal-code="editCtx.internalCode"
+      :protocol="editCtx.protocol"
+      :close-edit="closeEdit"
+    />
+    <template v-else>
     <el-form :inline="true" size="mini">
       <el-form-item v-if="embedded" style="margin-right: 2rem">
         <el-page-header content="通道列表" @back="$emit('back')" />
@@ -31,33 +39,50 @@
       </el-form-item>
     </el-form>
 
-    <el-table v-loading="loading" :data="list" size="small" border>
-      <el-table-column prop="name" label="通道名称" min-width="160" />
-      <el-table-column label="类型" width="110">
-        <template slot-scope="{ row }">{{ kindLabel(row.kind) }}</template>
-      </el-table-column>
-      <el-table-column label="经纬度" min-width="150">
+    <el-table v-loading="loading" :data="list" size="small" style="width: 100%; font-size: 12px;" header-row-class-name="table-header">
+      <el-table-column prop="name" label="名称" min-width="180" />
+      <el-table-column label="开启音频" min-width="100">
         <template slot-scope="{ row }">
-          <span v-if="row.longitude || row.latitude">{{ row.longitude }}, {{ row.latitude }}</span>
-          <span v-else class="sub-text">—</span>
+          <el-switch
+            v-model="row.hasAudio"
+            active-color="#1A73E8"
+            :disabled="row.protocol === 'gb28181'"
+            :title="row.protocol === 'gb28181' ? '国标通道请在设备通道页修改' : ''"
+            @change="() => onAudioChange(row)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="所属设备" min-width="180">
+      <el-table-column label="码流类型" min-width="180">
         <template slot-scope="{ row }">
-          <div>{{ row.deviceName }}</div>
+          <el-select
+            v-model="row._profileId"
+            size="mini"
+            style="width: 100%;"
+            placeholder="请选择码流类型"
+            :loading="row._profilesLoading"
+          >
+            <el-option
+              v-for="p in (row._profiles || [])"
+              :key="p.id || p.name"
+              :label="p.name"
+              :value="p.id"
+            />
+          </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="协议" width="100">
+      <el-table-column label="状态" min-width="100">
         <template slot-scope="{ row }">
+          <el-tag v-if="row.online" size="medium">在线</el-tag>
+          <el-tag v-else size="medium" type="info">离线</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="showDeviceColumn" label="所属设备" min-width="180">
+        <template slot-scope="{ row }">
+          <div class="device-link" @click="openDevice(row)">{{ row.deviceName }}</div>
           <el-tag size="mini" effect="plain">{{ protocolLabel(row.protocol) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="在线" width="80">
-        <template slot-scope="{ row }">
-          <el-tag size="mini" :type="row.online ? 'success' : 'info'">{{ row.online ? '在线' : '离线' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right" align="center">
+      <el-table-column label="操作" min-width="360" fixed="right">
         <template slot-scope="{ row }">
           <el-button
             type="text"
@@ -68,7 +93,12 @@
             @click="play(row)"
           >播放</el-button>
           <el-divider direction="vertical" />
-          <el-button type="text" size="medium" icon="el-icon-monitor" @click="openDevice(row)">设备</el-button>
+          <el-button
+            type="text"
+            size="medium"
+            icon="el-icon-edit"
+            @click="openEdit(row)"
+          >编辑</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -85,16 +115,18 @@
 
     <!-- 与标准接入一致的播放器（编码信息/实时视频；PTZ 暂不对插件开放） -->
     <device-player ref="devicePlayer" @closed="onPlayerClosed" />
+    </template>
   </div>
 </template>
 
 <script>
 import DevicePlayer from '@/views/device/dialog/devicePlayer.vue'
-import { queryChannels, startResourceLive, stopResourceLive } from '@/api/asset'
+import ChannelEdit from '@/views/device/channel/edit.vue'
+import { queryChannels, startResourceLive, stopResourceLive, updateChannel, getResourceDetail } from '@/api/asset'
 
 export default {
   name: 'UnifiedChannelPanel',
-  components: { DevicePlayer },
+  components: { DevicePlayer, ChannelEdit },
   props: {
     // 固定设备内码（设备详情下钻时传入）
     deviceInternalCode: { type: String, default: '' },
@@ -117,12 +149,17 @@ export default {
       query: '',
       protocolFilter: this.protocol,
       deviceCode: this.deviceInternalCode,
+      editCtx: null,
       playingRow: null
     }
   },
   computed: {
     lockedProtocol() {
       return !!this.protocol
+    },
+    // 锁定单设备时（设备下钻/插件接入）不重复显示所属设备
+    showDeviceColumn() {
+      return !this.deviceCode
     }
   },
   watch: {
@@ -144,16 +181,6 @@ export default {
     protocolLabel(p) {
       return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[p] || (p || '-')
     },
-    kindLabel(kind) {
-      return {
-        video_sensor: '视频通道',
-        audio_input: '音频输入',
-        audio_output: '音频输出',
-        alarm_input: '报警输入',
-        relay_output: '继电器',
-        metadata_source: '数据通道'
-      }[kind] || kind || '-'
-    },
     load() {
       this.loading = true
       queryChannels({
@@ -164,9 +191,44 @@ export default {
         deviceInternalCode: this.deviceCode
       }).then(res => {
         const data = (res && res.data) || {}
-        this.list = (data.list || []).map(item => ({ ...item, _loading: false }))
+        this.list = (data.list || []).map(item => ({ ...item, _loading: false, _profiles: [], _profilesLoading: true }))
         this.total = data.total || 0
+        this.list.forEach(row => this.loadProfiles(row))
       }).finally(() => { this.loading = false })
+    },
+    // 码流类型下拉：取资源下已投影的码流（插件当前只有主码流）
+    loadProfiles(row) {
+      getResourceDetail(row.resourceId).then(res => {
+        const detail = (res && res.data) || {}
+        const profiles = detail.profiles || []
+        if (profiles.length) {
+          row._profiles = profiles.map(p => ({
+            id: p.id,
+            name: p.name || (p.role === 'sub' ? '子码流' : '主码流')
+          }))
+          const def = profiles.find(p => p.isDefault) || profiles[0]
+          row._profileId = def.id
+        } else {
+          row._profiles = [{ id: '', name: '主码流' }]
+          row._profileId = ''
+        }
+      }).catch(() => {
+        row._profiles = [{ id: '', name: '主码流' }]
+        row._profileId = ''
+      }).finally(() => { row._profilesLoading = false })
+    },
+    onAudioChange(row) {
+      updateChannel(row.internalCode, { hasAudio: !!row.hasAudio }).catch(() => {
+        row.hasAudio = !row.hasAudio
+        this.$message.error('更新音频设置失败')
+      })
+    },
+    openEdit(row) {
+      this.editCtx = { internalCode: row.internalCode, protocol: row.protocol }
+    },
+    closeEdit() {
+      this.editCtx = null
+      this.load()
     },
     search() {
       this.page = 1
@@ -186,7 +248,7 @@ export default {
       player.openDialog('media', '', '', { pending: true, hasAudio: !!row.hasAudio, ptzType: 0, showPtz: false })
       row._loading = true
       this.playingRow = row
-      startResourceLive(row.resourceId).then(res => {
+      startResourceLive(row.resourceId, row._profileId).then(res => {
         const content = (res && res.data) || null
         if (!content) {
           player.onStreamError('未返回播放地址')
@@ -210,4 +272,6 @@ export default {
 
 <style scoped>
 .unified-channel .sub-text { color: #80868B; font-size: 12px; }
+.unified-channel .device-link { cursor: pointer; }
+.unified-channel .device-link:hover { color: #1A73E8; }
 </style>

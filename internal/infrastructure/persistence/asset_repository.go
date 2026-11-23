@@ -269,6 +269,24 @@ func (r *AssetRepository) UpdateResourceFields(id string, patch domainasset.Reso
 		attrs["enabled"] = *patch.Enabled
 		edited = true
 	}
+	// 非国标通道的国标编码与国标属性表单：无 zws_device_channel 行，落在 attrs_json。
+	if patch.GBCode != nil {
+		attrs["gbCode"] = strings.TrimSpace(*patch.GBCode)
+		edited = true
+	}
+	if patch.GBFields != nil {
+		merged := map[string]any{}
+		if old, ok := attrs["gb"].(map[string]any); ok {
+			for k, v := range old {
+				merged[k] = v
+			}
+		}
+		for k, v := range patch.GBFields {
+			merged[k] = v
+		}
+		attrs["gb"] = merged
+		edited = true
+	}
 	if edited {
 		attrs["userEdited"] = true
 	}
@@ -455,6 +473,7 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		MapLevel           int     `gorm:"column:map_level"`
 		Tags               string  `gorm:"column:tags"`
 		Enabled            int     `gorm:"column:enabled"`
+		AttrsJSON          string  `gorm:"column:attrs_json"`
 	}
 	var rows []row
 	err := q.Select(`r.id AS resource_id, r.internal_code, r.device_id, d.internal_code AS device_internal_code,
@@ -465,7 +484,8 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.latitude') AS DOUBLE), 0) AS latitude,
 			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.mapLevel') AS SIGNED), 0) AS map_level,
 			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.attrs_json, '$.tags')), '') AS tags,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.enabled') AS SIGNED), 1) AS enabled`).
+			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.enabled') AS SIGNED), 1) AS enabled,
+			COALESCE(r.attrs_json, '') AS attrs_json`).
 		Order("d.internal_code ASC, r.id ASC").
 		Offset((page - 1) * count).Limit(count).
 		Scan(&rows).Error
@@ -485,6 +505,17 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		}
 		if strings.EqualFold(x.Protocol, "gb28181") {
 			view.GBCode = x.ExternalKey
+		} else {
+			// 非国标通道：国标编码与国标属性由通道编辑页手工填写，存在 attrs_json。
+			var attrs map[string]any
+			if x.AttrsJSON != "" && json.Unmarshal([]byte(x.AttrsJSON), &attrs) == nil {
+				if code, ok := attrs["gbCode"].(string); ok {
+					view.GBCode = code
+				}
+				if gb, ok := attrs["gb"].(map[string]any); ok {
+					view.GB = gb
+				}
+			}
 		}
 		out = append(out, view)
 	}

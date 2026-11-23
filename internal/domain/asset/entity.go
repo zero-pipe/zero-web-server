@@ -146,6 +146,12 @@ type ResourcePatch struct {
 	HasAudio  *bool    `json:"hasAudio"`
 	Tags      *string  `json:"tags"`
 	Enabled   *bool    `json:"enabled"`
+	// GBCode 是通道国标编码。国标通道该值由外部编码（externalKey）给出；
+	// ONVIF / 插件通道没有原生国标码，可在此手工指定，落 attrs_json["gbCode"]。
+	GBCode *string `json:"gbCode"`
+	// GBFields 承载国标属性表单（行政区域、父节点、监视方位等）的其余字段，
+	// 非国标通道没有 zws_device_channel 行，统一按键值存入 attrs_json["gb"]。
+	GBFields map[string]any `json:"gb"`
 }
 
 // DeviceNode 是设备→通道树节点。
@@ -183,6 +189,8 @@ type ChannelView struct {
 	MapLevel           int     `json:"mapLevel"`
 	Tags               string  `json:"tags"`
 	Enabled            bool    `json:"enabled"`
+	// GB 是非国标通道手工填写的国标属性（国标通道走 zws_device_channel，不在这里）。
+	GB map[string]any `json:"gb,omitempty"`
 }
 
 // ResourceDetail 包含资源、码流与能力。

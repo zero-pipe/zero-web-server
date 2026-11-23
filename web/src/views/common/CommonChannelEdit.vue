@@ -253,6 +253,8 @@ import channelCode from './../dialog/channelCode'
 import ChooseCivilCode from '../dialog/chooseCivilCode.vue'
 import ChooseGroup from '../dialog/chooseGroup.vue'
 import ResetChannel from './../dialog/resetChannel.vue'
+import { queryOneByCode } from '@/api/commonChannel'
+import { queryChannels, updateChannel } from '@/api/asset'
 
 export default {
   name: 'CommonChannelEdit',
@@ -262,7 +264,10 @@ export default {
     ChooseGroup,
     channelCode
   },
-  props: ['id', 'dataForm', 'showCancel'],
+  // id：国标通道主键（zws_device_channel.id）
+  // internalCode：统一通道内码，非国标通道用它读写；国标通道也可用它定位
+  // protocol：gb28181 | onvif | plugin，决定读写的接口
+  props: ['id', 'internalCode', 'protocol', 'dataForm', 'showCancel'],
   data() {
     return {
       rules: {
@@ -289,14 +294,24 @@ export default {
   },
   created() {
     // 获取完整信息
-    if (this.id) {
-      this.getCommonChannel(this.id)
+    if (this.id || this.internalCode) {
+      if (this.isGB) {
+        this.getCommonChannel(this.id || this.internalCode)
+      } else {
+        this.getUnifiedChannel()
+      }
     } else {
       if (!this.dataForm.gbDeviceId) {
         this.dataForm.gbDeviceId = ''
       }
       this.form = window.structuredClone(this.dataForm)
       this.getPaths()
+    }
+  },
+  computed: {
+    // 国标通道走 zws_device_channel（国标码已存在）；ONVIF/插件通道走统一资产。
+    isGB() {
+      return !this.protocol || this.protocol === 'gb28181'
     }
   },
   methods: {
@@ -316,6 +331,11 @@ export default {
             this.form.gbDownloadSpeed = this.form.gbDownloadSpeedArray.join('/')
           }
           this.form.enableBroadcast = this.form.enableBroadcastForBool ? 1 : 0
+          // 非国标通道没有 zws_device_channel 行，写统一资产
+          if (!this.isGB) {
+            this.saveUnified()
+            return
+          }
           // 提交完整表单（经纬度等 el-input 为字符串，后端已兼容）
           const payload = Object.assign({}, this.form, { gbId: this.form.gbId })
           delete payload.enableBroadcastForBool
@@ -365,6 +385,63 @@ export default {
         }
       })
     },
+    // 非国标通道：读统一资产（通道内码 + attrs 里的国标属性）
+    getUnifiedChannel: function() {
+      this.loading = true
+      queryChannels({ page: 1, count: 50, query: this.internalCode })
+        .then(res => {
+          const list = (res.data && res.data.list) || []
+          const ch = list.find(x => x.internalCode === this.internalCode)
+          if (!ch) throw new Error('通道不存在')
+          const form = Object.assign({}, ch.gb || {})
+          form.gbId = 0
+          form.gbName = ch.name || ''
+          // 国标通道编码：非国标通道默认为空，必须手工填写后才能保存
+          form.gbDeviceId = ch.gbCode || ''
+          form.gbLongitude = ch.longitude ? String(ch.longitude) : ''
+          form.gbLatitude = ch.latitude ? String(ch.latitude) : ''
+          form.gbPtzType = Number(ch.ptzType) || 0
+          if (form.gbDownloadSpeed) {
+            form.gbDownloadSpeedArray = form.gbDownloadSpeed.split('/')
+          }
+          this.form = form
+          this.$set(this.form, 'enableBroadcastForBool', this.form.enableBroadcast === 1)
+          this.getPaths()
+          this.getRegionPaths()
+        })
+        .catch(error => {
+          this.$message({ showClose: true, message: (error && error.message) || error, type: 'error' })
+        })
+        .finally(() => {
+          this.loading = false
+        })
+    },
+    // 非国标通道保存：名称/经纬度/云台类型落资源主字段，其余国标属性整体落 attrs.gb
+    saveUnified: function() {
+      const gb = {}
+      Object.keys(this.form).forEach(key => {
+        if (key.indexOf('gb') !== 0 || key === 'gbId' || key === 'gbDownloadSpeedArray') return
+        gb[key] = this.form[key]
+      })
+      updateChannel(this.internalCode, {
+        name: this.form.gbName,
+        longitude: Number(this.form.gbLongitude) || 0,
+        latitude: Number(this.form.gbLatitude) || 0,
+        ptzType: Number(this.form.gbPtzType) || 0,
+        gbCode: this.form.gbDeviceId,
+        gb
+      })
+        .then(() => {
+          this.$message.success({ showClose: true, message: '保存成功' })
+          this.$emit('submitSuccess')
+        })
+        .catch(error => {
+          this.$message({ showClose: true, message: (error && error.message) || error, type: 'error' })
+        })
+        .finally(() => {
+          this.loading = false
+        })
+    },
     reset: function(fileIds) {
       this.$confirm('确定重置为默认内容?', '提示', {
         dangerouslyUseHTMLString: true,
@@ -400,7 +477,11 @@ export default {
     },
     getCommonChannel: function(id) {
       this.loading = true
-      this.$store.dispatch('commonChanel/queryOne', id)
+      // 有主键走主键；只有内码（从统一通道列表进入）时按内码取国标通道
+      const request = this.id
+        ? this.$store.dispatch('commonChanel/queryOne', id)
+        : queryOneByCode(id).then(res => res.data)
+      request
         .then(data => {
           if (data.gbDownloadSpeed) {
             data.gbDownloadSpeedArray = data.gbDownloadSpeed.split('/')

@@ -12,6 +12,17 @@ export function queryOne(id) {
   })
 }
 
+// 按统一通道内码取国标通道（统一通道列表进入编辑时用）
+export function queryOneByCode(internalCode) {
+  return request({
+    method: 'get',
+    url: '/api/v1/common/channel/one',
+    params: {
+      internalCode: internalCode
+    }
+  })
+}
+
 export function getIndustryList() {
   return request({
     method: 'get',
