@@ -25,9 +25,9 @@ export const primaryMenus = [
     title: '接入管理',
     icon: 'menu-access',
     children: [
+      { title: '插件包管理', path: '/plugins/packages', icon: 'el-icon-box' },
       { title: '标准接入', path: '/devices', icon: 'devices' },
       { title: '插件接入', path: '/plugins', icon: 'plugin' },
-      { title: '插件包管理', path: '/plugins/packages', icon: 'el-icon-box' },
       { title: '设备资产', path: '/assets', icon: 'menu-access' },
       { title: '通道列表', path: '/channel', icon: 'channelManger' },
       { title: '国标配置', path: '/gbConfig', icon: 'gbConfig' },
@@ -40,7 +40,6 @@ export const primaryMenus = [
     icon: 'menu-media',
     children: [
       { title: '媒体节点', path: '/mediaServer', icon: 'media-node' },
-      { title: '接入鉴权', path: '/accessToken', icon: 'el-icon-key' },
       { title: '推流列表', path: '/push', icon: 'streamPush' },
       { title: '拉流代理', path: '/proxy', icon: 'streamProxy' }
     ]
@@ -51,7 +50,6 @@ export const primaryMenus = [
     icon: 'menu-storage',
     children: [
       { title: '基础设施', path: '/infra', icon: 'menu-storage' },
-      { title: '对象存储', path: '/objectStore', icon: 'objectStore' },
       { title: '录制计划', path: '/recordPlan', icon: 'recordPlan' },
       { title: '云端录像', path: '/cloudRecord', icon: 'cloudRecord' }
     ]
@@ -70,6 +68,7 @@ export const primaryMenus = [
     title: '运维管理',
     icon: 'menu-ops',
     children: [
+      { title: '接入鉴权', path: '/accessToken', icon: 'el-icon-key' },
       { title: '资源监控', path: '/dashboard', icon: 'dashboard' },
       { title: '平台信息', path: '/operations/systemInfo', icon: 'systemInfo' },
       { title: '历史日志', path: '/operations/historyLog', icon: 'historyLog' },

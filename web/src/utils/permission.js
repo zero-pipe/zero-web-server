@@ -12,7 +12,7 @@ const PATH_RULES = [
   { prefix: '/gbConfig', menu: 'access' },
   { prefix: '/platform', menu: 'access' },
   { prefix: '/mediaServer', menu: 'media' },
-  { prefix: '/accessToken', menu: 'media' },
+  { prefix: '/accessToken', menu: 'ops' },
   { prefix: '/push', menu: 'media' },
   { prefix: '/proxy', menu: 'media' },
   { prefix: '/live', menu: 'app' },

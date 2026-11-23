@@ -10,7 +10,7 @@ import (
 // registerAccessToken 对外接入密钥（可视化配置）。
 func registerAccessToken(parent *gin.RouterGroup, h *handler.AccessTokenHandler) {
 	g := parent.Group("/accessToken")
-	g.Use(middleware.RequireMenu("media"))
+	g.Use(middleware.RequireMenu("ops"))
 	g.GET("/list", h.List)
 	g.GET("/first", h.First)
 	g.POST("/add", h.Add)

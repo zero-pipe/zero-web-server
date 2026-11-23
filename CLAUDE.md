@@ -69,7 +69,7 @@ make mock-plugin    # 单独起 mock 插件联调
 
 ### 5.1.1 对外接入 token（推/拉流）
 
-- 页面「接入鉴权」（媒体管理，`/accessToken`）：可视化配置外部集成密钥，`zws_access_token` 落库。
+- 页面「接入鉴权」（运维管理，`/accessToken`）：可视化配置外部集成密钥，`zws_access_token` 落库。
 - 后端 `internal/application/accesstoken/` + `persistence/access_token_repository.go` + `routes_access_token.go`；外部携带 `?token=`。
 - 启用中的 token 自动同步到在线 ZMS（`/index/api/auth/tokens`），节点注册/心跳时重推；默认关闭（无启用 token 即不鉴权）。
 - 规范全文见 [`docs/接口与鉴权规范.md`](docs/接口与鉴权规范.md)。
