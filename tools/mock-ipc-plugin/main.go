@@ -63,6 +63,7 @@ func main() {
 	mux.HandleFunc("/v1/playback/control", okHandler)
 	mux.HandleFunc("/v1/arm", handleArm)
 	mux.HandleFunc("/v1/disarm", handleDisarm)
+	mux.HandleFunc("/v1/command", handleCommand)
 	mux.HandleFunc("/v1/mock/event", handleMockEvent)
 
 	go func() {
@@ -162,6 +163,9 @@ func handleMockEvent(w http.ResponseWriter, r *http.Request) {
 		ChannelID string `json:"channel_id"`
 		ImageKey  string `json:"image_key"`
 		ImageURL  string `json:"image_url"`
+		MajorType string `json:"major_type"`
+		MinorType string `json:"minor_type"`
+		Level     string `json:"level"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	sessionMu.Lock()
@@ -189,6 +193,16 @@ func handleMockEvent(w http.ResponseWriter, r *http.Request) {
 	if body.ImageKey != "" {
 		event["image"] = map[string]any{"key": body.ImageKey, "url": body.ImageURL}
 	}
+	// 自定义事件示例：指定 majorType/minorType 且 eventType 非平台规范时，平台落 zws_custom_event。
+	if body.MajorType != "" {
+		event["majorType"] = body.MajorType
+	}
+	if body.MinorType != "" {
+		event["minorType"] = body.MinorType
+	}
+	if body.Level != "" {
+		event["level"] = body.Level
+	}
 	payload, _ := json.Marshal(event)
 	token := cli.Publish(cfg.MQTT.Topic, byte(cfg.MQTT.QoS), false, payload)
 	if !token.WaitTimeout(5*time.Second) || token.Error() != nil {
@@ -196,6 +210,42 @@ func handleMockEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]any{"eventId": event["eventId"]})
+}
+
+// handleCommand 通用命令透传示例：平台不解析 params/result 语义，由驱动按 cmd 分派。
+func handleCommand(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID string          `json:"device_uid"`
+		ChannelID string          `json:"channel_id"`
+		Cmd       string          `json:"cmd"`
+		Params    json.RawMessage `json:"params"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	log.Printf("command device=%s channel=%s cmd=%s params=%s", req.DeviceUID, req.ChannelID, req.Cmd, string(req.Params))
+	switch req.Cmd {
+	case "face.push": // 自定义能力示例：下发人脸图片
+		var p struct {
+			ImageURL string `json:"imageUrl"`
+			PersonID string `json:"personId"`
+		}
+		_ = json.Unmarshal(req.Params, &p)
+		if p.ImageURL == "" {
+			writeErr(w, "INVALID_ARGUMENT", "missing params.imageUrl")
+			return
+		}
+		writeOK(w, map[string]any{
+			"accepted": true, "personId": p.PersonID,
+			"faceId": fmt.Sprintf("face-%d", time.Now().UnixNano()),
+		})
+	case "door.open": // 自定义能力示例：远程开门
+		writeOK(w, map[string]any{"opened": true, "at": time.Now().UnixMilli()})
+	default:
+		// 未知命令：原样回显，证明平台纯透传、不解析语义。
+		writeOK(w, map[string]any{"echoCmd": req.Cmd, "echoParams": req.Params})
+	}
 }
 
 func handleDisarm(w http.ResponseWriter, r *http.Request) {
