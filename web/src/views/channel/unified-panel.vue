@@ -57,19 +57,18 @@
           <el-tag size="mini" :type="row.online ? 'success' : 'info'">{{ row.online ? '在线' : '离线' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right" align="center">
         <template slot-scope="{ row }">
           <el-button
             type="text"
-            size="mini"
+            size="medium"
             icon="el-icon-video-play"
-            title="播放"
-            aria-label="播放"
             :disabled="!row.online"
             :loading="row._loading"
             @click="play(row)"
-          />
-          <el-button type="text" size="mini" icon="el-icon-monitor" title="设备" aria-label="设备" @click="openDevice(row)" />
+          >播放</el-button>
+          <el-divider direction="vertical" />
+          <el-button type="text" size="medium" icon="el-icon-monitor" @click="openDevice(row)">设备</el-button>
         </template>
       </el-table-column>
     </el-table>

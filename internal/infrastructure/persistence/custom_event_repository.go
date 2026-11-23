@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"fmt"
 	"time"
 
 	domaince "zero-web-server/internal/domain/customevent"
@@ -93,8 +94,7 @@ func (r *CustomEventRepository) List(page, count int, f domaince.ListFilter) ([]
 	return out, total, nil
 }
 
-func (r *CustomEventRepository) DistinctTypes(deviceInternalCode string) ([]domaince.TypeCount, error) {
-	q := r.db.Model(&model.CustomEvent{}).
+func (r *CustomEventRepository) DistinctTypes(deviceInternalCode string) ([]domaince.TypeCount, error) {	q := r.db.Model(&model.CustomEvent{}).
 		Select("major_type, minor_type, count(*) as count")
 	if deviceInternalCode != "" {
 		q = q.Where("device_internal_code = ?", deviceInternalCode)
@@ -104,6 +104,23 @@ func (r *CustomEventRepository) DistinctTypes(deviceInternalCode string) ([]doma
 		return nil, err
 	}
 	return rows, nil
+}
+
+func (r *CustomEventRepository) DeleteRange(begin, end int64, all bool) (int64, error) {
+	q := r.db.Where("1=1")
+	if !all {
+		if begin <= 0 && end <= 0 {
+			return 0, fmt.Errorf("请指定时间范围或选择全部删除")
+		}
+		if begin > 0 {
+			q = q.Where("occur_at >= ?", begin)
+		}
+		if end > 0 {
+			q = q.Where("occur_at <= ?", end)
+		}
+	}
+	res := q.Delete(&model.CustomEvent{})
+	return res.RowsAffected, res.Error
 }
 
 func customEventFromModel(m *model.CustomEvent) *domaince.CustomEvent {

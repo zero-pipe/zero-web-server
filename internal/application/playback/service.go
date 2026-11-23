@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,6 +37,8 @@ type Service struct {
 	ssrcSeq       atomic.Int64
 	sessions      sync.Map
 	recordTimeout time.Duration
+	// streamModeFn 返回本级「国标配置」的媒体流传输模式（全局默认）。
+	streamModeFn func() string
 }
 
 func NewService(
@@ -55,6 +58,24 @@ func NewService(
 		media: media, serverID: serverID,
 		recordTimeout: time.Duration(recordTimeoutSec) * time.Second,
 	}
+}
+
+// SetStreamModeProvider 注入本级「国标配置」的媒体流传输模式来源（全局默认）。
+func (s *Service) SetStreamModeProvider(fn func() string) {
+	s.streamModeFn = fn
+}
+
+// resolveStreamMode 以本级「国标配置」的全局默认为准；未配置时回退设备自身 stream_mode，
+// 两者皆空回退 UDP。
+func (s *Service) resolveStreamMode(device *domaindevice.Device) string {
+	mode := ""
+	if s.streamModeFn != nil {
+		mode = strings.TrimSpace(s.streamModeFn())
+	}
+	if mode == "" && device != nil {
+		mode = strings.TrimSpace(device.StreamMode)
+	}
+	return gbsip.NormalizeStreamMode(mode)
 }
 
 func (s *Service) QueryRecord(ctx context.Context, deviceID, channelDeviceID, startTime, endTime string) (*domainrecord.RecordInfo, error) {
@@ -98,7 +119,7 @@ func (s *Service) StartPlayback(ctx context.Context, deviceID, channelDeviceID, 
 			if sdpIP == "" {
 				sdpIP = node.SDPIP()
 			}
-			return gbsip.BuildPlaybackSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, gbsip.NormalizeStreamMode(d.StreamMode), startTime, endTime)
+			return gbsip.BuildPlaybackSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, s.resolveStreamMode(d), startTime, endTime)
 		})
 	s.markResourceCap(channel, "playback", err == nil)
 	if err != nil {
@@ -130,7 +151,7 @@ func (s *Service) StartDownload(ctx context.Context, deviceID, channelDeviceID, 
 			if sdpIP == "" {
 				sdpIP = node.SDPIP()
 			}
-			return gbsip.BuildDownloadSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, gbsip.NormalizeStreamMode(d.StreamMode), startTime, endTime, downloadSpeed)
+			return gbsip.BuildDownloadSDP(d.DeviceID, ch.GBDeviceID, sdpIP, rtpPort, ssrc, s.resolveStreamMode(d), startTime, endTime, downloadSpeed)
 		})
 	if err != nil {
 		return nil, err
@@ -164,7 +185,7 @@ func (s *Service) PrepareCascadePlayback(ctx context.Context, deviceID, channelG
 		s.media.UnbindStream(app, stream)
 	}
 	sdpIP := node.SDPIP()
-	streamMode := gbsip.NormalizeStreamMode(device.StreamMode)
+	streamMode := s.resolveStreamMode(device)
 	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(streamMode))
 	if err != nil {
 		return nil, "", fmt.Errorf("打开RTP端口失败: %w", err)
@@ -342,7 +363,7 @@ func (s *Service) startMediaInvite(
 	if err != nil {
 		return nil, err
 	}
-	mediaMode := gbsip.NormalizeStreamMode(device.StreamMode)
+	mediaMode := s.resolveStreamMode(device)
 	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, streamModeToTCP(mediaMode))
 	if err != nil {
 		return nil, fmt.Errorf("打开RTP端口失败: %w", err)

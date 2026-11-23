@@ -71,7 +71,7 @@
               <el-col :span="12"><el-form-item label="设备名称"><el-input v-model="deviceForm.name" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="厂商"><el-input v-model="deviceForm.vendor" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="型号"><el-input v-model="deviceForm.model" /></el-form-item></el-col>
-              <el-col :span="12"><el-form-item label="序列号"><el-input v-model="deviceForm.serialNumber" /></el-form-item></el-col>
+              <el-col v-if="!isGbDevice" :span="12"><el-form-item label="序列号"><el-input v-model="deviceForm.serialNumber" /></el-form-item></el-col>
               <el-col :span="12"><el-form-item label="启用"><el-switch v-model="deviceForm.enabled" /></el-form-item></el-col>
             </el-row>
             <el-button size="small" type="primary" :loading="saving" @click="saveDevice">保存设备</el-button>
@@ -233,6 +233,11 @@ export default {
     gbDeviceCode() {
       const b = this.selectedDevice && this.selectedDevice.binding
       return b && b.protocol === 'gb28181' ? (b.externalId || '—') : '—'
+    },
+    // GB28181 协议无「序列号」字段（DeviceInfo 应答不含 SerialNumber），故 GB 设备隐藏该项。
+    isGbDevice() {
+      const b = this.selectedDevice && this.selectedDevice.binding
+      return !!b && b.protocol === 'gb28181'
     }
   },
   created() {

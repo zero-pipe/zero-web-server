@@ -16,6 +16,7 @@ type Config struct {
 	Alarm              bool   `json:"alarm"`
 	RequirePreRegister bool   `json:"requirePreRegister"`
 	Transport          string `json:"transport"`
+	StreamMode         string `json:"streamMode"`
 	CreateTime         string `json:"createTime"`
 	UpdateTime         string `json:"updateTime"`
 }

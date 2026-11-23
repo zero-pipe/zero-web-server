@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// HandleDeviceInfo 设备信息应答。厂商/型号以页面手填为准，仅在为空时用设备上报值补齐。
 func (s *Service) HandleDeviceInfo(deviceID, name, manufacturer, model, firmware string) error {
 	device, err := s.GetByDeviceID(deviceID)
 	if err != nil {
@@ -14,10 +15,10 @@ func (s *Service) HandleDeviceInfo(deviceID, name, manufacturer, model, firmware
 	if name != "" {
 		device.Name = name
 	}
-	if manufacturer != "" {
+	if manufacturer != "" && device.Manufacturer == "" {
 		device.Manufacturer = manufacturer
 	}
-	if model != "" {
+	if model != "" && device.Model == "" {
 		device.Model = model
 	}
 	if firmware != "" {
@@ -50,8 +51,8 @@ func (s *Service) autoQueryDeviceInfo(deviceID string) {
 	if err != nil || device == nil || !device.OnLine {
 		return
 	}
-	// 厂商为空则补查；部分设备 Model 可空
-	if device.Manufacturer != "" {
+	// 厂商或型号为空时补查 DeviceInfo（厂商可能手填，但型号仍需从设备拉取）。
+	if device.Manufacturer != "" && device.Model != "" {
 		return
 	}
 	if err := s.sip.SendDeviceInfoQuery(device); err != nil {

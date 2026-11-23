@@ -39,15 +39,9 @@
       </el-form-item>
     </el-form>
 
-    <!-- 红框融合列：统一列 + 国标流传输/订阅/统计；无能力协议格子留空 -->
+    <!-- 统一列 + 国标订阅/统计；无能力协议格子留空 -->
     <el-table v-loading="loading" size="small" :data="list" height="calc(100% - 96px)" header-row-class-name="table-header">
       <el-table-column prop="name" label="名称" min-width="140" />
-      <el-table-column label="模式" width="80">
-        <template v-slot:default="{ row }">
-          <el-tag v-if="row.accessMode === 'passive'" size="mini" type="success">被动</el-tag>
-          <el-tag v-else size="mini" type="warning">主动</el-tag>
-        </template>
-      </el-table-column>
       <el-table-column label="协议" width="90">
         <template v-slot:default="{ row }">
           <el-tag v-if="row.protocol === 'gb28181'" size="mini">GB28181</el-tag>
@@ -56,22 +50,6 @@
       </el-table-column>
       <el-table-column prop="addressText" label="地址/注册信息" min-width="150" show-overflow-tooltip />
       <el-table-column prop="vendor" label="厂商" width="90" />
-      <el-table-column label="流传输模式" min-width="150">
-        <template v-slot:default="{ row }">
-          <el-select
-            v-if="hasCap(row, 'transport')"
-            v-model="row.streamMode"
-            size="mini"
-            style="width: 120px"
-            @change="transportChange(row)"
-          >
-            <el-option label="UDP" value="UDP" />
-            <el-option label="TCP主动模式" value="TCP-ACTIVE" />
-            <el-option label="TCP被动模式" value="TCP-PASSIVE" />
-          </el-select>
-          <span v-else class="cell-empty">—</span>
-        </template>
-      </el-table-column>
       <el-table-column prop="channelCount" label="通道数" width="80" />
       <el-table-column label="状态" width="90">
         <template v-slot:default="{ row }">
@@ -291,11 +269,6 @@ export default {
           name: row.name
         })
       })
-    },
-    transportChange(row) {
-      this.$store.dispatch('device/updateDeviceTransport', [row.rawId, row.streamMode])
-        .then(() => this.$message.success('流传输模式已更新'))
-        .catch(err => this.$message.error(err.message || err || '更新失败'))
     },
     subscribeForCatalog(dbId, value) {
       this.$store.dispatch('device/subscribeCatalog', { id: dbId, cycle: value ? 60 : 0 })

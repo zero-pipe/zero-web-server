@@ -27,6 +27,9 @@ type Service struct {
 	ssrcSeq    atomic.Int64
 	sessions   sync.Map
 	broadcast  *broadcastRegistry
+	// streamModeFn 返回本级「国标配置」的媒体流传输模式（全局默认）。
+	// 为空时回退到设备自身 stream_mode 字段。
+	streamModeFn func() string
 }
 
 func NewService(
@@ -46,6 +49,26 @@ func NewService(
 		serverPort: serverPort,
 		broadcast:  newBroadcastRegistry(),
 	}
+}
+
+// SetStreamModeProvider 注入本级「国标配置」的媒体流传输模式来源（全局默认）。
+// 未注入时回退到设备自身 stream_mode。
+func (s *Service) SetStreamModeProvider(fn func() string) {
+	s.streamModeFn = fn
+}
+
+// resolveStreamMode 以本级「国标配置」的全局默认为准；未配置时回退设备自身 stream_mode，
+// 两者皆空回退 UDP。标准接入页已不再提供逐设备设置，故全局优先，避免存量设备
+// 落库的默认 UDP 覆盖全局选择。
+func (s *Service) resolveStreamMode(device *domaindevice.Device) string {
+	mode := ""
+	if s.streamModeFn != nil {
+		mode = strings.TrimSpace(s.streamModeFn())
+	}
+	if mode == "" && device != nil {
+		mode = strings.TrimSpace(device.StreamMode)
+	}
+	return gbsip.NormalizeStreamMode(mode)
 }
 
 func (s *Service) StartPlay(ctx context.Context, deviceID, channelDeviceID string) (*dto.StreamContent, error) {
@@ -91,7 +114,7 @@ func (s *Service) PrepareCascadePlay(ctx context.Context, deviceID, channelDevic
 	if sdpIP == "" {
 		sdpIP = node.SDPIP()
 	}
-	streamMode := gbsip.NormalizeStreamMode(device.StreamMode)
+	streamMode := s.resolveStreamMode(device)
 	tcpMode := streamModeToTCP(streamMode)
 	rtpPort, err := node.OpenRtpServer(ctx, app, stream, 0, tcpMode)
 	if err != nil {
@@ -163,7 +186,7 @@ func (s *Service) startPlay(ctx context.Context, device *domaindevice.Device, ch
 		sdpIP = node.SDPIP()
 	}
 
-	streamMode := gbsip.NormalizeStreamMode(device.StreamMode)
+	streamMode := s.resolveStreamMode(device)
 	applog.Debugf("[GB28181 play 1/6] start device=%s channel=%s target=%s:%d sipTransport=%s mediaStreamMode=%s sdpIP=%s mediaNode=%s zms=%s",
 		device.DeviceID, channel.GBDeviceID, device.IP, device.Port, device.Transport, streamMode, sdpIP, node.ID(), node.BaseURL())
 

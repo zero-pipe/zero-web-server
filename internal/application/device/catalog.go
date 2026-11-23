@@ -359,8 +359,9 @@ func (s *Service) SyncCatalog(deviceID string) error {
 	if s.sip == nil {
 		return errors.New("SIP服务未启动")
 	}
-	// IPC 也发 DeviceInfo/Catalog：厂商、真实设备名都在协议响应里，不能只建默认通道
-	if device.Manufacturer == "" {
+	// IPC 也发 DeviceInfo/Catalog：厂商、型号、真实设备名都在协议响应里，不能只建默认通道。
+	// 型号为空也要查（厂商可能手填，但型号仍需从设备拉取）。
+	if device.Manufacturer == "" || device.Model == "" {
 		if err := s.sip.SendDeviceInfoQuery(device); err != nil {
 			log.Printf("GB28181 device info on sync: device=%s err=%v", deviceID, err)
 		}

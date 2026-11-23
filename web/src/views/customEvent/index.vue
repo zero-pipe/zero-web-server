@@ -28,8 +28,9 @@
         />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="el-icon-search" circle title="查询" aria-label="查询" @click="reload" />
-        <el-button icon="el-icon-refresh" circle :loading="loading" @click="load" />
+        <el-button type="primary" icon="el-icon-search" @click="reload">查询</el-button>
+        <el-button icon="el-icon-refresh" :loading="loading" @click="load">刷新</el-button>
+        <el-button type="text" style="color:#EA4335" icon="el-icon-delete" @click="openDelete">删除记录</el-button>
       </el-form-item>
     </el-form>
 
@@ -42,27 +43,27 @@
     />
 
     <el-table v-loading="loading" :data="list" size="small" border height="calc(100vh - 260px)">
-      <el-table-column label="时间" width="170">
+      <el-table-column label="时间" width="165">
         <template slot-scope="{ row }">{{ formatTime(row.occurAt) }}</template>
       </el-table-column>
-      <el-table-column label="大类" width="140">
+      <el-table-column label="大类" min-width="120">
         <template slot-scope="{ row }">{{ row.majorType || '—' }}</template>
       </el-table-column>
-      <el-table-column label="小类" width="180">
+      <el-table-column label="小类" min-width="150">
         <template slot-scope="{ row }">{{ row.minorType || '—' }}</template>
       </el-table-column>
-      <el-table-column label="设备内码" min-width="180">
+      <el-table-column label="设备内码" min-width="160">
         <template slot-scope="{ row }">{{ row.deviceInternalCode || '—' }}</template>
       </el-table-column>
-      <el-table-column label="通道内码" width="180">
+      <el-table-column label="通道内码" min-width="160">
         <template slot-scope="{ row }">{{ row.channelInternalCode || '—' }}</template>
       </el-table-column>
-      <el-table-column label="级别" width="90">
+      <el-table-column label="级别" width="90" align="center">
         <template slot-scope="{ row }">
           <el-tag size="mini" :type="levelTag(row.level)">{{ row.level || 'info' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="图片" width="100">
+      <el-table-column label="图片" width="90" align="center">
         <template slot-scope="{ row }">
           <el-image
             v-if="row.imageUrl"
@@ -74,9 +75,9 @@
           <span v-else class="sub">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" fixed="right">
+      <el-table-column label="操作" width="110" fixed="right" align="center">
         <template slot-scope="{ row }">
-          <el-button type="text" size="mini" icon="el-icon-view" title="详情" aria-label="详情" @click="openDetail(row)" />
+          <el-button type="text" size="medium" icon="el-icon-view" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -113,11 +114,38 @@
         </el-collapse>
       </template>
     </el-dialog>
+
+    <el-dialog title="删除自定义事件记录" :visible.sync="deleteVisible" width="460px">
+      <div class="delete-tip">删除后不可恢复，请谨慎操作。</div>
+      <el-form label-width="90px" size="small">
+        <el-form-item label="删除范围">
+          <el-radio-group v-model="deleteAll" @change="onDeleteAllChange">
+            <el-radio :label="false">按时间范围</el-radio>
+            <el-radio :label="true">全部删除</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="!deleteAll" label="时间范围">
+          <el-date-picker
+            v-model="deleteRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="timestamp"
+            style="width:100%"
+          />
+        </el-form-item>
+      </el-form>
+      <span slot="footer">
+        <el-button size="small" @click="deleteVisible = false">取消</el-button>
+        <el-button size="small" type="danger" :loading="deleting" @click="confirmDelete">删除</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { queryCustomEvents, getCustomEvent, getCustomEventTypes } from '@/api/customEvent'
+import { queryCustomEvents, getCustomEvent, getCustomEventTypes, clearCustomEvents } from '@/api/customEvent'
 
 export default {
   name: 'CustomEventCenter',
@@ -131,7 +159,11 @@ export default {
       filters: { deviceCode: '', channelCode: '', majorType: '', minorType: '', range: [] },
       types: [],
       detailVisible: false,
-      detail: null
+      detail: null,
+      deleteVisible: false,
+      deleteAll: false,
+      deleteRange: [],
+      deleting: false
     }
   },
   computed: {
@@ -181,6 +213,33 @@ export default {
         this.detailVisible = true
       }).catch(e => this.$message.error(e || '加载失败'))
     },
+    openDelete() {
+      this.deleteAll = false
+      this.deleteRange = []
+      this.deleteVisible = true
+    },
+    onDeleteAllChange() {
+      if (this.deleteAll) this.deleteRange = []
+    },
+    confirmDelete() {
+      const all = this.deleteAll
+      if (!all && (!this.deleteRange || this.deleteRange.length !== 2)) {
+        this.$message.warning('请选择时间范围，或选择全部删除')
+        return
+      }
+      const beginTime = all ? 0 : this.deleteRange[0]
+      const endTime = all ? 0 : this.deleteRange[1]
+      const desc = all ? '全部自定义事件' : `${this.formatTime(beginTime)} 至 ${this.formatTime(endTime)}`
+      this.$confirm(`确认删除${desc}？此操作不可恢复。`, '删除确认', { type: 'warning' }).then(() => {
+        this.deleting = true
+        clearCustomEvents({ beginTime, endTime, all }).then(res => {
+          this.$message.success(`已删除 ${((res && res.data) || {}).deleted || 0} 条`)
+          this.deleteVisible = false
+          this.reload()
+        }).catch(e => this.$message.error((e && e.message) || '删除失败'))
+          .finally(() => { this.deleting = false })
+      }).catch(() => {})
+    },
     levelTag(level) {
       return { info: '', success: 'success', warning: 'warning', major: 'danger', critical: 'danger' }[level] || ''
     },
@@ -199,6 +258,7 @@ export default {
 
 <style scoped>
 .sub { color: #80868B; font-size: 12px; }
+.delete-tip { color: #606266; font-size: 13px; margin-bottom: 12px; }
 .section { margin-top: 14px; }
 .json { background: #f5f7fa; padding: 10px; border-radius: 6px; max-height: 320px; overflow: auto; font-size: 12px; }
 </style>

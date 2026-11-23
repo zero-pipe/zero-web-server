@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"fmt"
 	"time"
 
 	domainevent "zero-web-server/internal/domain/event"
@@ -121,6 +122,24 @@ func (r *EventRepository) UpdateAlarmID(id string, alarmID int) error {
 
 func (r *EventRepository) DeleteBefore(before int64) (int64, error) {
 	res := r.db.Where("occurred_at < ?", before).Delete(&model.Event{})
+	return res.RowsAffected, res.Error
+}
+
+func (r *EventRepository) DeleteRange(begin, end int64, all bool) (int64, error) {
+	// Where("1=1") 既避免 GORM 全表更新保护，也保证 all=true 时能删除全部。
+	q := r.db.Where("1=1")
+	if !all {
+		if begin <= 0 && end <= 0 {
+			return 0, fmt.Errorf("请指定时间范围或选择全部删除")
+		}
+		if begin > 0 {
+			q = q.Where("occurred_at >= ?", begin)
+		}
+		if end > 0 {
+			q = q.Where("occurred_at <= ?", end)
+		}
+	}
+	res := q.Delete(&model.Event{})
 	return res.RowsAffected, res.Error
 }
 

@@ -50,6 +50,10 @@ func (r *GbSipConfigRepository) Save(d *domaingbsipconfig.Config) error {
 	if transport == "" {
 		transport = "UDP"
 	}
+	streamMode := strings.TrimSpace(d.StreamMode)
+	if streamMode == "" {
+		streamMode = "UDP"
+	}
 	return r.db.Model(&model.GbSipConfig{}).Where("id = ?", gbSipConfigSingletonID).Updates(map[string]any{
 		"ip":                   d.IP,
 		"port":                 d.Port,
@@ -59,6 +63,7 @@ func (r *GbSipConfigRepository) Save(d *domaingbsipconfig.Config) error {
 		"alarm":                d.Alarm,
 		"require_pre_register": d.RequirePreRegister,
 		"transport":            transport,
+		"stream_mode":          streamMode,
 		"update_time":          d.UpdateTime,
 	}).Error
 }
@@ -67,7 +72,7 @@ func toModelGbSipConfig(d *domaingbsipconfig.Config) *model.GbSipConfig {
 	return &model.GbSipConfig{
 		ID: d.ID, IP: d.IP, Port: d.Port, Domain: d.Domain, DeviceID: d.DeviceID,
 		Password: d.Password, Alarm: d.Alarm, RequirePreRegister: d.RequirePreRegister,
-		Transport: d.Transport, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
+		Transport: d.Transport, StreamMode: d.StreamMode, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
 	}
 }
 
@@ -75,7 +80,7 @@ func toDomainGbSipConfig(m *model.GbSipConfig) *domaingbsipconfig.Config {
 	return &domaingbsipconfig.Config{
 		ID: m.ID, IP: m.IP, Port: m.Port, Domain: m.Domain, DeviceID: m.DeviceID,
 		Password: m.Password, Alarm: m.Alarm, RequirePreRegister: m.RequirePreRegister,
-		Transport: m.Transport, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+		Transport: m.Transport, StreamMode: m.StreamMode, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }
 

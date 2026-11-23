@@ -33,6 +33,7 @@ func (f *fakeRepo) List(page, count int, fl domainevent.ListFilter) ([]*domainev
 	return nil, 0, nil
 }
 func (f *fakeRepo) DeleteBefore(before int64) (int64, error)   { return 0, nil }
+func (f *fakeRepo) DeleteRange(begin, end int64, all bool) (int64, error) { return 0, nil }
 func (f *fakeRepo) UpdateAlarmID(id string, alarmID int) error { return nil }
 
 func TestHandleMessageStats(t *testing.T) {
@@ -89,6 +90,8 @@ func (f *fakeCustomRepo) List(page, count int, fl domaincustomevent.ListFilter) 
 func (f *fakeCustomRepo) DistinctTypes(deviceInternalCode string) ([]domaincustomevent.TypeCount, error) {
 	return nil, nil
 }
+
+func (f *fakeCustomRepo) DeleteRange(begin, end int64, all bool) (int64, error) { return 0, nil }
 
 func TestCustomEventRouting(t *testing.T) {
 	er := &fakeRepo{}

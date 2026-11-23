@@ -53,7 +53,6 @@ type DeviceView struct {
 type GBConfig struct {
 	DeviceID      string `json:"deviceId"`
 	Password      string `json:"password"`
-	SdpIP         string `json:"sdpIp"`
 	MediaServerID string `json:"mediaServerId"`
 	Charset       string `json:"charset"`
 }
@@ -248,7 +247,6 @@ func (s *Service) updateGB(deviceID string, req UpdateRequest) (*DeviceView, err
 	existing.Manufacturer = strings.TrimSpace(req.Vendor)
 	if req.GB != nil {
 		existing.Password = req.GB.Password
-		existing.SDPIP = req.GB.SdpIP
 		if req.GB.MediaServerID != "" {
 			existing.MediaServerID = req.GB.MediaServerID
 		}
@@ -325,7 +323,6 @@ func (s *Service) createGB(req CreateRequest) (*DeviceView, error) {
 		Name:              name,
 		Manufacturer:      strings.TrimSpace(req.Vendor),
 		Password:          req.GB.Password,
-		SDPIP:             req.GB.SdpIP,
 		MediaServerID:     mediaServerID,
 		Charset:           charset,
 		StreamMode:        "UDP",
@@ -351,6 +348,7 @@ func (s *Service) createONVIF(ctx context.Context, req CreateRequest) (*DeviceVi
 	}
 	dev, err := s.onvif.AddDevice(ctx, onvifapp.AddDeviceRequest{
 		Name:     strings.TrimSpace(req.Name),
+		Vendor:   strings.TrimSpace(req.Vendor),
 		IP:       strings.TrimSpace(req.Onvif.IP),
 		Port:     port,
 		Username: req.Onvif.Username,
@@ -403,14 +401,13 @@ func viewFromGB(d *domaindevice.Device) *DeviceView {
 		SubscribeCycleForCatalog:        d.SubscribeCycleForCatalog,
 		SubscribeCycleForMobilePosition: d.SubscribeCycleForMobilePosition,
 		SubscribeCycleForAlarm:          d.SubscribeCycleForAlarm,
-		// 国标操作/能力列：刷新、布防、订阅、统计、流传输…
+		// 国标操作/能力列：刷新、布防、订阅、统计…（流传输模式改由国标配置统一设置）
 		Capabilities: []string{
-			"catalog", "transport", "subscribe", "stats", "guard", "play", "ptz", "alarm", "edit", "delete",
+			"catalog", "subscribe", "stats", "guard", "play", "ptz", "alarm", "edit", "delete",
 		},
 		GB: &GBConfig{
 			DeviceID:      d.DeviceID,
 			Password:      d.Password,
-			SdpIP:         d.SDPIP,
 			MediaServerID: d.MediaServerID,
 			Charset:       d.Charset,
 		},
@@ -461,14 +458,19 @@ func matchStatus(v *DeviceView, status string) bool {
 	return v.Status == status
 }
 
-// ParseID 解析统一设备 ID：gb:{deviceId} / onvif:{id}
+// ParseID 解析统一设备 ID：gb:{deviceId} / gb28181:{deviceId} / onvif:{id}
 func ParseID(id string) (protocol, raw string, err error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return "", "", fmt.Errorf("设备ID为空")
 	}
 	if i := strings.IndexByte(id, ':'); i > 0 {
-		return id[:i], id[i+1:], nil
+		p := id[:i]
+		// 兼容 GB 设备展示 ID 的短前缀 "gb:"，统一归一到协议名 "gb28181"。
+		if p == "gb" {
+			p = ProtocolGB28181
+		}
+		return p, id[i+1:], nil
 	}
 	if _, e := strconv.ParseInt(id, 10, 64); e == nil {
 		return ProtocolONVIF, id, nil

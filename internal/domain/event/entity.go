@@ -59,5 +59,7 @@ type Repository interface {
 	Get(id string) (*Event, error)
 	List(page, count int, f ListFilter) ([]*Event, int64, error)
 	DeleteBefore(before int64) (int64, error)
+	// DeleteRange 按时间范围删除；all=true 时忽略范围删除全部。
+	DeleteRange(begin, end int64, all bool) (int64, error)
 	UpdateAlarmID(id string, alarmID int) error
 }

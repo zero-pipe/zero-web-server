@@ -12,3 +12,8 @@ export function getCustomEvent(id) {
 export function getCustomEventTypes(deviceCode) {
   return request({ url: '/api/v1/custom-events/types', method: 'get', params: { deviceCode } })
 }
+
+// 按时间范围清空自定义事件；all=true 时删除全部（忽略范围）。
+export function clearCustomEvents(params) {
+  return request({ url: '/api/v1/custom-events/clear', method: 'post', data: params })
+}

@@ -9,7 +9,7 @@
         随 zero-agent 分发的内置插件，发现即默认启用。停用生命周期：<b>删除设备 → 禁用插件（停进程）→ 删除插件包</b>。
       </div>
       <el-table v-loading="builtinLoading" :data="builtins" size="small" border>
-        <el-table-column label="Agent" min-width="140">
+        <el-table-column label="Agent" min-width="180">
           <template slot-scope="{ row }">
             <div>{{ row.agent.hostname || row.agent.id }}</div>
             <el-tag :type="row.agent.status === 'online' ? 'success' : 'info'" size="mini">
@@ -17,41 +17,40 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="插件" min-width="160">
+        <el-table-column label="插件" min-width="300">
           <template slot-scope="{ row }">
             <div>{{ row.name || row.pluginId }}</div>
             <span class="sub-text">{{ row.pluginId }} · v{{ row.version }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="协议" min-width="120">
+        <el-table-column label="协议" min-width="160" align="center">
           <template slot-scope="{ row }">
             <el-tag v-for="p in row.protocols" :key="p" size="mini" style="margin-right:4px">{{ p }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="120">
+        <el-table-column label="状态" min-width="140" align="center">
           <template slot-scope="{ row }">
             <el-tag :type="stateType(row.actualState)" size="mini">{{ stateLabel(row.actualState) }}</el-tag>
             <el-tag v-if="row.desiredState === 'disabled'" type="warning" size="mini" style="margin-left:4px">已禁用</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template slot-scope="{ row }">
-            <el-button
-              v-if="row.desiredState !== 'enabled'"
-              type="text" size="mini" icon="el-icon-check" title="启用" aria-label="启用"
-              @click="setBuiltinState(row, 'enable')"
+            <el-switch
+              v-model="row._enabled"
+              :disabled="row.agent.status !== 'online'"
+              active-color="#1A73E8"
+              @change="(val) => onBuiltinToggle(row, val)"
             />
+            <el-divider direction="vertical" />
             <el-button
-              v-else
-              type="text" size="mini" icon="el-icon-close" title="禁用（停止进程）" aria-label="禁用"
-              @click="setBuiltinState(row, 'disable')"
-            />
-            <el-button
-              type="text" size="mini" icon="el-icon-delete" style="color:#EA4335"
+              type="text"
+              size="medium"
+              style="color:#EA4335"
               :disabled="row.desiredState === 'enabled' || row.actualState === 'running'"
               :title="row.desiredState === 'enabled' || row.actualState === 'running' ? '请先禁用插件再删除' : '删除插件包'"
-              aria-label="删除" @click="removeBuiltin(row)"
-            />
+              @click="removeBuiltin(row)"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -78,43 +77,45 @@
         插件包为 <code>.zwplugin</code>（zip），根目录需包含 <code>plugin.yaml</code>。上传后选择目标 Agent 安装，安装完成后在「插件接入」中启用插件、添加设备。
       </div>
       <el-table v-loading="loading" :data="packages" size="small" border>
-        <el-table-column label="插件" min-width="180">
+        <el-table-column label="插件" min-width="240">
           <template slot-scope="{ row }">
             <div>{{ row.name || row.pluginId }}</div>
             <span class="sub-text">{{ row.pluginId }} · v{{ row.version }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="厂商" width="120">
+        <el-table-column label="厂商" min-width="140">
           <template slot-scope="{ row }">{{ row.vendor || '-' }}</template>
         </el-table-column>
-        <el-table-column label="协议" min-width="120">
+        <el-table-column label="协议" min-width="160" align="center">
           <template slot-scope="{ row }">
             <el-tag v-for="p in row.protocols" :key="p" size="mini" style="margin-right:4px">{{ p }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="能力" min-width="180">
+        <el-table-column label="能力" min-width="260">
           <template slot-scope="{ row }">
             <el-tag v-for="c in row.capabilities" :key="c" size="mini" type="info" style="margin-right:4px">{{ c }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="架构" width="150">
+        <el-table-column label="架构" min-width="160" align="center">
           <template slot-scope="{ row }">
             <el-tag v-for="a in row.architectures" :key="a" size="mini" type="info" style="margin-right:4px">{{ a }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="大小" width="100">
+        <el-table-column label="大小" min-width="110" align="center">
           <template slot-scope="{ row }">{{ formatSize(row.sizeBytes) }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column label="状态" min-width="110" align="center">
           <template slot-scope="{ row }">
             <el-tag :type="row.status === 'valid' ? 'success' : 'danger'" size="mini">{{ row.status === 'valid' ? '有效' : '无效' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right" align="center">
           <template slot-scope="{ row }">
-            <el-button type="text" size="mini" icon="el-icon-download" title="安装" aria-label="安装" @click="openInstall(row)" />
-            <el-button type="text" size="mini" icon="el-icon-view" title="详情" aria-label="详情" @click="showDetail(row)" />
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#EA4335" title="删除" aria-label="删除" @click="removePackage(row)" />
+            <el-button type="text" size="medium" icon="el-icon-download" @click="openInstall(row)">安装</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" icon="el-icon-view" @click="showDetail(row)">详情</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" style="color:#EA4335" @click="removePackage(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -128,37 +129,34 @@
         </el-select>
       </div>
       <el-table v-loading="installLoading" :data="installs" size="small" border>
-        <el-table-column label="Agent" min-width="150">
+        <el-table-column label="Agent" min-width="200">
           <template slot-scope="{ row }">{{ agentName(row.agentId) }}</template>
         </el-table-column>
-        <el-table-column label="插件" min-width="160">
+        <el-table-column label="插件" min-width="260">
           <template slot-scope="{ row }">{{ row.pluginId }} · v{{ row.version }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="110">
+        <el-table-column label="状态" min-width="120" align="center">
           <template slot-scope="{ row }">
             <el-tag :type="installType(row.status)" size="mini">{{ installLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="错误" min-width="200">
+        <el-table-column label="错误" min-width="340" show-overflow-tooltip>
           <template slot-scope="{ row }">
             <span class="sub-text">{{ row.lastError || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="更新时间" width="170">
+        <el-table-column label="更新时间" min-width="180">
           <template slot-scope="{ row }">{{ row.updateTime || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="110" fixed="right" align="center">
           <template slot-scope="{ row }">
             <el-button
               v-if="row.status === 'installed'"
               type="text"
-              size="mini"
-              icon="el-icon-delete"
+              size="medium"
               style="color:#EA4335"
-              title="卸载"
-              aria-label="卸载"
               @click="doUninstall(row)"
-            />
+            >卸载</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -246,19 +244,22 @@ export default {
           const list = (r.data && r.data.list) || []
           return list
             .filter(p => p.source !== 'platform')
-            .map(p => ({ ...p, agent: a, agentId: a.id }))
+            .map(p => ({ ...p, agent: a, agentId: a.id, _enabled: p.desiredState === 'enabled' }))
         }).catch(() => [])))
       }).then(rows => {
         this.builtins = rows.reduce((all, cur) => all.concat(cur), [])
       }).catch(() => { this.builtins = [] })
         .finally(() => { this.builtinLoading = false })
     },
-    setBuiltinState(row, action) {
-      const label = action === 'enable' ? '启用' : '禁用'
+    onBuiltinToggle(row, val) {
+      const action = val ? 'enable' : 'disable'
       setAgentPluginState(row.agentId, row.pluginId, action).then(() => {
-        this.$message.success(label + '命令已下发')
+        this.$message.success(val ? '已启用' : '已禁用')
         this.loadBuiltins()
-      }).catch(e => this.$message.error(e || (label + '失败')))
+      }).catch(e => {
+        row._enabled = !val
+        this.$message.error((e && e.message) || (val ? '启用失败' : '禁用失败'))
+      })
     },
     removeBuiltin(row) {
       this.$confirm(`删除内置插件 ${row.pluginId}？将停止进程并移除插件包（须已禁用且无设备）。`, '提示', { type: 'warning' }).then(() => {

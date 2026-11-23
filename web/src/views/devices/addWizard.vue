@@ -94,9 +94,6 @@
         <el-form-item label="注册密码">
           <el-input v-model="gb.password" type="password" show-password placeholder="可空则用平台默认" />
         </el-form-item>
-        <el-form-item label="收流 IP">
-          <el-input v-model="gb.sdpIp" placeholder="可选" />
-        </el-form-item>
         <el-form-item label="流媒体节点">
           <el-select v-model="gb.mediaServerId" style="width: 100%;">
             <el-option label="自动负载最小" value="auto" />
@@ -169,7 +166,6 @@ export default {
       gb: {
         deviceId: '',
         password: '',
-        sdpIp: '',
         mediaServerId: 'auto',
         charset: 'GB2312'
       },
@@ -255,7 +251,7 @@ export default {
       this.deviceType = ''
       this.accessTip = ''
       this.step1 = { name: '' }
-      this.gb = { deviceId: '', password: '', sdpIp: '', mediaServerId: 'auto', charset: 'GB2312' }
+      this.gb = { deviceId: '', password: '', mediaServerId: 'auto', charset: 'GB2312' }
       this.onvif = { ip: '', port: 80, username: 'admin', password: '' }
     },
     submit() {

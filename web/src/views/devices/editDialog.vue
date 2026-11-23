@@ -33,9 +33,6 @@
         <el-form-item label="注册密码">
           <el-input v-model="form.gb.password" type="password" show-password placeholder="可空则用平台默认" />
         </el-form-item>
-        <el-form-item label="收流 IP">
-          <el-input v-model="form.gb.sdpIp" />
-        </el-form-item>
         <el-form-item label="流媒体节点">
           <el-select v-model="form.gb.mediaServerId" style="width: 100%;">
             <el-option label="自动负载最小" value="auto" />
@@ -90,7 +87,7 @@ export default {
         name: '',
         vendor: '',
         internalCode: '',
-        gb: { deviceId: '', password: '', sdpIp: '', mediaServerId: 'auto', charset: 'GB2312' },
+        gb: { deviceId: '', password: '', mediaServerId: 'auto', charset: 'GB2312' },
         onvif: { ip: '', port: 80, username: '', password: '', gbCode: '' }
       },
       rules: {
@@ -118,7 +115,6 @@ export default {
       this.form.gb = {
         deviceId: gb.deviceId || row.rawId || '',
         password: gb.password || '',
-        sdpIp: gb.sdpIp || '',
         mediaServerId: gb.mediaServerId || 'auto',
         charset: gb.charset || 'GB2312'
       }
@@ -136,7 +132,7 @@ export default {
         name: '',
         vendor: '',
         internalCode: '',
-        gb: { deviceId: '', password: '', sdpIp: '', mediaServerId: 'auto', charset: 'GB2312' },
+        gb: { deviceId: '', password: '', mediaServerId: 'auto', charset: 'GB2312' },
         onvif: { ip: '', port: 80, username: '', password: '', gbCode: '' }
       }
     },

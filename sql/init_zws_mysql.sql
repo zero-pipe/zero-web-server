@@ -437,13 +437,14 @@ CREATE TABLE IF NOT EXISTS zws_gb_sip_config
     alarm                TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否处理报警',
     require_pre_register TINYINT(1) NOT NULL DEFAULT 1 COMMENT '强制预登记',
     transport            VARCHAR(16) NOT NULL DEFAULT 'UDP' COMMENT '信令传输偏好',
+    stream_mode          VARCHAR(16) NOT NULL DEFAULT 'UDP' COMMENT '媒体流传输模式(UDP/TCP-ACTIVE/TCP-PASSIVE)',
     create_time          VARCHAR(50) COMMENT '创建时间',
     update_time          VARCHAR(50) COMMENT '更新时间'
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
 
 -- 默认国标 SIP（与 configs/config.yaml 对齐；新装可随后在页面改编码，无需重启）
-INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, require_pre_register, transport, create_time, update_time)
-VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0, 1, 'UDP',
+INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, require_pre_register, transport, stream_mode, create_time, update_time)
+VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0, 1, 'UDP', 'UDP',
         '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 
 -- 下级国标平台（向本级 REGISTER，与 zws_device 分离）

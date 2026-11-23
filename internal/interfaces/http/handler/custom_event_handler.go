@@ -56,3 +56,21 @@ func (h *CustomEventHandler) Get(c *gin.Context) {
 	}
 	response.OK(c, e)
 }
+
+func (h *CustomEventHandler) Clear(c *gin.Context) {
+	var body struct {
+		BeginTime int64 `json:"beginTime"`
+		EndTime   int64 `json:"endTime"`
+		All       bool  `json:"all"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数无效")
+		return
+	}
+	n, err := h.svc.ClearRange(c.Request.Context(), body.BeginTime, body.EndTime, body.All)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"deleted": n})
+}

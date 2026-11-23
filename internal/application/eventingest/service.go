@@ -266,6 +266,19 @@ func (s *Service) ClearBefore(ctx context.Context, before int64) (int64, error) 
 	return s.repo.DeleteBefore(before)
 }
 
+// ClearRange 按时间范围删除事件；all=true 时删除全部（忽略范围）。
+func (s *Service) ClearRange(ctx context.Context, begin, end int64, all bool) (int64, error) {
+	if !all {
+		if begin <= 0 && end <= 0 {
+			return 0, fmt.Errorf("请选择时间范围，或选择全部删除")
+		}
+		if begin > 0 && end > 0 && begin > end {
+			return 0, fmt.Errorf("开始时间不能晚于结束时间")
+		}
+	}
+	return s.repo.DeleteRange(begin, end, all)
+}
+
 func (s *Service) List(ctx context.Context, page, count int, f domainevent.ListFilter) ([]*domainevent.Event, int64, error) {
 	list, total, err := s.repo.List(page, count, f)
 	if err != nil {

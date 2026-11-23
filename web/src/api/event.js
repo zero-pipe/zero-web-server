@@ -16,6 +16,7 @@ export function getEventTypes() {
   return request({ url: '/api/v1/events/types', method: 'get' })
 }
 
-export function clearEvents(beforeTime) {
-  return request({ url: '/api/v1/events/clear', method: 'post', data: { beforeTime } })
+// 按时间范围清空事件；all=true 时删除全部（忽略范围）。
+export function clearEvents(params) {
+  return request({ url: '/api/v1/events/clear', method: 'post', data: params })
 }

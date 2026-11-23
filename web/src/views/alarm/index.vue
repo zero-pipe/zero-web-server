@@ -40,32 +40,10 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button size="mini" type="primary" icon="el-icon-search" circle title="查询" aria-label="查询" @click="search" />
-        </el-form-item>
-        <el-form-item>
-          <el-button
-            size="mini"
-            type="danger"
-            icon="el-icon-delete"
-            :disabled="selectedRows.length === 0"
-            @click="deleteSelected"
-          >
-            删除选中
-          </el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button
-            size="mini"
-            type="danger"
-            plain
-            icon="el-icon-delete-solid"
-            @click="clearByCondition"
-          >
-            清空
-          </el-button>
-        </el-form-item>
-        <el-form-item style="float: right;">
-          <el-button icon="el-icon-refresh-right" circle size="mini" @click="getAlarmList()" />
+          <el-button size="mini" type="primary" icon="el-icon-search" @click="search">查询</el-button>
+          <el-button size="mini" icon="el-icon-refresh-right" @click="getAlarmList()">刷新</el-button>
+          <el-button size="mini" type="danger" icon="el-icon-delete" :disabled="selectedRows.length === 0" @click="deleteSelected">删除选中</el-button>
+          <el-button size="mini" type="text" style="color:#EA4335" icon="el-icon-delete" @click="openDelete">删除记录</el-button>
         </el-form-item>
       </el-form>
       <el-table
@@ -78,24 +56,24 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="alarmType" label="报警类型" width="170">
+        <el-table-column prop="alarmType" label="报警类型" width="160">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="getAlarmTypeTagType(scope.row.alarmType)">
               {{ scope.row.alarmCode ? eventTypeLabel(scope.row.alarmCode) : getAlarmTypeLabel(scope.row.alarmType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="级别" width="80">
+        <el-table-column label="级别" width="80" align="center">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="severityType(scope.row.severity)">{{ severityLabel(scope.row.severity) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="处置" width="95">
+        <el-table-column label="处置" width="90" align="center">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="statusType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="快照" width="100">
+        <el-table-column label="快照" width="90" align="center">
           <template v-slot:default="scope">
             <el-image
               v-if="scope.row.snapPath"
@@ -112,31 +90,31 @@
             <span v-else style="color: #c0c4cc; font-size: 12px;">无</span>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="报警描述" show-overflow-tooltip />
-        <el-table-column prop="deviceName" label="设备" width="150" />
-        <el-table-column prop="channelName" label="通道名称" width="150" />
-        <el-table-column prop="longitude" label="经度" width="110" />
-        <el-table-column prop="latitude" label="纬度" width="110" />
-        <el-table-column label="报警时间" width="170">
+        <el-table-column prop="description" label="报警描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="deviceName" label="设备" width="140" show-overflow-tooltip />
+        <el-table-column prop="channelName" label="通道名称" width="140" show-overflow-tooltip />
+        <el-table-column prop="longitude" label="经度" width="100" />
+        <el-table-column prop="latitude" label="纬度" width="100" />
+        <el-table-column label="报警时间" width="165">
           <template v-slot:default="scope">
             {{ formatTime(scope.row.alarmTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="400" fixed="right" align="center">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-view" type="text" title="详情" aria-label="详情" @click="openDetail(scope.row)" />
-            <el-button size="medium" icon="el-icon-video-play" type="text" title="回放" aria-label="回放" @click="openPlayback(scope.row)" />
-            <el-button v-if="scope.row.status !== 'handled'" size="medium" icon="el-icon-check" type="text" title="确认" aria-label="确认" @click="setStatus(scope.row, 'handled')" />
-            <el-button v-if="scope.row.status !== 'ignored'" size="medium" icon="el-icon-close" type="text" title="忽略" aria-label="忽略" @click="setStatus(scope.row, 'ignored')" />
-            <el-button
-              size="medium"
-              icon="el-icon-delete"
-              style="color: #EA4335"
-              type="text"
-              title="删除"
-              aria-label="删除"
-              @click="deleteSingle(scope.row)"
-            />
+            <el-button size="medium" icon="el-icon-view" type="text" @click="openDetail(scope.row)">详情</el-button>
+            <el-divider direction="vertical" />
+            <el-button size="medium" icon="el-icon-video-play" type="text" @click="openPlayback(scope.row)">回放</el-button>
+            <template v-if="scope.row.status !== 'handled'">
+              <el-divider direction="vertical" />
+              <el-button size="medium" icon="el-icon-check" type="text" @click="setStatus(scope.row, 'handled')">确认</el-button>
+            </template>
+            <template v-if="scope.row.status !== 'ignored'">
+              <el-divider direction="vertical" />
+              <el-button size="medium" icon="el-icon-close" type="text" @click="setStatus(scope.row, 'ignored')">忽略</el-button>
+            </template>
+            <el-divider direction="vertical" />
+            <el-button size="medium" icon="el-icon-delete" style="color: #EA4335" type="text" @click="deleteSingle(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -204,6 +182,33 @@
           <el-button size="small" type="primary" :disabled="!detail.channelId" @click="openPlayback(detail)">查看回放</el-button>
         </div>
       </template>
+    </el-dialog>
+
+    <el-dialog title="删除报警记录" :visible.sync="deleteVisible" width="460px">
+      <div class="delete-tip">删除后不可恢复，请谨慎操作。</div>
+      <el-form label-width="90px" size="small">
+        <el-form-item label="删除范围">
+          <el-radio-group v-model="deleteAll" @change="onDeleteAllChange">
+            <el-radio :label="false">按时间范围</el-radio>
+            <el-radio :label="true">全部删除</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="!deleteAll" label="时间范围">
+          <el-date-picker
+            v-model="deleteRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="timestamp"
+            style="width:100%"
+          />
+        </el-form-item>
+      </el-form>
+      <span slot="footer">
+        <el-button size="small" @click="deleteVisible = false">取消</el-button>
+        <el-button size="small" type="danger" :loading="deleting" @click="confirmDelete">删除</el-button>
+      </span>
     </el-dialog>
   </div>
 </template>
@@ -287,7 +292,11 @@ export default {
       playbackTitle: '录像回放',
       currentPlaybackChannelId: null,
       detailVisible: false,
-      detail: null
+      detail: null,
+      deleteVisible: false,
+      deleteAll: false,
+      deleteRange: [],
+      deleting: false
     }
   },
   created() {
@@ -459,38 +468,37 @@ export default {
           })
       }).catch(() => {})
     },
-    clearByCondition() {
-      const hasFilter = this.beginTime || this.endTime || this.selectedAlarmTypes.length > 0
-      const filterDesc = hasFilter
-        ? [
-          this.beginTime ? `开始时间：${this.beginTime}` : null,
-          this.endTime ? `结束时间：${this.endTime}` : null,
-          this.selectedAlarmTypes.length > 0 ? `报警类型：${this.selectedAlarmTypes.map(v => {
-            const opt = this.alarmTypeOptions.find(o => o.value === v)
-            return opt ? opt.label : v
-          }).join('、')}` : null
-        ].filter(Boolean).join('；')
-        : '全部'
-      this.$confirm(
-        `将删除符合当前筛选条件的所有报警记录（${filterDesc}），此操作不可恢复，确定继续？`,
-        '清空报警',
-        {
-          confirmButtonText: '确定删除',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }
-      ).then(() => {
-        this.$store.dispatch('alarm/clearAlarms', {
-          alarmType: this.selectedAlarmTypes.length > 0 ? this.selectedAlarmTypes : undefined,
-          beginTime: this.beginTime || undefined,
-          endTime: this.endTime || undefined
-        }).then(count => {
-          this.$message({ showClose: true, message: `已清空 ${count != null ? count : ''} 条报警记录`, type: 'success' })
+    openDelete() {
+      this.deleteAll = false
+      this.deleteRange = []
+      this.deleteVisible = true
+    },
+    onDeleteAllChange() {
+      if (this.deleteAll) this.deleteRange = []
+    },
+    confirmDelete() {
+      const all = this.deleteAll
+      if (!all && (!this.deleteRange || this.deleteRange.length !== 2)) {
+        this.$message.warning('请选择时间范围，或选择全部删除')
+        return
+      }
+      const beginTime = all ? undefined : this.deleteRange[0]
+      const endTime = all ? undefined : this.deleteRange[1]
+      const desc = all ? '全部报警记录' : `${this.formatTime(beginTime)} 至 ${this.formatTime(endTime)}`
+      this.$confirm(`确认删除${desc}？此操作不可恢复。`, '删除报警', {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.deleting = true
+        this.$store.dispatch('alarm/clearAlarms', { beginTime, endTime }).then(count => {
+          this.$message({ showClose: true, message: (count === undefined || count === null) ? '删除成功' : `已删除 ${count} 条报警记录`, type: 'success' })
+          this.deleteVisible = false
           this.currentPage = 1
           this.getAlarmList()
         }).catch(error => {
-          this.$message({ showClose: true, message: error, type: 'error' })
-        })
+          this.$message({ showClose: true, message: error || '删除失败', type: 'error' })
+        }).finally(() => { this.deleting = false })
       }).catch(() => {})
     },
     getAlarmTypeLabel(value) {
@@ -522,6 +530,7 @@ export default {
 
 <style scoped>
 .sub-text { color: #80868B; font-size: 11px; line-height: 14px; }
+.delete-tip { color: #606266; font-size: 13px; margin-bottom: 12px; }
 .section-title { font-weight: 600; margin-bottom: 6px; color: #303133; }
 .json { background: #f5f7fa; padding: 10px; border-radius: 6px; max-height: 240px; overflow: auto; font-size: 12px; }
 </style>

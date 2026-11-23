@@ -29,3 +29,16 @@ func (s *Service) Get(_ context.Context, id string) (*domaince.CustomEvent, erro
 func (s *Service) Types(_ context.Context, deviceInternalCode string) ([]domaince.TypeCount, error) {
 	return s.repo.DistinctTypes(deviceInternalCode)
 }
+
+// ClearRange 按时间范围删除自定义事件；all=true 时删除全部（忽略范围）。
+func (s *Service) ClearRange(_ context.Context, begin, end int64, all bool) (int64, error) {
+	if !all {
+		if begin <= 0 && end <= 0 {
+			return 0, fmt.Errorf("请选择时间范围，或选择全部删除")
+		}
+		if begin > 0 && end > 0 && begin > end {
+			return 0, fmt.Errorf("开始时间不能晚于结束时间")
+		}
+	}
+	return s.repo.DeleteRange(begin, end, all)
+}

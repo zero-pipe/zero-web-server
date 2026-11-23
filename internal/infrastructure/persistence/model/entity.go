@@ -382,6 +382,7 @@ type GbSipConfig struct {
 	Alarm              bool   `gorm:"column:alarm;not null;default:0" json:"alarm"`
 	RequirePreRegister bool   `gorm:"column:require_pre_register;not null;default:1" json:"requirePreRegister"`
 	Transport          string `gorm:"column:transport;size:16;not null;default:UDP" json:"transport"`
+	StreamMode         string `gorm:"column:stream_mode;size:16;not null;default:UDP" json:"streamMode"`
 	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
 	UpdateTime         string `gorm:"column:update_time;size:50" json:"updateTime"`
 }

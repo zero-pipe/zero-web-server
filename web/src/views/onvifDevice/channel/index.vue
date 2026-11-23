@@ -64,21 +64,19 @@
           <el-tag v-else size="medium" type="info">离线</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="120" fixed="right">
+      <el-table-column label="操作" min-width="240" fixed="right" align="center">
         <template v-slot:default="scope">
           <el-button
             size="medium"
             type="text"
             icon="el-icon-video-play"
-            title="播放"
-            aria-label="播放"
             :loading="scope.row.playLoading"
             @click="handlePlay(scope.row)"
-          />
+          >播放</el-button>
           <template v-if="scope.row.hasPtz">
             <el-divider direction="vertical" />
             <el-dropdown @command="(cmd) => handlePtz(scope.row, cmd)">
-              <el-button size="medium" type="text" icon="el-icon-s-tools" title="云台" aria-label="云台" />
+              <el-button size="medium" type="text" icon="el-icon-s-tools">云台</el-button>
               <el-dropdown-menu>
                 <el-dropdown-item command="LEFT">左转</el-dropdown-item>
                 <el-dropdown-item command="RIGHT">右转</el-dropdown-item>
@@ -92,10 +90,8 @@
               size="medium"
               type="text"
               icon="el-icon-edit"
-              title="编辑通道信息"
-              aria-label="编辑"
               @click="handleEdit(scope.row)"
-            />
+            >编辑</el-button>
           </template>
         </template>
       </el-table-column>

@@ -17,7 +17,7 @@
         <el-button type="text" icon="el-icon-refresh" title="刷新" aria-label="刷新" @click="loadAll" />
       </div>
       <el-table v-loading="loading" :data="agentPlugins" size="small" border>
-        <el-table-column label="Agent" min-width="150">
+        <el-table-column label="Agent" min-width="200">
           <template slot-scope="{ row }">
             <div>{{ row.agent.hostname || row.agent.id }}</div>
             <el-tag :type="row.agent.status === 'online' ? 'success' : 'info'" size="mini">
@@ -25,36 +25,47 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="插件" min-width="160">
+        <el-table-column label="插件" min-width="240">
           <template slot-scope="{ row }">
             <div>{{ row.name || row.pluginId }}</div>
             <span class="sub-text">v{{ row.version }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="协议" min-width="130">
+        <el-table-column label="协议" min-width="160" align="center">
           <template slot-scope="{ row }">
             <el-tag v-for="p in row.protocols" :key="p" size="mini" style="margin-right:4px">{{ p }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="能力" min-width="160">
+        <el-table-column label="能力" min-width="340">
           <template slot-scope="{ row }">
             <el-tag v-for="c in row.capabilities" :key="c" size="mini" type="info" style="margin-right:4px">{{ c }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="120">
+        <el-table-column label="状态" min-width="120" align="center">
           <template slot-scope="{ row }">
             <el-tag :type="stateType(row.actualState)" size="mini">{{ stateLabel(row.actualState) }}</el-tag>
             <el-tag v-if="row.desiredState === 'disabled'" type="warning" size="mini" style="margin-left:4px">已禁用</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="最后上报" width="170">
+        <el-table-column label="最后上报" min-width="180">
           <template slot-scope="{ row }">{{ formatTime(row.lastSeen) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right" align="center">
           <template slot-scope="{ row }">
-            <el-button v-if="row.desiredState !== 'enabled'" type="text" size="mini" icon="el-icon-check" title="启用" aria-label="启用" @click="setState(row, 'enable')" />
-            <el-button v-else type="text" size="mini" icon="el-icon-close" title="禁用" aria-label="禁用" @click="setState(row, 'disable')" />
-            <el-button type="text" size="mini" icon="el-icon-refresh-left" title="重启" aria-label="重启" @click="setState(row, 'restart')" />
+            <el-switch
+              v-model="row._enabled"
+              :disabled="row.agent.status !== 'online'"
+              active-color="#1A73E8"
+              @change="(val) => onPluginToggle(row, val)"
+            />
+            <el-divider direction="vertical" />
+            <el-button
+              type="text"
+              size="medium"
+              icon="el-icon-refresh-left"
+              :disabled="row.agent.status !== 'online'"
+              @click="setState(row, 'restart')"
+            >重启</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -68,31 +79,35 @@
         <el-button type="primary" size="small" icon="el-icon-plus" @click="openAdd" :disabled="!plugins.length">添加设备</el-button>
       </div>
       <el-table v-loading="loading" :data="devices" size="small" border>
-        <el-table-column prop="name" label="名称" min-width="140" />
-        <el-table-column prop="protocol" label="协议" width="140" />
-        <el-table-column label="地址/注册信息" min-width="160">
+        <el-table-column prop="name" label="名称" min-width="200" />
+        <el-table-column prop="protocol" label="协议" min-width="140" align="center" />
+        <el-table-column label="地址/注册信息" min-width="220">
           <template slot-scope="{ row }">{{ deviceAddress(row) }}</template>
         </el-table-column>
-        <el-table-column prop="manufacturer" label="厂商" width="100" />
-        <el-table-column prop="model" label="型号" width="120" />
-        <el-table-column label="在线" width="80">
+        <el-table-column prop="manufacturer" label="厂商" min-width="130" />
+        <el-table-column prop="model" label="型号" min-width="180" show-overflow-tooltip />
+        <el-table-column label="在线" min-width="90" align="center">
           <template slot-scope="{ row }">
             <el-tag :type="row.online ? 'success' : 'info'" size="mini">{{ row.online ? '在线' : '离线' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="channelCount" label="通道数" width="80" />
-        <el-table-column label="布防" width="90">
+        <el-table-column prop="channelCount" label="通道数" min-width="100" align="center" />
+        <el-table-column label="操作" min-width="380" fixed="right" align="center">
           <template slot-scope="{ row }">
-            <el-tag v-if="row._armed" size="mini" type="success">已布防</el-tag>
-            <el-tag v-else size="mini" type="info">未布防</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="170">
-          <template slot-scope="{ row }">
-            <el-button type="text" size="mini" icon="el-icon-video-camera" title="通道" aria-label="通道" @click="goChannels(row)" />
-            <el-button type="text" size="mini" icon="el-icon-refresh" title="同步" aria-label="同步" @click="syncDevice(row)" />
-            <el-button type="text" size="mini" :icon="row._armed ? 'el-icon-unlock' : 'el-icon-lock'" :title="row._armed ? '撤防' : '布防'" :aria-label="row._armed ? '撤防' : '布防'" :disabled="!row.online" @click="toggleArm(row)" />
-            <el-button type="text" size="mini" icon="el-icon-delete" style="color:#EA4335" title="删除" aria-label="删除" @click="removeDevice(row)" />
+            <el-switch
+              v-model="row._armed"
+              :disabled="!row.online"
+              active-color="#1A73E8"
+              active-text="撤防"
+              inactive-text="布防"
+              @change="() => toggleArm(row)"
+            />
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" icon="el-icon-video-camera" @click="goChannels(row)">通道</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" icon="el-icon-refresh" @click="syncDevice(row)">同步</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" style="color:#EA4335" @click="removeDevice(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -186,18 +201,28 @@ export default {
         const agents = (res.data && res.data.list) || []
         return Promise.all(agents.map(a => queryAgentPlugins(a.id).then(r => {
           const list = (r.data && r.data.list) || []
-          return list.map(p => ({ ...p, agent: a }))
+          return list.map(p => ({ ...p, agent: a, agentId: a.id, _enabled: p.desiredState === 'enabled' }))
         })))
       }).then(rows => {
         this.agentPlugins = rows.reduce((all, cur) => all.concat(cur), [])
       }).catch(() => { this.agentPlugins = [] })
     },
+    onPluginToggle(row, val) {
+      const action = val ? 'enable' : 'disable'
+      setAgentPluginState(row.agentId, row.pluginId, action).then(() => {
+        this.$message.success(val ? '已启用' : '已禁用')
+        this.loadAll()
+      }).catch(e => {
+        row._enabled = !val
+        this.$message.error((e && e.message) || (val ? '启用失败' : '禁用失败'))
+      })
+    },
     setState(row, action) {
-      const label = action === 'enable' ? '启用' : action === 'disable' ? '禁用' : '重启'
+      const label = action === 'restart' ? '重启' : ''
       setAgentPluginState(row.agentId, row.pluginId, action).then(() => {
         this.$message.success(label + '命令已下发')
         this.loadAll()
-      }).catch(e => this.$message.error(e || (label + '失败')))
+      }).catch(e => this.$message.error((e && e.message) || (label + '失败')))
     },
     stateLabel(state) {
       return { running: '运行中', starting: '启动中', stopped: '已停止', error: '异常', discovered: '已发现', offline: '离线' }[state] || state || '-'
@@ -224,24 +249,34 @@ export default {
       })
     },
     toggleArm(row) {
-      if (row._armed) {
+      if (!row._armed) {
+        // 关闭开关 → 撤防（需确认）
         this.$confirm(`确认对设备 ${row.name} 撤防？`, '提示', { type: 'warning' }).then(() => {
           disarmIpcDevice(row.id).then(() => {
             this.$message.success('已撤防')
             this.loadArmStatuses()
+          }).catch(e => {
+            row._armed = true
+            this.$message.error((e && e.message) || '撤防失败')
           })
-        }).catch(() => {})
+        }).catch(() => { row._armed = true })
         return
       }
+      // 打开开关 → 布防
       if (!this.pipelineReady) {
+        row._armed = false
         this.$message.warning(this.pipelineMsg || '事件管道未就绪，请先配置对象存储与 MQTT')
         return
       }
       armIpcDevice(row.id, ['motion', 'line_crossing', 'intrusion']).then(res => {
         const d = (res && res.data) || {}
         if (d.armed) this.$message.success('布防成功')
+        else row._armed = false
         this.loadArmStatuses()
-      }).catch(e => this.$message.error(e || '布防失败'))
+      }).catch(e => {
+        row._armed = false
+        this.$message.error((e && e.message) || '布防失败')
+      })
     },
     deviceAddress(row) {
       let params = {}

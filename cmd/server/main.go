@@ -322,6 +322,16 @@ func main() {
 	cascadeResolver := cascadeapp.NewResolver(platformRepo, platformRepo, channelRepo)
 	cascadeInbound := cascadeapp.NewInboundService(cascadeResolver, deviceRepo, playService, sessionAdapter, playbackService, sessionAdapter, sipCfg.ID, cfg.UserSettings.ServerID, platformChannelSvc)
 	sipServer.SetCascadeInbound(cascadeInbound)
+	// 媒体流传输模式统一由本级「国标配置」决定（标准接入不再逐设备设置）。
+	streamModeProvider := func() string {
+		row, err := gbSipConfigService.GetOrEmpty()
+		if err != nil || row == nil {
+			return ""
+		}
+		return row.StreamMode
+	}
+	playService.SetStreamModeProvider(streamModeProvider)
+	playbackService.SetStreamModeProvider(streamModeProvider)
 	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
 	assetService := assetapp.NewService(assetRepo, assetProjector, drivers)
 	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, assetService, mediaCluster, cfg.Server.Port)

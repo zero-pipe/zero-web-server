@@ -51,13 +51,15 @@ func (h *EventHandler) Types(c *gin.Context) {
 
 func (h *EventHandler) Clear(c *gin.Context) {
 	var body struct {
-		BeforeTime int64 `json:"beforeTime"`
+		BeginTime int64 `json:"beginTime"`
+		EndTime   int64 `json:"endTime"`
+		All       bool  `json:"all"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil || body.BeforeTime <= 0 {
-		response.Error(c, response.CodeBadReq, "beforeTime 无效")
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, response.CodeBadReq, "参数无效")
 		return
 	}
-	n, err := h.svc.ClearBefore(c.Request.Context(), body.BeforeTime)
+	n, err := h.svc.ClearRange(c.Request.Context(), body.BeginTime, body.EndTime, body.All)
 	if err != nil {
 		response.FromError(c, err)
 		return

@@ -67,6 +67,7 @@ func (s *Service) Discover(ctx context.Context, timeoutSec int) ([]*domainonvif.
 
 type AddDeviceRequest struct {
 	Name     string `json:"name"`
+	Vendor   string `json:"vendor"`
 	IP       string `json:"ip"`
 	Port     int    `json:"port"`
 	Username string `json:"username"`
@@ -115,6 +116,11 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 	if name == "" {
 		name = info.Manufacturer + " " + info.Model
 	}
+	// 厂商以页面手填为准（平台接入标准字典）；未填才回退设备上报值。
+	manufacturer := strings.TrimSpace(req.Vendor)
+	if manufacturer == "" {
+		manufacturer = info.Manufacturer
+	}
 
 	device := &domainonvif.Device{
 		Name:          name,
@@ -122,7 +128,7 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 		Port:          port,
 		Username:      req.Username,
 		Password:      req.Password,
-		Manufacturer:  info.Manufacturer,
+		Manufacturer:  manufacturer,
 		Model:         info.Model,
 		Firmware:      info.FirmwareVersion,
 		SerialNumber:  info.SerialNumber,

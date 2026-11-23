@@ -88,6 +88,7 @@ func (s *Service) buildDefaultRow() *domaingbsipconfig.Config {
 		Alarm:              d.Alarm,
 		RequirePreRegister: true, // yaml 默认通常为 true；库种子与之一致
 		Transport:          "UDP",
+		StreamMode:         "UDP",
 		CreateTime:         now,
 		UpdateTime:         now,
 	}
@@ -161,6 +162,15 @@ func validate(row *domaingbsipconfig.Config) error {
 	}
 	if row.Transport != "UDP" && row.Transport != "TCP" {
 		return errors.New("传输模式须为 UDP 或 TCP")
+	}
+	row.StreamMode = strings.ToUpper(strings.TrimSpace(row.StreamMode))
+	if row.StreamMode == "" {
+		row.StreamMode = "UDP"
+	}
+	switch row.StreamMode {
+	case "UDP", "TCP-ACTIVE", "TCP-PASSIVE":
+	default:
+		return errors.New("媒体流传输模式须为 UDP / TCP-ACTIVE / TCP-PASSIVE")
 	}
 	if row.IP == "" {
 		return ErrIPRequired

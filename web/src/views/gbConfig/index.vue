@@ -35,6 +35,14 @@
             <el-radio label="TCP">TCP</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="媒体流传输">
+          <el-select v-model="form.streamMode" style="width: 200px">
+            <el-option label="UDP" value="UDP" />
+            <el-option label="TCP 主动" value="TCP-ACTIVE" />
+            <el-option label="TCP 被动" value="TCP-PASSIVE" />
+          </el-select>
+          <span class="hint">GB28181 取流 RTP 传输方式，对本级所有设备生效</span>
+        </el-form-item>
         <el-form-item label="强制预登记">
           <el-switch v-model="form.requirePreRegister" />
           <span class="hint">开启后：未在「标准接入」或「下级平台」预登记的编号，REGISTER 返回 403</span>
@@ -87,7 +95,8 @@ export default {
         password: '',
         alarm: false,
         requirePreRegister: true,
-        transport: 'UDP'
+        transport: 'UDP',
+        streamMode: 'UDP'
       },
       rules: {
         ip: [{ required: true, message: '请填写 SIP IP', trigger: 'blur' }],
@@ -119,7 +128,8 @@ export default {
             password: data.password || '',
             alarm: !!data.alarm,
             requirePreRegister: data.requirePreRegister !== false,
-            transport: data.transport || 'UDP'
+            transport: data.transport || 'UDP',
+            streamMode: data.streamMode || 'UDP'
           }
         })
         .catch(err => {

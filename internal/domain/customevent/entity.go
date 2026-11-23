@@ -44,4 +44,6 @@ type Repository interface {
 	Get(id string) (*CustomEvent, error)
 	List(page, count int, f ListFilter) ([]*CustomEvent, int64, error)
 	DistinctTypes(deviceInternalCode string) ([]TypeCount, error)
+	// DeleteRange 按时间范围删除；all=true 时删除全部。
+	DeleteRange(begin, end int64, all bool) (int64, error)
 }
