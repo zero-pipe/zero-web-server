@@ -22,6 +22,7 @@ const PATH_RULES = [
   { prefix: '/commonChannel', menu: 'org' },
   { prefix: '/map', menu: 'app' },
   { prefix: '/alarm', menu: 'app' },
+  { prefix: '/customEvent', menu: 'app' },
   { prefix: '/dashboard', menu: 'ops' },
   { prefix: '/operations', menu: 'ops' },
   { prefix: '/user', menu: 'user' },

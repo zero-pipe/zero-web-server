@@ -17,7 +17,8 @@ export const primaryMenus = [
       { title: '电子地图', path: '/map', icon: 'menu-map' },
       { title: '分屏监控', path: '/live', icon: 'live' },
       { title: '报警管理', path: '/alarm', icon: 'alarm' },
-      { title: '事件中心', path: '/events', icon: 'menu-record' }
+      { title: '事件中心', path: '/events', icon: 'menu-record' },
+      { title: '自定义事件', path: '/customEvent', icon: 'menu-record' }
     ]
   },
   {
