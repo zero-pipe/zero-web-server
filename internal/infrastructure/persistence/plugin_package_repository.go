@@ -161,6 +161,7 @@ func packageFromModel(m *model.PluginPackage) *domainpkg.Package {
 		var mf domainpkg.Manifest
 		if json.Unmarshal([]byte(m.ManifestJSON), &mf) == nil {
 			p.Manifest = &mf
+			p.CustomCaps = mf.CustomCaps
 		}
 	}
 	return p

@@ -92,6 +92,7 @@ func (s *Service) Upload(ctx context.Context, data []byte) (*domainpkg.Package, 
 		ObjectKey: key, SHA256: res.SHA256, SizeBytes: int64(len(data)),
 		ManifestJSON: res.ManifestJSON, ConfigSchema: res.ConfigSchema,
 		Protocols: res.Manifest.Protocols, Capabilities: res.Manifest.Capabilities,
+		CustomCaps:       res.Manifest.CustomCaps,
 		StreamTransports: res.Manifest.StreamTransports, EventTypes: res.Manifest.EventTypes,
 		Architectures: res.Architectures, Status: domainpkg.PackageValid,
 	}

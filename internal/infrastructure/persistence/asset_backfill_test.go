@@ -44,6 +44,35 @@ func TestChannelCaps(t *testing.T) {
 	}
 }
 
+func TestPluginOpSupported(t *testing.T) {
+	// 未上报声明（nil）→ 维持宽松，全部放行。
+	if !pluginOpSupported(nil, "playback") {
+		t.Errorf("nil declared should be permissive")
+	}
+	// 只声明 login/channels/live → 只支持 play/sync，回放/云台/抓拍均不支持。
+	declared := map[string]bool{"login": true, "channels": true, "live": true}
+	cases := map[string]bool{
+		"play": true, "sync": true,
+		"playback": false, "ptz": false, "snapshot": false, "alarm": false, "subscribe": false,
+	}
+	for op, want := range cases {
+		if got := pluginOpSupported(declared, op); got != want {
+			t.Errorf("op %s: got %v want %v", op, got, want)
+		}
+	}
+	// record_query 亦视为支持回放；arm 视为告警+订阅。
+	declared2 := map[string]bool{"record_query": true, "arm": true}
+	if !pluginOpSupported(declared2, "playback") {
+		t.Errorf("record_query should enable playback")
+	}
+	if !pluginOpSupported(declared2, "alarm") || !pluginOpSupported(declared2, "subscribe") {
+		t.Errorf("arm should enable alarm/subscribe")
+	}
+	if pluginOpSupported(declared2, "play") {
+		t.Errorf("play requires live, not record_query")
+	}
+}
+
 func TestStableIDDeterministic(t *testing.T) {
 	a := stableID("profile", "resource-1", "main")
 	b := stableID("profile", "resource-1", "main")

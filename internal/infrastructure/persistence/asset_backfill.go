@@ -320,8 +320,11 @@ func (p *AssetProjector) backfillPlugin() error {
 	if err := p.db.Find(&devices).Error; err != nil {
 		return err
 	}
+	// 每插件声明能力缓存：从 zws_plugin.capabilities 读取（JSON 数组），nil=未知。
+	capCache := map[string]map[string]bool{}
 	for i := range devices {
 		dev := &devices[i]
+		declared := p.pluginCapsCached(capCache, dev.PluginID)
 		uid, err := p.legacyID("zws_plugin_device", strconv.Itoa(dev.ID))
 		if err != nil {
 			return err
@@ -340,7 +343,9 @@ func (p *AssetProjector) backfillPlugin() error {
 		if err := p.upsertRef("zws_plugin_device", strconv.Itoa(dev.ID), "physical_device", uid); err != nil {
 			return err
 		}
-		if err := p.upsertCapabilities("device", uid, "plugin", dev.Online, nil); err != nil {
+		if err := p.upsertCapabilitiesWith("device", uid, "plugin", dev.Online, nil, func(op string) bool {
+			return pluginOpSupported(declared, op)
+		}); err != nil {
 			return err
 		}
 		var channels []model.PluginChannel
@@ -371,7 +376,9 @@ func (p *AssetProjector) backfillPlugin() error {
 				`{"channel":"main"}`, "", "", true); err != nil {
 				return err
 			}
-			if err := p.upsertCapabilities("resource", chUID, "plugin", dev.Online, channelCaps(ch.PTZType, ch.HasAudio)); err != nil {
+			if err := p.upsertCapabilitiesWith("resource", chUID, "plugin", dev.Online, channelCaps(ch.PTZType, ch.HasAudio), func(op string) bool {
+				return pluginOpSupported(declared, op)
+			}); err != nil {
 				return err
 			}
 		}
@@ -519,6 +526,13 @@ func (p *AssetProjector) upsertProfile(id, resourceID, role, name, selector, cod
 }
 
 func (p *AssetProjector) upsertCapabilities(scopeType, scopeID, protocol string, online bool, extra []string) error {
+	return p.upsertCapabilitiesWith(scopeType, scopeID, protocol, online, extra, nil)
+}
+
+// upsertCapabilitiesWith 按 supportedOf 决定每个操作是否"声明支持"（声明驱动）。
+// supportedOf 为 nil 时全部视为支持（保持 GB/ONVIF 旧行为）。
+// 声明不支持的操作显式写 Supported=false，使调用前即可拒绝（不再靠运行时失败兜底）。
+func (p *AssetProjector) upsertCapabilitiesWith(scopeType, scopeID, protocol string, online bool, extra []string, supportedOf func(op string) bool) error {
 	ops := protocolDeviceOps(protocol)
 	ops = append(ops, extra...)
 	now := nowText()
@@ -529,15 +543,73 @@ func (p *AssetProjector) upsertCapabilities(scopeType, scopeID, protocol string,
 			continue
 		}
 		seen[op] = true
+		supported := true
+		if supportedOf != nil {
+			supported = supportedOf(op)
+		}
 		if err := p.db.Create(&model.AssetCapability{
 			ID: stableID("cap", scopeType, scopeID, op), ScopeType: scopeType, ScopeID: scopeID,
-			Operation: op, Supported: true, Configured: true, Available: online,
+			Operation: op, Supported: supported, Configured: supported, Available: online && supported,
 			Source: "backfill", UpdateTime: now,
 		}).Error; err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// pluginCapsCached 读插件实例声明的能力集合（zws_plugin.capabilities，JSON 数组）。
+// 返回 nil 表示未知（无插件行或能力为空），调用方据此维持宽松（legacy）行为。
+func (p *AssetProjector) pluginCapsCached(cache map[string]map[string]bool, pluginInstanceID string) map[string]bool {
+	key := strings.TrimSpace(pluginInstanceID)
+	if key == "" {
+		return nil
+	}
+	if v, ok := cache[key]; ok {
+		return v
+	}
+	var raw string
+	_ = p.db.Model(&model.Plugin{}).Where("id = ?", key).Pluck("capabilities", &raw).Error
+	var set map[string]bool
+	if strings.TrimSpace(raw) != "" {
+		var caps []string
+		if json.Unmarshal([]byte(raw), &caps) == nil && len(caps) > 0 {
+			set = map[string]bool{}
+			for _, c := range caps {
+				set[strings.ToLower(strings.TrimSpace(c))] = true
+			}
+		}
+	}
+	cache[key] = set
+	return set
+}
+
+// pluginOpSupported 把插件清单能力（live/ptz/playback/arm…）映射到平台能力操作，
+// 决定该操作是否声明支持。declared==nil 时维持宽松（存量插件未上报能力）。
+func pluginOpSupported(declared map[string]bool, op string) bool {
+	if declared == nil {
+		return true
+	}
+	switch op {
+	case "play":
+		return declared["live"]
+	case "playback":
+		return declared["playback"] || declared["record_query"]
+	case "ptz":
+		return declared["ptz"]
+	case "snapshot":
+		return declared["snapshot"]
+	case "alarm", "subscribe":
+		return declared["arm"] || declared["disarm"]
+	case "audio":
+		return declared["audio"]
+	case "config":
+		return declared["config"]
+	case "sync":
+		return true
+	default:
+		return true
+	}
 }
 
 func (p *AssetProjector) upsertEvent(id, deviceID, resourceID, kind, external string, enabled bool) error {

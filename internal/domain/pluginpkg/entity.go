@@ -35,47 +35,57 @@ const (
 
 // Manifest 是 plugin.yaml 的解析结果（规范第 4 节）。
 type Manifest struct {
-	Spec             int               `yaml:"spec" json:"spec"`
-	ID               string            `yaml:"id" json:"id"`
-	Name             string            `yaml:"name" json:"name"`
-	Vendor           string            `yaml:"vendor" json:"vendor"`
-	Version          string            `yaml:"version" json:"version"`
-	Protocols        []string          `yaml:"protocols" json:"protocols"`
-	RPC              string            `yaml:"rpc" json:"rpc"`
-	Executable       map[string]string `yaml:"executable" json:"executable"`
-	Args             []string          `yaml:"args" json:"args"`
-	Listen           string            `yaml:"listen" json:"listen"`
-	Health           string            `yaml:"health" json:"health"`
-	Capabilities     []string          `yaml:"capabilities" json:"capabilities"`
-	StreamTransports []string          `yaml:"stream_transports" json:"streamTransports"`
-	EventTypes       []string          `yaml:"event_types" json:"eventTypes"`
-	ConfigSchema     string            `yaml:"config_schema" json:"configSchema"`
-	Env              map[string]string `yaml:"env" json:"env"`
-	MinPlatform      string            `yaml:"min_platform" json:"minPlatform"`
+	Spec             int                `yaml:"spec" json:"spec"`
+	ID               string             `yaml:"id" json:"id"`
+	Name             string             `yaml:"name" json:"name"`
+	Vendor           string             `yaml:"vendor" json:"vendor"`
+	Version          string             `yaml:"version" json:"version"`
+	Protocols        []string           `yaml:"protocols" json:"protocols"`
+	RPC              string             `yaml:"rpc" json:"rpc"`
+	Executable       map[string]string  `yaml:"executable" json:"executable"`
+	Args             []string           `yaml:"args" json:"args"`
+	Listen           string             `yaml:"listen" json:"listen"`
+	Health           string             `yaml:"health" json:"health"`
+	Capabilities     []string           `yaml:"capabilities" json:"capabilities"`
+	CustomCaps       []CustomCapability `yaml:"custom_capabilities" json:"customCapabilities"`
+	StreamTransports []string           `yaml:"stream_transports" json:"streamTransports"`
+	EventTypes       []string           `yaml:"event_types" json:"eventTypes"`
+	ConfigSchema     string             `yaml:"config_schema" json:"configSchema"`
+	Env              map[string]string  `yaml:"env" json:"env"`
+	MinPlatform      string             `yaml:"min_platform" json:"minPlatform"`
+}
+
+// CustomCapability 是插件自定义能力（平台不解释语义，只登记 + 通用 command 透传）。
+type CustomCapability struct {
+	ID           string `yaml:"id" json:"id"`
+	Title        string `yaml:"title" json:"title"`
+	ParamsSchema string `yaml:"params_schema" json:"paramsSchema"` // 可选，内联 JSON Schema
+	ResultSchema string `yaml:"result_schema" json:"resultSchema"` // 可选，内联 JSON Schema
 }
 
 // Package 是平台登记的插件包（zws_plugin_package）。
 type Package struct {
-	ID               string    `json:"id"`
-	PluginID         string    `json:"pluginId"`
-	Version          string    `json:"version"`
-	Name             string    `json:"name"`
-	Vendor           string    `json:"vendor"`
-	ObjectKey        string    `json:"objectKey"`
-	SHA256           string    `json:"sha256"`
-	SizeBytes        int64     `json:"sizeBytes"`
-	ManifestJSON     string    `json:"manifestJson"`
-	ConfigSchema     string    `json:"configSchema"`
-	Protocols        []string  `json:"protocols"`
-	Capabilities     []string  `json:"capabilities"`
-	StreamTransports []string  `json:"streamTransports"`
-	EventTypes       []string  `json:"eventTypes"`
-	Status           string    `json:"status"`
-	ErrorMsg         string    `json:"errorMsg"`
-	CreateTime       string    `json:"createTime"`
-	UpdateTime       string    `json:"updateTime"`
-	Manifest         *Manifest `json:"-"`
-	Architectures    []string  `json:"architectures"`
+	ID               string             `json:"id"`
+	PluginID         string             `json:"pluginId"`
+	Version          string             `json:"version"`
+	Name             string             `json:"name"`
+	Vendor           string             `json:"vendor"`
+	ObjectKey        string             `json:"objectKey"`
+	SHA256           string             `json:"sha256"`
+	SizeBytes        int64              `json:"sizeBytes"`
+	ManifestJSON     string             `json:"manifestJson"`
+	ConfigSchema     string             `json:"configSchema"`
+	Protocols        []string           `json:"protocols"`
+	Capabilities     []string           `json:"capabilities"`
+	CustomCaps       []CustomCapability `json:"customCapabilities"`
+	StreamTransports []string           `json:"streamTransports"`
+	EventTypes       []string           `json:"eventTypes"`
+	Status           string             `json:"status"`
+	ErrorMsg         string             `json:"errorMsg"`
+	CreateTime       string             `json:"createTime"`
+	UpdateTime       string             `json:"updateTime"`
+	Manifest         *Manifest          `json:"-"`
+	Architectures    []string           `json:"architectures"`
 }
 
 // Install 是某 Agent 上的安装任务/状态（zws_plugin_install）。

@@ -227,6 +227,31 @@ func validateManifest(m *Manifest) error {
 			return fmt.Errorf("未知能力: %s", c)
 		}
 	}
+	customSeen := map[string]bool{}
+	for i := range m.CustomCaps {
+		cc := &m.CustomCaps[i]
+		id := strings.TrimSpace(cc.ID)
+		if !protoRe.MatchString(id) {
+			return fmt.Errorf("自定义能力 id 非法: %s", cc.ID)
+		}
+		if capabilitySet[id] {
+			return fmt.Errorf("自定义能力 id 不得与基线能力重名: %s", id)
+		}
+		if customSeen[id] {
+			return fmt.Errorf("自定义能力 id 重复: %s", id)
+		}
+		customSeen[id] = true
+		cc.ID = id
+		cc.Title = strings.TrimSpace(cc.Title)
+		if cc.Title == "" {
+			return fmt.Errorf("自定义能力 %s 缺少 title", id)
+		}
+		for _, s := range []string{cc.ParamsSchema, cc.ResultSchema} {
+			if st := strings.TrimSpace(s); st != "" && !json.Valid([]byte(st)) {
+				return fmt.Errorf("自定义能力 %s 的 schema 不是合法 JSON", id)
+			}
+		}
+	}
 	if len(m.StreamTransports) == 0 {
 		return fmt.Errorf("stream_transports 不能为空")
 	}
