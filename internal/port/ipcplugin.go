@@ -1,6 +1,9 @@
 package port
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // IPCStreamSource 是插件返回的流源（不包含最终播放地址）。
 type IPCStreamSource struct {
@@ -93,6 +96,8 @@ type IPCClient interface {
 	PTZ(ctx context.Context, deviceUID, channelID, direction string, h, v, z int) error
 	Arm(ctx context.Context, cfg IPCArmConfig) (*IPCArmResult, error)
 	Disarm(ctx context.Context, deviceUID, subscriptionID string) error
+	// Command 通用命令透传（自定义能力）：平台不解析 params/result 语义。
+	Command(ctx context.Context, deviceUID, channelID, cmd string, params json.RawMessage) (json.RawMessage, error)
 }
 
 // IPCClientFactory 按插件 endpoint 构造 RPC 客户端。

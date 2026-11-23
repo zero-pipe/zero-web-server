@@ -185,6 +185,23 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 	return s.buildContent(ctx, stream)
 }
 
+// Command 通用命令透传（自定义能力）：平台不解析 params/result 语义。
+func (s *Service) Command(ctx context.Context, deviceID int, channelID, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	dev, p, client, err := s.deviceClient(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	if !dev.Enabled {
+		return nil, fmt.Errorf("设备已禁用")
+	}
+	out, err := client.Command(ctx, dev.DeviceUID, channelID, cmd, params)
+	if err != nil {
+		s.plugins.MarkOffline(p.ID)
+		return nil, fmt.Errorf("插件执行命令失败: %w", err)
+	}
+	return out, nil
+}
+
 // pickTransport 优先 rtsp_url（平台侧更简单），其次 rtp_push，默认 rtsp_url。
 func pickTransport(transports []string) string {
 	for _, t := range transports {

@@ -322,6 +322,7 @@ func (p *AssetProjector) backfillPlugin() error {
 	}
 	// 每插件声明能力缓存：从 zws_plugin.capabilities 读取（JSON 数组），nil=未知。
 	capCache := map[string]map[string]bool{}
+	custCache := map[string][]string{}
 	for i := range devices {
 		dev := &devices[i]
 		declared := p.pluginCapsCached(capCache, dev.PluginID)
@@ -347,6 +348,16 @@ func (p *AssetProjector) backfillPlugin() error {
 			return pluginOpSupported(declared, op)
 		}); err != nil {
 			return err
+		}
+		// 自定义能力：登记到设备作用域能力表（Source=custom），供 UI 展示与运行时熔断。
+		for _, ccID := range p.pluginCustomCapIDs(custCache, dev.PluginID) {
+			if err := p.db.Create(&model.AssetCapability{
+				ID: stableID("cap", "device", uid, ccID), ScopeType: "device", ScopeID: uid,
+				Operation: ccID, Supported: true, Configured: true, Available: dev.Online,
+				Source: "custom", UpdateTime: nowText(),
+			}).Error; err != nil {
+				return err
+			}
 		}
 		var channels []model.PluginChannel
 		if err := p.db.Where("device_db_id = ?", dev.ID).Find(&channels).Error; err != nil {
@@ -584,7 +595,48 @@ func (p *AssetProjector) pluginCapsCached(cache map[string]map[string]bool, plug
 	return set
 }
 
-// pluginOpSupported 把插件清单能力（live/ptz/playback/arm…）映射到平台能力操作，
+// pluginCustomCapIDs 读插件实例自定义能力 id 列表：
+// zws_plugin(plugin_id,version) → zws_plugin_package.manifest_json.custom_capabilities[].id。
+// 无安装包（手工部署）或解析失败时返回空。
+func (p *AssetProjector) pluginCustomCapIDs(cache map[string][]string, pluginInstanceID string) []string {
+	key := strings.TrimSpace(pluginInstanceID)
+	if key == "" {
+		return nil
+	}
+	if v, ok := cache[key]; ok {
+		return v
+	}
+	var row struct {
+		PluginID string
+		Version  string
+	}
+	_ = p.db.Model(&model.Plugin{}).Select("plugin_id, version").Where("id = ?", key).Scan(&row).Error
+	var ids []string
+	if strings.TrimSpace(row.PluginID) != "" {
+		var mj string
+		_ = p.db.Model(&model.PluginPackage{}).
+			Where("plugin_id = ? AND version = ?", row.PluginID, row.Version).
+			Pluck("manifest_json", &mj).Error
+		if strings.TrimSpace(mj) != "" {
+			var mf struct {
+				CustomCapabilities []struct {
+					ID string `json:"id"`
+				} `json:"custom_capabilities"`
+			}
+			if json.Unmarshal([]byte(mj), &mf) == nil {
+				for _, cc := range mf.CustomCapabilities {
+					if id := strings.TrimSpace(cc.ID); id != "" {
+						ids = append(ids, id)
+					}
+				}
+			}
+		}
+	}
+	cache[key] = ids
+	return ids
+}
+
+// pluginOpSupported 把插件清单能力（live/ptz/playback/arm…）映射到平台能力操作。
 // 决定该操作是否声明支持。declared==nil 时维持宽松（存量插件未上报能力）。
 func pluginOpSupported(declared map[string]bool, op string) bool {
 	if declared == nil {

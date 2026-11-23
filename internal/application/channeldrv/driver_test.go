@@ -2,6 +2,7 @@ package channeldrv
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -51,6 +52,10 @@ func (f *fakeDriver) StopLive(context.Context, *domainasset.Resource, *domainass
 func (f *fakeDriver) Sync(context.Context, *domainasset.AccessBinding) error { return nil }
 func (f *fakeDriver) PTZ(context.Context, *domainasset.Resource, *domainasset.AccessBinding, PTZCommand) error {
 	return nil
+}
+
+func (f *fakeDriver) Command(context.Context, *domainasset.Resource, *domainasset.AccessBinding, string, json.RawMessage) (json.RawMessage, error) {
+	return nil, nil
 }
 
 func TestLimitedTimeout(t *testing.T) {

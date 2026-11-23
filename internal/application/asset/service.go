@@ -1,10 +1,10 @@
 package asset
 
 import (
-	"log"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 
@@ -272,6 +272,36 @@ func profileToken(p *domainasset.StreamProfile) string {
 		return ""
 	}
 	return sel.ProfileToken
+}
+
+// Command 通用命令透传（自定义能力）：校验声明/熔断后转发到协议驱动；平台不解析语义。
+func (s *Service) Command(ctx context.Context, resourceID, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	res, err := s.repo.GetResource(resourceID)
+	if err != nil || res == nil {
+		return nil, fmt.Errorf("资源不存在")
+	}
+	binding, err := s.repo.GetBindingByDevice(res.DeviceID)
+	if err != nil || binding == nil {
+		return nil, fmt.Errorf("设备缺少接入绑定")
+	}
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return nil, fmt.Errorf("命令不能为空")
+	}
+	if supported, exists := s.capabilitySupported("device", res.DeviceID, cmd); exists && !supported {
+		return nil, fmt.Errorf("该设备不支持能力 %s", cmd)
+	}
+	drv, ok := s.drivers.Get(binding.Protocol)
+	if !ok {
+		return nil, fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
+	}
+	out, err := drv.Command(ctx, res, binding, cmd, params)
+	if err != nil {
+		s.markCapability("device", res.DeviceID, cmd, false)
+		return nil, err
+	}
+	s.markCapability("device", res.DeviceID, cmd, true)
+	return out, nil
 }
 
 func (s *Service) setSession(resourceID string, sess *channeldrv.Session) {

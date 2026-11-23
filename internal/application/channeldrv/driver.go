@@ -43,6 +43,8 @@ type ChannelDriver interface {
 	StopLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, sess *Session) error
 	Sync(ctx context.Context, binding *domainasset.AccessBinding) error
 	PTZ(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd PTZCommand) error
+	// Command 通用命令透传（自定义能力）；不支持的协议返回错误。平台不解析 params/result。
+	Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error)
 }
 
 // Deps 驱动所需的协议侧实现。
@@ -137,6 +139,15 @@ func (l *limited) PTZ(ctx context.Context, res *domainasset.Resource, binding *d
 	return l.next.PTZ(cctx, res, binding, cmd)
 }
 
+func (l *limited) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	return l.next.Command(cctx, res, binding, cmd, params)
+}
+
 // Get 按协议取驱动。
 func (r Registry) Get(protocol string) (ChannelDriver, bool) {
 	d, ok := r[protocol]
@@ -210,6 +221,10 @@ func (d *gbDriver) PTZ(ctx context.Context, res *domainasset.Resource, binding *
 	return d.ptz.SendPTZ(device, res.ExternalKey, direction, speed, speed, zoom)
 }
 
+func (d *gbDriver) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	return nil, fmt.Errorf("GB28181 接入不支持自定义命令: %s", cmd)
+}
+
 // ---- ONVIF ----
 
 type onvifDriver struct {
@@ -276,6 +291,10 @@ func (d *onvifDriver) PTZ(ctx context.Context, res *domainasset.Resource, bindin
 	})
 }
 
+func (d *onvifDriver) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	return nil, fmt.Errorf("ONVIF 接入不支持自定义命令: %s", cmd)
+}
+
 // ---- 插件（私有 SDK） ----
 
 type pluginDriver struct {
@@ -326,6 +345,13 @@ func (d *pluginDriver) PTZ(ctx context.Context, res *domainasset.Resource, bindi
 	speed := int(clamp01(cmd.Speed)*100 + 0.5)
 	zoom := int(clamp01(cmd.Zoom)*16 + 0.5)
 	return d.ipc.PTZ(ctx, binding.LegacyDeviceID, res.ExternalKey, cmd.Direction, speed, speed, zoom)
+}
+
+func (d *pluginDriver) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	if d.ipc == nil {
+		return nil, fmt.Errorf("插件服务未启用")
+	}
+	return d.ipc.Command(ctx, binding.LegacyDeviceID, res.ExternalKey, cmd, params)
 }
 
 // profileToken 从 StreamProfile.SelectorJSON 解析 ONVIF profileToken。

@@ -143,6 +143,22 @@ func (c *Client) Disarm(ctx context.Context, deviceUID, subscriptionID string) e
 	}, nil)
 }
 
+// Command 通用命令透传：平台不解析 params/result 语义，原样转发给插件 /v1/command。
+func (c *Client) Command(ctx context.Context, deviceUID, channelID, cmd string, params json.RawMessage) (json.RawMessage, error) {
+	body := map[string]any{"device_uid": deviceUID, "cmd": cmd}
+	if channelID != "" {
+		body["channel_id"] = channelID
+	}
+	if len(params) > 0 {
+		body["params"] = params
+	}
+	var out json.RawMessage
+	if err := c.post(ctx, "/v1/command", body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 var _ port.IPCClient = (*Client)(nil)
 
 type Factory struct{ token string }

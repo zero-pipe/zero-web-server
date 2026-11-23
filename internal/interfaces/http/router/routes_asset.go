@@ -22,4 +22,5 @@ func registerAssets(g *gin.RouterGroup, h *handler.AssetHandler) {
 	g.GET("/resources/:id/capabilities", h.Capabilities)
 	g.POST("/resources/:id/live/start", h.StartLive)
 	g.POST("/resources/:id/live/stop", h.StopLive)
+	g.POST("/resources/:id/command/:cmd", h.Command)
 }

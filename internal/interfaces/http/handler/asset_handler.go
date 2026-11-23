@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"strconv"
 
 	assetapp "zero-web-server/internal/application/asset"
@@ -160,4 +161,18 @@ func (h *AssetHandler) StopLive(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// Command 通用命令透传（自定义能力）：body {params}，params 原样转发给插件驱动。
+func (h *AssetHandler) Command(c *gin.Context) {
+	var body struct {
+		Params json.RawMessage `json:"params"`
+	}
+	_ = c.ShouldBindJSON(&body)
+	out, err := h.svc.Command(c.Request.Context(), c.Param("id"), c.Param("cmd"), body.Params)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, out)
 }
