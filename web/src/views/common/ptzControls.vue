@@ -15,7 +15,7 @@
       </div>
       <div class="ptz-func-col">
         <div class="ptz-func-group" :class="{ row: btnLayout === 'row' }">
-          <div class="ptz-func-row" v-if="homePosition && hasGuard">
+          <div class="ptz-func-row" v-if="showGuard">
             <div class="ptz-func-row">
               <div class="ptz-func-btn" title="看守位" @click.prevent="$emit('ptz-guard')">
                 <i class="el-icon-s-home" /><span>看守位</span>
@@ -38,7 +38,7 @@
               <i class="iconfont icon-bianjiao-suoxiao" /><span>聚焦-</span>
             </div>
           </div>
-          <div v-if="hasIris" class="ptz-func-row">
+          <div v-if="showIris" class="ptz-func-row">
             <div class="ptz-func-btn" title="光圈+" @mousedown.prevent="$emit('iris-move', { command: 'in', speed: controSpeed })" @mouseup.prevent="$emit('iris-stop')">
               <i class="iconfont icon-guangquan" /><span>光圈+</span>
             </div>
@@ -46,7 +46,7 @@
               <i class="iconfont icon-guangquan-" /><span>光圈-</span>
             </div>
           </div>
-          <div v-if="hasDragZoom" class="ptz-func-row">
+          <div v-if="showDragZoom" class="ptz-func-row">
             <div class="ptz-func-btn" title="拉框放大" @click="$emit('toggle-drag-zoom')">
               <i class="iconfont icon-guangquan" /><span>拉框放大</span>
             </div>
@@ -75,15 +75,22 @@ export default {
   props: {
     btnLayout: { type: String, default: 'column' },
     homePosition: { type: Boolean, default: false },
-    showDiagonals: { type: Boolean, default: true }
+    showDiagonals: { type: Boolean, default: true },
+    // 能力集：由调用方按通道事实推导后传入（唯一真相），未传视为全不支持。
+    // 例 { direction, zoom, focus, iris }。
+    caps: { type: Object, default: () => ({}) }
   },
   computed: {
-    hasPtzDirection() { return 'ptz-move' in this.$listeners },
-    hasFocus() { return 'focus-move' in this.$listeners },
-    hasIris() { return 'iris-move' in this.$listeners },
-    hasDragZoom() { return 'toggle-drag-zoom' in this.$listeners || 'toggle-drag-zoom-out' in this.$listeners },
-    hasGuard() { return 'ptz-guard' in this.$listeners },
-    hasAnyPtz() { return this.hasPtzDirection || this.hasFocus || this.hasIris || this.hasDragZoom || this.hasGuard }
+    showDirection() { return !!this.caps.direction },
+    showZoom() { return !!this.caps.zoom },
+    showFocus() { return !!this.caps.focus },
+    showIris() { return !!this.caps.iris },
+    // 拉框放大/缩小本质是变倍的一种交互，跟随 zoom 能力。
+    showDragZoom() { return !!this.caps.zoom },
+    showGuard() { return !!this.caps.direction && this.homePosition },
+    hasAnyPtz() {
+      return this.showDirection || this.showZoom || this.showFocus || this.showIris || this.showDragZoom || this.showGuard
+    }
   },
   data() {
     return {

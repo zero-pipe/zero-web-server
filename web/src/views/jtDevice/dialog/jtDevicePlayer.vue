@@ -20,7 +20,12 @@
         </div>
 
         <div class="control-side">
-          <jtDevicePtzPanel v-if="showPtz" :device-id="deviceId" :channel-id="channelId" />
+          <jtDevicePtzPanel
+            v-if="ptzAvailable"
+            :device-id="deviceId"
+            :channel-id="channelId"
+            :caps="effectivePtzCaps"
+          />
           <el-tabs v-model="tabActiveName" @tab-click="tabHandleClick" class="control-tabs">
             <el-tab-pane label="编码信息" name="codec">
               <mediaInfo v-if="tabActiveName === 'codec'" ref="mediaInfo" :app="app" :stream="streamId" :media-server-id="mediaServerId" />
@@ -68,6 +73,7 @@ import playerTabs from '../../common/playerTabs.vue'
 import jtDevicePtzPanel from '../common/jtDevicePtzPanel.vue'
 import elDragDialog from '@/directive/el-drag-dialog'
 import mediaInfo from '../../common/mediaInfo.vue'
+import { derivePtzCaps, FULL_PTZ_CAPS } from '@/utils/playerStrategy'
 
 export default {
   name: 'JtDevicePlayer',
@@ -83,6 +89,7 @@ export default {
       mediaServerId: '',
       deviceId: '',
       channelId: '',
+      ptzType: 0,
       tabActiveName: 'codec',
       hasAudio: false,
       isLoging: false,
@@ -95,6 +102,25 @@ export default {
       },
       broadcastRtc: null,
       broadcastStatus: -1
+    }
+  },
+  computed: {
+    /** 通道云台/镜头能力集（唯一真相） */
+    ptzCaps() {
+      return derivePtzCaps(this.ptzType)
+    },
+    hasPtzCaps() {
+      const c = this.ptzCaps
+      return !!(c.direction || c.zoom || c.focus || c.iris)
+    },
+    /** 是否展示云台区：非取流页、且（识别到能力 或 ptzType 未知时兜底展示） */
+    ptzAvailable() {
+      if (!this.showPtz) return false
+      return this.hasPtzCaps || !this.ptzType
+    },
+    /** 传给面板的实际能力集：识别到按真值；未识别到时全开，方便现场兜底 */
+    effectivePtzCaps() {
+      return this.hasPtzCaps ? this.ptzCaps : { ...FULL_PTZ_CAPS }
     }
   },
   methods: {
@@ -116,6 +142,7 @@ export default {
       }
       this.deviceId = deviceId
       this.channelId = channelId
+      this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
       this.streamId = ''
       this.mediaServerId = ''
       this.app = ''
@@ -147,6 +174,7 @@ export default {
       }
       this.videoUrl = ''
       this.showVideoDialog = false
+      this.ptzType = 0
       this.stopBroadcast()
     },
     wiper(command) {

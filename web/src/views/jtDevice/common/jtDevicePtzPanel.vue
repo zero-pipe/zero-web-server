@@ -3,6 +3,7 @@
     <ptzControls
       btn-layout="row"
       :show-diagonals="false"
+      :caps="caps"
       @ptz-move="onPtzMove"
       @ptz-stop="onPtzStop"
       @focus-move="onFocusMove"
@@ -15,13 +16,16 @@
 
 <script>
 import ptzControls from '../../common/ptzControls.vue'
+import { FULL_PTZ_CAPS } from '@/utils/playerStrategy'
 
 export default {
   name: 'JtDevicePtzPanel',
   components: { ptzControls },
   props: {
     deviceId: { type: String, default: null },
-    channelId: { type: String, default: null }
+    channelId: { type: String, default: null },
+    // 云台/镜头能力集（由父级按通道事实推导后传入；缺省=不过滤全显示）
+    caps: { type: Object, default: () => ({ ...FULL_PTZ_CAPS }) }
   },
   methods: {
     onPtzMove(e) {

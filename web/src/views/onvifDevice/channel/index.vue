@@ -205,6 +205,7 @@
               v-if="currentHasPtz"
               btn-layout="row"
               :show-diagonals="false"
+              :caps="onvifPtzCaps"
               @ptz-move="onPtzMove"
               @ptz-stop="onPtzStop"
             />
@@ -272,6 +273,10 @@ export default {
     }
   },
   computed: {
+    // ONVIF 目前只实现了方向云台，无变倍/聚焦/光圈。
+    onvifPtzCaps() {
+      return { direction: !!this.currentHasPtz, zoom: false, focus: false, iris: false }
+    },
     isStreaming() {
       return !!(this.streamInfo && this.playerVisible)
     },

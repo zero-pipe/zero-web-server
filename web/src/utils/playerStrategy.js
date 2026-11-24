@@ -68,7 +68,6 @@ export function isWebRTCAudioCodec(audioCodec) {
 }
 
 const FLV_URL_PRIORITY = ['flv', 'https_flv', 'ws_flv', 'wss_flv']
-const RTC_URL_PRIORITY = ['rtc', 'rtcs'].concat(FLV_URL_PRIORITY)
 
 /**
  * @param {object} opts
@@ -98,20 +97,50 @@ export function resolvePlayerStrategy(opts) {
     }
   }
 
-  // 2) H264 / 未知：以 Jessibuca(HTTP-FLV) 兜底，兼容性与音频最稳。
+  // 2) H264 / 未知：以 Jessibuca(HTTP-FLV) 兜底——首屏最快、兼容性与音频最稳。
+  //    用户不再手动选引擎；默认就是 FLV，H265 自动切高清，WebRTC 仅作最后可用项（不首选）。
   const allowed = ['jessibuca']
-  let preferred = 'jessibuca'
+  const preferred = 'jessibuca'
   const webrtcAudioOk = !hasAudio || isWebRTCAudioCodec(audioCodec)
 
-  // 仅当“已知是 H264”且 ZMS 有 WebRTC 能力时才提供 WebRTC，避免未知编码（可能是 H265）误选。
-  // 选择 A：有音频且非 WebRTC 可用编码（如 AAC）时，默认仍走 Jessibuca（有声）；WebRTC 作为「超低延迟(无声)」手动可选。
+  // 已知是 H264 且 ZMS 有 WebRTC 能力时，把 WebRTC 追加为「最后」一项备用（不首选）。
   if (rtcAvailable && videoCodec === 'H264') {
     allowed.push('webRTC')
-    if (webrtcAudioOk) {
-      preferred = 'webRTC'
-    }
   }
 
-  const urlPriority = preferred === 'webRTC' ? RTC_URL_PRIORITY.slice() : FLV_URL_PRIORITY.slice()
+  const urlPriority = FLV_URL_PRIORITY.slice()
   return { preferredPlayer: preferred, allowedPlayers: allowed, urlPriority, videoCodec, audioCodec, hasAudio, webrtcAudioOk }
 }
+
+/**
+ * 由通道 PTZType 推导播放器云台/镜头能力集（唯一真相）。
+ *
+ * PTZType 枚举沿用 GB28181 目录定义（2016 A.2.1 g / 2022 A.2.1.9）：
+ *   1 球机 / 2 半球 / 4 遥控枪机 / 5 遥控半球 → 有转台方向
+ *   3 固定枪机 / 6 全景通道 / 7 分割通道 → 无转台方向
+ * 其余（0 未知）按无处理。
+ *
+ * 现在只按形态粗判；等后端把细分能力（lens_zoom/focus/iris、preset）下放到
+ * ChannelView.caps 后，只需改这一个函数读真值即可，UI 与面板不必动。
+ *
+ * @param {number|string} ptzType
+ * @returns {{direction:boolean, zoom:boolean, focus:boolean, iris:boolean}}
+ *   direction=转台方向盘；zoom/focus/iris=电动镜头（变倍/聚焦/光圈）。
+ */
+export function derivePtzCaps(ptzType) {
+  const t = Number(ptzType) || 0
+  const hasPT = t === 1 || t === 2 || t === 4 || t === 5
+  return {
+    direction: hasPT,
+    zoom: hasPT,
+    focus: hasPT,
+    iris: hasPT
+  }
+}
+
+/**
+ * 「不做能力过滤、全部显示」的能力集。
+ * 用于不做按通道能力检测的入口（分屏监控器、历史 playerPtzPanel 包裹层），
+ * 保持其原有「所有方向/镜头按钮都可见」的行为。新播放器一律传 derivePtzCaps 结果。
+ */
+export const FULL_PTZ_CAPS = { direction: true, zoom: true, focus: true, iris: true }

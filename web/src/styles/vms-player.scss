@@ -284,6 +284,35 @@
   min-height: 280px;
 }
 
+/* 云台卡折叠态：收成一行标题，不再占满高度（NVR 未知/无云台通道默认折叠） */
+.vms-player-dialog .panel-block.is-ptz.is-collapsed {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.vms-player-dialog .ptz-card-head {
+  margin-bottom: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.vms-player-dialog .panel-block.is-ptz:not(.is-collapsed) .ptz-card-head {
+  margin-bottom: 10px;
+}
+
+.vms-player-dialog .ptz-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  color: var(--vms-muted);
+}
+
+.vms-player-dialog .ptz-card-hint {
+  font-size: 12px;
+  color: var(--vms-muted);
+}
+
 .vms-player-dialog .panel-disabled-tip {
   color: var(--vms-muted);
   font-size: 13px;

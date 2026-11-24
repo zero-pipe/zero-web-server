@@ -14,9 +14,6 @@
       <div slot="title" class="vms-player-header">
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
-        <span class="vms-player-select">
-          <player-mode-select />
-        </span>
       </div>
 
       <div class="dhsdk-player-body">
@@ -35,13 +32,12 @@
                 :has-audio="hasAudio"
                 :show-button="true"
                 :show-tab="false"
-                :preferred-player="preferredPlayer"
                 @playerChanged="playerChanged"
               />
             </div>
           </div>
 
-          <div v-if="showPtz" class="player-under panel-block control-extra">
+          <div v-if="supportsPreset" class="player-under panel-block control-extra">
             <div class="panel-block-title">预置位</div>
             <ptzPreset :device-id="deviceId" :channel-device-id="channelId" />
           </div>
@@ -67,11 +63,21 @@
             />
           </div>
 
-          <div v-if="showPtz" class="panel-block is-ptz">
-            <div class="panel-block-title">云台控制</div>
+          <!-- 云台卡：按可折叠 accordion 渲染；无能力时折叠成一行但保留「展开」兜底。
+               NVR 混合挂载或协议误报时，现场人员仍可手动展开调用。 -->
+          <div v-if="showPtz" class="panel-block is-ptz" :class="{ 'is-collapsed': !ptzExpanded }">
+            <div class="panel-block-title ptz-card-head" @click="ptzExpanded = !ptzExpanded">
+              <span>云台控制</span>
+              <span class="ptz-card-toggle">
+                <span v-if="!hasPtzCaps" class="ptz-card-hint">该通道未识别到云台</span>
+                <i :class="ptzExpanded ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" />
+              </span>
+            </div>
             <devicePtzPanel
+              v-show="ptzExpanded"
               :device-id="deviceId"
               :channel-id="channelId"
+              :caps="effectivePtzCaps"
               @drag-zoom-start="toggleDragZoom"
             />
           </div>
@@ -84,22 +90,16 @@
 <script>
 import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '../../common/playerTabs.vue'
-import playerModeSelect from '../../common/playerModeSelect.vue'
 import devicePtzPanel from '../common/devicePtzPanel.vue'
 import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
 
-import { modeToPreferredPlayer } from '@/utils/playerStrategy'
-
-function isDomeCamera(ptzType) {
-  const t = Number(ptzType)
-  return t === 1 || t === 2
-}
+import { derivePtzCaps, FULL_PTZ_CAPS } from '@/utils/playerStrategy'
 
 export default {
   name: 'DevicePlayer',
   directives: { elDragDialog },
-  components: { playerTabs, playerModeSelect, devicePtzPanel, PtzPreset, mediaInfo },
+  components: { playerTabs, devicePtzPanel, PtzPreset, mediaInfo },
   data() {
     return {
       videoUrl: '',
@@ -110,6 +110,7 @@ export default {
       channelId: '',
       ptzType: 0,
       showPtz: true,
+      ptzExpanded: true,
       extraTab: 'media',
       hasAudio: false,
       isLoging: false,
@@ -124,12 +125,22 @@ export default {
     }
   },
   computed: {
-    /** 全局播放模式（store）换算成 PlayerTabs 的偏好引擎 */
-    preferredPlayer() {
-      return modeToPreferredPlayer(this.$store.getters.playerMode)
+    /** 云台/镜头能力集（唯一真相，供播放器右侧面板显隐） */
+    ptzCaps() {
+      return derivePtzCaps(this.ptzType)
     },
-    ptzEnabled() {
-      return isDomeCamera(this.ptzType)
+    /** 是否有任意云台/镜头能力（决定右侧云台卡是否默认展开） */
+    hasPtzCaps() {
+      const c = this.ptzCaps
+      return !!(c.direction || c.zoom || c.focus || c.iris)
+    },
+    /** 传给面板的实际能力集：识别到能力按真值；未识别到但用户手动展开时全开，方便现场兜底操作 */
+    effectivePtzCaps() {
+      return this.hasPtzCaps ? this.ptzCaps : { ...FULL_PTZ_CAPS }
+    },
+    /** 是否支持预置位：需要转台能力才能定位 */
+    supportsPreset() {
+      return this.showPtz && this.ptzCaps.direction
     },
     isStreaming() {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
@@ -159,6 +170,8 @@ export default {
       this.channelId = channelId
       this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
       this.showPtz = !(param && param.showPtz === false)
+      // 有能力默认展开，无能力/未知默认折叠（保留手动展开兜底）。
+      this.ptzExpanded = this.hasPtzCaps
       this.extraTab = (tab === 'preset' && this.showPtz) ? 'preset' : 'media'
       this.streamId = ''
       this.mediaServerId = ''

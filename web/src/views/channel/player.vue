@@ -13,9 +13,6 @@
       <div slot="title" class="vms-player-header">
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
-        <span class="vms-player-select">
-          <player-mode-select />
-        </span>
       </div>
 
       <div class="dhsdk-player-body">
@@ -34,7 +31,6 @@
                 :has-audio="hasAudio"
                 :show-button="true"
                 :show-tab="false"
-                :preferred-player="preferredPlayer"
                 @playerChanged="playerChanged"
               />
             </div>
@@ -42,7 +38,7 @@
 
           <div class="player-under panel-block control-extra">
             <div class="panel-block-title">预置位</div>
-            <div v-if="cameraCategory === 'gun'" class="preset-muted">
+            <div v-if="!ptzCaps.direction" class="preset-muted">
               该通道为{{ ptzTypeText }}，不支持预置位
             </div>
             <channelPreset v-else-if="channelId" :channel-id="channelId" />
@@ -68,10 +64,19 @@
             />
           </div>
 
-          <div class="panel-block is-ptz">
-            <div class="panel-block-title">云台控制</div>
+          <!-- 云台卡：按可折叠 accordion 渲染；无能力时折叠成一行但保留「展开」兜底。 -->
+          <div class="panel-block is-ptz" :class="{ 'is-collapsed': !ptzExpanded }">
+            <div class="panel-block-title ptz-card-head" @click="ptzExpanded = !ptzExpanded">
+              <span>云台控制</span>
+              <span class="ptz-card-toggle">
+                <span v-if="!hasPtzCaps" class="ptz-card-hint">该通道未识别到云台</span>
+                <i :class="ptzExpanded ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" />
+              </span>
+            </div>
             <channelPtzPanel
+              v-show="ptzExpanded"
               :channel-id="channelId"
+              :caps="effectivePtzCaps"
               @drag-zoom-start="toggleDragZoom"
             />
           </div>
@@ -84,24 +89,17 @@
 <script>
 import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '../common/playerTabs.vue'
-import playerModeSelect from '../common/playerModeSelect.vue'
-import { modeToPreferredPlayer } from '@/utils/playerStrategy'
+import { derivePtzCaps, FULL_PTZ_CAPS } from '@/utils/playerStrategy'
 import channelPtzPanel from './common/channelPtzPanel.vue'
 import channelPreset from './common/ptzPreset.vue'
 import mediaInfo from '../common/mediaInfo.vue'
 
-// 云台能力判定，口径与后端 persistence.hasPTZ 一致：
-// 国标 PTZType 1-球机 2-半球 4-遥控枪机 5-遥控半球（2022）有云台；
-// 3-固定枪机 与 6/7 多目通道没有云台。
-function isDomeCamera(ptzType) {
-  const t = Number(ptzType)
-  return t === 1 || t === 2 || t === 4 || t === 5
-}
+// 云台能力判定统一收敛到 playerStrategy.derivePtzCaps（唯一真相）。
 
 export default {
   name: 'ChannelPlayer',
   directives: { elDragDialog },
-  components: { playerTabs, playerModeSelect, channelPtzPanel, channelPreset, mediaInfo },
+  components: { playerTabs, channelPtzPanel, channelPreset, mediaInfo },
   data() {
     return {
       videoUrl: '',
@@ -110,6 +108,7 @@ export default {
       mediaServerId: '',
       channelId: '',
       ptzType: 0,
+      ptzExpanded: true,
       extraTab: 'media',
       hasAudio: false,
       isLoging: false,
@@ -124,20 +123,18 @@ export default {
     }
   },
   computed: {
-    /** 全局播放模式（store）换算成 PlayerTabs 的偏好引擎 */
-    preferredPlayer() {
-      return modeToPreferredPlayer(this.$store.getters.playerMode)
+    ptzCaps() {
+      return derivePtzCaps(this.ptzType)
     },
-    ptzEnabled() {
-      return isDomeCamera(this.ptzType)
+    hasPtzCaps() {
+      const c = this.ptzCaps
+      return !!(c.direction || c.zoom || c.focus || c.iris)
     },
-    // 依据国标目录应答的 PTZType 区分形态（枚举见 2016 A.2.1 g / 2022 A.2.1.9）
-    cameraCategory() {
-      const t = Number(this.ptzType)
-      if (t === 1 || t === 2 || t === 4 || t === 5) return 'dome'
-      if (t === 3 || t === 6 || t === 7) return 'gun'
-      return 'unknown'
+    /** 传给面板的实际能力集：识别到能力按真值；未识别到但用户手动展开时全开，方便现场兜底操作 */
+    effectivePtzCaps() {
+      return this.hasPtzCaps ? this.ptzCaps : { ...FULL_PTZ_CAPS }
     },
+    // 依据国标目录应答的 PTZType 取中文形态名（仅用于文案展示）
     ptzTypeText() {
       const texts = { 1: '球机', 2: '半球', 3: '固定枪机', 4: '遥控枪机', 5: '遥控半球', 6: '全景通道', 7: '分割通道' }
       return texts[Number(this.ptzType)] || '枪机'
@@ -154,6 +151,8 @@ export default {
       if (this.showVideoDialog) return
       this.channelId = channelId
       this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
+      // 有能力默认展开，无能力/未知默认折叠（保留手动展开兜底）。
+      this.ptzExpanded = this.hasPtzCaps
       this.extraTab = tab === 'preset' ? 'preset' : 'media'
       this.streamId = ''
       this.mediaServerId = ''
@@ -218,6 +217,7 @@ export default {
       this.streamInfo = null
       this.videoUrl = ''
       this.ptzType = 0
+      this.ptzExpanded = true
       this.extraTab = 'media'
       this.showVideoDialog = false
     },
