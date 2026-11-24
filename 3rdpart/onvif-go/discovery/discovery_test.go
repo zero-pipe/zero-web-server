@@ -286,11 +286,26 @@ func TestListNetworkInterfaces(t *testing.T) {
 }
 
 func TestResolveNetworkInterface(t *testing.T) {
-	// Determine the loopback interface name based on platform
+	// Determine the loopback interface name based on platform:
+	// lo (Linux) / lo0 (macOS) / "Loopback Pseudo-Interface 1" (Windows).
 	loopbackName := "lo"
 	if _, err := net.InterfaceByName("lo"); err != nil {
-		// Loopback might be "lo0" on macOS
 		loopbackName = "lo0"
+	}
+	if _, err := net.InterfaceByName(loopbackName); err != nil {
+		// Windows 下回环网卡名字不固定，按 FlagLoopback 找实际名字。
+		loopbackName = ""
+		if ifaces, err := net.Interfaces(); err == nil {
+			for _, iface := range ifaces {
+				if iface.Flags&net.FlagLoopback != 0 {
+					loopbackName = iface.Name
+					break
+				}
+			}
+		}
+		if loopbackName == "" {
+			t.Skip("no loopback interface found on this platform")
+		}
 	}
 
 	tests := []struct {

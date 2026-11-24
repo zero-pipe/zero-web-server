@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/0x524a/onvif-go/internal/soap"
+	"zero-web-server/3rdpart/onvif-go/internal/soap"
 )
 
 // PTZ service namespace.

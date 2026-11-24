@@ -16,7 +16,7 @@ import (
 	"zero-web-server/internal/onvifcli"
 	"zero-web-server/internal/port"
 
-	onviflib "github.com/0x524a/onvif-go"
+	onviflib "zero-web-server/3rdpart/onvif-go"
 )
 
 type Service struct {

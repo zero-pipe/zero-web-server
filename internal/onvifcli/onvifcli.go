@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0x524a/onvif-go/discovery"
+	"zero-web-server/3rdpart/onvif-go/discovery"
 )
 
 // Discover 在局域网内发现 ONVIF 设备。

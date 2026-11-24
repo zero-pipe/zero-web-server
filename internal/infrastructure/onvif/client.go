@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	onviflib "github.com/0x524a/onvif-go"
-	"github.com/0x524a/onvif-go/discovery"
+	onviflib "zero-web-server/3rdpart/onvif-go"
+	"zero-web-server/3rdpart/onvif-go/discovery"
 )
 
 type ClientFactory struct {

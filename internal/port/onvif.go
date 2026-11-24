@@ -3,7 +3,7 @@ package port
 import (
 	"context"
 
-	onviflib "github.com/0x524a/onvif-go"
+	onviflib "zero-web-server/3rdpart/onvif-go"
 )
 
 // ONVIFFactory 构造 / 初始化 ONVIF 客户端。
