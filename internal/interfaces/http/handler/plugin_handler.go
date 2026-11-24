@@ -156,7 +156,7 @@ func (h *PluginHandler) StartLive(c *gin.Context) {
 		response.Error(c, response.CodeBadReq, "deviceId/channelId 无效")
 		return
 	}
-	content, err := h.ipc.StartLive(c.Request.Context(), deviceID, channelID)
+	content, err := h.ipc.StartLive(c.Request.Context(), deviceID, channelID, c.Query("stream"))
 	if err != nil {
 		response.FromError(c, err)
 		return

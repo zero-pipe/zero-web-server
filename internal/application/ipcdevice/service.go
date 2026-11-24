@@ -128,7 +128,11 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int) ([]*domainplug
 }
 
 // StartLive 让插件给出流源，再由平台交给 ZMS 拉流并生成播放地址。
-func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string) (*dto.StreamContent, error) {
+// StartLive 起一路插件直播流。
+//
+// streamKey 是码流选择（main/sub），空则走主码流。它是"选哪条流"，
+// 与 ZMS 侧流名（<设备内码>_<通道内码>）是两回事，不要混用。
+func (s *Service) StartLive(ctx context.Context, deviceID int, channelID, streamKey string) (*dto.StreamContent, error) {
 	dev, p, client, err := s.deviceClient(deviceID)
 	if err != nil {
 		return nil, err
@@ -162,7 +166,7 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID string)
 		}
 		push = &port.IPCPushParams{SDPIP: node.SDPIP(), RTPPort: rtpPort, Mode: "UDP"}
 	}
-	src, err := client.StartLive(ctx, dev.DeviceUID, channelID, stream, transport, push)
+	src, err := client.StartLive(ctx, dev.DeviceUID, channelID, streamKey, transport, push)
 	if err != nil {
 		s.plugins.MarkOffline(p.ID)
 		return nil, fmt.Errorf("插件开始取流失败: %w", err)

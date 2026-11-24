@@ -400,6 +400,13 @@ func (p *AssetProjector) backfillPlugin() error {
 				`{"channel":"main"}`, "", "", true); err != nil {
 				return err
 			}
+			// 子码流：插件按 dwStreamType 切流（URL 里是 .../102），不换通道号。
+			// 没有这条 profile，前端就没有"分辨率"可选，插件的子码流能力等于没用。
+			subID := stableID("profile", chUID, "sub")
+			if err := p.upsertProfile(subID, chUID, domainasset.ProfileSub, "子码流",
+				`{"channel":"sub"}`, "", "", false); err != nil {
+				return err
+			}
 			if err := p.upsertCapabilitiesWith("resource", chUID, "plugin", dev.Online, channelCaps(ch.PTZType, ch.HasAudio), func(op string) bool {
 				return pluginOpSupported(declared, op)
 			}); err != nil {

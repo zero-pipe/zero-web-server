@@ -351,7 +351,7 @@ func (d *pluginDriver) StartLive(ctx context.Context, res *domainasset.Resource,
 	if d.ipc == nil {
 		return nil, nil, fmt.Errorf("插件服务未启用")
 	}
-	content, err := d.ipc.StartLive(ctx, binding.LegacyDeviceID, res.ExternalKey)
+	content, err := d.ipc.StartLive(ctx, binding.LegacyDeviceID, res.ExternalKey, streamKeyOf(profile))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -457,4 +457,22 @@ func profileToken(selectorJSON string) string {
 		return ""
 	}
 	return sel.ProfileToken
+}
+
+// streamKeyOf 从 StreamProfile.SelectorJSON 解析插件侧码流选择（main/sub）。
+//
+// 插件通道的 selector 是 {"channel":"main"} / {"channel":"sub"}。
+// 解析不出来时返回空串，由插件按主码流兜底——不要在这里硬编码 "main"，
+// 否则 profile 缺失时会把"没选"伪装成"选了主码流"，排查时看不出来。
+func streamKeyOf(p *domainasset.StreamProfile) string {
+	if p == nil || strings.TrimSpace(p.SelectorJSON) == "" {
+		return ""
+	}
+	var sel struct {
+		Channel string `json:"channel"`
+	}
+	if err := json.Unmarshal([]byte(p.SelectorJSON), &sel); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(sel.Channel)
 }

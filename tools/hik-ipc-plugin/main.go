@@ -239,7 +239,8 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 		var req struct {
 			DeviceUID string `json:"device_uid"`
 			ChannelID string `json:"channel_id"`
-			Stream    string `json:"stream"` // main（默认）| sub
+			Stream    string `json:"stream"`     // main（默认）| sub
+			StreamKey string `json:"stream_key"` // 平台侧码流选择，与 stream 同义
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		sessionMu.Lock()
@@ -253,7 +254,11 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 		if n, err := strconv.Atoi(req.ChannelID); err == nil && n > 0 {
 			display = n
 		}
-		rtsp := buildRTSPURL(cfg, s, display, streamNumber(req.Stream))
+		streamKey := req.Stream
+		if strings.TrimSpace(streamKey) == "" {
+			streamKey = req.StreamKey
+		}
+		rtsp := buildRTSPURL(cfg, s, display, streamNumber(streamKey))
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtsp})
 	}
 }
