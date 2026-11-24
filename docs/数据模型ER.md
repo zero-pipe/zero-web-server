@@ -304,3 +304,22 @@
 > 便于保留旧报警查询；`zws_device` 增加 enabled；`zws_stream_push`/`zws_stream_proxy` 增加 gb_code/gb_name/
 > server_id 等对外字段（替代原“无主通道”伪行）；`zws_cloud_record` 增加 play_url/server_id；`zws_media_server`
 > 增加 server_id。均为兼容现有接口契约的最小子集，不改变主模型分层。
+
+## 13. 落地与验证进度
+
+**持久层已全量迁移到本模型并运行时验证（真库 `zws` 重置后跑通）：**
+
+- 构建：`go build ./...` 全绿；`go vet` 干净。
+- 建库：`sql/init_zws_mysql.sql` 在空库一次建 44 表 + 种子（admin/角色/SIP/对象存储）。
+- 启动：平台 `:18080` + SIP `:5060` 正常起，full routes 注册，`mysql ready`。
+- 读路径：`/api/v1/devices`、`/channels`、`/assets/tree`、`/region/tree/list`、`/group/tree/list`
+  从统一表正确回填（协议/vendor/经纬度/PTZ/有音频/gb_json 字段、嵌套 binding+resources 均正确）。
+- 写路径：`/region/add`（根/子级 parentId 自关联）、`/group/add`（国标 215 业务分组）写入并在库里读回。
+- 级联：删设备 → 绑定/通道/扩展/码流/能力/位置/事件/报警 级联归零；`zws_catalog` 因多态 target 保留（应用层清理）。
+
+**尚未合并的内部重构（不影响运行，作为后续独立批）：**
+
+- `domain/asset`（统一模型）与 `domain/device|channel|onvif|plugin`（扁平旧模型）两套 domain 并存，
+  当前都读写同一组统一表；合并为一套是纯内部重构，不改变 `/api/v1` 契约。
+- 通道隶属（区划 civilCode / 分组 parentId）过渡期存 `channel_ext.gb_json`，与 `zws_catalog` 多挂载并存；
+  可后续决定是否把 catalog 作为唯一隶属来源。
