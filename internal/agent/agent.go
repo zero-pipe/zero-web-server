@@ -82,6 +82,10 @@ type Agent struct {
 	localIP   string
 	startedAt time.Time
 	startWait time.Duration
+	// job 把本 agent 拉起的插件子进程绑定到 OS 级 Job 对象：
+	// agent 无论正常退出还是被硬杀/崩溃，句柄关闭时 OS 会连带杀掉所有子进程，
+	// 杜绝子进程变成占着端口的孤儿（Windows 无此机制）。
+	job *procJob
 }
 
 // New 创建 Agent 并加载插件清单。
@@ -126,6 +130,12 @@ func New(cfg Config) (*Agent, error) {
 		a.startWait = d
 	}
 	a.localIP = localIP(cfg.PlatformURL)
+	// 尽力创建 Job 对象：让 agent 拉起的插件子进程随 agent 退出/崩溃被 OS 一并回收。
+	if j, err := newProcJob(); err != nil {
+		log.Printf("[agent] job object init failed: %v (orphan guard disabled)", err)
+	} else {
+		a.job = j
+	}
 	a.loadState()
 	if err := a.discover(); err != nil {
 		return nil, err
@@ -160,6 +170,11 @@ func (a *Agent) Run(ctx context.Context) error {
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
+		// 退出前主动停掉所有插件子进程，避免它们在 Windows 上变成占端口的孤儿。
+		a.stopAll()
+		if a.job != nil {
+			a.job.close()
+		}
 	}()
 	log.Printf("zero-agent %s listening on %s, endpoint=%s, plugins=%d", a.cfg.AgentID, a.cfg.Listen, a.cfg.Endpoint, len(a.plugins))
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -353,6 +368,9 @@ func (a *Agent) start(p *plugin) {
 	}
 	p.cmd, p.exited, p.stopping = cmd, false, false
 	p.actual, p.lastErr = "starting", ""
+	if a.job != nil {
+		a.job.assign(cmd.Process)
+	}
 	log.Printf("[plugin] %s starting pid=%d", p.manifest.ID, cmd.Process.Pid)
 	go a.waitReady(p)
 	go func() {
@@ -410,6 +428,13 @@ func (a *Agent) stop(p *plugin, reason string) {
 		case <-time.After(3 * time.Second):
 		case <-waitDone(p):
 		}
+	}
+}
+
+// stopAll 停掉所有插件子进程。正常退出路径的兜底；硬杀/崩溃由 Job 对象负责回收。
+func (a *Agent) stopAll() {
+	for _, p := range a.snapshot() {
+		a.stop(p, "agent shutdown")
 	}
 }
 
