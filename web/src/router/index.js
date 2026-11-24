@@ -80,14 +80,8 @@ export const constantRoutes = [
   {
     path: '/channel',
     component: Layout,
-    redirect: '/channel',
-    onlyIndex: 0,
-    children: [{
-      path: '/channel',
-      name: 'Channel',
-      component: () => import('@/views/channel/unified-panel'),
-      meta: { title: '通道列表', icon: 'channelManger' }
-    },
+    redirect: '/assets',
+    children: [
     {
       path: '/channel/record/:channelId',
       name: 'CommonRecord',
