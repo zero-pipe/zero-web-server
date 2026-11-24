@@ -25,15 +25,6 @@ func NewGroupRegionRepository(db *gorm.DB) *GroupRegionRepository {
 	return &GroupRegionRepository{db: db}
 }
 
-func idToStr(p *int64) string {
-	if p == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", *p)
-}
-
-func intPtr(v int) *int64 { x := int64(v); return &x }
-
 // ============================ 业务分组树 ============================
 
 func (r *GroupRegionRepository) QueryGroupTree(query string, parentID *int) ([]domaintree.Node, error) {

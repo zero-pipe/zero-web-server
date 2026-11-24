@@ -140,7 +140,7 @@ func (s *Service) HandleMessage(topic string, body []byte) error {
 				if r != nil {
 					e.ResourceID = r.ID
 					e.ChannelInternalCode = r.InternalCode
-					legacyChannelID = r.LegacyChannelID
+					legacyChannelID = r.ProtocolChannelID
 				}
 			}
 			if sources, err := s.assets.ListEventSources(dev.ID); err == nil {
@@ -341,12 +341,12 @@ func (s *Service) attachPlayback(e *domainevent.Event) {
 		playback.Supported = true
 		playback.DeviceExternal = binding.ExternalID
 		playback.ChannelExternal = res.ExternalKey
-		playback.ChannelLegacyID = res.LegacyChannelID
+		playback.ChannelLegacyID = res.ProtocolChannelID
 	case "onvif":
-		playback.ChannelLegacyID = res.LegacyChannelID
+		playback.ChannelLegacyID = res.ProtocolChannelID
 		playback.Reason = "ONVIF 回放尚未接入"
 	case "plugin":
-		playback.ChannelLegacyID = res.LegacyChannelID
+		playback.ChannelLegacyID = res.ProtocolChannelID
 		playback.Reason = "插件回放尚未接入"
 	default:
 		playback.Reason = "不支持的接入协议"

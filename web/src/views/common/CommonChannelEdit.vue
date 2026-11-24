@@ -264,7 +264,7 @@ export default {
     ChooseGroup,
     channelCode
   },
-  // id：国标通道主键（zws_device_channel.id）
+  // id：国标通道主键（zws_channel.id）
   // internalCode：统一通道内码，非国标通道用它读写；国标通道也可用它定位
   // protocol：gb28181 | onvif | plugin，决定读写的接口
   props: ['id', 'internalCode', 'protocol', 'dataForm', 'showCancel'],
@@ -309,7 +309,7 @@ export default {
     }
   },
   computed: {
-    // 国标通道走 zws_device_channel（国标码已存在）；ONVIF/插件通道走统一资产。
+    // 国标通道走 zws_channel（国标码已存在）；ONVIF/插件通道走统一通道模型。
     isGB() {
       return !this.protocol || this.protocol === 'gb28181'
     }
@@ -331,7 +331,7 @@ export default {
             this.form.gbDownloadSpeed = this.form.gbDownloadSpeedArray.join('/')
           }
           this.form.enableBroadcast = this.form.enableBroadcastForBool ? 1 : 0
-          // 非国标通道没有 zws_device_channel 行，写统一资产
+          // 非国标通道没有独立国标行，写统一通道模型
           if (!this.isGB) {
             this.saveUnified()
             return

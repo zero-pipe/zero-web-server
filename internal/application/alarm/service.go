@@ -139,7 +139,7 @@ func (s *Service) enrich(a *domainalarm.Alarm) {
 			a.Playback = map[string]any{
 				"supported":       supported,
 				"protocol":        protocol,
-				"channelLegacyId": res.LegacyChannelID,
+				"channelLegacyId": res.ProtocolChannelID,
 				"startAt":         a.AlarmTime - 10_000,
 				"endAt":           a.AlarmTime + 10_000,
 				"reason":          map[bool]string{true: "", false: protocol + " 回放尚未接入"}[supported],

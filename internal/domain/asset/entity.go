@@ -26,7 +26,7 @@ type AccessBinding struct {
 	ConfigJSON       string `json:"configJson"`
 	Status           string `json:"status"`
 	LastSeen         int64  `json:"lastSeen"`
-	LegacyDeviceID   int    `json:"-"`
+	ProtocolDeviceID   int    `json:"-"`
 	CreateTime       string `json:"createTime"`
 	UpdateTime       string `json:"updateTime"`
 }
@@ -51,7 +51,7 @@ type Resource struct {
 	ExternalKey     string  `json:"externalKey"`
 	Name            string  `json:"name"`
 	Status          string  `json:"status"`
-	LegacyChannelID int     `json:"-"`
+	ProtocolChannelID int     `json:"-"`
 	AttrsJSON       string  `json:"attrsJson"`
 	Longitude       float64 `json:"longitude"`
 	Latitude        float64 `json:"latitude"`

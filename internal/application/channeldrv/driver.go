@@ -23,8 +23,8 @@ import (
 // Session 记录停止/控制时恢复协议侧上下文（可为 nil）。
 type Session struct {
 	Protocol        string
-	LegacyDeviceID  int
-	LegacyChannelID int64
+	ProtocolDeviceID  int
+	ProtocolChannelID int64
 	ProfileToken    string
 	ChannelKey      string
 	// Playback 标记这是回放会话，避免 StopLive 误关同名直播流。
@@ -354,11 +354,11 @@ func (d *onvifDriver) StartLive(ctx context.Context, res *domainasset.Resource, 
 	if profile != nil {
 		token = profileToken(profile.SelectorJSON)
 	}
-	content, err := d.onvif.StartPlay(ctx, int64(res.LegacyChannelID), token)
+	content, err := d.onvif.StartPlay(ctx, int64(res.ProtocolChannelID), token)
 	if err != nil {
 		return nil, nil, err
 	}
-	sess := &Session{Protocol: d.Protocol(), LegacyChannelID: int64(res.LegacyChannelID), ProfileToken: token}
+	sess := &Session{Protocol: d.Protocol(), ProtocolChannelID: int64(res.ProtocolChannelID), ProfileToken: token}
 	return &dto.StreamContent{
 		App: content.App, Stream: content.Stream, MediaServerID: content.MediaServerID,
 		Flv: content.URLs["flv"], WsFlv: content.URLs["ws"], Hls: content.URLs["hls"],
@@ -375,14 +375,14 @@ func (d *onvifDriver) StopLive(ctx context.Context, res *domainasset.Resource, b
 	if sess != nil {
 		token = sess.ProfileToken
 	}
-	return d.onvif.StopPlay(ctx, int64(res.LegacyChannelID), token)
+	return d.onvif.StopPlay(ctx, int64(res.ProtocolChannelID), token)
 }
 
 func (d *onvifDriver) Sync(ctx context.Context, binding *domainasset.AccessBinding) error {
 	if d.onvif == nil {
 		return fmt.Errorf("ONVIF 服务未启用")
 	}
-	_, err := d.onvif.SyncChannels(ctx, int64(binding.LegacyDeviceID))
+	_, err := d.onvif.SyncChannels(ctx, int64(binding.ProtocolDeviceID))
 	return err
 }
 
@@ -406,7 +406,7 @@ func (d *onvifDriver) PTZ(ctx context.Context, res *domainasset.Resource, bindin
 		}
 	}
 	return d.onvif.PTZControl(ctx, onvifapp.PTZRequest{
-		ChannelID: int64(res.LegacyChannelID),
+		ChannelID: int64(res.ProtocolChannelID),
 		Command:   direction,
 		Speed:     speed,
 	})
@@ -420,7 +420,7 @@ func (d *onvifDriver) Snapshot(ctx context.Context, res *domainasset.Resource, b
 	if d.onvif == nil {
 		return nil, fmt.Errorf("ONVIF 服务未启用")
 	}
-	return d.onvif.Snapshot(ctx, int64(res.LegacyChannelID), "")
+	return d.onvif.Snapshot(ctx, int64(res.ProtocolChannelID), "")
 }
 
 // ---- 插件（私有 SDK） ----
@@ -441,11 +441,11 @@ func (d *pluginDriver) StartLive(ctx context.Context, res *domainasset.Resource,
 	if d.ipc == nil {
 		return nil, nil, fmt.Errorf("插件服务未启用")
 	}
-	content, err := d.ipc.StartLive(ctx, binding.LegacyDeviceID, res.ExternalKey, streamKeyOf(profile))
+	content, err := d.ipc.StartLive(ctx, binding.ProtocolDeviceID, res.ExternalKey, streamKeyOf(profile))
 	if err != nil {
 		return nil, nil, err
 	}
-	sess := &Session{Protocol: d.Protocol(), LegacyDeviceID: binding.LegacyDeviceID, ChannelKey: res.ExternalKey}
+	sess := &Session{Protocol: d.Protocol(), ProtocolDeviceID: binding.ProtocolDeviceID, ChannelKey: res.ExternalKey}
 	return content, sess, nil
 }
 
@@ -455,10 +455,10 @@ func (d *pluginDriver) StopLive(ctx context.Context, res *domainasset.Resource, 
 	}
 	devID := 0
 	if binding != nil {
-		devID = binding.LegacyDeviceID
+		devID = binding.ProtocolDeviceID
 	}
 	if sess != nil {
-		devID = sess.LegacyDeviceID
+		devID = sess.ProtocolDeviceID
 	}
 	return d.ipc.StopLive(ctx, devID, res.ExternalKey)
 }
@@ -467,7 +467,7 @@ func (d *pluginDriver) Sync(ctx context.Context, binding *domainasset.AccessBind
 	if d.ipc == nil {
 		return fmt.Errorf("插件服务未启用")
 	}
-	_, err := d.ipc.SyncChannels(ctx, binding.LegacyDeviceID)
+	_, err := d.ipc.SyncChannels(ctx, binding.ProtocolDeviceID)
 	return err
 }
 
@@ -477,14 +477,14 @@ func (d *pluginDriver) PTZ(ctx context.Context, res *domainasset.Resource, bindi
 	}
 	speed := int(clamp01(cmd.Speed)*100 + 0.5)
 	zoom := int(clamp01(cmd.Zoom)*16 + 0.5)
-	return d.ipc.PTZ(ctx, binding.LegacyDeviceID, res.ExternalKey, cmd.Direction, speed, speed, zoom)
+	return d.ipc.PTZ(ctx, binding.ProtocolDeviceID, res.ExternalKey, cmd.Direction, speed, speed, zoom)
 }
 
 func (d *pluginDriver) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
 	if d.ipc == nil {
 		return nil, fmt.Errorf("插件服务未启用")
 	}
-	return d.ipc.Command(ctx, binding.LegacyDeviceID, res.ExternalKey, cmd, params)
+	return d.ipc.Command(ctx, binding.ProtocolDeviceID, res.ExternalKey, cmd, params)
 }
 
 // ---- 插件回放（PlaybackDriver） ----
@@ -500,7 +500,7 @@ func (d *pluginDriver) QueryRecords(ctx context.Context, res *domainasset.Resour
 	if streamType < 0 {
 		streamType = pluginPlaybackStreamType
 	}
-	return d.ipc.QueryRecord(ctx, binding.LegacyDeviceID, res.ExternalKey, startTime, endTime, streamType)
+	return d.ipc.QueryRecord(ctx, binding.ProtocolDeviceID, res.ExternalKey, startTime, endTime, streamType)
 }
 
 func (d *pluginDriver) StartPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
@@ -508,11 +508,11 @@ func (d *pluginDriver) StartPlayback(ctx context.Context, res *domainasset.Resou
 	if d.ipc == nil {
 		return nil, nil, fmt.Errorf("插件服务未启用")
 	}
-	content, err := d.ipc.StartPlayback(ctx, binding.LegacyDeviceID, res.ExternalKey, startTime, endTime, streamKey)
+	content, err := d.ipc.StartPlayback(ctx, binding.ProtocolDeviceID, res.ExternalKey, startTime, endTime, streamKey)
 	if err != nil {
 		return nil, nil, err
 	}
-	sess := &Session{Protocol: d.Protocol(), LegacyDeviceID: binding.LegacyDeviceID, ChannelKey: res.ExternalKey, Playback: true}
+	sess := &Session{Protocol: d.Protocol(), ProtocolDeviceID: binding.ProtocolDeviceID, ChannelKey: res.ExternalKey, Playback: true}
 	return content, sess, nil
 }
 
@@ -522,7 +522,7 @@ func (d *pluginDriver) StopPlayback(ctx context.Context, res *domainasset.Resour
 	}
 	devID := 0
 	if binding != nil {
-		devID = binding.LegacyDeviceID
+		devID = binding.ProtocolDeviceID
 	}
 	return d.ipc.StopPlayback(ctx, devID, res.ExternalKey)
 }
@@ -531,7 +531,7 @@ func (d *pluginDriver) Snapshot(ctx context.Context, res *domainasset.Resource, 
 	if d.ipc == nil {
 		return nil, fmt.Errorf("插件服务未启用")
 	}
-	return d.ipc.Snapshot(ctx, binding.LegacyDeviceID, res.ExternalKey)
+	return d.ipc.Snapshot(ctx, binding.ProtocolDeviceID, res.ExternalKey)
 }
 
 // profileToken 从 StreamProfile.SelectorJSON 解析 ONVIF profileToken。

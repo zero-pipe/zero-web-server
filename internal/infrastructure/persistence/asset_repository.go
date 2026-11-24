@@ -144,6 +144,7 @@ func (r *AssetRepository) ListDevices(page, count int, query, protocol, status s
 				ExternalID: rows[i].ExternalID, Endpoint: rows[i].Endpoint,
 				PluginInstanceID: rows[i].PluginInstanceID, ConfigJSON: rows[i].ConfigJSON,
 				Status: rows[i].BStatus, LastSeen: rows[i].LastSeen,
+				ProtocolDeviceID: int(rows[i].ID),
 				CreateTime: rows[i].BCreateTime, UpdateTime: rows[i].BUpdateTime,
 			}
 		}
@@ -344,6 +345,7 @@ func (r *AssetRepository) hydrateAssetResource(m *model.Channel) *domainasset.Re
 		ID: formatID(m.ID), InternalCode: m.InternalCode, DeviceID: formatID(m.DeviceID),
 		Kind: m.Kind, ExternalKey: m.ExternalKey, Name: m.Name, Status: m.Status,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime, Enabled: true,
+		ProtocolChannelID: int(m.ID),
 	}
 	var b model.AccessBinding
 	if err := r.db.Where("device_id = ?", m.DeviceID).First(&b).Error; err == nil {
@@ -723,6 +725,7 @@ func toDomainAssetBinding(m *model.AccessBinding) *domainasset.AccessBinding {
 		ID: formatID(m.ID), DeviceID: formatID(m.DeviceID), Protocol: m.Protocol, Mode: m.Mode,
 		ExternalID: m.ExternalID, Endpoint: m.Endpoint, PluginInstanceID: m.PluginInstanceID,
 		ConfigJSON: m.ConfigJSON, Status: m.Status, LastSeen: m.LastSeen,
+		ProtocolDeviceID: int(m.DeviceID),
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }
