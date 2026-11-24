@@ -61,17 +61,16 @@
 
     <!-- 树表：设备父行 + 通道子行 -->
     <el-table
+      ref="table"
       v-loading="loading"
       :data="rows"
       :row-key="rowKey"
       :tree-props="{ children: 'children' }"
-      :expand-row-keys="expandKeys"
       style="width:100%"
       size="small"
       header-row-class-name="table-header"
       :row-class-name="rowClass"
-      height="calc(100vh - 330px)"
-      @expand-change="onExpandChange"
+      max-height="calc(100vh - 300px)"
     >
       <el-table-column label="设备 / 通道名称" min-width="220">
         <template slot-scope="{ row }">
@@ -192,7 +191,6 @@ export default {
       view: 'tree',
       devices: [],
       channels: [],
-      expandKeys: [],
       allExpanded: true,
       deviceEditVisible: false,
       deviceEditRow: null,
@@ -228,7 +226,8 @@ export default {
     protoTagType(p) { return p === 'onvif' ? '' : (p === 'plugin' ? 'warning' : 'success') },
     capLabel(c) { return CAP_LABELS[c] || c },
     capIcon(c) { return CAP_ICONS[c] || 'el-icon-check' },
-    rowKey(row) { return row._kind === 'device' ? 'd:' + row.internalCode : 'r:' + row.resourceId },
+    // row-key 用后端保证唯一的 id（gb:xxx / onvif:n / plugin:n），避免内码为空时树表丢行
+    rowKey(row) { return row._kind === 'device' ? 'd:' + row.id : 'r:' + row.resourceId },
     rowClass({ row }) { return row._kind === 'device' ? 'row-device' : 'row-channel' },
     protoCount(p) { return this.devices.filter(d => d.protocol === p).length },
     protoPct(p) {
@@ -237,7 +236,18 @@ export default {
     },
     setView(v) {
       this.view = v
-      if (v === 'flat') this.expandKeys = []
+      // 切回树形且处于「全部展开」时重新展开（扁平视图下无展开概念）
+      if (v === 'tree' && this.allExpanded) {
+        this.$nextTick(() => {
+          const table = this.$refs.table
+          if (!table) return
+          this.rows.forEach(row => {
+            if (row._kind === 'device' && (row.children || []).length) {
+              table.toggleRowExpansion(row, true)
+            }
+          })
+        })
+      }
     },
     reload() { this.loadData() },
     loadData() {
@@ -261,8 +271,17 @@ export default {
           channels = channels.filter(c => (this.status === 'online') === !!c.online)
         }
         this.channels = channels
+        // 树形视图且处于「全部展开」时，加载后主动展开所有设备行
         if (this.view === 'tree' && this.allExpanded) {
-          this.expandKeys = this.devices.map(d => 'd:' + d.internalCode)
+          this.$nextTick(() => {
+            const table = this.$refs.table
+            if (!table) return
+            this.rows.forEach(row => {
+              if (row._kind === 'device' && (row.children || []).length) {
+                table.toggleRowExpansion(row, true)
+              }
+            })
+          })
         }
       }).catch(err => {
         this.$message.error((err && err.message) || '加载失败')
@@ -284,11 +303,18 @@ export default {
     },
     toggleExpandAll() {
       this.allExpanded = !this.allExpanded
-      this.expandKeys = this.allExpanded ? this.devices.map(d => 'd:' + d.internalCode) : []
-    },
-    onExpandChange(row, expandedRows) {
-      // 手动展开/收起时同步受控的 expandKeys，避免下次重渲染被重置
-      this.expandKeys = (expandedRows || []).filter(r => r._kind === 'device').map(r => 'd:' + r.internalCode)
+      const expand = this.allExpanded
+      // 用 table 实例逐行展开/收起，比纯 expand-row-keys 更可靠（折叠时后者不生效）
+      this.$nextTick(() => {
+        const table = this.$refs.table
+        if (!table) return
+        this.rows.forEach(row => {
+          if (row._kind === 'device' && (row.children || []).length) {
+            table.toggleRowExpansion(row, expand)
+          }
+        })
+      })
+      this.allExpanded = expand
     },
     syncDevice(row) {
       syncUnifiedDevice(row.id).then(() => {
