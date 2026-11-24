@@ -28,13 +28,19 @@
             <el-tag v-for="p in row.protocols" :key="p" size="mini" style="margin-right:4px">{{ p }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="能力" min-width="240">
+          <template slot-scope="{ row }">
+            <el-tag v-for="c in (row.capabilities || [])" :key="c" size="mini" type="info" style="margin-right:4px">{{ c }}</el-tag>
+            <span v-if="!(row.capabilities || []).length" class="sub-text">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" min-width="140" align="center">
           <template slot-scope="{ row }">
             <el-tag :type="stateType(row.actualState)" size="mini">{{ stateLabel(row.actualState) }}</el-tag>
             <el-tag v-if="row.desiredState === 'disabled'" type="warning" size="mini" style="margin-left:4px">已禁用</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="260" fixed="right" align="center">
           <template slot-scope="{ row }">
             <el-switch
               v-model="row._enabled"
@@ -42,6 +48,14 @@
               active-color="#1A73E8"
               @change="(val) => onBuiltinToggle(row, val)"
             />
+            <el-divider direction="vertical" />
+            <el-button
+              type="text"
+              size="medium"
+              icon="el-icon-refresh-left"
+              :disabled="row.agent.status !== 'online'"
+              @click="restartBuiltin(row)"
+            >重启</el-button>
             <el-divider direction="vertical" />
             <el-button
               type="text"
@@ -74,7 +88,7 @@
         </div>
       </div>
       <div class="hint">
-        插件包为 <code>.zwplugin</code>（zip），根目录需包含 <code>plugin.yaml</code>。上传后选择目标 Agent 安装，安装完成后在「插件接入」中启用插件、添加设备。
+        插件包为 <code>.zwplugin</code>（zip），根目录需包含 <code>plugin.yaml</code>。上传后选择目标 Agent 安装，安装完成后在上方「内置插件」中启用插件，再到「设备接入」添加设备。
       </div>
       <el-table v-loading="loading" :data="packages" size="small" border>
         <el-table-column label="插件" min-width="240">
@@ -269,6 +283,12 @@ export default {
         }).catch(e => this.$message.error(e || '删除失败'))
       }).catch(() => {})
     },
+    restartBuiltin(row) {
+      setAgentPluginState(row.agentId, row.pluginId, 'restart').then(() => {
+        this.$message.success('重启命令已下发')
+        this.loadBuiltins()
+      }).catch(e => this.$message.error((e && e.message) || '重启失败'))
+    },
     stateLabel(state) {
       return { running: '运行中', starting: '启动中', stopped: '已停止', error: '异常', discovered: '已发现', offline: '离线' }[state] || state || '-'
     },
@@ -306,7 +326,7 @@ export default {
     doInstall() {
       this.installing = true
       installPluginPackage(this.installTarget.id, this.installAgent).then(() => {
-        this.$message.success('安装成功，可在「插件接入」启用插件')
+        this.$message.success('安装成功，可在「内置插件」启用插件')
         this.installVisible = false
         this.loadInstalls()
       }).catch(e => this.$message.error(e || '安装失败'))

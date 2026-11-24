@@ -9,42 +9,35 @@
   >
     <div v-if="step === 1">
       <div class="steps">
-        <span class="on">1. 选择接入模式</span>
+        <span class="on">1. 选择协议</span>
         <span>2. 填写协议参数</span>
       </div>
-      <el-alert
-        title="先添加，再接入。被动设备入库后为「待上线」，仅当设备用正确编号向平台注册后才变在线。"
-        type="warning"
-        :closable="false"
-        style="margin-bottom: 14px;"
-      />
+      <!-- 协议类别：标准协议（GB28181/ONVIF，后续可扩展）/ 插件协议 -->
       <div class="mode-cards">
         <div
           class="mode-card"
-          :class="{ selected: accessMode === 'passive' }"
-          @click="pickMode('passive')"
+          :class="{ selected: protocolKind === 'standard' }"
+          @click="pickKind('standard')"
         >
-          <h4><el-tag size="mini" type="success">被动</el-tag> 设备找平台</h4>
-          <p>设备配置平台地址与自身 ID，主动向平台注册。比如：GB28181。</p>
+          <h4><el-tag size="mini" type="success">标准协议</el-tag> 内置直连</h4>
+          <p>平台内置标准协议直连：GB28181、ONVIF，后续可扩展更多标准协议。</p>
         </div>
         <div
           class="mode-card"
-          :class="{ selected: accessMode === 'active' }"
-          @click="pickMode('active')"
+          :class="{ selected: protocolKind === 'plugin' }"
+          @click="pickKind('plugin')"
         >
-          <h4><el-tag size="mini" type="warning">主动</el-tag> 平台找设备</h4>
-          <p>平台持有设备固定 IP，主动连接并拉取通道。比如：ONVIF。</p>
+          <h4><el-tag size="mini" type="warning">插件协议</el-tag> 厂商私有 SDK</h4>
+          <p>通过 zero-agent 托管的厂商插件接入（如海康私有 SDK）。</p>
         </div>
       </div>
-      <el-form ref="step1Form" :model="step1" :rules="step1Rules" label-width="90px" size="small" style="margin-top: 12px;">
-        <el-form-item label="协议" required>
+
+      <!-- 标准协议：选 GB28181 / ONVIF -->
+      <el-form v-if="protocolKind === 'standard'" ref="step1Form" :model="step1" :rules="step1Rules" label-width="90px" size="small" style="margin-top: 12px;">
+        <el-form-item label="标准协议" required>
           <el-select v-model="protocol" style="width: 100%;">
-            <el-option
-              v-for="p in protocolOptions"
-              :key="p.value"
-              :label="p.label"
-              :value="p.value"
-            />
+            <el-option label="GB28181" value="gb28181" />
+            <el-option label="ONVIF" value="onvif" />
           </el-select>
         </el-form-item>
         <el-form-item label="设备名称" prop="name">
@@ -67,11 +60,30 @@
           </el-select>
         </el-form-item>
       </el-form>
+
+      <!-- 插件协议：选插件 + 名称 -->
+      <el-form v-else ref="step1Form" :model="step1" :rules="step1Rules" label-width="90px" size="small" style="margin-top: 12px;">
+        <el-form-item label="插件" required>
+          <el-select v-model="pluginForm.pluginId" style="width: 100%;" placeholder="选择在线插件" @change="onPluginChange">
+            <el-option v-for="p in onlinePlugins" :key="p.id" :label="p.id + ' (' + p.protocols.join(',') + ')'" :value="p.id" />
+          </el-select>
+          <div v-if="!onlinePlugins.length" class="field-desc" style="color:#FBBC05">暂无在线插件，请先在「插件管理」安装并启用插件。</div>
+        </el-form-item>
+        <el-form-item label="插件协议">
+          <el-select v-model="pluginForm.protocol" style="width: 100%;">
+            <el-option v-for="p in pluginProtocols" :key="p" :label="p" :value="p" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="设备名称" prop="name">
+          <el-input v-model="step1.name" placeholder="留空则使用 IP:端口" maxlength="64" show-word-limit />
+        </el-form-item>
+      </el-form>
     </div>
 
-    <div v-else-if="accessMode === 'passive'">
+    <!-- 标准协议参数 -->
+    <div v-else-if="protocolKind === 'standard' && protocol === 'gb28181'">
       <div class="steps">
-        <span>1. 选择接入模式</span>
+        <span>1. 选择协议</span>
         <span class="on">2. GB28181 参数</span>
       </div>
       <el-alert
@@ -108,9 +120,10 @@
       </el-form>
     </div>
 
-    <div v-else>
+    <!-- ONVIF 参数 -->
+    <div v-else-if="protocolKind === 'standard' && protocol === 'onvif'">
       <div class="steps">
-        <span>1. 选择接入模式</span>
+        <span>1. 选择协议</span>
         <span class="on">2. ONVIF 参数</span>
       </div>
       <el-alert
@@ -135,6 +148,28 @@
       </el-form>
     </div>
 
+    <!-- 插件参数（按插件 configSchema 动态渲染） -->
+    <div v-else>
+      <div class="steps">
+        <span>1. 选择协议</span>
+        <span class="on">2. 插件参数</span>
+      </div>
+      <el-alert
+        type="info"
+        :closable="false"
+        style="margin-bottom: 12px;"
+        :title="'插件：' + pluginForm.pluginId + (step1.name ? '；设备名称：' + step1.name : '')"
+      />
+      <el-form label-width="110px" size="small">
+        <el-form-item v-for="(f, key) in schemaProps" :key="key" :label="f.title || key">
+          <el-input v-if="isNumber(f)" v-model.number="pluginForm.params[key]" />
+          <el-input v-else-if="f.format === 'password'" v-model="pluginForm.params[key]" type="password" show-password />
+          <el-input v-else v-model="pluginForm.params[key]" />
+          <div v-if="f.description" class="field-desc">{{ f.description }}</div>
+        </el-form-item>
+      </el-form>
+    </div>
+
     <div slot="footer">
       <el-button v-if="step > 1" size="small" @click="step = 1">上一步</el-button>
       <el-button size="small" @click="innerVisible = false">取消</el-button>
@@ -146,6 +181,8 @@
 
 <script>
 import { createDevice } from '@/api/devices'
+import { addIpcDevice, queryPlugins } from '@/api/plugin'
+import { queryAgents, queryAgentPlugins } from '@/api/agent'
 import { getGbSipConfig } from '@/api/server'
 
 export default {
@@ -157,7 +194,7 @@ export default {
     return {
       step: 1,
       submitting: false,
-      accessMode: 'passive',
+      protocolKind: 'standard',
       protocol: 'gb28181',
       vendor: '',
       deviceType: '',
@@ -175,6 +212,11 @@ export default {
         username: 'admin',
         password: ''
       },
+      // 插件添加
+      onlinePlugins: [],
+      pluginForm: { pluginId: '', protocol: '', params: {} },
+      pluginProtocols: [],
+      schemaProps: {},
       step1Rules: {
         name: [
           { required: true, message: '请输入设备名称', trigger: 'blur' },
@@ -197,13 +239,8 @@ export default {
     },
     dialogTitle() {
       if (this.step === 1) return '添加设备'
-      return this.accessMode === 'passive' ? '添加设备 · GB28181（被动）' : '添加设备 · ONVIF（主动）'
-    },
-    protocolOptions() {
-      if (this.accessMode === 'passive') {
-        return [{ label: 'GB28181', value: 'gb28181' }]
-      }
-      return [{ label: 'ONVIF', value: 'onvif' }]
+      if (this.protocolKind === 'plugin') return '添加设备 · 插件'
+      return this.protocol === 'gb28181' ? '添加设备 · GB28181' : '添加设备 · ONVIF'
     }
   },
   mounted() {
@@ -213,18 +250,70 @@ export default {
     this.$root.$off('devices-prefill-onvif', this.prefillOnvif)
   },
   methods: {
-    pickMode(mode) {
-      this.accessMode = mode
-      this.protocol = mode === 'passive' ? 'gb28181' : 'onvif'
+    pickKind(kind) {
+      this.protocolKind = kind
+      if (kind === 'standard') {
+        this.protocol = 'gb28181'
+      } else {
+        this.loadOnlinePlugins()
+      }
+    },
+    loadOnlinePlugins() {
+      // 插件来自 Agent 托管，在线插件才能添加设备。
+      queryAgents().then(res => {
+        const agents = (res.data && res.data.list) || []
+        return Promise.all(agents.filter(a => a.status === 'online').map(a =>
+          queryAgentPlugins(a.id).then(r => (r.data && r.data.list) || []).catch(() => [])
+        ))
+      }).then(lists => {
+        const all = lists.reduce((acc, cur) => acc.concat(cur), [])
+        // 兼容 queryPlugins 的平台插件表（含 configSchema）
+        return queryPlugins().then(r => {
+          const platform = (r.data && r.data.list) || []
+          const byId = {}
+          platform.forEach(p => { byId[p.id] = p })
+          this.onlinePlugins = all.map(p => ({ ...p, ...(byId[p.pluginId] || byId[p.id] || {}) }))
+            .filter(p => p.online !== false)
+        }).catch(() => { this.onlinePlugins = all })
+      }).catch(() => { this.onlinePlugins = [] })
+    },
+    onPluginChange(id) {
+      const plugin = this.onlinePlugins.find(p => p.id === id || p.pluginId === id)
+      this.pluginProtocols = (plugin && plugin.protocols) || []
+      this.pluginForm.protocol = this.pluginProtocols[0] || ''
+      this.schemaProps = {}
+      this.pluginForm.params = {}
+      if (plugin && plugin.configSchema) {
+        try {
+          const schema = JSON.parse(plugin.configSchema)
+          this.schemaProps = schema.properties || {}
+          Object.keys(this.schemaProps).forEach(key => {
+            const def = this.schemaProps[key].default
+            this.$set(this.pluginForm.params, key, def !== undefined ? def : '')
+          })
+        } catch (e) {
+          console.warn('invalid config schema', e)
+        }
+      }
+    },
+    isNumber(f) {
+      return f.type === 'integer' || f.type === 'number'
     },
     goNext() {
-      this.$refs.step1Form.validate(valid => {
-        if (!valid) return
-        this.step = 2
-        if (this.accessMode === 'passive') {
-          this.loadAccessTip()
-        }
-      })
+      if (this.protocolKind === 'standard') {
+        this.$refs.step1Form.validate(valid => {
+          if (!valid) return
+          this.step = 2
+          if (this.protocol === 'gb28181') this.loadAccessTip()
+        })
+        return
+      }
+      // 插件：只需选插件即可进入下一步
+      if (!this.pluginForm.pluginId) {
+        this.$message.warning('请选择插件')
+        return
+      }
+      this.step = 2
     },
     loadAccessTip() {
       getGbSipConfig().then(res => {
@@ -235,7 +324,8 @@ export default {
       })
     },
     prefillOnvif(data) {
-      this.pickMode('active')
+      this.protocolKind = 'standard'
+      this.protocol = 'onvif'
       this.step = 1
       this.onvif.ip = data.ip || ''
       this.onvif.port = data.port || 80
@@ -245,7 +335,7 @@ export default {
     },
     reset() {
       this.step = 1
-      this.accessMode = 'passive'
+      this.protocolKind = 'standard'
       this.protocol = 'gb28181'
       this.vendor = ''
       this.deviceType = ''
@@ -253,9 +343,17 @@ export default {
       this.step1 = { name: '' }
       this.gb = { deviceId: '', password: '', mediaServerId: 'auto', charset: 'GB2312' }
       this.onvif = { ip: '', port: 80, username: 'admin', password: '' }
+      this.onlinePlugins = []
+      this.pluginForm = { pluginId: '', protocol: '', params: {} }
+      this.pluginProtocols = []
+      this.schemaProps = {}
     },
     submit() {
-      const formRef = this.accessMode === 'passive' ? 'gbForm' : 'onvifForm'
+      if (this.protocolKind === 'plugin') {
+        this.submitPlugin()
+        return
+      }
+      const formRef = this.protocol === 'gb28181' ? 'gbForm' : 'onvifForm'
       this.$refs[formRef].validate(valid => {
         if (!valid) return
         const name = (this.step1.name || '').trim()
@@ -266,13 +364,14 @@ export default {
         }
         this.submitting = true
         const payload = {
-          accessMode: this.accessMode,
+          // 接入模式对用户不可见：GB 为被动注册，ONVIF 为主动连接。
+          accessMode: this.protocol === 'gb28181' ? 'passive' : 'active',
           protocol: this.protocol,
           name,
           vendor: this.vendor,
           deviceType: this.deviceType
         }
-        if (this.accessMode === 'passive') {
+        if (this.protocol === 'gb28181') {
           payload.gb = { ...this.gb }
         } else {
           payload.onvif = { ...this.onvif }
@@ -286,6 +385,23 @@ export default {
         }).finally(() => {
           this.submitting = false
         })
+      })
+    },
+    submitPlugin() {
+      this.submitting = true
+      addIpcDevice({
+        pluginId: this.pluginForm.pluginId,
+        protocol: this.pluginForm.protocol,
+        name: (this.step1.name || '').trim(),
+        params: this.pluginForm.params
+      }).then(() => {
+        this.$message.success('设备已添加')
+        this.innerVisible = false
+        this.$emit('success')
+      }).catch(err => {
+        this.$message.error(err.message || err || '添加失败')
+      }).finally(() => {
+        this.submitting = false
       })
     }
   }
@@ -341,4 +457,5 @@ export default {
   color: #5F6368;
   line-height: 1.5;
 }
+.field-desc { color: #80868B; font-size: 12px; line-height: 18px; margin-top: 4px; }
 </style>

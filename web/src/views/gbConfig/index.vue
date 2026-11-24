@@ -45,7 +45,7 @@
         </el-form-item>
         <el-form-item label="强制预登记">
           <el-switch v-model="form.requirePreRegister" />
-          <span class="hint">开启后：未在「标准接入」或「下级平台」预登记的编号，REGISTER 返回 403</span>
+          <span class="hint">开启后：未在「设备接入」或「下级平台」预登记的编号，REGISTER 返回 403</span>
         </el-form-item>
         <el-form-item label="报警订阅">
           <el-switch v-model="form.alarm" />

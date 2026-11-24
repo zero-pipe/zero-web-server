@@ -1,7 +1,7 @@
 <template>
   <div class="ptz-section-inner">
     <div class="ptz-top">
-      <div v-if="hasPtzDirection" class="ptz-dpad">
+      <div v-if="showDirection" class="ptz-dpad">
         <div class="dpad-ring"></div>
         <button class="dpad-btn card card-up" @mousedown.prevent="handlePtzMove('up')" @mouseup.prevent="handlePtzStop()">▲</button>
         <button class="dpad-btn card card-right" @mousedown.prevent="handlePtzMove('right')" @mouseup.prevent="handlePtzStop()">▶</button>
@@ -22,7 +22,7 @@
               </div>
             </div>
           </div>
-          <div v-if="hasPtzDirection" class="ptz-func-row">
+          <div v-if="showZoom" class="ptz-func-row">
             <div class="ptz-func-btn" title="变倍+" @mousedown.prevent="handlePtzMove('zoomin')" @mouseup.prevent="handlePtzStop()">
               <i class="el-icon-zoom-in" /><span>变倍+</span>
             </div>
@@ -30,7 +30,7 @@
               <i class="el-icon-zoom-out" /><span>变倍-</span>
             </div>
           </div>
-          <div v-if="hasFocus" class="ptz-func-row">
+          <div v-if="showFocus" class="ptz-func-row">
             <div class="ptz-func-btn" title="聚焦+" @mousedown.prevent="$emit('focus-move', { command: 'near', speed: controSpeed })" @mouseup.prevent="$emit('focus-stop')">
               <i class="iconfont icon-bianjiao-fangda" /><span>聚焦+</span>
             </div>

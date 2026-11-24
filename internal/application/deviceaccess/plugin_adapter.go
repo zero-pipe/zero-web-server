@@ -53,7 +53,7 @@ func (a pluginAdapter) GetByInternalCode(ctx context.Context, code string) (*Dev
 
 func (a pluginAdapter) Create(context.Context, CreateRequest) (*DeviceView, error) {
 	// 插件设备走独立的添加流程（需选插件、按 configSchema 填参数），不经统一创建。
-	return nil, fmt.Errorf("插件设备请在「插件接入」页添加")
+	return nil, fmt.Errorf("插件设备请在「设备接入」页添加")
 }
 
 func (a pluginAdapter) Update(ctx context.Context, rawID string, req UpdateRequest) (*DeviceView, error) {

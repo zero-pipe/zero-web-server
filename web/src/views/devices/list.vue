@@ -11,17 +11,15 @@
           @input="reload"
         />
       </el-form-item>
-      <el-form-item label="接入模式">
-        <el-select v-model="accessMode" style="width: 110px;" clearable placeholder="全部" @change="reload">
-          <el-option label="被动" value="passive" />
-          <el-option label="主动" value="active" />
-        </el-select>
-      </el-form-item>
       <el-form-item label="协议">
-        <el-select v-model="protocol" style="width: 130px;" clearable placeholder="全部" @change="reload">
-          <el-option label="GB28181" value="gb28181" />
-          <el-option label="ONVIF" value="onvif" />
-          <el-option label="插件" value="plugin" />
+        <el-select v-model="protocol" style="width: 150px;" clearable placeholder="全部" @change="reload">
+          <el-option-group label="标准协议">
+            <el-option label="GB28181" value="gb28181" />
+            <el-option label="ONVIF" value="onvif" />
+          </el-option-group>
+          <el-option-group label="插件协议">
+            <el-option label="插件" value="plugin" />
+          </el-option-group>
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -221,7 +219,6 @@ export default {
       page: 1,
       count: 15,
       query: '',
-      accessMode: '',
       protocol: '',
       status: '',
       wizardVisible: false,
@@ -267,7 +264,6 @@ export default {
         page: this.page,
         count: this.count,
         query: this.query,
-        accessMode: this.accessMode || undefined,
         protocol: this.protocol || undefined,
         status: this.status || undefined
       }).then(res => {
