@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/onvifcli"
 	"zero-web-server/internal/port"
+	applog "zero-web-server/pkg/log"
 
 	onviflib "zero-web-server/3rdpart/onvif-go"
 )
@@ -32,8 +34,16 @@ type Service struct {
 	evSubs    map[int64]context.CancelFunc
 	eventSink EventSink
 
+	// 心跳：周期探活探测到可达时写保活时间戳（未注入则为空操作）。
+	keepalive KeepalivePusher
+
 	// mu 保护 eventSink 的读写（SetEventSink 可能在运行期被调用）。
 	mu sync.Mutex
+}
+
+// KeepalivePusher 记录设备保活时间戳（Redis 实现）。
+type KeepalivePusher interface {
+	PushKeepalive(ctx context.Context, deviceID string, ts int64) error
 }
 
 func NewService(
@@ -407,8 +417,39 @@ func (s *Service) ProbeAll(ctx context.Context) error {
 			continue
 		}
 		_ = s.devices.UpdateOnlineStatus(ctx, d.ID, true)
+		// 探活成功即记一次心跳，供「统计-心跳」列展示。键与前端一致：用设备 rawId。
+		if s.keepalive != nil {
+			_ = s.keepalive.PushKeepalive(ctx, strconv.FormatInt(d.ID, 10), time.Now().UnixMilli())
+		}
 	}
 	return nil
+}
+
+// SetKeepalivePusher 注入保活时间戳写入器（main 装配时调用）。
+func (s *Service) SetKeepalivePusher(p KeepalivePusher) {
+	s.keepalive = p
+}
+
+// StartHeartbeat 周期探活：ONVIF 在线状态只在探活时刷新，不定时会话会把
+// "设备已下线但平台仍显示在线"长期固化。这里按固定周期跑 ProbeAll。
+func (s *Service) StartHeartbeat(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := s.ProbeAll(ctx); err != nil {
+					applog.Warnf("[onvif] 周期探活失败: %v", err)
+				}
+			}
+		}
+	}()
 }
 
 type PlayResult struct {

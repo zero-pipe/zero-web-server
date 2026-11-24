@@ -1,16 +1,6 @@
 <template>
   <div class="app-container">
-    <!-- 设备列表 / 通道列表：与标准接入一致的页内下钻 -->
-    <channel-panel
-      v-if="channelCtx"
-      embedded
-      device-locked
-      protocol="plugin"
-      :device-internal-code="channelCtx.internalCode"
-      :device-name="channelCtx.name"
-      @back="channelCtx = null"
-    />
-    <div v-show="!channelCtx">
+    <div>
     <el-card shadow="never">
       <div slot="header" class="card-header">
         <span>Agent 与插件</span>
@@ -78,39 +68,10 @@
         <span>插件设备</span>
         <el-button type="primary" size="small" icon="el-icon-plus" @click="openAdd" :disabled="!plugins.length">添加设备</el-button>
       </div>
-      <el-table v-loading="loading" :data="devices" size="small" border>
-        <el-table-column prop="name" label="名称" min-width="200" />
-        <el-table-column prop="protocol" label="协议" min-width="140" align="center" />
-        <el-table-column label="地址/注册信息" min-width="220">
-          <template slot-scope="{ row }">{{ deviceAddress(row) }}</template>
-        </el-table-column>
-        <el-table-column prop="manufacturer" label="厂商" min-width="130" />
-        <el-table-column prop="model" label="型号" min-width="180" show-overflow-tooltip />
-        <el-table-column label="在线" min-width="90" align="center">
-          <template slot-scope="{ row }">
-            <el-tag :type="row.online ? 'success' : 'info'" size="mini">{{ row.online ? '在线' : '离线' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="channelCount" label="通道数" min-width="100" align="center" />
-        <el-table-column label="操作" min-width="380" fixed="right" align="center">
-          <template slot-scope="{ row }">
-            <el-switch
-              v-model="row._armed"
-              :disabled="!row.online"
-              active-color="#1A73E8"
-              active-text="撤防"
-              inactive-text="布防"
-              @change="() => toggleArm(row)"
-            />
-            <el-divider direction="vertical" />
-            <el-button type="text" size="medium" icon="el-icon-video-camera" @click="goChannels(row)">通道</el-button>
-            <el-divider direction="vertical" />
-            <el-button type="text" size="medium" icon="el-icon-refresh" @click="syncDevice(row)">同步</el-button>
-            <el-divider direction="vertical" />
-            <el-button type="text" size="medium" style="color:#EA4335" @click="removeDevice(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="hint">
+        插件设备已合并到「标准接入」统一展示与管理（名称/厂商/型号/协议/地址/状态/通道数/订阅(布防撤防)/统计(心跳)/操作）。
+        <el-button type="text" size="small" icon="el-icon-right" @click="$router.push({ path: '/devices', query: { protocol: 'plugin' } })">前往标准接入查看</el-button>
+      </div>
     </el-card>
 
     <!-- 添加设备 -->
@@ -146,32 +107,24 @@
 </template>
 
 <script>
-import {
-  queryPlugins, queryIpcDevices, addIpcDevice, deleteIpcDevice,
-  syncIpcDevice, armIpcDevice, disarmIpcDevice, getIpcArmStatus
-} from '@/api/plugin'
+import { queryPlugins, addIpcDevice } from '@/api/plugin'
 import { queryAgents, queryAgentPlugins, setAgentPluginState } from '@/api/agent'
 import { getPipelineStatus } from '@/api/infra'
-import ChannelPanel from '@/views/channel/unified-panel'
 
 export default {
   name: 'IpcPlugins',
-  components: { ChannelPanel },
   data() {
     return {
       loading: false,
       submitting: false,
       plugins: [],
       agentPlugins: [],
-      devices: [],
       addVisible: false,
       addForm: { pluginId: '', protocol: '', name: '', params: {} },
       schemaProps: {},
       protocolOptions: [],
       pipelineReady: false,
-      pipelineMsg: '',
-      armStatuses: {},
-      channelCtx: null
+      pipelineMsg: ''
     }
   },
   computed: {
@@ -182,18 +135,13 @@ export default {
   created() {
     this.loadAll()
   },
-  beforeDestroy() {
-    this.stopPlay()
-  },
   methods: {
     loadAll() {
       this.loading = true
       this.loadAgents()
-      Promise.all([queryPlugins(), queryIpcDevices(), getPipelineStatus()]).then(([p, d, ps]) => {
+      Promise.all([queryPlugins(), getPipelineStatus()]).then(([p, ps]) => {
         this.plugins = p.data || []
-        this.devices = (d.data && d.data.list) || []
         this.applyPipeline((ps && ps.data) || {})
-        this.loadArmStatuses()
       }).finally(() => { this.loading = false })
     },
     loadAgents() {
@@ -237,57 +185,8 @@ export default {
       if (!p.mqtt || !p.mqtt.enabled || !p.mqtt.connected) missing.push('MQTT')
       this.pipelineMsg = missing.length ? ('事件管道未就绪：请先配置 ' + missing.join(' / ')) : ''
     },
-    loadArmStatuses() {
-      this.devices.forEach(row => {
-        this.$set(row, '_armed', false)
-        getIpcArmStatus(row.id).then(res => {
-          const d = (res && res.data) || {}
-          const sub = d.subscription
-          this.$set(row, '_armed', !!(sub && sub.armed))
-          this.$set(row, '_armStatus', sub || null)
-        }).catch(() => {})
-      })
-    },
-    toggleArm(row) {
-      if (!row._armed) {
-        // 关闭开关 → 撤防（需确认）
-        this.$confirm(`确认对设备 ${row.name} 撤防？`, '提示', { type: 'warning' }).then(() => {
-          disarmIpcDevice(row.id).then(() => {
-            this.$message.success('已撤防')
-            this.loadArmStatuses()
-          }).catch(e => {
-            row._armed = true
-            this.$message.error((e && e.message) || '撤防失败')
-          })
-        }).catch(() => { row._armed = true })
-        return
-      }
-      // 打开开关 → 布防
-      if (!this.pipelineReady) {
-        row._armed = false
-        this.$message.warning(this.pipelineMsg || '事件管道未就绪，请先配置对象存储与 MQTT')
-        return
-      }
-      armIpcDevice(row.id, ['motion', 'line_crossing', 'intrusion']).then(res => {
-        const d = (res && res.data) || {}
-        if (d.armed) this.$message.success('布防成功')
-        else row._armed = false
-        this.loadArmStatuses()
-      }).catch(e => {
-        row._armed = false
-        this.$message.error((e && e.message) || '布防失败')
-      })
-    },
-    deviceAddress(row) {
-      let params = {}
-      try { params = JSON.parse(row.driverParams || '{}') } catch (e) { params = {} }
-      if (params.ip) return params.port ? `${params.ip}:${params.port}` : params.ip
-      const uid = row.deviceUid || ''
-      const i = uid.lastIndexOf('-')
-      if (i > 0 && /^\d+$/.test(uid.slice(i + 1))) return uid.slice(0, i) + ':' + uid.slice(i + 1)
-      return uid || '—'
-    },
-    formatTime(ms) {      if (!ms) return '-'
+    formatTime(ms) {
+      if (!ms) return '-'
       const d = new Date(ms)
       const pad = n => (n < 10 ? '0' + n : n)
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
@@ -341,24 +240,6 @@ export default {
     resetAdd() {
       this.addForm = { pluginId: '', protocol: '', name: '', params: {} }
       this.schemaProps = {}
-    },
-    removeDevice(row) {
-      this.$confirm(`删除设备 ${row.name} ?`, '提示', { type: 'warning' }).then(() => {
-        deleteIpcDevice(row.id).then(() => {
-          this.$message.success('已删除')
-          this.loadAll()
-        })
-      }).catch(() => {})
-    },
-    syncDevice(row) {
-      syncIpcDevice(row.id).then(() => {
-        this.$message.success('通道已同步')
-        this.loadAll()
-      })
-    },
-    // 与标准接入一致的通道下钻：页内切换通道列表，返回时回到设备列表。
-    goChannels(row) {
-      this.channelCtx = { internalCode: row.internalCode, name: row.name }
     }
   }
 }

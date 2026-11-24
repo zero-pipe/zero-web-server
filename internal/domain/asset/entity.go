@@ -189,6 +189,8 @@ type ChannelView struct {
 	MapLevel           int     `json:"mapLevel"`
 	Tags               string  `json:"tags"`
 	Enabled            bool    `json:"enabled"`
+	// Caps 该通道真实可用的操作能力（驱动实现 ∩ 通道事实），前端能力集列据此点亮。
+	Caps []string `json:"caps"`
 	// GB 是非国标通道手工填写的国标属性（国标通道走 zws_device_channel，不在这里）。
 	GB map[string]any `json:"gb,omitempty"`
 }

@@ -332,7 +332,7 @@ func main() {
 	}
 	playService.SetStreamModeProvider(streamModeProvider)
 	playbackService.SetStreamModeProvider(streamModeProvider)
-	deviceAccessService := deviceaccess.NewService(deviceService, onvifService)
+	deviceAccessService := deviceaccess.NewService(deviceService, onvifService, ipcService)
 	assetService := assetapp.NewService(assetRepo, assetProjector, drivers)
 	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, assetService, mediaCluster, cfg.Server.Port)
 
@@ -372,7 +372,28 @@ func main() {
 	// 与插件那条 MQTT 链路并列。设备不支持 PullPoint 时只打日志，不影响其它能力。
 	onvifService.SetEventSink(eventIngest)
 	onvifService.StartEventSync(ctx)
+	// 心跳：ONVIF / 插件没有主动上报的保活，靠周期探活刷新在线并写心跳时间戳，
+	// 避免"设备已下线但平台仍显示在线"长期固化。
+	if redisClient != nil {
+		onvifService.SetKeepalivePusher(redisClient)
+		ipcService.SetKeepalivePusher(redisClient)
+	}
+	onvifService.StartHeartbeat(ctx, 30*time.Second)
 	pluginService.Start(ctx, 10*time.Second, 30*time.Second)
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := ipcService.ProbeAll(ctx); err != nil {
+					applog.Warnf("[plugin] 周期探活失败: %v", err)
+				}
+			}
+		}
+	}()
 	agentService.Start(ctx, 10*time.Second, 30*time.Second)
 	if err := sipServer.Start(ctx); err != nil {
 		applog.Fatalf("start sip: %v", err)

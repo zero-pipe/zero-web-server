@@ -4,27 +4,26 @@
       v-show="!channelCtx"
       @show-channel="showChannel"
     />
-    <gb-channel
-      v-if="channelCtx && channelCtx.protocol === 'gb28181'"
-      :device-id="channelCtx.rawId"
-      @show-device="showDevice"
-    />
-    <onvif-channel
-      v-if="channelCtx && channelCtx.protocol === 'onvif'"
-      :device-id="Number(channelCtx.rawId)"
-      @show-device="showDevice"
+    <!-- 通道列表对所有协议统一：不再按协议分支到不同组件，新增协议零改动 -->
+    <unified-channel
+      v-if="channelCtx"
+      :device-internal-code="channelCtx.internalCode"
+      :device-name="channelCtx.name"
+      :protocol="channelCtx.protocol"
+      embedded
+      device-locked
+      @back="showDevice"
     />
   </div>
 </template>
 
 <script>
 import deviceList from './list.vue'
-import gbChannel from '@/views/device/channel/index.vue'
-import onvifChannel from '@/views/onvifDevice/channel/index.vue'
+import unifiedChannel from '@/views/channel/unified-panel.vue'
 
 export default {
   name: 'Devices',
-  components: { deviceList, gbChannel, onvifChannel },
+  components: { deviceList, unifiedChannel },
   data() {
     return {
       channelCtx: null
@@ -34,8 +33,8 @@ export default {
     showChannel(row) {
       this.channelCtx = {
         protocol: row.protocol,
-        rawId: row.rawId,
-        id: row.id
+        internalCode: row.internalCode,
+        name: row.name
       }
     },
     showDevice() {

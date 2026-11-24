@@ -9,6 +9,7 @@ import (
 	"time"
 
 	deviceapp "zero-web-server/internal/application/device"
+	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	onvifapp "zero-web-server/internal/application/onvif"
 	domaindevice "zero-web-server/internal/domain/device"
 	domainonvif "zero-web-server/internal/domain/onvif"
@@ -20,6 +21,7 @@ const (
 
 	ProtocolGB28181 = "gb28181"
 	ProtocolONVIF   = "onvif"
+	ProtocolPlugin  = "plugin"
 
 	StatusOnline  = "online"
 	StatusOffline = "offline"
@@ -32,6 +34,7 @@ type DeviceView struct {
 	AccessMode   string   `json:"accessMode"`
 	Protocol     string   `json:"protocol"`
 	Vendor       string   `json:"vendor"`
+	Model        string   `json:"model"`
 	DeviceType   string   `json:"deviceType,omitempty"`
 	Status       string   `json:"status"`
 	ChannelCount int      `json:"channelCount"`
@@ -95,12 +98,18 @@ type ListQuery struct {
 type Service struct {
 	gb       *deviceapp.Service
 	onvif    *onvifapp.Service
+	plugin   *ipcdevice.Service
 	registry *protocolRegistry
 }
 
-func NewService(gb *deviceapp.Service, onvif *onvifapp.Service) *Service {
-	s := &Service{gb: gb, onvif: onvif}
-	s.registry = newProtocolRegistry(gbAdapter{s: s}, onvifAdapter{s: s}, jt1078Adapter{})
+func NewService(gb *deviceapp.Service, onvif *onvifapp.Service, plugin *ipcdevice.Service) *Service {
+	s := &Service{gb: gb, onvif: onvif, plugin: plugin}
+	s.registry = newProtocolRegistry(
+		gbAdapter{s: s},
+		onvifAdapter{s: s},
+		pluginAdapter{ipc: plugin},
+		jt1078Adapter{},
+	)
 	return s
 }
 
@@ -213,6 +222,21 @@ func (s *Service) ensureNameUniqueExcept(ctx context.Context, name, exceptProtoc
 		}
 		if strings.EqualFold(strings.TrimSpace(n), name) {
 			return fmt.Errorf("设备名称已存在: %s", name)
+		}
+	}
+	// 插件设备同名校验（插件设备也投影到统一接入列表，重名会导致挑选困难）。
+	if s.plugin != nil {
+		pluginList, err := s.plugin.ListDevices()
+		if err != nil {
+			return err
+		}
+		for _, d := range pluginList {
+			if exceptProtocol == ProtocolPlugin && strconv.Itoa(d.ID) == exceptRawID {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(d.Name), name) {
+				return fmt.Errorf("设备名称已存在: %s", name)
+			}
 		}
 	}
 	return nil
@@ -392,6 +416,7 @@ func viewFromGB(d *domaindevice.Device) *DeviceView {
 		AccessMode:                      AccessPassive,
 		Protocol:                        ProtocolGB28181,
 		Vendor:                          d.Manufacturer,
+		Model:                           d.Model,
 		Status:                          status,
 		ChannelCount:                    d.ChannelCount,
 		AddressText:                     addr,
@@ -432,13 +457,14 @@ func viewFromONVIF(d *domainonvif.Device) *DeviceView {
 		AccessMode:   AccessActive,
 		Protocol:     ProtocolONVIF,
 		Vendor:       d.Manufacturer,
+		Model:        d.Model,
 		Status:       status,
 		ChannelCount: 0,
 		AddressText:  fmt.Sprintf("%s:%d", d.IP, d.Port),
 		RawID:        strconv.FormatInt(d.ID, 10),
 		DBID:         int(d.ID),
-		// ONVIF：无流传输/订阅/统计；操作只有同步/通道/编辑/删除
-		Capabilities: []string{"sync", "play", "ptz", "edit", "delete"},
+		// ONVIF：订阅=事件订阅(PullPoint)，统计=心跳；操作 同步/通道/编辑/删除
+		Capabilities: []string{"sync", "play", "ptz", "event", "stats", "edit", "delete"},
 		Onvif: &OnvifConfig{
 			IP:       d.IP,
 			Port:     d.Port,

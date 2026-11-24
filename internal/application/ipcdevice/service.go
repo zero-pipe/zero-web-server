@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	pluginapp "zero-web-server/internal/application/plugin"
 	domainplugin "zero-web-server/internal/domain/plugin"
@@ -23,9 +25,16 @@ type Service struct {
 	media    port.MediaCluster
 	factory  port.IPCClientFactory
 	serverID string
+	keepalive KeepalivePusher
 
 	mu     sync.Mutex
 	active map[string]*activeStream
+}
+
+// KeepalivePusher 记录设备保活时间戳（Redis 实现；未注入则为空操作）。
+// 插件设备没有协议层心跳，由周期探活（ProbeAll）探测到可达时写入。
+type KeepalivePusher interface {
+	PushKeepalive(ctx context.Context, deviceID string, ts int64) error
 }
 
 type activeStream struct {
@@ -297,6 +306,51 @@ func (s *Service) dropStaleStream(ctx context.Context, nodeID, app, stream strin
 
 func (s *Service) GetDevice(deviceID int) (*domainplugin.Device, error) {
 	return s.repo.GetDevice(deviceID)
+}
+
+// SetKeepalivePusher 注入保活时间戳写入器（main 装配时调用）。
+func (s *Service) SetKeepalivePusher(p KeepalivePusher) {
+	s.keepalive = p
+}
+
+// ProbeAll 周期探活：对每台插件设备发一次轻量请求（ListChannels），可达则置在线并写心跳。
+// 插件设备没有协议层心跳，不周期探活会导致"设备已下线但平台仍显示在线"。
+func (s *Service) ProbeAll(ctx context.Context) error {
+	list, err := s.repo.ListDevices()
+	if err != nil {
+		return err
+	}
+	for _, dev := range list {
+		if dev == nil {
+			continue
+		}
+		p, err := s.repo.GetPlugin(dev.PluginID)
+		if err != nil || p == nil || !p.Online {
+			// 插件离线：设备必然不可达，置离线。
+			if dev.Online {
+				dev.Online = false
+				_ = s.repo.UpdateDevice(dev)
+			}
+			continue
+		}
+		probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		_, lerr := s.factory.For(p.Endpoint).ListChannels(probeCtx, dev.DeviceUID)
+		cancel()
+		online := lerr == nil
+		if online != dev.Online {
+			dev.Online = online
+			_ = s.repo.UpdateDevice(dev)
+		}
+		if online && s.keepalive != nil {
+			_ = s.keepalive.PushKeepalive(ctx, strconv.Itoa(dev.ID), time.Now().UnixMilli())
+		}
+	}
+	return nil
+}
+
+// UpdateDevice 保存插件设备（名称等可编辑字段）。统一接入的编辑入口复用。
+func (s *Service) UpdateDevice(d *domainplugin.Device) error {
+	return s.repo.UpdateDevice(d)
 }
 
 // EnsureLogin 确保插件侧已登录该设备（插件重启后补登录）。

@@ -21,6 +21,7 @@
         <el-select v-model="protocol" style="width: 130px;" clearable placeholder="全部" @change="reload">
           <el-option label="GB28181" value="gb28181" />
           <el-option label="ONVIF" value="onvif" />
+          <el-option label="插件" value="plugin" />
         </el-select>
       </el-form-item>
       <el-form-item label="状态">
@@ -39,27 +40,30 @@
       </el-form-item>
     </el-form>
 
-    <!-- 统一列 + 国标订阅/统计；无能力协议格子留空 -->
+    <!-- 统一 10 列：三类接入完全对齐，新增协议只需在此渲染 -->
     <el-table v-loading="loading" size="small" :data="list" height="calc(100% - 96px)" header-row-class-name="table-header">
       <el-table-column prop="name" label="名称" min-width="140" />
+      <el-table-column prop="vendor" label="厂商" width="100" />
+      <el-table-column prop="model" label="型号" width="130" show-overflow-tooltip />
       <el-table-column label="协议" width="90">
         <template v-slot:default="{ row }">
           <el-tag v-if="row.protocol === 'gb28181'" size="mini">GB28181</el-tag>
-          <el-tag v-else size="mini" style="color:#7c3aed;border-color:#ddd6fe;background:#f5f3ff">ONVIF</el-tag>
+          <el-tag v-else-if="row.protocol === 'onvif'" size="mini" style="color:#7c3aed;border-color:#ddd6fe;background:#f5f3ff">ONVIF</el-tag>
+          <el-tag v-else size="mini" type="warning">插件</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="addressText" label="地址/注册信息" min-width="150" show-overflow-tooltip />
-      <el-table-column prop="vendor" label="厂商" width="90" />
-      <el-table-column prop="channelCount" label="通道数" width="80" />
       <el-table-column label="状态" width="90">
         <template v-slot:default="{ row }">
           <el-tag v-if="row.status === 'online'" size="mini" type="success">在线</el-tag>
           <el-tag v-else size="mini" type="info">离线</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="订阅" min-width="220">
+      <el-table-column prop="channelCount" label="通道数" width="80" align="center" />
+      <el-table-column label="订阅" min-width="230">
         <template v-slot:default="{ row }">
-          <template v-if="hasCap(row, 'subscribe')">
+          <!-- 国标：目录/位置/报警 -->
+          <template v-if="row.protocol === 'gb28181'">
             <el-checkbox
               label="目录"
               :checked="row.subscribeCycleForCatalog > 0"
@@ -76,10 +80,27 @@
               @change="(e) => subscribeForAlarm(row.dbId, e)"
             />
           </template>
+          <!-- ONVIF：事件订阅（进程内 PullPoint，设备可达即自动订阅） -->
+          <template v-else-if="row.protocol === 'onvif'">
+            <el-tag size="mini" :type="row.status === 'online' ? 'success' : 'info'">
+              {{ row.status === 'online' ? '事件订阅中' : '事件未订阅' }}
+            </el-tag>
+          </template>
+          <!-- 插件：事件（布防/撤防） -->
+          <template v-else-if="row.protocol === 'plugin'">
+            <el-switch
+              v-model="row._armed"
+              :disabled="row.status !== 'online'"
+              active-color="#1A73E8"
+              active-text="撤防"
+              inactive-text="布防"
+              @change="() => toggleArm(row)"
+            />
+          </template>
           <span v-else class="cell-empty">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="统计" min-width="140">
+      <el-table-column label="统计" min-width="150">
         <template v-slot:default="{ row }">
           <template v-if="hasCap(row, 'stats')">
             <el-button
@@ -91,6 +112,7 @@
               @click="getKeepaliveTimeStatistics(row.rawId)"
             >心跳</el-button>
             <el-button
+              v-if="row.protocol === 'gb28181'"
               type="text"
               size="mini"
               :disabled="row.status !== 'online'"
@@ -122,6 +144,16 @@
           </template>
           <!-- ONVIF 操作 -->
           <template v-else-if="row.protocol === 'onvif'">
+            <el-button type="text" size="medium" icon="el-icon-refresh" @click="handleSync(row)">同步</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" icon="el-icon-video-camera" @click="$emit('show-channel', row)">通道</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" icon="el-icon-edit" @click="openEdit(row)">编辑</el-button>
+            <el-divider direction="vertical" />
+            <el-button type="text" size="medium" style="color:#EA4335" @click="handleDelete(row)">删除</el-button>
+          </template>
+          <!-- 插件操作 -->
+          <template v-else-if="row.protocol === 'plugin'">
             <el-button type="text" size="medium" icon="el-icon-refresh" @click="handleSync(row)">同步</el-button>
             <el-divider direction="vertical" />
             <el-button type="text" size="medium" icon="el-icon-video-camera" @click="$emit('show-channel', row)">通道</el-button>
@@ -171,6 +203,7 @@
 <script>
 import { listDevices, syncDevice, deleteDevice as deleteUnifiedDevice } from '@/api/devices'
 import { discoverDevices } from '@/api/onvif'
+import { armIpcDevice, disarmIpcDevice, getIpcArmStatus, syncIpcDevice } from '@/api/plugin'
 import addWizard from './addWizard.vue'
 import editDialog from './editDialog.vue'
 import configInfo from '@/views/dialog/configInfo.vue'
@@ -201,6 +234,10 @@ export default {
     }
   },
   mounted() {
+    // 支持从「插件接入」页带 protocol=plugin 跳转过来直接看插件设备。
+    if (this.$route && this.$route.query && this.$route.query.protocol) {
+      this.protocol = this.$route.query.protocol
+    }
     this.loadList()
     this.looper = setInterval(this.loadList, 15000)
   },
@@ -235,8 +272,9 @@ export default {
         status: this.status || undefined
       }).then(res => {
         const data = (res && res.data) || {}
-        this.list = data.list || []
+        this.list = (data.list || []).map(row => ({ ...row, _armed: false, _armLoading: true }))
         this.total = data.total || 0
+        this.loadArmStatuses()
       }).catch(err => {
         this.$message.error((err && err.message) || '加载失败')
       }).finally(() => {
@@ -308,11 +346,43 @@ export default {
       })
     },
     handleSync(row) {
-      syncDevice(row.id).then(() => {
+      const call = row.protocol === 'plugin' ? syncIpcDevice(row.rawId) : syncDevice(row.id)
+      call.then(() => {
         this.$message.success('已触发同步')
         this.loadList()
       }).catch(err => {
         this.$message.error(err.message || err || '同步失败')
+      })
+    },
+    // 插件设备布防/撤防：与事件订阅等价（布防=订阅事件，撤防=取消）。
+    loadArmStatuses() {
+      this.list.filter(r => r.protocol === 'plugin').forEach(row => {
+        getIpcArmStatus(row.rawId).then(res => {
+          const sub = (res && res.data && res.data.subscription) || null
+          this.$set(row, '_armed', !!(sub && sub.armed))
+        }).catch(() => {}).finally(() => { this.$set(row, '_armLoading', false) })
+      })
+    },
+    toggleArm(row) {
+      if (!row._armed) {
+        // 关闭开关 → 撤防
+        this.$confirm(`确认对设备「${row.name}」撤防？`, '提示', { type: 'warning' }).then(() => {
+          disarmIpcDevice(row.rawId).then(() => {
+            this.$message.success('已撤防')
+          }).catch(e => {
+            row._armed = true
+            this.$message.error((e && e.message) || '撤防失败')
+          })
+        }).catch(() => { row._armed = true })
+        return
+      }
+      armIpcDevice(row.rawId, ['motion', 'line_crossing', 'intrusion']).then(res => {
+        const d = (res && res.data) || {}
+        if (!d.armed) row._armed = false
+        else this.$message.success('布防成功')
+      }).catch(e => {
+        row._armed = false
+        this.$message.error((e && e.message) || '布防失败')
       })
     },
     moreClick(command, row) {

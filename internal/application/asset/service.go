@@ -64,7 +64,41 @@ func (s *Service) ListChannels(page, count int, query, protocol, deviceInternalC
 	if s.repo == nil {
 		return nil, 0, fmt.Errorf("资产仓储未初始化")
 	}
-	return s.repo.ListChannels(page, count, query, protocol, deviceInternalCode)
+	list, total, err := s.repo.ListChannels(page, count, query, protocol, deviceInternalCode)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, v := range list {
+		v.Caps = s.channelCaps(v)
+	}
+	return list, total, nil
+}
+
+// channelCaps 按协议驱动自报的能力 ∩ 通道事实，得出该通道真实可用的能力集。
+//
+// 驱动 Capabilities() 是"这个协议实现了哪些操作"的唯一真相；
+// 再叠加通道自身事实（云台要 ptzType>0、音频要 hasAudio）收窄。
+// 前端「能力集」列据此点亮图标，扩展能力只需改驱动 + 前端模板两处。
+func (s *Service) channelCaps(v *domainasset.ChannelView) []string {
+	if v == nil {
+		return nil
+	}
+	var base []string
+	if drv, ok := s.drivers.Get(v.Protocol); ok && drv != nil {
+		base = drv.Capabilities()
+	}
+	out := make([]string, 0, len(base))
+	for _, op := range base {
+		switch op {
+		case "ptz":
+			if v.PTZType > 0 {
+				out = append(out, op)
+			}
+		default:
+			out = append(out, op)
+		}
+	}
+	return out
 }
 
 func (s *Service) GetDetail(deviceID string) (*domainasset.DeviceDetail, error) {

@@ -4,6 +4,7 @@ package channeldrv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -47,7 +48,20 @@ type ChannelDriver interface {
 	PTZ(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd PTZCommand) error
 	// Command 通用命令透传（自定义能力）；不支持的协议返回错误。平台不解析 params/result。
 	Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error)
+	// Capabilities 自报本协议**真实实现**的操作能力（唯一真相）。
+	//
+	// 前端「能力集」列据此点亮/置灰按钮：channelCaps 模板决定展示哪些图标，
+	// 这里返回的集合决定哪些是亮的（实现了）。两者相交即最终效果。
+	// 新增能力只在真正实现后往这里加一项，禁止在没实现的驱动里写。
+	// 词表：play / ptz / snapshot / playback / record / event / subscribe / catalog / sync。
+	Capabilities() []string
 }
+
+// 可选能力的标准错误，供不支持该能力的驱动返回，文案直接给前端看。
+var (
+	ErrPlaybackUnsupported = errors.New("该接入方式暂不支持回放")
+	ErrSnapshotUnsupported = errors.New("该接入方式暂不支持抓图")
+)
 
 // PlaybackDriver 是可选的「按时间回放」能力。
 //
@@ -129,6 +143,9 @@ func (l *limited) begin(ctx context.Context) (context.Context, func(), error) {
 
 func (l *limited) Protocol() string { return l.next.Protocol() }
 
+// Capabilities 透传给内层驱动：能力真相在内层，壳子只负责加超时/并发保护。
+func (l *limited) Capabilities() []string { return l.next.Capabilities() }
+
 func (l *limited) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
 	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
 	cctx, done, err := l.begin(ctx)
@@ -175,6 +192,66 @@ func (l *limited) Command(ctx context.Context, res *domainasset.Resource, bindin
 	return l.next.Command(cctx, res, binding, cmd, params)
 }
 
+// ---- 可选接口的转发 ----
+//
+// 壳子必须转发 PlaybackDriver / SnapshotDriver，否则业务层对 Registry 取出的
+// 驱动做 `drv.(PlaybackDriver)` 断言时永远命中不到内层实现（断言对象是壳子）。
+// 内层不支持时返回标准错误，让调用方拿到准确文案而不是"不支持"的错误判定。
+
+func (l *limited) QueryRecords(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+	startTime, endTime string, streamType int) (json.RawMessage, error) {
+	pd, ok := l.next.(PlaybackDriver)
+	if !ok {
+		return nil, ErrPlaybackUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	return pd.QueryRecords(cctx, res, binding, startTime, endTime, streamType)
+}
+
+func (l *limited) StartPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+	startTime, endTime, streamKey string) (*dto.StreamContent, *Session, error) {
+	pd, ok := l.next.(PlaybackDriver)
+	if !ok {
+		return nil, nil, ErrPlaybackUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer done()
+	return pd.StartPlayback(cctx, res, binding, startTime, endTime, streamKey)
+}
+
+func (l *limited) StopPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) error {
+	pd, ok := l.next.(PlaybackDriver)
+	if !ok {
+		return ErrPlaybackUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return pd.StopPlayback(cctx, res, binding)
+}
+
+func (l *limited) Snapshot(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]byte, error) {
+	sd, ok := l.next.(SnapshotDriver)
+	if !ok {
+		return nil, ErrSnapshotUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	return sd.Snapshot(cctx, res, binding)
+}
+
 // Get 按协议取驱动。
 func (r Registry) Get(protocol string) (ChannelDriver, bool) {
 	d, ok := r[protocol]
@@ -201,6 +278,11 @@ type gbDriver struct {
 }
 
 func (d *gbDriver) Protocol() string { return "gb28181" }
+
+// Capabilities GB 统一驱动目前真实实现的通道能力：直播 + 云台。
+// 回放仍走旧 SIP 播放服务、抓图未实现，故不声明——声明了就必须在这里实现，
+// 否则前端会点亮一个点下去就报错的按钮。
+func (d *gbDriver) Capabilities() []string { return []string{"play", "ptz"} }
 
 func (d *gbDriver) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
 	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
@@ -259,6 +341,9 @@ type onvifDriver struct {
 }
 
 func (d *onvifDriver) Protocol() string { return "onvif" }
+
+// Capabilities ONVIF 统一驱动实现了直播、云台、抓图；回放缺 Profile G 未实现。
+func (d *onvifDriver) Capabilities() []string { return []string{"play", "ptz", "snapshot"} }
 
 func (d *onvifDriver) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
 	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
@@ -345,6 +430,11 @@ type pluginDriver struct {
 }
 
 func (d *pluginDriver) Protocol() string { return "plugin" }
+
+// Capabilities 插件统一驱动实现了直播、云台、抓图、回放/录像检索。
+func (d *pluginDriver) Capabilities() []string {
+	return []string{"play", "ptz", "snapshot", "playback", "record"}
+}
 
 func (d *pluginDriver) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
 	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {

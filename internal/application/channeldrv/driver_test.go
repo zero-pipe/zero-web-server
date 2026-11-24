@@ -34,7 +34,8 @@ func TestClamp01(t *testing.T) {
 
 type fakeDriver struct{ delay time.Duration }
 
-func (f *fakeDriver) Protocol() string { return "fake" }
+func (f *fakeDriver) Protocol() string       { return "fake" }
+func (f *fakeDriver) Capabilities() []string { return []string{"play"} }
 func (f *fakeDriver) StartLive(ctx context.Context, _ *domainasset.Resource, _ *domainasset.AccessBinding,
 	_ *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
 	if f.delay > 0 {

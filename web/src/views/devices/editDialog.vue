@@ -11,13 +11,13 @@
         <el-tag v-if="row && row.accessMode === 'passive'" size="mini" type="success">被动</el-tag>
         <el-tag v-else size="mini" type="warning">主动</el-tag>
         <span style="margin-left: 8px; color: #5F6368; font-size: 12px;">
-          {{ row && row.protocol === 'gb28181' ? 'GB28181' : 'ONVIF' }}
+          {{ protocolLabel }}
         </span>
       </el-form-item>
       <el-form-item label="设备名称" prop="name">
         <el-input v-model="form.name" maxlength="64" show-word-limit />
       </el-form-item>
-      <el-form-item label="厂商">
+      <el-form-item v-if="row && row.protocol !== 'plugin'" label="厂商">
         <el-select v-model="form.vendor" clearable placeholder="不限 / 未知" style="width: 100%;">
           <el-option label="海康" value="海康" />
           <el-option label="大华" value="大华" />
@@ -99,6 +99,9 @@ export default {
     innerVisible: {
       get() { return this.visible },
       set(v) { this.$emit('update:visible', v) }
+    },
+    protocolLabel() {
+      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[(this.row && this.row.protocol)] || '—'
     }
   },
   watch: {
@@ -146,9 +149,10 @@ export default {
         }
         if (this.row.protocol === 'gb28181') {
           payload.gb = { ...this.form.gb }
-        } else {
+        } else if (this.row.protocol === 'onvif') {
           payload.onvif = { ...this.form.onvif }
         }
+        // 插件设备仅改名（vendor 由设备侧上报，不在此编辑）
         updateDevice(this.row.id, payload).then(() => {
           this.$message.success('已保存')
           this.innerVisible = false

@@ -40,49 +40,28 @@
     </el-form>
 
     <el-table v-loading="loading" :data="list" size="small" style="width: 100%; font-size: 12px;" header-row-class-name="table-header">
+      <el-table-column prop="_ordinal" label="通道号" width="90" align="center" />
       <el-table-column prop="name" label="名称" min-width="180" />
-      <el-table-column label="开启音频" min-width="100">
-        <template slot-scope="{ row }">
-          <el-switch
-            v-model="row.hasAudio"
-            active-color="#1A73E8"
-            :disabled="row.protocol === 'gb28181'"
-            :title="row.protocol === 'gb28181' ? '国标通道请在设备通道页修改' : ''"
-            @change="() => onAudioChange(row)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="码流类型" min-width="180">
-        <template slot-scope="{ row }">
-          <el-select
-            v-model="row._profileId"
-            size="mini"
-            style="width: 100%;"
-            placeholder="请选择码流类型"
-            :loading="row._profilesLoading"
-          >
-            <el-option
-              v-for="p in (row._profiles || [])"
-              :key="p.id || p.name"
-              :label="p.name"
-              :value="p.id"
-            />
-          </el-select>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" min-width="100">
-        <template slot-scope="{ row }">
-          <el-tag v-if="row.online" size="medium">在线</el-tag>
-          <el-tag v-else size="medium" type="info">离线</el-tag>
-        </template>
-      </el-table-column>
       <el-table-column v-if="showDeviceColumn" label="所属设备" min-width="180">
         <template slot-scope="{ row }">
           <div class="device-link" @click="openDevice(row)">{{ row.deviceName }}</div>
           <el-tag size="mini" effect="plain">{{ protocolLabel(row.protocol) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" min-width="360" fixed="right">
+      <el-table-column label="能力集" min-width="260">
+        <template slot-scope="{ row }">
+          <span
+            v-for="cap in capTemplate"
+            :key="cap.op"
+            class="cap-item"
+            :class="{ 'cap-on': (row.caps || []).includes(cap.op) }"
+            :title="(row.caps || []).includes(cap.op) ? ('支持' + cap.label) : ('不支持' + cap.label)"
+          >
+            <i :class="cap.icon" /> {{ cap.label }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" min-width="180" fixed="right">
         <template slot-scope="{ row }">
           <el-button
             type="text"
@@ -122,7 +101,19 @@
 <script>
 import DevicePlayer from '@/views/device/dialog/devicePlayer.vue'
 import ChannelEdit from '@/views/device/channel/edit.vue'
-import { queryChannels, startResourceLive, stopResourceLive, updateChannel, getResourceDetail } from '@/api/asset'
+import { queryChannels, startResourceLive, stopResourceLive, getResourceDetail } from '@/api/asset'
+
+// 能力集展示模板：决定「展示哪些能力图标」，顺序即展示顺序。
+// 点亮与否由后端每行的 caps（驱动真实实现 ∩ 通道事实）决定——扩展一个能力，
+// 这里加一行即可；是否真能用，取决于对应驱动 Capabilities() 里有没有声明。
+const CAP_TEMPLATE = [
+  { op: 'play', icon: 'el-icon-video-play', label: '预览' },
+  { op: 'playback', icon: 'el-icon-video-camera-solid', label: '回放' },
+  { op: 'record', icon: 'el-icon-folder-opened', label: '录像检索' },
+  { op: 'ptz', icon: 'el-icon-aim', label: '云台' },
+  { op: 'snapshot', icon: 'el-icon-camera', label: '抓图' },
+  { op: 'event', icon: 'el-icon-bell', label: '事件订阅' }
+]
 
 export default {
   name: 'UnifiedChannelPanel',
@@ -150,7 +141,8 @@ export default {
       protocolFilter: this.protocol,
       deviceCode: this.deviceInternalCode,
       editCtx: null,
-      playingRow: null
+      playingRow: null,
+      capTemplate: CAP_TEMPLATE
     }
   },
   computed: {
@@ -193,8 +185,18 @@ export default {
         const data = (res && res.data) || {}
         this.list = (data.list || []).map(item => ({ ...item, _loading: false, _profiles: [], _profilesLoading: true }))
         this.total = data.total || 0
+        this.assignOrdinals()
         this.list.forEach(row => this.loadProfiles(row))
       }).finally(() => { this.loading = false })
+    },
+    // 通道号 = 顺位号：按设备分组、组内顺序 1,2,3…（与协议原生通道号无关）。
+    assignOrdinals() {
+      const counter = {}
+      this.list.forEach(row => {
+        const key = row.deviceInternalCode || row.deviceId || ''
+        counter[key] = (counter[key] || 0) + 1
+        row._ordinal = counter[key]
+      })
     },
     // 码流类型下拉：取资源下已投影的码流（插件当前只有主码流）
     loadProfiles(row) {
@@ -216,12 +218,6 @@ export default {
         row._profiles = [{ id: '', name: '主码流' }]
         row._profileId = ''
       }).finally(() => { row._profilesLoading = false })
-    },
-    onAudioChange(row) {
-      updateChannel(row.internalCode, { hasAudio: !!row.hasAudio }).catch(() => {
-        row.hasAudio = !row.hasAudio
-        this.$message.error('更新音频设置失败')
-      })
     },
     openEdit(row) {
       this.editCtx = { internalCode: row.internalCode, protocol: row.protocol }
@@ -274,4 +270,13 @@ export default {
 .unified-channel .sub-text { color: #80868B; font-size: 12px; }
 .unified-channel .device-link { cursor: pointer; }
 .unified-channel .device-link:hover { color: #1A73E8; }
+.unified-channel .cap-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 10px;
+  color: #C0C4CC;
+  white-space: nowrap;
+}
+.unified-channel .cap-item.cap-on { color: #1A73E8; }
 </style>
