@@ -89,6 +89,10 @@ func (s *Service) reconcileEventSubs(ctx context.Context) {
 		if d == nil || strings.TrimSpace(d.DeviceURI) == "" {
 			continue
 		}
+		// 用户关闭了事件订阅的设备不纳入订阅集合（下一轮会撤掉其订阅）。
+		if !d.EventSubscribe {
+			continue
+		}
 		want[d.ID] = d
 	}
 

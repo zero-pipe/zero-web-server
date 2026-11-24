@@ -60,39 +60,51 @@
       <el-table-column prop="channelCount" label="通道数" width="80" align="center" />
       <el-table-column label="订阅" min-width="230">
         <template v-slot:default="{ row }">
+          <!-- 三类协议统一表现：勾选框 + 名称；勾选成功文字变蓝，取消成功恢复原色 -->
           <!-- 国标：目录/位置/报警 -->
           <template v-if="row.protocol === 'gb28181'">
             <el-checkbox
+              class="sub-chk"
+              :class="{ 'sub-on': row.subscribeCycleForCatalog > 0 }"
               label="目录"
               :checked="row.subscribeCycleForCatalog > 0"
               @change="(e) => subscribeForCatalog(row.dbId, e)"
             />
             <el-checkbox
+              class="sub-chk"
+              :class="{ 'sub-on': row.subscribeCycleForMobilePosition > 0 }"
               label="位置"
               :checked="row.subscribeCycleForMobilePosition > 0"
               @change="(e) => subscribeForMobilePosition(row.dbId, e)"
             />
             <el-checkbox
+              class="sub-chk"
+              :class="{ 'sub-on': row.subscribeCycleForAlarm > 0 }"
               label="报警"
               :checked="row.subscribeCycleForAlarm > 0"
               @change="(e) => subscribeForAlarm(row.dbId, e)"
             />
           </template>
-          <!-- ONVIF：事件订阅（进程内 PullPoint，设备可达即自动订阅） -->
+          <!-- ONVIF：事件订阅（真开关，控制 PullPoint） -->
           <template v-else-if="row.protocol === 'onvif'">
-            <el-tag size="mini" :type="row.status === 'online' ? 'success' : 'info'">
-              {{ row.status === 'online' ? '事件订阅中' : '事件未订阅' }}
-            </el-tag>
-          </template>
-          <!-- 插件：事件（布防/撤防） -->
-          <template v-else-if="row.protocol === 'plugin'">
-            <el-switch
-              v-model="row._armed"
+            <el-checkbox
+              class="sub-chk"
+              :class="{ 'sub-on': row.eventSubscribe }"
+              label="事件"
+              :checked="row.eventSubscribe"
               :disabled="row.status !== 'online'"
-              active-color="#1A73E8"
-              active-text="撤防"
-              inactive-text="布防"
-              @change="() => toggleArm(row)"
+              @change="(e) => toggleOnvifEvent(row, e)"
+            />
+          </template>
+          <!-- 插件：事件（布防=订阅，撤防=取消） -->
+          <template v-else-if="row.protocol === 'plugin'">
+            <el-checkbox
+              class="sub-chk"
+              :class="{ 'sub-on': row._armed }"
+              label="事件"
+              :checked="row._armed"
+              :disabled="row.status !== 'online'"
+              @change="(e) => togglePluginEvent(row, e)"
             />
           </template>
           <span v-else class="cell-empty">—</span>
@@ -200,7 +212,7 @@
 
 <script>
 import { listDevices, syncDevice, deleteDevice as deleteUnifiedDevice } from '@/api/devices'
-import { discoverDevices } from '@/api/onvif'
+import { discoverDevices, setEventSubscribe } from '@/api/onvif'
 import { armIpcDevice, disarmIpcDevice, getIpcArmStatus, syncIpcDevice } from '@/api/plugin'
 import addWizard from './addWizard.vue'
 import editDialog from './editDialog.vue'
@@ -359,26 +371,41 @@ export default {
         }).catch(() => {}).finally(() => { this.$set(row, '_armLoading', false) })
       })
     },
-    toggleArm(row) {
-      if (!row._armed) {
-        // 关闭开关 → 撤防
-        this.$confirm(`确认对设备「${row.name}」撤防？`, '提示', { type: 'warning' }).then(() => {
+    // ONVIF 事件订阅开关：真开关，立即启停 PullPoint。勾选成功字变蓝，取消成功恢复原色。
+    toggleOnvifEvent(row, checked) {
+      setEventSubscribe(row.rawId, checked).then(() => {
+        this.$set(row, 'eventSubscribe', checked)
+        this.$message.success(checked ? '已开启事件订阅' : '已关闭事件订阅')
+      }).catch(e => {
+        // 失败不改动勾选态（:checked 由 row.eventSubscribe 决定，无需回滚）
+        this.$message.error((e && e.message) || (checked ? '开启失败' : '关闭失败'))
+      })
+    },
+    // 插件设备事件：勾选=布防(订阅)，取消=撤防(取消订阅)；与国标/ONVIF 表现一致。
+    togglePluginEvent(row, checked) {
+      if (!checked) {
+        // 取消勾选 → 撤防
+        this.$confirm(`确认关闭设备「${row.name}」的事件订阅？`, '提示', { type: 'warning' }).then(() => {
           disarmIpcDevice(row.rawId).then(() => {
-            this.$message.success('已撤防')
+            this.$set(row, '_armed', false)
+            this.$message.success('已关闭事件订阅')
           }).catch(e => {
-            row._armed = true
-            this.$message.error((e && e.message) || '撤防失败')
+            this.$message.error((e && e.message) || '取消失败')
           })
-        }).catch(() => { row._armed = true })
+        }).catch(() => {})
         return
       }
+      // 勾选 → 布防
       armIpcDevice(row.rawId, ['motion', 'line_crossing', 'intrusion']).then(res => {
         const d = (res && res.data) || {}
-        if (!d.armed) row._armed = false
-        else this.$message.success('布防成功')
+        if (d.armed === false) {
+          this.$message.error('开启失败')
+          return
+        }
+        this.$set(row, '_armed', true)
+        this.$message.success('已开启事件订阅')
       }).catch(e => {
-        row._armed = false
-        this.$message.error((e && e.message) || '布防失败')
+        this.$message.error((e && e.message) || '开启失败')
       })
     },
     moreClick(command, row) {
@@ -419,5 +446,17 @@ export default {
 <style scoped>
 .cell-empty {
   color: #c0c4cc;
+}
+/* 订阅勾选框：默认灰色文字，勾选成功后文字变蓝；取消成功后恢复默认色 */
+.sub-chk {
+  margin-right: 16px;
+}
+.sub-chk ::v-deep .el-checkbox__label {
+  color: #606266;
+  transition: color .2s;
+}
+.sub-on ::v-deep .el-checkbox__label {
+  color: #1A73E8;
+  font-weight: 600;
 }
 </style>

@@ -40,6 +40,8 @@ type OnvifDevice struct {
 	MediaURI      string `gorm:"column:media_uri;size:512"`
 	PTZURI        string `gorm:"column:ptz_uri;size:512"`
 	OnLine        bool   `gorm:"column:on_line"`
+	// EventSubscribe 是否启用事件订阅（PullPoint）。默认 true 保持"有 DeviceURI 即订阅"的既有行为。
+	EventSubscribe bool  `gorm:"column:event_subscribe;default:true"`
 	DiscoveryMode int    `gorm:"column:discovery_mode"`
 	MediaServerID string `gorm:"column:media_server_id;size:255"`
 	CustomName    string `gorm:"column:custom_name;size:255"`

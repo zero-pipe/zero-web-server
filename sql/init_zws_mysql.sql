@@ -706,6 +706,7 @@ CREATE TABLE IF NOT EXISTS zws_onvif_device (
     media_uri       VARCHAR(512) COMMENT 'Media Service URI',
     ptz_uri         VARCHAR(512) COMMENT 'PTZ Service URI',
     on_line         TINYINT(1) DEFAULT 0 COMMENT '在线状态',
+    event_subscribe TINYINT(1) DEFAULT 1 COMMENT '事件订阅开关（1=开启 PullPoint）',
     discovery_mode  INT DEFAULT 0 COMMENT '0=手动 1=自动发现',
     media_server_id VARCHAR(255) DEFAULT 'auto',
     custom_name     VARCHAR(255),

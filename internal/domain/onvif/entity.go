@@ -20,6 +20,7 @@ type Device struct {
 	MediaURI      string `json:"mediaUri"`
 	PTZURI        string `json:"ptzUri"`
 	OnLine        bool   `json:"onLine"`
+	EventSubscribe bool  `json:"eventSubscribe"`
 	DiscoveryMode int    `json:"discoveryMode"`
 	MediaServerID string `json:"mediaServerId"`
 	CustomName    string `json:"customName"`

@@ -45,6 +45,23 @@ export function probeDevices() {
   })
 }
 
+// 事件订阅开关：与 GB 报警、插件布防在界面上统一为「勾选框 + 事件」
+export function getEventSubscribe(id) {
+  return request({
+    url: '/api/v1/onvif/device/event-subscribe',
+    method: 'get',
+    params: { id }
+  })
+}
+
+export function setEventSubscribe(id, eventSubscribe) {
+  return request({
+    url: '/api/v1/onvif/device/event-subscribe',
+    method: 'post',
+    data: { id, eventSubscribe }
+  })
+}
+
 export function queryChannels(params) {
   return request({
     url: '/api/v1/onvif/channel/query',

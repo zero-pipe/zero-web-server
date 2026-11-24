@@ -103,6 +103,42 @@ func (h *ONVIFHandler) Probe(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// GetEventSubscribe 查询设备事件订阅开关状态。
+func (h *ONVIFHandler) GetEventSubscribe(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Query("id"), 10, 64)
+	if err != nil {
+		response.Error(c, response.CodeBadReq, "无效的设备ID")
+		return
+	}
+	enabled, err := h.svc.GetEventSubscribe(c.Request.Context(), id)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"eventSubscribe": enabled})
+}
+
+// SetEventSubscribe 开启/关闭设备事件订阅。
+func (h *ONVIFHandler) SetEventSubscribe(c *gin.Context) {
+	var req struct {
+		ID             int64 `json:"id"`
+		EventSubscribe bool  `json:"eventSubscribe"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ID == 0 {
+		req.ID, _ = strconv.ParseInt(c.PostForm("id"), 10, 64)
+		req.EventSubscribe = c.PostForm("eventSubscribe") == "true"
+	}
+	if req.ID == 0 {
+		response.Error(c, response.CodeBadReq, "无效的设备ID")
+		return
+	}
+	if err := h.svc.SetEventSubscribe(c.Request.Context(), req.ID, req.EventSubscribe); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"eventSubscribe": req.EventSubscribe})
+}
+
 func (h *ONVIFHandler) QueryChannels(c *gin.Context) {
 	page, count := parsePageCount(c)
 	deviceID, _ := strconv.ParseInt(c.Query("deviceId"), 10, 64)

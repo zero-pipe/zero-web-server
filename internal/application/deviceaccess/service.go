@@ -47,6 +47,7 @@ type DeviceView struct {
 	SubscribeCycleForCatalog        int          `json:"subscribeCycleForCatalog,omitempty"`
 	SubscribeCycleForMobilePosition int          `json:"subscribeCycleForMobilePosition,omitempty"`
 	SubscribeCycleForAlarm          int          `json:"subscribeCycleForAlarm,omitempty"`
+	EventSubscribe                  bool         `json:"eventSubscribe,omitempty"` // ONVIF 事件订阅开关
 	GB                              *GBConfig    `json:"gb,omitempty"`
 	Onvif                           *OnvifConfig `json:"onvif,omitempty"`
 	CreateTime                      string       `json:"createTime"`
@@ -464,7 +465,8 @@ func viewFromONVIF(d *domainonvif.Device) *DeviceView {
 		RawID:        strconv.FormatInt(d.ID, 10),
 		DBID:         int(d.ID),
 		// ONVIF：订阅=事件订阅(PullPoint)，统计=心跳；操作 同步/通道/编辑/删除
-		Capabilities: []string{"sync", "play", "ptz", "event", "stats", "edit", "delete"},
+		Capabilities:   []string{"sync", "play", "ptz", "event", "stats", "edit", "delete"},
+		EventSubscribe: d.EventSubscribe,
 		Onvif: &OnvifConfig{
 			IP:       d.IP,
 			Port:     d.Port,

@@ -156,6 +156,7 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 		MediaURI:      endpoint,
 		PTZURI:        endpoint,
 		OnLine:        true,
+		EventSubscribe: true,
 		DiscoveryMode: 0,
 		MediaServerID: "auto",
 		ServerID:      s.serverID,
@@ -450,6 +451,42 @@ func (s *Service) StartHeartbeat(ctx context.Context, interval time.Duration) {
 			}
 		}
 	}()
+}
+
+// SetEventSubscribe 开启/关闭某设备的事件订阅（PullPoint），立即生效。
+// 关闭时同步撤销该设备当前订阅；开启时由下一轮对齐补建（也可立即触发）。
+func (s *Service) SetEventSubscribe(ctx context.Context, id int64, enable bool) error {
+	dev, err := s.devices.GetByID(ctx, id)
+	if err != nil || dev == nil {
+		return fmt.Errorf("设备不存在")
+	}
+	dev.EventSubscribe = enable
+	dev.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
+	if err := s.devices.Update(ctx, dev); err != nil {
+		return err
+	}
+	if !enable {
+		// 立即撤销该设备订阅，不必等下一轮对齐。
+		s.evMu.Lock()
+		if cancel, ok := s.evSubs[id]; ok {
+			cancel()
+			delete(s.evSubs, id)
+		}
+		s.evMu.Unlock()
+	} else {
+		// 立即补建（异步，设备不可达时由拉取循环自行退避重试）。
+		go s.reconcileEventSubs(context.Background())
+	}
+	return nil
+}
+
+// GetEventSubscribe 查询某设备是否启用事件订阅。
+func (s *Service) GetEventSubscribe(ctx context.Context, id int64) (bool, error) {
+	dev, err := s.devices.GetByID(ctx, id)
+	if err != nil || dev == nil {
+		return false, fmt.Errorf("设备不存在")
+	}
+	return dev.EventSubscribe, nil
 }
 
 type PlayResult struct {
