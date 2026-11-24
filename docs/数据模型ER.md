@@ -323,3 +323,12 @@
   当前都读写同一组统一表；合并为一套是纯内部重构，不改变 `/api/v1` 契约。
 - 通道隶属（区划 civilCode / 分组 parentId）过渡期存 `channel_ext.gb_json`，与 `zws_catalog` 多挂载并存；
   可后续决定是否把 catalog 作为唯一隶属来源。
+
+**写路径扩展验证（118 个 GET 全表 + 写接口 create/read-back）：**
+
+- 读面：对全部 118 个 GET `/api/v1` 路由无参冒烟，无 500/panic/查询失败；非 0 返回均为
+  预期的业务校验（缺参 400、无记录 record not found、服务未启用、无媒体节点）。
+- 写面（创建→读回，均落到统一表）：接入 token→`zws_access_token`；拉流代理→`zws_stream_proxy`；
+  上级平台→`zws_upper_platform`（`/platform/query` 正常回填）；录像计划+时段→`zws_record_plan`/`_item`；
+  录像计划关联通道→`channel_ext.record_plan_id`（`hasLink=true` 过滤正确）。
+- 媒体节点保存需真实 ZMS 可达（按预期拒绝并提示连通），非迁移问题。
