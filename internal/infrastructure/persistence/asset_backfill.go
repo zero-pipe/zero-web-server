@@ -231,7 +231,14 @@ func (p *AssetProjector) backfillGB() error {
 				`{"stream":"main"}`, "", "", true); err != nil {
 				return err
 			}
-			if err := p.upsertCapabilities("resource", chUID, "gb28181", dev.OnLine, channelCaps(ch.PTZType, ch.HasAudio)); err != nil {
+			// 云台能力由国标目录的 PTZType 决定（见 hasPTZ）：固定枪机不写 ptz 支持，
+			// 使调用前即可拒绝，而不是发下去等设备无响应（GB 云台控制属无应答命令）。
+			if err := p.upsertCapabilitiesWith("resource", chUID, "gb28181", dev.OnLine, channelCaps(ch.PTZType, ch.HasAudio), func(op string) bool {
+				if op == "ptz" {
+					return hasPTZ(ch.PTZType)
+				}
+				return true
+			}); err != nil {
 				return err
 			}
 		}
@@ -307,7 +314,13 @@ func (p *AssetProjector) backfillONVIF() error {
 			if ch.HasPTZ {
 				ptzType = 1
 			}
-			if err := p.upsertCapabilities("resource", chUID, "onvif", dev.OnLine, channelCaps(ptzType, ch.HasAudio)); err != nil {
+			// 云台能力取同步时由 Profile.PTZConfiguration 得到的 HasPTZ；未同步到则按无云台处理。
+			if err := p.upsertCapabilitiesWith("resource", chUID, "onvif", dev.OnLine, channelCaps(ptzType, ch.HasAudio), func(op string) bool {
+				if op == "ptz" {
+					return ch.HasPTZ
+				}
+				return true
+			}); err != nil {
 				return err
 			}
 		}
@@ -771,9 +784,29 @@ func protocolDeviceOps(protocol string) []string {
 	}
 }
 
+// hasPTZ 依据国标目录 Info/PTZType 判定通道是否具备云台转动能力。
+//
+// 规范枚举（2016 A.2.1 g、2022 A.2.1.9）：1-球机、2-半球、3-固定枪机、
+// 4-遥控枪机、5-遥控半球、6-多目设备全景/拼接通道、7-多目设备分割通道。
+// 规范只给了名称、没有为各类给出云台条款，这里按名称语义判定：
+//   - 1/2/4/5 球机类，都有云台。"4-遥控枪机"与"3-固定枪机"的唯一差别就是可否远控，
+//     故 4 视为有云台（若排除会把真有云台的遥控枪机误杀）。
+//   - 3-固定枪机 名称即固定，无云台。未知 IPC 的兜底值也是 3（见 catalog.go），
+//     所以"没上报能力"的设备默认不给云台，是保守方向。
+//   - 6/7 是多目设备的全景/拼接与分割通道，出的是拼接画面，本身不带云台。
+// 设备若通过能力集自述有云台（ONVIF 的 Profile.PTZConfiguration、海康能力集 XML），
+// 应以能力集为准，而不是靠目录里的 PTZType 推断。
+func hasPTZ(ptzType int) bool {
+	switch ptzType {
+	case 1, 2, 4, 5:
+		return true
+	}
+	return false
+}
+
 func channelCaps(ptzType int, hasAudio bool) []string {
 	ops := []string{"play", "snapshot"}
-	if ptzType > 0 {
+	if hasPTZ(ptzType) {
 		ops = append(ops, "ptz")
 	}
 	if hasAudio {

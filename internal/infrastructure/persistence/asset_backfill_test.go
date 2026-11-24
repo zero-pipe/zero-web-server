@@ -44,6 +44,36 @@ func TestChannelCaps(t *testing.T) {
 	}
 }
 
+// TestHasPTZ 锁定国标 PTZType 的云台判定口径（2016 A.2.1 g / 2022 A.2.1.9）：
+// 只有 3-固定枪机 与 6/7-多目通道没有云台；0 表示未上报，按无云台处理。
+func TestHasPTZ(t *testing.T) {
+	cases := []struct {
+		ptzType int
+		want    bool
+		desc    string
+	}{
+		{0, false, "未上报"},
+		{1, true, "球机"},
+		{2, true, "半球"},
+		{3, false, "固定枪机"},
+		{4, true, "遥控枪机（与固定枪机的差别就是可否远控）"},
+		{5, true, "遥控半球（2022 新增）"},
+		{6, false, "多目设备全景/拼接通道"},
+		{7, false, "多目设备分割通道"},
+	}
+	for _, c := range cases {
+		if got := hasPTZ(c.ptzType); got != c.want {
+			t.Errorf("hasPTZ(%d)=%v, want %v（%s）", c.ptzType, got, c.want, c.desc)
+		}
+	}
+	// 固定枪机不能出现在通道能力位里，否则界面会显示一个按不出反应的云台。
+	for _, op := range channelCaps(3, false) {
+		if op == "ptz" {
+			t.Errorf("固定枪机不应获得 ptz 能力：%v", channelCaps(3, false))
+		}
+	}
+}
+
 func TestPluginOpSupported(t *testing.T) {
 	// 未上报声明（nil）→ 维持宽松，全部放行。
 	if !pluginOpSupported(nil, "playback") {

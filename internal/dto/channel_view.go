@@ -2,12 +2,16 @@ package dto
 
 import domainchannel "zero-web-server/internal/domain/channel"
 
+// 国标目录 Info/PTZType 枚举（2016 A.2.1 g、2022 A.2.1.9）。
 var ptzTypeTexts = map[int]string{
 	0: "未知",
 	1: "球机",
 	2: "半球",
 	3: "固定枪机",
 	4: "遥控枪机",
+	5: "遥控半球",
+	6: "全景通道",
+	7: "分割通道",
 }
 
 type ChannelView struct {

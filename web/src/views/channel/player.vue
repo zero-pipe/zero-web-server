@@ -90,9 +90,12 @@ import channelPtzPanel from './common/channelPtzPanel.vue'
 import channelPreset from './common/ptzPreset.vue'
 import mediaInfo from '../common/mediaInfo.vue'
 
+// 云台能力判定，口径与后端 persistence.hasPTZ 一致：
+// 国标 PTZType 1-球机 2-半球 4-遥控枪机 5-遥控半球（2022）有云台；
+// 3-固定枪机 与 6/7 多目通道没有云台。
 function isDomeCamera(ptzType) {
   const t = Number(ptzType)
-  return t === 1 || t === 2
+  return t === 1 || t === 2 || t === 4 || t === 5
 }
 
 export default {
@@ -128,15 +131,16 @@ export default {
     ptzEnabled() {
       return isDomeCamera(this.ptzType)
     },
-    // 依据国标目录应答的 PTZType（1球机 2半球 3固定枪机 4遥控枪机，0未上报）区分形态
+    // 依据国标目录应答的 PTZType 区分形态（枚举见 2016 A.2.1 g / 2022 A.2.1.9）
     cameraCategory() {
       const t = Number(this.ptzType)
-      if (t === 1 || t === 2) return 'dome'
-      if (t === 3 || t === 4) return 'gun'
+      if (t === 1 || t === 2 || t === 4 || t === 5) return 'dome'
+      if (t === 3 || t === 6 || t === 7) return 'gun'
       return 'unknown'
     },
     ptzTypeText() {
-      return { 1: '球机', 2: '半球', 3: '固定枪机', 4: '遥控枪机' }[Number(this.ptzType)] || '枪机'
+      const texts = { 1: '球机', 2: '半球', 3: '固定枪机', 4: '遥控枪机', 5: '遥控半球', 6: '全景通道', 7: '分割通道' }
+      return texts[Number(this.ptzType)] || '枪机'
     },
     isStreaming() {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
