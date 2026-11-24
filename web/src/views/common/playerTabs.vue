@@ -37,8 +37,7 @@
       <!-- 起播倒计时：点击播放后叠一个 3→2→1，真正出画即撤掉（所以常常 3 还没到 2 就开播了）。 -->
       <transition name="cd-fade">
         <div v-if="countdownVisible" class="player-countdown">
-          <div class="player-countdown-num">{{ countdownNum > 0 ? countdownNum : 'GO' }}</div>
-          <div class="player-countdown-tip">正在建立视频连接…</div>
+          <div class="player-countdown-num">{{ countdownNum }}</div>
         </div>
       </transition>
     </div>
@@ -556,16 +555,11 @@ export default {
   pointer-events: none;
 }
 .player-countdown-num {
-  font-size: 64px;
+  font-size: 40px;
   font-weight: 800;
   line-height: 1;
   color: #fff;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-}
-.player-countdown-tip {
-  margin-top: 12px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
 }
 .cd-fade-enter-active,
 .cd-fade-leave-active {
