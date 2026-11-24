@@ -19,16 +19,14 @@
           :class="{ selected: protocolKind === 'standard' }"
           @click="pickKind('standard')"
         >
-          <h4><el-tag size="mini" type="success">标准协议</el-tag> 内置直连</h4>
-          <p>平台内置标准协议直连：GB28181、ONVIF，后续可扩展更多标准协议。</p>
+          <h4>标准协议</h4>
         </div>
         <div
           class="mode-card"
           :class="{ selected: protocolKind === 'plugin' }"
           @click="pickKind('plugin')"
         >
-          <h4><el-tag size="mini" type="warning">插件协议</el-tag> 厂商私有 SDK</h4>
-          <p>通过 zero-agent 托管的厂商插件接入（如海康私有 SDK）。</p>
+          <h4>厂商私有 SDK</h4>
         </div>
       </div>
 
@@ -434,9 +432,10 @@ export default {
 .mode-card {
   border: 2px solid #E8EAED;
   border-radius: 8px;
-  padding: 14px;
+  padding: 22px 14px;
   cursor: pointer;
   transition: .15s;
+  text-align: center;
 }
 .mode-card:hover { border-color: #93c5fd; }
 .mode-card.selected {
@@ -444,18 +443,10 @@ export default {
   background: #E8F0FE;
 }
 .mode-card h4 {
-  font-size: 14px;
-  margin: 0 0 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #202124;
-}
-.mode-card p {
+  font-size: 18px;
+  font-weight: 600;
   margin: 0;
-  font-size: 12px;
-  color: #5F6368;
-  line-height: 1.5;
+  color: #202124;
 }
 .field-desc { color: #80868B; font-size: 12px; line-height: 18px; margin-top: 4px; }
 </style>
