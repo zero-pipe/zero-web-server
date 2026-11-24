@@ -41,11 +41,11 @@ export function ipcPtz(data) {
 
 // 布防 / 撤防
 export function armIpcDevice(deviceId, eventTypes) {
-  return request({ url: '/api/v1/ipc/devices/arm', method: 'post', data: { deviceId, eventTypes } })
+  return request({ url: '/api/v1/ipc/devices/arm', method: 'post', data: { deviceId: Number(deviceId), eventTypes } })
 }
 
 export function disarmIpcDevice(deviceId) {
-  return request({ url: '/api/v1/ipc/devices/disarm', method: 'post', data: { deviceId } })
+  return request({ url: '/api/v1/ipc/devices/disarm', method: 'post', data: { deviceId: Number(deviceId) } })
 }
 
 export function getIpcArmStatus(deviceId) {

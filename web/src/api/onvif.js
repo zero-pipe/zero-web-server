@@ -50,7 +50,7 @@ export function getEventSubscribe(id) {
   return request({
     url: '/api/v1/onvif/device/event-subscribe',
     method: 'get',
-    params: { id }
+    params: { id: Number(id) }
   })
 }
 
@@ -58,7 +58,7 @@ export function setEventSubscribe(id, eventSubscribe) {
   return request({
     url: '/api/v1/onvif/device/event-subscribe',
     method: 'post',
-    data: { id, eventSubscribe }
+    data: { id: Number(id), eventSubscribe }
   })
 }
 

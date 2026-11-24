@@ -3,7 +3,7 @@
     <el-tabs v-if="showTab && playerList.length > 1" v-model="activePlayer" type="card" :stretch="true" @tab-click="changePlayer">
       <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key"></el-tab-pane>
     </el-tabs>
-    <div class="player-video-area">
+    <div class="player-video-area" :class="{ 'is-counting': countdownVisible }">
       <jessibucaPlayer
         v-if="activePlayer === 'jessibuca'"
         ref="jessibuca"
@@ -542,17 +542,22 @@ export default {
   flex: 1;
 }
 
-/* 起播倒计时遮罩 */
+/* 起播倒计时遮罩：盖住引擎自带的 loading 圈/文字，只留倒计时数字 */
 .player-countdown {
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: 30;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.42);
+  background: #1b2430;
   pointer-events: none;
+}
+/* 倒计时期间隐藏引擎自带的 loading 圈与文字（穿透子组件），避免与数字叠加 */
+.player-video-area.is-counting >>> .jessibuca-loading,
+.player-video-area.is-counting >>> .jessibuca-loading-text,
+.player-video-area.is-counting >>> .play-loading {
+  display: none !important;
 }
 .player-countdown-num {
   font-size: 40px;

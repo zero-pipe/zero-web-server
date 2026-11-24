@@ -19,6 +19,7 @@
           :class="{ selected: protocolKind === 'standard' }"
           @click="pickKind('standard')"
         >
+          <i class="mode-ico el-icon-connection" />
           <h4>标准协议</h4>
         </div>
         <div
@@ -26,6 +27,7 @@
           :class="{ selected: protocolKind === 'plugin' }"
           @click="pickKind('plugin')"
         >
+          <i class="mode-ico el-icon-box" />
           <h4>厂商私有 SDK</h4>
         </div>
       </div>
@@ -430,23 +432,35 @@ export default {
   gap: 12px;
 }
 .mode-card {
-  border: 2px solid #E8EAED;
+  border: 1px solid #E8EAED;
   border-radius: 8px;
-  padding: 22px 14px;
+  padding: 14px 12px;
   cursor: pointer;
   transition: .15s;
   text-align: center;
+  background: #fff;
 }
-.mode-card:hover { border-color: #93c5fd; }
+.mode-card:hover { border-color: #93c5fd; background: #f8fbff; }
 .mode-card.selected {
   border-color: #1A73E8;
   background: #E8F0FE;
+  box-shadow: 0 0 0 1px #1A73E8 inset;
 }
+.mode-ico {
+  display: block;
+  font-size: 20px;
+  color: #9aa0a6;
+  margin-bottom: 6px;
+  transition: .15s;
+}
+.mode-card.selected .mode-ico { color: #1A73E8; }
 .mode-card h4 {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   margin: 0;
-  color: #202124;
+  color: #5F6368;
+  transition: .15s;
 }
+.mode-card.selected h4 { color: #1A73E8; }
 .field-desc { color: #80868B; font-size: 12px; line-height: 18px; margin-top: 4px; }
 </style>
