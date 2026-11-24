@@ -5,9 +5,6 @@
         <span>内置插件</span>
         <el-button type="text" icon="el-icon-refresh" title="刷新" aria-label="刷新" @click="loadBuiltins" />
       </div>
-      <div class="hint">
-        随 zero-agent 分发的内置插件，发现即默认启用。停用生命周期：<b>删除设备 → 禁用插件（停进程）→ 删除插件包</b>。
-      </div>
       <el-table v-loading="builtinLoading" :data="builtins" size="small" border>
         <el-table-column label="Agent" min-width="180">
           <template slot-scope="{ row }">
@@ -86,9 +83,6 @@
           </el-upload>
           <el-button type="text" icon="el-icon-refresh" title="刷新" aria-label="刷新" @click="loadAll" />
         </div>
-      </div>
-      <div class="hint">
-        插件包为 <code>.zwplugin</code>（zip），根目录需包含 <code>plugin.yaml</code>。上传后选择目标 Agent 安装，安装完成后在上方「内置插件」中启用插件，再到「设备接入」添加设备。
       </div>
       <el-table v-loading="loading" :data="packages" size="small" border>
         <el-table-column label="插件" min-width="240">
