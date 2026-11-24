@@ -381,6 +381,7 @@ export default {
     play: function (channel) {
       this.$refs.player.openDialog('codec', channel.gbId, {
         pending: true,
+        name: channel.gbName,
         hasAudio: channel.hasAudio,
         ptzType: channel.ptzType
       })

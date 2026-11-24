@@ -9,31 +9,62 @@
         ref="jessibuca"
         class="player-instance"
         :has-audio="hasAudio"
-        :show-button="showButton"
+        :show-button="showButton && !showControlBar"
         fluent autoplay live
         @playTimeChange="$emit('playTimeChange', $event)"
-        @playStatusChange="$emit('playStatusChange', $event)"
+        @playStatusChange="onPlayStatusChange"
       />
       <rtc-player
         v-if="activePlayer === 'webRTC'"
         ref="webRTC"
         class="player-instance"
         :has-audio="hasAudio"
-        :show-button="showButton"
+        :show-controls="!showControlBar"
         fluent autoplay live
         @playTimeChange="$emit('playTimeChange', $event)"
-        @playStatusChange="$emit('playStatusChange', $event)"
+        @playStatusChange="onPlayStatusChange"
       />
       <h265web
         v-if="activePlayer === 'h265web'"
         ref="h265web"
         class="player-instance"
         :has-audio="hasAudio"
-        :show-button="showButton"
+        :show-button="showButton && !showControlBar"
         fluent autoplay live
         @playTimeChange="$emit('playTimeChange', $event)"
-        @playStatusChange="$emit('playStatusChange', $event)"
+        @playStatusChange="onPlayStatusChange"
       />
+      <!-- 起播倒计时：点击播放后叠一个 3→2→1，真正出画即撤掉（所以常常 3 还没到 2 就开播了）。 -->
+      <transition name="cd-fade">
+        <div v-if="countdownVisible" class="player-countdown">
+          <div class="player-countdown-num">{{ countdownNum > 0 ? countdownNum : 'GO' }}</div>
+          <div class="player-countdown-tip">正在建立视频连接…</div>
+        </div>
+      </transition>
+    </div>
+    <!-- 播放控制栏：固定在画面下方，不再是悬浮在画面里的图标。 -->
+    <div v-if="showControlBar" class="player-control-bar">
+      <button
+        v-if="activePlayer !== 'webRTC'"
+        class="pcb-btn"
+        :title="playerPlaying ? '暂停' : '播放'"
+        @click="togglePlay"
+      >
+        <i :class="playerPlaying ? 'el-icon-video-pause' : 'el-icon-video-play'" />
+      </button>
+      <button class="pcb-btn" :title="ctrlMuted ? '取消静音' : '静音'" @click="toggleMute">
+        <i :class="ctrlMuted ? 'iconfont icon-audio-mute' : 'iconfont icon-audio-high'" />
+      </button>
+      <button class="pcb-btn" title="截图" @click="doScreenshot">
+        <i class="el-icon-camera" />
+      </button>
+      <button class="pcb-btn" title="刷新重连" @click="doRefresh">
+        <i class="el-icon-refresh-right" />
+      </button>
+      <span class="pcb-spacer" />
+      <button class="pcb-btn" :title="docFull ? '退出全屏' : '全屏'" @click="toggleFullscreen">
+        <i :class="docFull ? 'el-icon-close' : 'el-icon-full-screen'" />
+      </button>
     </div>
   </div>
 </template>
@@ -62,12 +93,20 @@ export default {
     /** 覆盖默认 URL 优先级，如 ['flv','ws_flv'] */
     urlPriority: { type: Array, default: null },
     /** 首选播放器（覆盖策略），如 jessibuca / h265web / webRTC */
-    preferredPlayer: { type: String, default: '' }
+    preferredPlayer: { type: String, default: '' },
+    /** 是否展示底部播放控制栏（并隐藏引擎内悬浮按钮）。弹窗播放器用。 */
+    showControlBar: { type: Boolean, default: false }
   },
   data() {
     return {
       streamInfo: null,
-      activePlayer: 'jessibuca'
+      activePlayer: 'jessibuca',
+      playerPlaying: false,
+      ctrlMuted: false,
+      docFull: false,
+      countdownVisible: false,
+      countdownNum: 3,
+      countdownTimer: null
     }
   },
   computed: {
@@ -102,10 +141,21 @@ export default {
       this.activePlayer = this.playerList[0].key
     }
   },
+  mounted() {
+    document.addEventListener('fullscreenchange', this.onFullscreenChange)
+  },
+  beforeDestroy() {
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange)
+    this.stopCountdown()
+  },
   watch: {
     // 全局播放模式变化（任意页面切换后）：按可用能力重新落位到具体引擎
     preferredPlayer() {
       this.$nextTick(() => this.reapplyPreference())
+    },
+    activePlayer() {
+      this.playerPlaying = false
+      this.$nextTick(() => this.syncMuteState())
     }
   },
   methods: {
@@ -125,6 +175,112 @@ export default {
     },
     getPlayerList() {
       return this.playerList
+    },
+    /* ---------------- 播放控制栏（面向用户，隐藏引擎内悬浮按钮） ---------------- */
+    activeEngine() {
+      return this.$refs[this.activePlayer]
+    },
+    onPlayStatusChange(playing) {
+      if (playing) {
+        this.stopCountdown()
+      }
+      this.playerPlaying = !!playing
+      this.$emit('playStatusChange', playing)
+    },
+    syncMuteState() {
+      const p = this.activeEngine()
+      if (!p) return
+      if (this.activePlayer === 'webRTC') {
+        const v = p.$refs && p.$refs.video
+        this.ctrlMuted = v ? !!v.muted : false
+      } else if (typeof p.isNotMute === 'boolean') {
+        this.ctrlMuted = p.isNotMute === false
+      }
+    },
+    togglePlay() {
+      if (this.activePlayer === 'webRTC') return
+      const p = this.activeEngine()
+      if (!p) return
+      if (this.playerPlaying) {
+        p.pause && p.pause()
+      } else if (this.activePlayer === 'h265web') {
+        p.unPause && p.unPause()
+      } else {
+        p.playBtnClick && p.playBtnClick()
+      }
+    },
+    toggleMute() {
+      const p = this.activeEngine()
+      if (!p) return
+      if (this.activePlayer === 'webRTC') {
+        const v = p.$refs && p.$refs.video
+        if (v) { v.muted = !v.muted; this.ctrlMuted = v.muted }
+        return
+      }
+      if (typeof p.isNotMute === 'boolean') {
+        if (p.isNotMute) { p.mute && p.mute() } else { p.cancelMute && p.cancelMute() }
+        this.ctrlMuted = !p.isNotMute
+      }
+    },
+    doScreenshot() {
+      const p = this.activeEngine()
+      if (!p) return
+      if (this.activePlayer === 'webRTC') {
+        this.screenshotWebRTC(p)
+      } else if (p.screenshot) {
+        p.screenshot()
+      }
+    },
+    screenshotWebRTC(p) {
+      const v = p.$refs && p.$refs.video
+      if (!v || !v.videoWidth) return
+      const canvas = document.createElement('canvas')
+      canvas.width = v.videoWidth
+      canvas.height = v.videoHeight
+      canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height)
+      const link = document.createElement('a')
+      link.download = 'screenshot.png'
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    },
+    doRefresh() {
+      // 刷新 = 用当前 URL 重新起播。
+      if (this.streamInfo) this.play()
+    },
+    toggleFullscreen() {
+      const p = this.activeEngine()
+      if (!p) return
+      if (this.activePlayer === 'webRTC') {
+        const wrap = p.$refs && (p.$refs.wrapper || p.$refs.video)
+        if (!document.fullscreenElement) {
+          wrap && wrap.requestFullscreen && wrap.requestFullscreen()
+        } else {
+          document.exitFullscreen && document.exitFullscreen()
+        }
+      } else if (p.fullscreenSwich) {
+        p.fullscreenSwich()
+      }
+    },
+    onFullscreenChange() {
+      this.docFull = !!document.fullscreenElement
+    },
+    startCountdown() {
+      this.stopCountdown()
+      this.countdownNum = 3
+      this.countdownVisible = true
+      this.countdownTimer = setInterval(() => {
+        this.countdownNum -= 1
+        if (this.countdownNum <= 0) {
+          this.stopCountdown()
+        }
+      }, 500)
+    },
+    stopCountdown() {
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+        this.countdownTimer = null
+      }
+      this.countdownVisible = false
     },
     getActivePlayer() {
       return this.activePlayer
@@ -215,7 +371,11 @@ export default {
     },
     setStreamInfo(streamInfo) {
       this.streamInfo = streamInfo
+      this.playerPlaying = false
       this.ensureActivePlayer()
+      if (this.showControlBar) {
+        this.startCountdown()
+      }
       // 分屏首次从「无信号」切到播放器时，等 DOM/布局完成再播，避免 Jessibuca 黑屏
       this.$nextTick(() => {
         requestAnimationFrame(() => {
@@ -347,5 +507,72 @@ export default {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+/* 底部播放控制栏 */
+.player-control-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+  background: #2b333f;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pcb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #cfd6df;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: background 0.15s, color 0.15s;
+}
+.pcb-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.pcb-spacer {
+  flex: 1;
+}
+
+/* 起播倒计时遮罩 */
+.player-countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.42);
+  pointer-events: none;
+}
+.player-countdown-num {
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+.player-countdown-tip {
+  margin-top: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.cd-fade-enter-active,
+.cd-fade-leave-active {
+  transition: opacity 0.2s;
+}
+.cd-fade-enter,
+.cd-fade-leave-to {
+  opacity: 0;
 }
 </style>

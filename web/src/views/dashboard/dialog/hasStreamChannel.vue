@@ -124,6 +124,7 @@ export default {
       this.$set(row, "playing", true)
       this.$refs.devicePlayer.openDialog("codec", deviceId, channelId, {
         pending: true,
+        name: row.name,
         hasAudio: row.hasAudio,
         ptzType: row.ptzType
       })

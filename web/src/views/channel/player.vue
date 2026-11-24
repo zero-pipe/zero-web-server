@@ -5,7 +5,7 @@
       v-el-drag-dialog
       custom-class="vms-player-dialog"
       top="5vh"
-      width="1040px"
+      width="1160px"
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
@@ -13,6 +13,7 @@
       <div slot="title" class="vms-player-header">
         <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
         <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
+        <span v-if="channelName" class="vms-channel-name">{{ channelName }}</span>
       </div>
 
       <div class="dhsdk-player-body">
@@ -29,8 +30,9 @@
               <playerTabs
                 ref="playerTabs"
                 :has-audio="hasAudio"
-                :show-button="true"
+                :show-button="false"
                 :show-tab="false"
+                :show-control-bar="true"
                 @playerChanged="playerChanged"
               />
             </div>
@@ -107,6 +109,7 @@ export default {
       app: '',
       mediaServerId: '',
       channelId: '',
+      channelName: '',
       ptzType: 0,
       ptzExpanded: true,
       extraTab: 'media',
@@ -150,6 +153,7 @@ export default {
     openDialog(tab, channelId, param) {
       if (this.showVideoDialog) return
       this.channelId = channelId
+      this.channelName = (param && (param.name || param.channelName)) || ''
       this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
       // 有能力默认展开，无能力/未知默认折叠（保留手动展开兜底）。
       this.ptzExpanded = this.hasPtzCaps
@@ -217,6 +221,7 @@ export default {
       this.streamInfo = null
       this.videoUrl = ''
       this.ptzType = 0
+      this.channelName = ''
       this.ptzExpanded = true
       this.extraTab = 'media'
       this.showVideoDialog = false

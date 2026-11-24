@@ -318,6 +318,7 @@ export default {
       itemData.playLoading = true
       this.$refs.devicePlayer.openDialog('codec', deviceId, channelId, {
         pending: true,
+        name: itemData.name,
         hasAudio: itemData.hasAudio,
         ptzType: itemData.ptzType
       })

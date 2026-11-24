@@ -90,6 +90,17 @@
   color: var(--vms-muted);
 }
 
+/* 头部通道名：跟在 LIVE 之后，过长省略 */
+.vms-player-dialog .vms-channel-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vms-text);
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @keyframes vms-live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
@@ -97,7 +108,7 @@
 
 .vms-player-dialog .dhsdk-player-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 440px;
+  grid-template-columns: minmax(0, 1fr) 420px;
   gap: 12px;
   align-items: stretch;
   padding: 12px;
@@ -139,7 +150,8 @@
 }
 
 .vms-player-dialog .player-under {
-  flex: 1;
+  flex: 0 0 auto;
+  max-height: 180px;
   min-height: 0;
   background: var(--vms-panel);
   border: 1px solid var(--vms-border);
@@ -247,10 +259,12 @@
   background: #E8F0FE;
 }
 
-/* 右侧控制栏：编码 + 云台常驻 */
+/* 右侧控制栏：高度与左栏（视频+预置位）对齐，内部滚动，避免把弹窗撑成头重脚轻。
+   height:0 + min-height:100%：既不让自身内容把整行撑高，又能撑满左栏高度。 */
 .vms-player-dialog .control-side {
   min-width: 0;
-  max-height: calc(100vh - 160px);
+  height: 0;
+  min-height: 100%;
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -439,7 +453,9 @@
   }
 
   .vms-player-dialog .control-side {
-    max-height: none;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   .vms-player-dialog .player-video-area {
