@@ -26,6 +26,14 @@ type Service struct {
 	media     port.MediaCluster
 	serverID  string
 	proxyKeys sync.Map // stream -> ZMS addStreamProxy key
+
+	// 事件订阅（见 events.go）：每台设备一个 PullPoint 拉取协程。
+	evMu      sync.Mutex
+	evSubs    map[int64]context.CancelFunc
+	eventSink EventSink
+
+	// mu 保护 eventSink 的读写（SetEventSink 可能在运行期被调用）。
+	mu sync.Mutex
 }
 
 func NewService(
@@ -41,6 +49,7 @@ func NewService(
 		factory:  factory,
 		media:    media,
 		serverID: serverID,
+		evSubs:   map[int64]context.CancelFunc{},
 	}
 }
 
@@ -631,6 +640,9 @@ func (s *Service) PTZControl(ctx context.Context, req PTZRequest) error {
 		speed = 0.5
 	}
 
+	// 方向映射与国标/插件的归一化取值保持一致：8 方向 + 变倍 + 停。
+	// 斜向不是两条命令的拼接，而是同一次 ContinuousMove 里 pan/tilt 同时非零——
+	// 拆成两次连续移动会让云台先水平后垂直地"拐弯"，而不是斜着走。
 	var velocity *onviflib.PTZSpeed
 	switch strings.ToUpper(req.Command) {
 	case "LEFT":
@@ -641,6 +653,18 @@ func (s *Service) PTZControl(ctx context.Context, req PTZRequest) error {
 		velocity = &onviflib.PTZSpeed{PanTilt: &onviflib.Vector2D{X: 0, Y: speed}}
 	case "DOWN":
 		velocity = &onviflib.PTZSpeed{PanTilt: &onviflib.Vector2D{X: 0, Y: -speed}}
+	case "UPLEFT":
+		velocity = &onviflib.PTZSpeed{PanTilt: &onviflib.Vector2D{X: -speed, Y: speed}}
+	case "UPRIGHT":
+		velocity = &onviflib.PTZSpeed{PanTilt: &onviflib.Vector2D{X: speed, Y: speed}}
+	case "DOWNLEFT":
+		velocity = &onviflib.PTZSpeed{PanTilt: &onviflib.Vector2D{X: -speed, Y: -speed}}
+	case "DOWNRIGHT":
+		velocity = &onviflib.PTZSpeed{PanTilt: &onviflib.Vector2D{X: speed, Y: -speed}}
+	case "ZOOMIN":
+		velocity = &onviflib.PTZSpeed{Zoom: &onviflib.Vector1D{X: speed}}
+	case "ZOOMOUT":
+		velocity = &onviflib.PTZSpeed{Zoom: &onviflib.Vector1D{X: -speed}}
 	case "STOP":
 		return client.Stop(ctx, ch.ProfileToken, true, true)
 	default:

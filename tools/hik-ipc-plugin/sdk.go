@@ -137,6 +137,25 @@ func (HikSDK) PTZ(userID int64, channel int, cmd int, stop bool, speed int) erro
 	return nil
 }
 
+// CaptureJPEG 抓一张 JPEG。分辨率由设备当前码流决定。
+//
+// 缓冲区一次给 4MB：自动分辨率下 1080p/4MP 的图通常 200KB~1.5MB，
+// 留足余量避免"缓冲区不够"这类要排查半天的小坑。
+func (HikSDK) CaptureJPEG(userID int64, channel int, quality int) ([]byte, error) {
+	const maxJPEG = 4 << 20
+	buf := make([]byte, maxJPEG)
+	var outLen C.int
+	if C.hik_capture_jpeg(C.long(userID), C.long(channel), C.int(quality),
+		(*C.char)(unsafe.Pointer(&buf[0])), C.int(len(buf)), &outLen) != 0 {
+		return nil, fmt.Errorf("NET_DVR_CaptureJPEGPicture_NEW failed: %d", int(C.hik_last_error()))
+	}
+	n := int(outLen)
+	if n <= 0 || n > len(buf) {
+		return nil, fmt.Errorf("抓图返回长度异常: %d", n)
+	}
+	return buf[:n], nil
+}
+
 // RecordFile 是一条设备录像。时间为 Unix 秒，按设备本地时间解释。
 type RecordFile struct {
 	Name      string `json:"name"`

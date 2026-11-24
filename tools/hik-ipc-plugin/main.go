@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -69,6 +70,9 @@ var (
 	sdk       HikSDK
 	sessionMu sync.Mutex
 	sessions  = map[string]*session{}
+	// lastPTZ 记住每个 设备|通道 最后一次下发的云台动作码，
+	// 因为海康的"停止"必须复用同一个动作码再发一次 stop=1。
+	lastPTZ sync.Map
 )
 
 func main() {
@@ -103,6 +107,7 @@ func main() {
 	mux.HandleFunc("/v1/playback/stop", handlePlaybackStop)
 	mux.HandleFunc("/v1/playback/control", handlePlaybackControl)
 	mux.HandleFunc("/v1/command", handleCommand(cfg))
+	mux.HandleFunc("/v1/snapshot", handleSnapshot)
 
 	ln, err := net.Listen("tcp", cfg.listen)
 	if err != nil {
@@ -456,6 +461,12 @@ func handleCommand(cfg config) http.HandlerFunc {
 				p.ChannelID = req.ChannelID
 			}
 			doPlaybackStart(cfg, w, p)
+		case "snapshot":
+			var q struct {
+				Quality int `json:"quality"`
+			}
+			_ = json.Unmarshal(req.Params, &q)
+			doSnapshot(w, req.DeviceUID, req.ChannelID, q.Quality)
 		default:
 			writeErr(w, "UNSUPPORTED", "unknown command: "+req.Cmd)
 		}
@@ -628,9 +639,19 @@ func (s *session) channelOf(display string) int {
 
 var hikPTZCmd = map[string]int{
 	"up": 21, "down": 22, "left": 23, "right": 24,
-	"zoomIn": 11, "zoomOut": 12,
-	"focusNear": 13, "focusFar": 14,
-	"irisNear": 15, "irisFar": 16,
+	// 斜向是 SDK 自己的复合命令（25~28），不是两次单方向命令的拼接。
+	"upleft": 25, "upright": 26, "downleft": 27, "downright": 28,
+	"zoomin": 11, "zoomout": 12,
+	"focusnear": 13, "focusfar": 14,
+	"irisnear": 15, "irisfar": 16,
+}
+
+// normalizePTZDirection 把平台的方向取值统一成小写无分隔符，兼容
+// upleft / UP_LEFT / up-left 几种写法。
+func normalizePTZDirection(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.NewReplacer("_", "", "-", "", " ", "").Replace(s)
+	return s
 }
 
 func handlePTZ(w http.ResponseWriter, r *http.Request) {
@@ -654,8 +675,20 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
 		return
 	}
-	cmd, ok := hikPTZCmd[req.Direction]
-	if !ok {
+	dir := normalizePTZDirection(req.Direction)
+	isStop := req.Stop || dir == "stop"
+	cmd, known := hikPTZCmd[dir]
+	lastKey := req.DeviceUID + "|" + req.ChannelID
+	if isStop {
+		// 海康没有"停止"这条独立命令，必须拿同一个动作再发一次 stop=1，
+		// 所以按 设备+通道 记住最后一次动的方向。没动过时直接回 OK（停是幂等的）。
+		last, ok := lastPTZ.Load(lastKey)
+		if !ok {
+			writeOK(w, nil)
+			return
+		}
+		cmd = last.(int)
+	} else if !known {
 		writeErr(w, "INVALID_ARGUMENT", "unknown direction")
 		return
 	}
@@ -674,8 +707,9 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 	if speed <= 0 {
 		speed = 4
 	}
-	if req.Stop {
+	if isStop {
 		_ = sdk.PTZ(s.UserID, sdkCh, cmd, true, speed)
+		lastPTZ.Delete(lastKey)
 		writeOK(w, nil)
 		return
 	}
@@ -683,6 +717,7 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "INTERNAL", err.Error())
 		return
 	}
+	lastPTZ.Store(lastKey, cmd)
 	// Continuous move: stop shortly after; callers may also send explicit stop.
 	go func() {
 		time.Sleep(300 * time.Millisecond)
@@ -692,6 +727,48 @@ func handlePTZ(w http.ResponseWriter, r *http.Request) {
 }
 
 func okHandler(w http.ResponseWriter, _ *http.Request) { writeOK(w, nil) }
+
+// handleSnapshot 抓一张 JPEG，以 base64 放在 data.image 里回给平台。
+//
+// 走 SDK 抓图接口而不是从直播流截帧：截帧要求有人正在播，抓图不要求。
+func handleSnapshot(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID string `json:"device_uid"`
+		ChannelID string `json:"channel_id"`
+		Quality   int    `json:"quality"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	doSnapshot(w, req.DeviceUID, req.ChannelID, req.Quality)
+}
+
+func writeSnapshot(w http.ResponseWriter, img []byte) {
+	writeOK(w, map[string]any{
+		"format":   "jpeg",
+		"encoding": "base64",
+		"image":    base64.StdEncoding.EncodeToString(img),
+		"size":     len(img),
+	})
+}
+
+// doSnapshot 供 /v1/command 的分发复用。
+func doSnapshot(w http.ResponseWriter, deviceUID, channelID string, quality int) {
+	sessionMu.Lock()
+	s := sessions[deviceUID]
+	sessionMu.Unlock()
+	if s == nil {
+		writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
+		return
+	}
+	img, err := sdk.CaptureJPEG(s.UserID, s.channelOf(channelID), quality)
+	if err != nil {
+		writeErr(w, "INTERNAL", err.Error())
+		return
+	}
+	writeSnapshot(w, img)
+}
 
 func writeOK(w http.ResponseWriter, data any) {
 	writeJSON(w, map[string]any{"code": "OK", "message": "", "data": data})

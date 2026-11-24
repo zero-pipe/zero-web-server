@@ -310,6 +310,33 @@ func (s *Service) StopPlayback(ctx context.Context, resourceID string) error {
 
 var errPlaybackUnsupported = fmt.Errorf("该接入方式暂不支持回放")
 
+// Snapshot 让协议侧抓一张 JPEG。
+//
+// 抓图走协议自己的接口（ONVIF 抓图地址 / SDK 抓图），不依赖是否有人在看直播：
+// 从流里截帧在无人观看时拿不到，而且要先起流，代价大得多。
+func (s *Service) Snapshot(ctx context.Context, resourceID string) ([]byte, error) {
+	res, err := s.repo.GetResource(resourceID)
+	if err != nil || res == nil {
+		return nil, fmt.Errorf("资源不存在")
+	}
+	if res.Kind != domainasset.ResourceVideoSensor {
+		return nil, fmt.Errorf("该资源类型不支持抓图")
+	}
+	binding, err := s.repo.GetBindingByDevice(res.DeviceID)
+	if err != nil || binding == nil {
+		return nil, fmt.Errorf("设备缺少接入绑定")
+	}
+	drv, ok := s.drivers.Get(binding.Protocol)
+	if !ok {
+		return nil, fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
+	}
+	sd, ok := drv.(channeldrv.SnapshotDriver)
+	if !ok {
+		return nil, fmt.Errorf("该接入方式暂不支持抓图")
+	}
+	return sd.Snapshot(ctx, res, binding)
+}
+
 // playbackTarget 解析回放所需的资源、接入绑定与驱动。
 func (s *Service) playbackTarget(resourceID string) (*domainasset.Resource, *domainasset.AccessBinding, channeldrv.ChannelDriver, error) {
 	res, err := s.repo.GetResource(resourceID)

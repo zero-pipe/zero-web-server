@@ -255,3 +255,19 @@ void hik_find_close(long find_handle) {
     if (find_handle < 0) return;
     NET_DVR_FindClose((LONG)find_handle);
 }
+
+int hik_capture_jpeg(long user_id, long channel, int quality, char *buf, int buf_len, int *out_len) {
+    if (buf == NULL || buf_len <= 0 || out_len == NULL) return -1;
+    NET_DVR_JPEGPARA para;
+    memset(&para, 0, sizeof(para));
+    para.wPicSize    = 0xff;                 /* Auto：跟随设备当前码流分辨率 */
+    para.wPicQuality = (WORD)(quality < 0 ? 1 : (quality > 2 ? 2 : quality));
+    DWORD returned = 0;
+    if (!NET_DVR_CaptureJPEGPicture_NEW((LONG)user_id, (LONG)channel, &para,
+                                        buf, (DWORD)buf_len, &returned)) {
+        return -1;
+    }
+    if (returned == 0) return -1;
+    *out_len = (int)returned;
+    return 0;
+}

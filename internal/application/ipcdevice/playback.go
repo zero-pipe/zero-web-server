@@ -2,6 +2,7 @@ package ipcdevice
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -146,4 +147,48 @@ func (s *Service) playbackStreamName(dev *domainplugin.Device, channelID string)
 		return "", fmt.Errorf("设备或通道内码缺失")
 	}
 	return name, nil
+}
+
+// snapshotResult 是插件抓图的返回：base64 编码的 JPEG。
+type snapshotResult struct {
+	Format   string `json:"format"`
+	Encoding string `json:"encoding"`
+	Image    string `json:"image"`
+}
+
+// Snapshot 让插件抓一张 JPEG。
+//
+// 走通用命令通道（cmd=snapshot）而不是新增 RPC 方法：抓图是纯透传，
+// 塞进 IPCClient 接口只会让所有插件实现都被迫加一个空方法。
+func (s *Service) Snapshot(ctx context.Context, deviceID int, channelID string) ([]byte, error) {
+	dev, _, client, err := s.deviceClient(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	if !dev.Enabled {
+		return nil, fmt.Errorf("设备已禁用")
+	}
+	params, err := json.Marshal(map[string]any{"quality": 1})
+	if err != nil {
+		return nil, err
+	}
+	raw, err := client.Command(ctx, dev.DeviceUID, channelID, "snapshot", params)
+	if err != nil {
+		return nil, fmt.Errorf("插件抓图失败: %w", err)
+	}
+	var res snapshotResult
+	if err := json.Unmarshal(raw, &res); err != nil {
+		return nil, fmt.Errorf("插件抓图返回无法解析: %w", err)
+	}
+	if !strings.EqualFold(res.Encoding, "base64") || strings.TrimSpace(res.Image) == "" {
+		return nil, fmt.Errorf("插件未返回图片数据")
+	}
+	img, err := base64.StdEncoding.DecodeString(res.Image)
+	if err != nil {
+		return nil, fmt.Errorf("插件返回的图片数据损坏: %w", err)
+	}
+	if len(img) < 3 || img[0] != 0xFF || img[1] != 0xD8 {
+		return nil, fmt.Errorf("插件返回的不是 JPEG 图片")
+	}
+	return img, nil
 }

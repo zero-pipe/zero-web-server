@@ -65,6 +65,15 @@ type PlaybackDriver interface {
 	StopPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) error
 }
 
+// SnapshotDriver 是可选的抓图能力，返回 JPEG 原始字节。
+//
+// 能力位里 `snapshot` 是所有视频通道都会声明的，但声明不等于能抓：
+// 抓图必须走协议自己的通道（ONVIF 抓图地址 / SDK 抓图接口），
+// 从直播流里截帧在没人在看的时候是拿不到的。
+type SnapshotDriver interface {
+	Snapshot(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]byte, error)
+}
+
 // Deps 驱动所需的协议侧实现。
 type Deps struct {
 	Play    *playapp.Service
@@ -298,19 +307,35 @@ func (d *onvifDriver) PTZ(ctx context.Context, res *domainasset.Resource, bindin
 	}
 	direction := strings.ToLower(strings.TrimSpace(cmd.Direction))
 	switch direction {
-	case "left", "right", "up", "down", "stop":
+	case "left", "right", "up", "down",
+		"upleft", "upright", "downleft", "downright",
+		"zoomin", "zoomout", "stop":
 	default:
 		return fmt.Errorf("ONVIF 不支持该云台指令: %s", cmd.Direction)
+	}
+	speed := clamp01(cmd.Speed)
+	// 变倍用的是独立的速度分量；只按水平速度算会让变倍要么不动要么满速。
+	if direction == "zoomin" || direction == "zoomout" {
+		if z := clamp01(cmd.Zoom); z > 0 {
+			speed = z
+		}
 	}
 	return d.onvif.PTZControl(ctx, onvifapp.PTZRequest{
 		ChannelID: int64(res.LegacyChannelID),
 		Command:   direction,
-		Speed:     clamp01(cmd.Speed),
+		Speed:     speed,
 	})
 }
 
 func (d *onvifDriver) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
 	return nil, fmt.Errorf("ONVIF 接入不支持自定义命令: %s", cmd)
+}
+
+func (d *onvifDriver) Snapshot(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]byte, error) {
+	if d.onvif == nil {
+		return nil, fmt.Errorf("ONVIF 服务未启用")
+	}
+	return d.onvif.Snapshot(ctx, int64(res.LegacyChannelID), "")
 }
 
 // ---- 插件（私有 SDK） ----
@@ -410,6 +435,13 @@ func (d *pluginDriver) StopPlayback(ctx context.Context, res *domainasset.Resour
 		devID = binding.LegacyDeviceID
 	}
 	return d.ipc.StopPlayback(ctx, devID, res.ExternalKey)
+}
+
+func (d *pluginDriver) Snapshot(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]byte, error) {
+	if d.ipc == nil {
+		return nil, fmt.Errorf("插件服务未启用")
+	}
+	return d.ipc.Snapshot(ctx, binding.LegacyDeviceID, res.ExternalKey)
 }
 
 // profileToken 从 StreamProfile.SelectorJSON 解析 ONVIF profileToken。

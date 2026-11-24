@@ -368,6 +368,10 @@ func main() {
 		retentionDays = 30
 	}
 	eventIngest.StartRetention(ctx, retentionDays)
+	// ONVIF 事件走设备侧 PullPoint 订阅，进程内直接投给事件入库，
+	// 与插件那条 MQTT 链路并列。设备不支持 PullPoint 时只打日志，不影响其它能力。
+	onvifService.SetEventSink(eventIngest)
+	onvifService.StartEventSync(ctx)
 	pluginService.Start(ctx, 10*time.Second, 30*time.Second)
 	agentService.Start(ctx, 10*time.Second, 30*time.Second)
 	if err := sipServer.Start(ctx); err != nil {

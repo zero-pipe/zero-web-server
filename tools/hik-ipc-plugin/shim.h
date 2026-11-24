@@ -61,6 +61,15 @@ int  hik_find_next(long find_handle, char *out_name, int name_len,
                    long long *out_start, long long *out_end, unsigned int *out_size);
 void hik_find_close(long find_handle);
 
+/*
+ * JPEG 抓图：NET_DVR_CaptureJPEGPicture_NEW，直接把图写进调用方缓冲区，不落临时文件。
+ *
+ * buf/buf_len 由调用方提供；成功时 out_len 写回实际长度。
+ * quality: 0-最好 1-较好 2-一般。分辨率由设备当前码流决定（wPicSize=0xff Auto）。
+ * 返回 0 成功，-1 失败（用 hik_last_error() 取原因；常见是缓冲区不够）。
+ */
+int hik_capture_jpeg(long user_id, long channel, int quality, char *buf, int buf_len, int *out_len);
+
 #ifdef __cplusplus
 }
 #endif

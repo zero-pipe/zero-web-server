@@ -22,6 +22,7 @@ func registerAssets(g *gin.RouterGroup, h *handler.AssetHandler) {
 	g.GET("/resources/:id/capabilities", h.Capabilities)
 	g.POST("/resources/:id/live/start", h.StartLive)
 	g.POST("/resources/:id/live/stop", h.StopLive)
+	g.GET("/resources/:id/snapshot", h.Snapshot)
 	// 按时间回放（统一资源口径）：检索录像、起流、停流。
 	g.POST("/resources/:id/playback/records", h.QueryRecords)
 	g.POST("/resources/:id/playback/start", h.StartPlayback)

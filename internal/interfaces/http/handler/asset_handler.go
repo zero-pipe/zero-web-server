@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 
 	assetapp "zero-web-server/internal/application/asset"
@@ -209,6 +210,17 @@ func (h *AssetHandler) StopPlayback(c *gin.Context) {
 		return
 	}
 	response.OK(c, nil)
+}
+
+// Snapshot 抓一张图，直接回 JPEG 字节（不落对象存储）。
+func (h *AssetHandler) Snapshot(c *gin.Context) {
+	data, err := h.svc.Snapshot(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "image/jpeg", data)
 }
 
 // Command 通用命令透传（自定义能力）：body {params}，params 原样转发给插件驱动。
