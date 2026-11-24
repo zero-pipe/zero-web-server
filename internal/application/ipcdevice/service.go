@@ -414,20 +414,26 @@ func (s *Service) streamName(dev *domainplugin.Device, channelID string) (string
 	if dev == nil {
 		return "", fmt.Errorf("设备不存在")
 	}
-	chCode := ""
-	if list, err := s.repo.ListChannels(dev.ID); err == nil {
-		for _, c := range list {
-			if c.ChannelID == channelID {
-				chCode = c.InternalCode
-				break
-			}
-		}
-	}
-	name := mediaurl.LiveStream(dev.InternalCode, chCode)
+	name := mediaurl.LiveStream(dev.InternalCode, s.channelInternalCode(dev, channelID))
 	if name == "" {
 		return "", fmt.Errorf("设备或通道内码缺失")
 	}
 	return name, nil
+}
+
+// channelInternalCode 用插件侧通道号查平台通道内码；流命名不允许回退协议标识。
+func (s *Service) channelInternalCode(dev *domainplugin.Device, channelID string) string {
+	if dev == nil {
+		return ""
+	}
+	if list, err := s.repo.ListChannels(dev.ID); err == nil {
+		for _, c := range list {
+			if c.ChannelID == channelID {
+				return c.InternalCode
+			}
+		}
+	}
+	return ""
 }
 
 func deriveUID(pluginID string, params map[string]any) string {

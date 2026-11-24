@@ -41,6 +41,26 @@ int hik_ptz_speed(long user_id, long channel, unsigned int cmd, unsigned int sto
 long hik_setup_alarm(long user_id);
 int  hik_close_alarm(long alarm_handle);
 
+/*
+ * 录像检索：NET_DVR_FindFile_V40 / NET_DVR_FindNextFile_V40。
+ *
+ * hik_find_begin 建立检索会话，返回句柄（>=0）；<0 表示建会话失败
+ * （通道无权限 / 设备不支持检索），此时用 hik_last_error() 取原因。
+ *
+ * hik_find_next 每次取一条，语义按 SDK 返回码区分，调用方不要把它当错误处理：
+ *    1  取到一条，out_* 有效
+ *    0  检索结束。设备没开录像就是这里（SDK 的 1001 NOFIND / 1003 NOMOREFILE）
+ *    2  设备仍在检索（SDK 的 1002 ISFINDING），稍后重试
+ *   -1  真错误
+ *
+ * 时间参数为 Unix 秒（按设备本地时间解释）。
+ * stream_type: 0-同段只返一种(主>子>三) 1-子码流 2-三码流 3-主码流 254-双码流
+ */
+long hik_find_begin(long user_id, long channel, long long start_ts, long long end_ts, int stream_type);
+int  hik_find_next(long find_handle, char *out_name, int name_len,
+                   long long *out_start, long long *out_end, unsigned int *out_size);
+void hik_find_close(long find_handle);
+
 #ifdef __cplusplus
 }
 #endif

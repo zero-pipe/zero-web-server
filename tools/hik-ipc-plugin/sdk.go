@@ -14,6 +14,7 @@ import "C"
 
 import (
 	"fmt"
+	"time"
 	"unsafe"
 )
 
@@ -134,4 +135,59 @@ func (HikSDK) PTZ(userID int64, channel int, cmd int, stop bool, speed int) erro
 		return fmt.Errorf("NET_DVR_PTZControlWithSpeed_Other failed: %d", int(C.hik_last_error()))
 	}
 	return nil
+}
+
+// RecordFile 是一条设备录像。时间为 Unix 秒，按设备本地时间解释。
+type RecordFile struct {
+	Name      string `json:"name"`
+	StartTime int64  `json:"startTime"`
+	EndTime   int64  `json:"endTime"`
+	Size      uint32 `json:"size"`
+}
+
+// 录像检索时 SDK 返回"仍在检索"的轮询节奏与整体上限。
+const (
+	findPollInterval = 200 * time.Millisecond
+	findPollTimeout  = 10 * time.Second
+)
+
+// FindRecords 检索通道在 [start, end] 内的设备录像。
+//
+// 设备没开录像时返回空列表且 err == nil：SDK 的 1001(NOFIND)/1003(NOMOREFILE)
+// 表示"查不到/取完了"，是正常结束而不是错误，不能当异常抛给上层。
+func (HikSDK) FindRecords(userID int64, channel int, start, end int64, streamType int) ([]RecordFile, error) {
+	handle := int64(C.hik_find_begin(C.long(userID), C.long(channel),
+		C.longlong(start), C.longlong(end), C.int(streamType)))
+	if handle < 0 {
+		return nil, fmt.Errorf("NET_DVR_FindFile_V40 failed: %d", int(C.hik_last_error()))
+	}
+	defer C.hik_find_close(C.long(handle))
+
+	var name [100]C.char
+	var startTS, endTS C.longlong
+	var size C.uint
+
+	out := make([]RecordFile, 0, 8)
+	deadline := time.Now().Add(findPollTimeout)
+	for {
+		switch int(C.hik_find_next(C.long(handle), &name[0], C.int(len(name)),
+			&startTS, &endTS, &size)) {
+		case 1:
+			out = append(out, RecordFile{
+				Name:      C.GoString(&name[0]),
+				StartTime: int64(startTS),
+				EndTime:   int64(endTS),
+				Size:      uint32(size),
+			})
+		case 0:
+			return out, nil
+		case 2:
+			if time.Now().After(deadline) {
+				return out, fmt.Errorf("录像检索超时：设备检索时间过长")
+			}
+			time.Sleep(findPollInterval)
+		default:
+			return nil, fmt.Errorf("NET_DVR_FindNextFile_V40 failed: %d", int(C.hik_last_error()))
+		}
+	}
 }

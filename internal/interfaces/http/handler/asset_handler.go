@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	assetapp "zero-web-server/internal/application/asset"
@@ -157,6 +158,53 @@ func (h *AssetHandler) StartLive(c *gin.Context) {
 
 func (h *AssetHandler) StopLive(c *gin.Context) {
 	if err := h.svc.StopLive(c.Request.Context(), c.Param("id")); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// QueryRecords 检索设备录像。body: {startTime,endTime,streamType}，时间为
+// "2006-01-02 15:04:05" 或 RFC3339 字符串；streamType 不传按"同段只返一种"处理。
+func (h *AssetHandler) QueryRecords(c *gin.Context) {
+	var body struct {
+		StartTime  string `json:"startTime"`
+		EndTime    string `json:"endTime"`
+		StreamType int    `json:"streamType"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.FromError(c, fmt.Errorf("请求参数格式错误: %w", err))
+		return
+	}
+	out, err := h.svc.QueryRecords(c.Request.Context(), c.Param("id"), body.StartTime, body.EndTime, body.StreamType)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, out)
+}
+
+// StartPlayback 起一路回放流。body: {startTime,endTime,stream:main|sub}。
+func (h *AssetHandler) StartPlayback(c *gin.Context) {
+	var body struct {
+		StartTime string `json:"startTime"`
+		EndTime   string `json:"endTime"`
+		Stream    string `json:"stream"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.FromError(c, fmt.Errorf("请求参数格式错误: %w", err))
+		return
+	}
+	content, err := h.svc.StartPlayback(c.Request.Context(), c.Param("id"), body.StartTime, body.EndTime, body.Stream)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, content)
+}
+
+func (h *AssetHandler) StopPlayback(c *gin.Context) {
+	if err := h.svc.StopPlayback(c.Request.Context(), c.Param("id")); err != nil {
 		response.FromError(c, err)
 		return
 	}

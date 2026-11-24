@@ -26,6 +26,8 @@ type Session struct {
 	LegacyChannelID int64
 	ProfileToken    string
 	ChannelKey      string
+	// Playback 标记这是回放会话，避免 StopLive 误关同名直播流。
+	Playback bool
 }
 
 // PTZCommand 归一化的云台指令：速度统一到 [0,1]，方向沿用平台既有取值。
@@ -45,6 +47,22 @@ type ChannelDriver interface {
 	PTZ(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd PTZCommand) error
 	// Command 通用命令透传（自定义能力）；不支持的协议返回错误。平台不解析 params/result。
 	Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error)
+}
+
+// PlaybackDriver 是可选的「按时间回放」能力。
+//
+// 单独拆成一个接口而不是塞进 Driver：三类协议的回放实现路径差异太大
+// （国标走 INVITE、插件走 RTSP 拉流、ONVIF 需要 Profile G），
+// 让不支持回放的驱动显式不实现，服务层好据此给出准确提示，
+// 而不是给一个空实现让调用方以为支持。
+type PlaybackDriver interface {
+	// QueryRecords 检索设备侧录像，返回插件/协议原始结构，平台不解析。
+	QueryRecords(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+		startTime, endTime string, streamType int) (json.RawMessage, error)
+	// StartPlayback 让协议侧给出回放流源，由 ZMS 拉成 <设备内码>_<通道内码>_playback。
+	StartPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+		startTime, endTime, streamKey string) (*dto.StreamContent, *Session, error)
+	StopPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) error
 }
 
 // Deps 驱动所需的协议侧实现。
@@ -352,6 +370,46 @@ func (d *pluginDriver) Command(ctx context.Context, res *domainasset.Resource, b
 		return nil, fmt.Errorf("插件服务未启用")
 	}
 	return d.ipc.Command(ctx, binding.LegacyDeviceID, res.ExternalKey, cmd, params)
+}
+
+// ---- 插件回放（PlaybackDriver） ----
+
+// pluginPlaybackStreamType 是检索录像时的码流筛选默认值：0 = 同段只返一种（主>子>三）。
+const pluginPlaybackStreamType = 0
+
+func (d *pluginDriver) QueryRecords(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+	startTime, endTime string, streamType int) (json.RawMessage, error) {
+	if d.ipc == nil {
+		return nil, fmt.Errorf("插件服务未启用")
+	}
+	if streamType < 0 {
+		streamType = pluginPlaybackStreamType
+	}
+	return d.ipc.QueryRecord(ctx, binding.LegacyDeviceID, res.ExternalKey, startTime, endTime, streamType)
+}
+
+func (d *pluginDriver) StartPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
+	startTime, endTime, streamKey string) (*dto.StreamContent, *Session, error) {
+	if d.ipc == nil {
+		return nil, nil, fmt.Errorf("插件服务未启用")
+	}
+	content, err := d.ipc.StartPlayback(ctx, binding.LegacyDeviceID, res.ExternalKey, startTime, endTime, streamKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	sess := &Session{Protocol: d.Protocol(), LegacyDeviceID: binding.LegacyDeviceID, ChannelKey: res.ExternalKey, Playback: true}
+	return content, sess, nil
+}
+
+func (d *pluginDriver) StopPlayback(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) error {
+	if d.ipc == nil {
+		return fmt.Errorf("插件服务未启用")
+	}
+	devID := 0
+	if binding != nil {
+		devID = binding.LegacyDeviceID
+	}
+	return d.ipc.StopPlayback(ctx, devID, res.ExternalKey)
 }
 
 // profileToken 从 StreamProfile.SelectorJSON 解析 ONVIF profileToken。

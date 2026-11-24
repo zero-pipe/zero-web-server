@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -97,6 +98,11 @@ func main() {
 	mux.HandleFunc("/v1/ptz", handlePTZ)
 	mux.HandleFunc("/v1/arm", handleArm)
 	mux.HandleFunc("/v1/disarm", handleDisarm)
+	mux.HandleFunc("/v1/record/query", handleRecordQuery)
+	mux.HandleFunc("/v1/playback/start", handlePlaybackStart(cfg))
+	mux.HandleFunc("/v1/playback/stop", handlePlaybackStop)
+	mux.HandleFunc("/v1/playback/control", handlePlaybackControl)
+	mux.HandleFunc("/v1/command", handleCommand(cfg))
 
 	ln, err := net.Listen("tcp", cfg.listen)
 	if err != nil {
@@ -228,6 +234,7 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 		var req struct {
 			DeviceUID string `json:"device_uid"`
 			ChannelID string `json:"channel_id"`
+			Stream    string `json:"stream"` // main（默认）| sub
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		sessionMu.Lock()
@@ -241,7 +248,7 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 		if n, err := strconv.Atoi(req.ChannelID); err == nil && n > 0 {
 			display = n
 		}
-		rtsp := buildRTSPURL(cfg, s, display)
+		rtsp := buildRTSPURL(cfg, s, display, streamNumber(req.Stream))
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtsp})
 	}
 }
@@ -318,9 +325,256 @@ func handleDisarm(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, nil)
 }
 
-func buildRTSPURL(cfg config, s *session, displayChannel int) string {
-	// Hikvision channel mapping: CH1 -> 101, CH2 -> 102 ...
-	pathChannel := displayChannel*100 + 1
+// recordQueryRequest 是录像检索请求。时间接受 Unix 秒、"2006-01-02 15:04:05" 或 RFC3339。
+type recordQueryRequest struct {
+	DeviceUID  string `json:"device_uid"`
+	ChannelID  string `json:"channel_id"`
+	StartTime  any    `json:"start_time"`
+	EndTime    any    `json:"end_time"`
+	StreamType int    `json:"stream_type"` // 0 任选(主>子>三) 1 子 2 三 3 主 254 双
+}
+
+// playbackStartRequest 是按时间回放请求。
+type playbackStartRequest struct {
+	DeviceUID string `json:"device_uid"`
+	ChannelID string `json:"channel_id"`
+	StartTime any    `json:"start_time"`
+	EndTime   any    `json:"end_time"`
+	Stream    string `json:"stream"` // main（默认）| sub
+}
+
+func handleRecordQuery(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeErr(w, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	var req recordQueryRequest
+	if err := json.Unmarshal(normalizeBody(body), &req); err != nil {
+		writeErr(w, "INVALID_ARGUMENT", err.Error())
+		return
+	}
+	doRecordQuery(w, req)
+}
+
+func handlePlaybackStart(cfg config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+		if err != nil {
+			writeErr(w, "INVALID_ARGUMENT", err.Error())
+			return
+		}
+		var req playbackStartRequest
+		if err := json.Unmarshal(normalizeBody(body), &req); err != nil {
+			writeErr(w, "INVALID_ARGUMENT", err.Error())
+			return
+		}
+		doPlaybackStart(cfg, w, req)
+	}
+}
+
+// handlePlaybackStop 回放是"把 RTSP 地址交给 ZMS 去拉"，插件这边没有会话要拆，
+// ZMS 断开 RTSP 连接回放即停止，所以这里是幂等的空操作。
+func handlePlaybackStop(w http.ResponseWriter, r *http.Request) {
+	writeOK(w, map[string]any{"stopped": true})
+}
+
+// handlePlaybackControl 暂停/倍速/拖放需要设备侧的控制通道。
+// 当前是"交给 ZMS 拉 RTSP"的传输模式，没有可用的控制面，明确回不支持，
+// 让平台把回放控制按钮置灰，而不是假装成功。
+func handlePlaybackControl(w http.ResponseWriter, _ *http.Request) {
+	writeErr(w, "UNSUPPORTED", "RTSP 回放取流不支持暂停/倍速/拖放控制")
+}
+
+// camelToSnake 是文档字段名与代码字段名的对应关系。
+// docs/插件化设备接入.md 的 RPC 契约用 camelCase（deviceUid/startTime），
+// 早期实现用的是 snake_case（device_uid/start_time），两种写法都接。
+var camelToSnake = map[string]string{
+	"deviceUid":       "device_uid",
+	"channelId":       "channel_id",
+	"streamKey":       "stream_key",
+	"startTime":       "start_time",
+	"endTime":         "end_time",
+	"preferTransport": "prefer_transport",
+	"streamType":      "stream_type",
+}
+
+// normalizeBody 在 snake_case 缺失时用 camelCase 补上，其余字段原样保留。
+func normalizeBody(body []byte) []byte {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		return body
+	}
+	changed := false
+	for camel, snake := range camelToSnake {
+		if _, ok := m[snake]; ok {
+			continue
+		}
+		if v, ok := m[camel]; ok {
+			m[snake] = v
+			changed = true
+		}
+	}
+	if !changed {
+		return body
+	}
+	out, err := json.Marshal(m)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// handleCommand 是通用命令透传入口（平台 IPCClient.Command 打到这里），
+// 用于还没定型的自定义能力，平台不解析 params 语义。
+func handleCommand(cfg config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			DeviceUID string          `json:"device_uid"`
+			ChannelID string          `json:"channel_id"`
+			Cmd       string          `json:"cmd"`
+			Params    json.RawMessage `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErr(w, "INVALID_ARGUMENT", err.Error())
+			return
+		}
+		switch req.Cmd {
+		case "record.query":
+			var q recordQueryRequest
+			_ = json.Unmarshal(req.Params, &q)
+			q.DeviceUID = req.DeviceUID
+			if q.ChannelID == "" {
+				q.ChannelID = req.ChannelID
+			}
+			doRecordQuery(w, q)
+		case "playback.start":
+			var p playbackStartRequest
+			_ = json.Unmarshal(req.Params, &p)
+			p.DeviceUID = req.DeviceUID
+			if p.ChannelID == "" {
+				p.ChannelID = req.ChannelID
+			}
+			doPlaybackStart(cfg, w, p)
+		default:
+			writeErr(w, "UNSUPPORTED", "unknown command: "+req.Cmd)
+		}
+	}
+}
+
+func doRecordQuery(w http.ResponseWriter, req recordQueryRequest) {
+	sessionMu.Lock()
+	s := sessions[req.DeviceUID]
+	sessionMu.Unlock()
+	if s == nil {
+		writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
+		return
+	}
+	start, ok := parseFlexibleTime(req.StartTime)
+	if !ok {
+		writeErr(w, "INVALID_ARGUMENT", "start_time 无法解析")
+		return
+	}
+	end, ok := parseFlexibleTime(req.EndTime)
+	if !ok {
+		writeErr(w, "INVALID_ARGUMENT", "end_time 无法解析")
+		return
+	}
+	if end <= start {
+		writeErr(w, "INVALID_ARGUMENT", "end_time 必须晚于 start_time")
+		return
+	}
+	streamType := req.StreamType
+	if streamType != 254 && (streamType < 0 || streamType > 3) {
+		streamType = 0
+	}
+	records, err := sdk.FindRecords(s.UserID, s.channelOf(req.ChannelID), start, end, streamType)
+	if err != nil {
+		writeErr(w, "INTERNAL", err.Error())
+		return
+	}
+	// 设备没开录像时 records 为空且 err 为 nil —— 这是正常结果，不是错误。
+	writeOK(w, map[string]any{"records": records, "total": len(records)})
+}
+
+func doPlaybackStart(cfg config, w http.ResponseWriter, req playbackStartRequest) {
+	sessionMu.Lock()
+	s := sessions[req.DeviceUID]
+	sessionMu.Unlock()
+	if s == nil {
+		writeErr(w, "DEVICE_UNREACHABLE", "device not logged in")
+		return
+	}
+	start, ok := parseFlexibleTime(req.StartTime)
+	if !ok {
+		writeErr(w, "INVALID_ARGUMENT", "start_time 无法解析")
+		return
+	}
+	end, ok := parseFlexibleTime(req.EndTime)
+	if !ok {
+		writeErr(w, "INVALID_ARGUMENT", "end_time 无法解析")
+		return
+	}
+	if end <= start {
+		writeErr(w, "INVALID_ARGUMENT", "end_time 必须晚于 start_time")
+		return
+	}
+	// 回放取流走海康的按时间回放 RTSP 地址，由 ZMS 拉流；
+	// 暂停/倍速/拖放需要 SIP INFO 或 SDK 控制通道，当前传输模式下不支持。
+	rtsp := buildPlaybackRTSPURL(cfg, s, displayChannelOf(req.ChannelID), streamNumber(req.Stream), start, end)
+	writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtsp})
+}
+
+func displayChannelOf(channelID string) int {
+	if n, err := strconv.Atoi(channelID); err == nil && n > 0 {
+		return n
+	}
+	return 1
+}
+
+// parseFlexibleTime 兼容 Unix 秒、"2006-01-02 15:04:05" 与 RFC3339 三种写法。
+func parseFlexibleTime(v any) (int64, bool) {
+	switch t := v.(type) {
+	case float64:
+		return int64(t), true
+	case json.Number:
+		if n, err := t.Int64(); err == nil {
+			return n, true
+		}
+	case string:
+		s := strings.TrimSpace(t)
+		if s == "" {
+			return 0, false
+		}
+		if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return n, true
+		}
+		for _, layout := range []string{"2006-01-02 15:04:05", time.RFC3339, "2006-01-02T15:04:05"} {
+			if ts, err := time.ParseInLocation(layout, s, time.Local); err == nil {
+				return ts.Unix(), true
+			}
+		}
+	}
+	return 0, false
+}
+
+// streamNumber 把码流名换算成海康 RTSP 路径里的码流号：1=主码流，2=子码流。
+// 注意 hikvision 的通道号与码流号是两个维度，子码流不是"通道 2"。
+func streamNumber(stream string) int {
+	switch strings.ToLower(strings.TrimSpace(stream)) {
+	case "sub", "2", "substream", "子码流":
+		return 2
+	default:
+		return 1
+	}
+}
+
+// buildRTSPURL 拼实时预览 RTSP 地址：/Streaming/Channels/<通道号*100+码流号>。
+func buildRTSPURL(cfg config, s *session, displayChannel, stream int) string {
+	if stream != 2 {
+		stream = 1
+	}
+	pathChannel := displayChannel*100 + stream
 	if cfg.rtspTmpl != "" {
 		return fmt.Sprintf(cfg.rtspTmpl, s.User, s.Pass, s.IP, pathChannel)
 	}
@@ -331,6 +585,45 @@ func buildRTSPURL(cfg config, s *session, displayChannel int) string {
 		Path:   fmt.Sprintf("/Streaming/Channels/%d", pathChannel),
 	}
 	return u.String()
+}
+
+// hikLocalTimeLayout 是海康回放/下载地址里的时间格式：20260101T120000Z。
+// 设备按自己的本地时间解释这个串（Z 只是格式约定），所以这里不做 UTC 换算，
+// 直接把"设备本地时间"的墙上时间写进去，避免时区偏移导致回放起点差几个小时。
+const hikLocalTimeLayout = "20060102T150405Z"
+
+// buildPlaybackRTSPURL 拼按时间回放的 RTSP 地址：
+// /Streaming/tracks/<通道号*100+码流号>?starttime=...&endtime=...
+func buildPlaybackRTSPURL(cfg config, s *session, displayChannel, stream int, start, end int64) string {
+	if stream != 2 {
+		stream = 1
+	}
+	pathChannel := displayChannel*100 + stream
+	u := &url.URL{
+		Scheme: "rtsp",
+		User:   url.UserPassword(s.User, s.Pass),
+		Host:   net.JoinHostPort(s.IP, strconv.Itoa(cfg.rtspPort)),
+		Path:   fmt.Sprintf("/Streaming/tracks/%d", pathChannel),
+	}
+	q := url.Values{}
+	q.Set("starttime", time.Unix(start, 0).Format(hikLocalTimeLayout))
+	q.Set("endtime", time.Unix(end, 0).Format(hikLocalTimeLayout))
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// channelOf 把协议侧通道号（展示用，从 1 开始）换成 SDK 通道号。
+func (s *session) channelOf(display string) int {
+	if n, err := strconv.Atoi(display); err == nil && n > 0 {
+		if sdkCh, ok := s.Channels[display]; ok {
+			return sdkCh
+		}
+		return n
+	}
+	if sdkCh, ok := s.Channels["1"]; ok {
+		return sdkCh
+	}
+	return 1
 }
 
 var hikPTZCmd = map[string]int{

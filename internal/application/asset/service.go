@@ -245,6 +245,91 @@ func (s *Service) StopLive(ctx context.Context, resourceID string) error {
 	return drv.StopLive(ctx, res, binding, sess)
 }
 
+// ---- 按时间回放（统一资源） ----
+//
+// 回放只在驱动实现了 channeldrv.PlaybackDriver 时可用。目前只有插件（私有 SDK）
+// 接入做到位：国标回放在旧的 playback 服务里走 SIP INVITE，ONVIF 缺 Profile G。
+// 这里不做能力行判定，直接按驱动实现与否拒绝，避免给前端点亮无实际功能的按钮。
+
+// QueryRecords 检索资源对应通道的设备录像。
+func (s *Service) QueryRecords(ctx context.Context, resourceID, startTime, endTime string, streamType int) (json.RawMessage, error) {
+	res, binding, drv, err := s.playbackTarget(resourceID)
+	if err != nil {
+		return nil, err
+	}
+	pd, ok := drv.(channeldrv.PlaybackDriver)
+	if !ok {
+		return nil, errPlaybackUnsupported
+	}
+	return pd.QueryRecords(ctx, res, binding, startTime, endTime, streamType)
+}
+
+// StartPlayback 起一路回放流。streamKey 是码流选择（main/sub），空则用设备默认。
+func (s *Service) StartPlayback(ctx context.Context, resourceID, startTime, endTime, streamKey string) (*dto.StreamContent, error) {
+	res, binding, drv, err := s.playbackTarget(resourceID)
+	if err != nil {
+		return nil, err
+	}
+	pd, ok := drv.(channeldrv.PlaybackDriver)
+	if !ok {
+		return nil, errPlaybackUnsupported
+	}
+	content, sess, err := pd.StartPlayback(ctx, res, binding, startTime, endTime, streamKey)
+	if err != nil {
+		return nil, err
+	}
+	if sess != nil {
+		// 回放会话单独记账，避免覆盖同一资源的直播会话。
+		s.mu.Lock()
+		s.sessions[resourceID+"#playback"] = sess
+		s.mu.Unlock()
+	}
+	return content, nil
+}
+
+// StopPlayback 关闭回放流。
+func (s *Service) StopPlayback(ctx context.Context, resourceID string) error {
+	res, err := s.repo.GetResource(resourceID)
+	if err != nil {
+		return fmt.Errorf("资源不存在")
+	}
+	binding, _ := s.repo.GetBindingByDevice(res.DeviceID)
+	if binding == nil {
+		return fmt.Errorf("设备缺少接入绑定")
+	}
+	drv, ok := s.drivers.Get(binding.Protocol)
+	if !ok {
+		return fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
+	}
+	pd, ok := drv.(channeldrv.PlaybackDriver)
+	if !ok {
+		return errPlaybackUnsupported
+	}
+	return pd.StopPlayback(ctx, res, binding)
+}
+
+var errPlaybackUnsupported = fmt.Errorf("该接入方式暂不支持回放")
+
+// playbackTarget 解析回放所需的资源、接入绑定与驱动。
+func (s *Service) playbackTarget(resourceID string) (*domainasset.Resource, *domainasset.AccessBinding, channeldrv.ChannelDriver, error) {
+	res, err := s.repo.GetResource(resourceID)
+	if err != nil || res == nil {
+		return nil, nil, nil, fmt.Errorf("资源不存在")
+	}
+	if res.Kind != domainasset.ResourceVideoSensor {
+		return nil, nil, nil, fmt.Errorf("该资源类型不支持回放")
+	}
+	binding, err := s.repo.GetBindingByDevice(res.DeviceID)
+	if err != nil || binding == nil {
+		return nil, nil, nil, fmt.Errorf("设备缺少接入绑定")
+	}
+	drv, ok := s.drivers.Get(binding.Protocol)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
+	}
+	return res, binding, drv, nil
+}
+
 func (s *Service) pickProfile(resourceID, profileID string) (*domainasset.StreamProfile, error) {
 	if strings.TrimSpace(profileID) != "" {
 		return s.repo.GetProfile(profileID)
