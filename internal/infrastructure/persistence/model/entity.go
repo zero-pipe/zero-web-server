@@ -136,6 +136,7 @@ type Region struct {
 	ParentID   *int64 `gorm:"column:parent_id;index" json:"parentId"`
 	Code       string `gorm:"column:code;size:20;uniqueIndex:uk_region_code" json:"code"`
 	Name       string `gorm:"column:name;size:255" json:"name"`
+	Alias      string `gorm:"column:alias;size:255" json:"alias"`
 	Sort       int    `gorm:"column:sort" json:"sort"`
 	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
 	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
@@ -145,13 +146,16 @@ func (Region) TableName() string { return "zws_region" }
 
 // Group 业务分组目录。
 type Group struct {
-	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	ParentID   *int64 `gorm:"column:parent_id;index" json:"parentId"`
-	Code       string `gorm:"column:code;size:20;uniqueIndex:uk_group_code" json:"code"`
-	Name       string `gorm:"column:name;size:255" json:"name"`
-	Sort       int    `gorm:"column:sort" json:"sort"`
-	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+	ID            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ParentID      *int64 `gorm:"column:parent_id;index" json:"parentId"`
+	Code          string `gorm:"column:code;size:20;uniqueIndex:uk_group_code" json:"code"`
+	Name          string `gorm:"column:name;size:255" json:"name"`
+	BusinessGroup string `gorm:"column:business_group;size:255" json:"businessGroup"`
+	CivilCode     string `gorm:"column:civil_code;size:255" json:"civilCode"`
+	Alias         string `gorm:"column:alias;size:255" json:"alias"`
+	Sort          int    `gorm:"column:sort" json:"sort"`
+	CreateTime    string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime    string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
 func (Group) TableName() string { return "zws_group" }
