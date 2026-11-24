@@ -29,7 +29,7 @@ func (r *EventSubscriptionRepository) Save(s *domainevent.Subscription) error {
 	err := r.db.Where("device_id = ?", s.DeviceID).First(&existing).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		m := &model.EventSubscription{
-			DeviceID: s.DeviceID, PluginID: s.PluginID, DeviceUID: s.DeviceUID,
+			DeviceID: int64(s.DeviceID), PluginInstanceID: s.PluginID, DeviceUID: s.DeviceUID,
 			DeviceInternalCode: s.DeviceInternalCode, EventTypesJSON: string(raw),
 			Armed: s.Armed, Status: s.Status, LastError: s.LastError, RemoteID: s.RemoteID,
 			LastArmedAt: s.LastArmedAt, CreateTime: now, UpdateTime: now,
@@ -75,7 +75,7 @@ func toDomainEventSubscription(m *model.EventSubscription) *domainevent.Subscrip
 	var types []string
 	_ = json.Unmarshal([]byte(m.EventTypesJSON), &types)
 	return &domainevent.Subscription{
-		ID: m.ID, DeviceID: m.DeviceID, PluginID: m.PluginID, DeviceUID: m.DeviceUID,
+		ID: int(m.ID), DeviceID: int(m.DeviceID), PluginID: m.PluginInstanceID, DeviceUID: m.DeviceUID,
 		DeviceInternalCode: m.DeviceInternalCode, EventTypes: types,
 		Armed: m.Armed, Status: m.Status, LastError: m.LastError, RemoteID: m.RemoteID,
 		LastArmedAt: m.LastArmedAt, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,

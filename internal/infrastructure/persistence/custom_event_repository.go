@@ -7,10 +7,11 @@ import (
 	domaince "zero-web-server/internal/domain/customevent"
 	"zero-web-server/internal/infrastructure/persistence/model"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
+// CustomEventRepository 自定义事件持久化。
+// 新 schema：BIGINT 自增主键；对外字符串 ID 优先用业务 event_id，回退为 BIGINT 字符串。
 type CustomEventRepository struct{ db *gorm.DB }
 
 func NewCustomEventRepository(db *gorm.DB) *CustomEventRepository {
@@ -19,22 +20,34 @@ func NewCustomEventRepository(db *gorm.DB) *CustomEventRepository {
 
 var _ domaince.Repository = (*CustomEventRepository)(nil)
 
+func customEventCode(m *model.CustomEvent) string {
+	if m.EventID != "" {
+		return m.EventID
+	}
+	return formatID(m.ID)
+}
+
 func (r *CustomEventRepository) Create(e *domaince.CustomEvent) error {
-	if e.ID == "" {
-		e.ID = uuid.NewString()
+	if e.EventID == "" {
+		e.EventID = newBusinessID("CE")
 	}
 	if e.CreateTime == "" {
 		e.CreateTime = time.Now().Format("2006-01-02 15:04:05")
 	}
-	return r.db.Create(&model.CustomEvent{
-		ID: e.ID, EventID: e.EventID,
+	m := &model.CustomEvent{
+		EventID: e.EventID,
 		DeviceInternalCode: e.DeviceInternalCode, ChannelInternalCode: e.ChannelInternalCode,
 		DeviceID: e.DeviceID, ResourceID: e.ResourceID,
 		MajorType: e.MajorType, MinorType: e.MinorType,
 		OccurAt: e.OccurAt, Level: e.Level,
 		ImageKey: e.ImageKey, ImageURL: e.ImageURL, RawJSON: e.RawJSON,
 		CreateTime: e.CreateTime,
-	}).Error
+	}
+	if err := r.db.Create(m).Error; err != nil {
+		return err
+	}
+	e.ID = customEventCode(m)
+	return nil
 }
 
 func (r *CustomEventRepository) Exists(eventID string) (bool, error) {
@@ -47,7 +60,11 @@ func (r *CustomEventRepository) Exists(eventID string) (bool, error) {
 
 func (r *CustomEventRepository) Get(id string) (*domaince.CustomEvent, error) {
 	var m model.CustomEvent
-	if err := r.db.Where("id = ?", id).First(&m).Error; err != nil {
+	q := r.db.Where("event_id = ?", id)
+	if pk, ok := parseID(id); ok {
+		q = r.db.Where("event_id = ? OR id = ?", id, pk)
+	}
+	if err := q.First(&m).Error; err != nil {
 		return nil, err
 	}
 	return customEventFromModel(&m), nil
@@ -84,7 +101,7 @@ func (r *CustomEventRepository) List(page, count int, f domaince.ListFilter) ([]
 		return nil, 0, err
 	}
 	var rows []model.CustomEvent
-	if err := q.Order("occur_at DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
+	if err := q.Order("occur_at DESC, id DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	out := make([]*domaince.CustomEvent, 0, len(rows))
@@ -94,7 +111,8 @@ func (r *CustomEventRepository) List(page, count int, f domaince.ListFilter) ([]
 	return out, total, nil
 }
 
-func (r *CustomEventRepository) DistinctTypes(deviceInternalCode string) ([]domaince.TypeCount, error) {	q := r.db.Model(&model.CustomEvent{}).
+func (r *CustomEventRepository) DistinctTypes(deviceInternalCode string) ([]domaince.TypeCount, error) {
+	q := r.db.Model(&model.CustomEvent{}).
 		Select("major_type, minor_type, count(*) as count")
 	if deviceInternalCode != "" {
 		q = q.Where("device_internal_code = ?", deviceInternalCode)
@@ -125,7 +143,7 @@ func (r *CustomEventRepository) DeleteRange(begin, end int64, all bool) (int64, 
 
 func customEventFromModel(m *model.CustomEvent) *domaince.CustomEvent {
 	return &domaince.CustomEvent{
-		ID: m.ID, EventID: m.EventID,
+		ID: customEventCode(m), EventID: m.EventID,
 		DeviceInternalCode: m.DeviceInternalCode, ChannelInternalCode: m.ChannelInternalCode,
 		DeviceID: m.DeviceID, ResourceID: m.ResourceID,
 		MajorType: m.MajorType, MinorType: m.MinorType,

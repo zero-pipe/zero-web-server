@@ -1,443 +1,262 @@
 package model
 
-type UserRole struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Name       string `gorm:"column:name;size:50" json:"name"`
-	Authority  string `gorm:"column:authority;size:512" json:"authority"` // 菜单权限：* 或 JSON 数组
+// ===========================================================================
+// A. 物模型：设备 / 接入绑定 / 通道 / 扩展 / 码流 / 能力
+// ===========================================================================
+
+// Device 设备（物理资产，稳定信息）。
+type Device struct {
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_device_internal_code" json:"internalCode"`
+	GbCode       string `gorm:"column:gb_code;size:20;uniqueIndex:uk_device_gb_code" json:"gbCode"`
+	Name         string `gorm:"column:name;size:255" json:"name"`
+	Manufacturer string `gorm:"column:manufacturer;size:255" json:"manufacturer"`
+	Model        string `gorm:"column:model;size:255" json:"model"`
+	Firmware     string `gorm:"column:firmware;size:255" json:"firmware"`
+	SerialNumber string `gorm:"column:serial_number;size:255" json:"serialNumber"`
+	Online       bool   `gorm:"column:online" json:"online"`
+	Enabled      bool   `gorm:"column:enabled;default:true" json:"enabled"`
+	Status       string `gorm:"column:status;size:32" json:"status"`
+	CreateTime   string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime   string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (Device) TableName() string { return "zws_device" }
+
+// AccessBindingAgent 设备接入绑定(1:1)。
+type AccessBinding struct {
+	ID               int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	DeviceID         int64  `gorm:"column:device_id;uniqueIndex:uk_binding_device" json:"deviceId"`
+	Protocol         string `gorm:"column:protocol;size:16;uniqueIndex:uk_binding_external,priority:1" json:"protocol"`
+	Mode             string `gorm:"column:mode;size:16" json:"mode"`
+	ExternalID       string `gorm:"column:external_id;size:255;uniqueIndex:uk_binding_external,priority:2" json:"externalId"`
+	Endpoint         string `gorm:"column:endpoint;size:255" json:"endpoint"`
+	PluginInstanceID string `gorm:"column:plugin_instance_id;size:128" json:"pluginInstanceId"`
+	ConfigJSON       string `gorm:"column:config_json;type:longtext" json:"configJson"`
+	Status           string `gorm:"column:status;size:32" json:"status"`
+	LastSeen         int64  `gorm:"column:last_seen" json:"lastSeen"`
+	CreateTime       string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime       string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (AccessBinding) TableName() string { return "zws_access_binding" }
+
+// Channel 通道（业务唯一事实来源）。
+type Channel struct {
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	DeviceID     int64  `gorm:"column:device_id;index" json:"deviceId"`
+	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_channel_internal_code" json:"internalCode"`
+	GbCode       string `gorm:"column:gb_code;size:20;uniqueIndex:uk_channel_gb_code" json:"gbCode"`
+	ExternalKey  string `gorm:"column:external_key;size:255" json:"externalKey"`
+	Kind         string `gorm:"column:kind;size:32" json:"kind"`
+	Name         string `gorm:"column:name;size:255" json:"name"`
+	Online       bool   `gorm:"column:online" json:"online"`
+	Status       string `gorm:"column:status;size:32" json:"status"`
+	CreateTime   string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime   string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (Channel) TableName() string { return "zws_channel" }
+
+// DeviceExt 设备扩展信息（易变）。
+type DeviceExt struct {
+	ID          int64   `gorm:"column:id;primaryKey;autoIncrement"`
+	DeviceID    int64   `gorm:"column:device_id;uniqueIndex:uk_device_ext_device"`
+	Longitude   float64 `gorm:"column:longitude"`
+	Latitude    float64 `gorm:"column:latitude"`
+	Address     string  `gorm:"column:address;size:255"`
+	GeoCoordSys string  `gorm:"column:geo_coord_sys;size:50"`
+	Remark      string  `gorm:"column:remark;size:255"`
+	Tags        string  `gorm:"column:tags;size:255"`
+	ExtraJSON   string  `gorm:"column:extra_json;type:longtext"`
+	CreateTime  string  `gorm:"column:create_time;size:50"`
+	UpdateTime  string  `gorm:"column:update_time;size:50"`
+}
+
+func (DeviceExt) TableName() string { return "zws_device_ext" }
+
+// ChannelExt 通道扩展信息（易变：经纬度/PTZ/标签/录像计划）。
+type ChannelExt struct {
+	ID           int64   `gorm:"column:id;primaryKey;autoIncrement"`
+	ChannelID    int64   `gorm:"column:channel_id;uniqueIndex:uk_channel_ext_channel"`
+	Longitude    float64 `gorm:"column:longitude"`
+	Latitude     float64 `gorm:"column:latitude"`
+	MapLevel     int     `gorm:"column:map_level"`
+	PTZType      int     `gorm:"column:ptz_type"`
+	HasAudio     bool    `gorm:"column:has_audio"`
+	Enabled      bool    `gorm:"column:enabled;default:true"`
+	Tags         string  `gorm:"column:tags;size:255"`
+	RecordPlanID int64   `gorm:"column:record_plan_id"`
+	GBJSON       string  `gorm:"column:gb_json;type:longtext"`
+	ExtraJSON    string  `gorm:"column:extra_json;type:longtext"`
+	CreateTime   string  `gorm:"column:create_time;size:50"`
+	UpdateTime   string  `gorm:"column:update_time;size:50"`
+}
+
+func (ChannelExt) TableName() string { return "zws_channel_ext" }
+
+// StreamProfile 视频通道码流。
+type StreamProfile struct {
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ChannelID    int64  `gorm:"column:channel_id;uniqueIndex:uk_profile_channel_role,priority:1" json:"channelId"`
+	Role         string `gorm:"column:role;size:16;uniqueIndex:uk_profile_channel_role,priority:2" json:"role"`
+	Name         string `gorm:"column:name;size:128" json:"name"`
+	SelectorJSON string `gorm:"column:selector_json;type:text" json:"selectorJson"`
+	Codec        string `gorm:"column:codec;size:64" json:"codec"`
+	Resolution   string `gorm:"column:resolution;size:64" json:"resolution"`
+	IsDefault    bool   `gorm:"column:is_default" json:"isDefault"`
+	CreateTime   string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime   string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (StreamProfile) TableName() string { return "zws_stream_profile" }
+
+// Capability 通道能力集合（三态制约操作）。
+type Capability struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	ChannelID  int64  `gorm:"column:channel_id;uniqueIndex:uk_cap_channel_op,priority:1"`
+	Operation  string `gorm:"column:operation;size:64;uniqueIndex:uk_cap_channel_op,priority:2"`
+	Supported  bool   `gorm:"column:supported"`
+	Configured bool   `gorm:"column:configured"`
+	Available  bool   `gorm:"column:available"`
+	ParamsJSON string `gorm:"column:params_json;type:text"`
+	Source     string `gorm:"column:source;size:32"`
+	UpdateTime string `gorm:"column:update_time;size:50"`
+}
+
+func (Capability) TableName() string { return "zws_capability" }
+
+// ===========================================================================
+// B. 目录树：行政区划 / 业务分组 / 多挂载
+// ===========================================================================
+
+// Region 行政区划目录。
+type Region struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ParentID   *int64 `gorm:"column:parent_id;index" json:"parentId"`
+	Code       string `gorm:"column:code;size:20;uniqueIndex:uk_region_code" json:"code"`
+	Name       string `gorm:"column:name;size:255" json:"name"`
+	Sort       int    `gorm:"column:sort" json:"sort"`
 	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
 	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
-func (UserRole) TableName() string { return "zws_user_role" }
+func (Region) TableName() string { return "zws_region" }
 
-type User struct {
-	ID         int      `gorm:"column:id;primaryKey;autoIncrement"`
-	Username   string   `gorm:"column:username;size:255"`
-	Password   string   `gorm:"column:password;size:255"`
-	RoleID     int      `gorm:"column:role_id"`
-	CreateTime string   `gorm:"column:create_time;size:50"`
-	UpdateTime string   `gorm:"column:update_time;size:50"`
-	Role       UserRole `gorm:"foreignKey:RoleID;references:ID"`
+// Group 业务分组目录。
+type Group struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ParentID   *int64 `gorm:"column:parent_id;index" json:"parentId"`
+	Code       string `gorm:"column:code;size:20;uniqueIndex:uk_group_code" json:"code"`
+	Name       string `gorm:"column:name;size:255" json:"name"`
+	Sort       int    `gorm:"column:sort" json:"sort"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
-func (User) TableName() string { return "zws_user" }
+func (Group) TableName() string { return "zws_group" }
 
-type OnvifDevice struct {
-	ID            int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	InternalCode  string `gorm:"column:internal_code;size:32;uniqueIndex:uk_onvif_device_internal_code" json:"internalCode"`
-	GbCode        string `gorm:"column:gb_code;size:50" json:"gbCode"` // 可选国标编号（级联上级时手填）
-	Name          string `gorm:"column:name;size:255"`
-	IP            string `gorm:"column:ip;size:64"`
-	Port          int    `gorm:"column:port"`
-	Username      string `gorm:"column:username;size:128"`
-	Password      string `gorm:"column:password;size:128"`
-	Manufacturer  string `gorm:"column:manufacturer;size:255"`
-	Model         string `gorm:"column:model;size:255"`
-	Firmware      string `gorm:"column:firmware;size:255"`
-	SerialNumber  string `gorm:"column:serial_number;size:255"`
-	HardwareID    string `gorm:"column:hardware_id;size:255"`
-	DeviceURI     string `gorm:"column:device_uri;size:512"`
-	MediaURI      string `gorm:"column:media_uri;size:512"`
-	PTZURI        string `gorm:"column:ptz_uri;size:512"`
-	OnLine        bool   `gorm:"column:on_line"`
-	// EventSubscribe 是否启用事件订阅（PullPoint）。默认 true 保持"有 DeviceURI 即订阅"的既有行为。
-	EventSubscribe bool  `gorm:"column:event_subscribe;default:true"`
-	DiscoveryMode int    `gorm:"column:discovery_mode"`
-	MediaServerID string `gorm:"column:media_server_id;size:255"`
-	CustomName    string `gorm:"column:custom_name;size:255"`
-	ServerID      string `gorm:"column:server_id;size:50"`
-	CreateTime    string `gorm:"column:create_time;size:50"`
-	UpdateTime    string `gorm:"column:update_time;size:50"`
+// Catalog 目录挂载（多对多，可多挂）。
+type Catalog struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	RegionID   *int64 `gorm:"column:region_id;uniqueIndex:uk_catalog_region,priority:1" json:"regionId"`
+	GroupID    *int64 `gorm:"column:group_id;uniqueIndex:uk_catalog_group,priority:1" json:"groupId"`
+	TargetType string `gorm:"column:target_type;size:16;uniqueIndex:uk_catalog_region,priority:2;uniqueIndex:uk_catalog_group,priority:2" json:"targetType"`
+	TargetID   int64  `gorm:"column:target_id;uniqueIndex:uk_catalog_region,priority:3;uniqueIndex:uk_catalog_group,priority:3;index:idx_catalog_target,priority:2" json:"targetId"`
+	Sort       int    `gorm:"column:sort" json:"sort"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
 }
 
-func (OnvifDevice) TableName() string { return "zws_onvif_device" }
+func (Catalog) TableName() string { return "zws_catalog" }
 
-type OnvifChannel struct {
-	ID           int64  `gorm:"column:id;primaryKey;autoIncrement"`
-	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_onvif_channel_internal_code" json:"internalCode"`
-	GbCode       string `gorm:"column:gb_code;size:50" json:"gbCode"` // 可选国标通道编号
-	DeviceID     int64  `gorm:"column:device_id"`
-	ProfileToken string `gorm:"column:profile_token;size:255"`
-	Name         string `gorm:"column:name;size:255"`
-	VideoSource  string `gorm:"column:video_source;size:255"`
-	EncoderToken string `gorm:"column:encoder_token;size:255"`
-	Resolution   string `gorm:"column:resolution;size:64"`
-	Codec        string `gorm:"column:codec;size:64"`
-	HasAudio     bool   `gorm:"column:has_audio"`
-	HasPTZ       bool   `gorm:"column:has_ptz"`
-	StreamURI    string `gorm:"column:stream_uri;size:1024"`
-	Status       string `gorm:"column:status;size:50"`
-	ProfilesJSON string `gorm:"column:profiles_json;type:text"` // 同视频源下可选码流 JSON
-	CreateTime   string `gorm:"column:create_time;size:50"`
-	UpdateTime   string `gorm:"column:update_time;size:50"`
+// ===========================================================================
+// C. 事件
+// ===========================================================================
+
+// EventType 统一事件类型注册表。
+type EventType struct {
+	Code           string `gorm:"column:code;primaryKey;size:64"`
+	Name           string `gorm:"column:name;size:128"`
+	Category       string `gorm:"column:category;size:32"`
+	Severity       string `gorm:"column:severity;size:32"`
+	AlarmEligible  bool   `gorm:"column:alarm_eligible"`
+	RequiresVideo  bool   `gorm:"column:requires_video"`
+	BBoxCapable    bool   `gorm:"column:bbox_capable"`
+	VendorMappings string `gorm:"column:vendor_mappings;type:text"`
+	Enabled        bool   `gorm:"column:enabled"`
+	UpdateTime     string `gorm:"column:update_time;size:50"`
 }
 
-func (OnvifChannel) TableName() string { return "zws_onvif_channel" }
+func (EventType) TableName() string { return "zws_event_type" }
 
-type MediaServer struct {
-	ID            string `gorm:"column:id;primaryKey;size:255" json:"id"`
-	IP            string `gorm:"column:ip;size:50" json:"ip"`
-	HookIP        string `gorm:"column:hook_ip;size:50" json:"hookIp"`
-	SDPIP         string `gorm:"column:sdp_ip;size:50" json:"sdpIp"`
-	StreamIP      string `gorm:"column:stream_ip;size:50" json:"streamIp"`
-	HTTPPort      int    `gorm:"column:http_port" json:"httpPort"`
-	HTTPSSLPort   int    `gorm:"column:http_ssl_port" json:"httpSSlPort"`
-	RTMPPort      int    `gorm:"column:rtmp_port" json:"rtmpPort"`
-	RTMPSSLPort   int    `gorm:"column:rtmp_ssl_port" json:"rtmpSslPort"`
-	RTSPPort      int    `gorm:"column:rtsp_port" json:"rtspPort"`
-	RTSPSSLPort   int    `gorm:"column:rtsp_ssl_port" json:"rtspSslPort"`
-	SRTPort       int    `gorm:"column:srt_port" json:"srtPort"`
-	RTPProxyPort  int    `gorm:"column:rtp_proxy_port" json:"rtpProxyPort"`
-	WebRTCPortMin int    `gorm:"column:webrtc_port_min" json:"webrtcPortMin"`
-	WebRTCPortMax int    `gorm:"column:webrtc_port_max" json:"webrtcPortMax"`
-
-	CapabilitiesReported bool `gorm:"column:capabilities_reported" json:"capabilitiesReported"`
-	EnableRTSP           bool `gorm:"column:enable_rtsp" json:"enableRtsp"`
-	EnableRTMP           bool `gorm:"column:enable_rtmp" json:"enableRtmp"`
-	EnableHLS            bool `gorm:"column:enable_hls" json:"enableHls"`
-	EnableSRT            bool `gorm:"column:enable_srt" json:"enableSrt"`
-	EnableWebRTC         bool `gorm:"column:enable_webrtc" json:"enableWebrtc"`
-
-	Secret            string `gorm:"column:secret;size:50" json:"secret"`
-	Type              string `gorm:"column:type;size:50" json:"type"`
-	Version           string `gorm:"column:version;size:50" json:"version"`
-	DefaultServer     bool   `gorm:"column:default_server" json:"defaultServer"`
-	HookAliveInterval int    `gorm:"column:hook_alive_interval" json:"hookAliveInterval"`
-	LastSeen          int64  `gorm:"column:last_seen" json:"lastSeen"`
-	CreateTime        string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime        string `gorm:"column:update_time;size:50" json:"updateTime"`
-	ServerID          string `gorm:"column:server_id;size:50" json:"serverId"`
+// Event 平台事件记录（统一信封）。
+type Event struct {
+	ID                   int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	EventID              string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
+	DeviceID             int64  `gorm:"column:device_id;index:idx_event_device_time,priority:1" json:"deviceId"`
+	ChannelID            *int64 `gorm:"column:channel_id;index:idx_event_channel_time,priority:1" json:"channelId"`
+	EventType            string `gorm:"column:event_type;size:64;index:idx_event_type_time,priority:1" json:"eventType"`
+	Severity             string `gorm:"column:severity;size:16" json:"severity"`
+	Status               string `gorm:"column:status;size:16" json:"status"`
+	OccurredAt           int64  `gorm:"column:occurred_at;index:idx_event_device_time,priority:2;index:idx_event_channel_time,priority:2;index:idx_event_type_time,priority:2" json:"occurredAt"`
+	ReceivedAt           int64  `gorm:"column:received_at" json:"receivedAt"`
+	DeviceInternalCode   string `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
+	ChannelInternalCode  string `gorm:"column:channel_internal_code;size:64" json:"channelInternalCode"`
+	BBoxJSON             string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
+	ImageURL             string `gorm:"column:image_url;size:1024" json:"imageUrl"`
+	RawJSON              string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
+	CreateTime           string `gorm:"column:create_time;size:50" json:"createTime"`
 }
 
-func (MediaServer) TableName() string { return "zws_media_server" }
+func (Event) TableName() string { return "zws_event" }
 
-type GBDevice struct {
-	ID                               int    `gorm:"column:id;primaryKey;autoIncrement"`
-	InternalCode                     string `gorm:"column:internal_code;size:32;uniqueIndex:uk_device_internal_code" json:"internalCode"`
-	DeviceID                         string `gorm:"column:device_id;size:50"`
-	Name                             string `gorm:"column:name;size:255"`
-	Manufacturer                     string `gorm:"column:manufacturer;size:255"`
-	Model                            string `gorm:"column:model;size:255"`
-	Firmware                         string `gorm:"column:firmware;size:255"`
-	Transport                        string `gorm:"column:transport;size:50"`
-	StreamMode                       string `gorm:"column:stream_mode;size:50"`
-	OnLine                           bool   `gorm:"column:on_line"`
-	IP                               string `gorm:"column:ip;size:50"`
-	Port                             int    `gorm:"column:port"`
-	Expires                          int    `gorm:"column:expires"`
-	HostAddress                      string `gorm:"column:host_address;size:50"`
-	Charset                          string `gorm:"column:charset;size:50"`
-	MediaServerID                    string `gorm:"column:media_server_id;size:50"`
-	CustomName                       string `gorm:"column:custom_name;size:255"`
-	SDPIP                            string `gorm:"column:sdp_ip;size:50"`
-	LocalIP                          string `gorm:"column:local_ip;size:50"`
-	Password                         string `gorm:"column:password;size:255"`
-	HeartBeatInterval                int    `gorm:"column:heart_beat_interval"`
-	HeartBeatCount                   int    `gorm:"column:heart_beat_count"`
-	SubscribeCycleForCatalog         int    `gorm:"column:subscribe_cycle_for_catalog"`
-	SubscribeCycleForMobilePosition  int    `gorm:"column:subscribe_cycle_for_mobile_position"`
-	MobilePositionSubmissionInterval int    `gorm:"column:mobile_position_submission_interval"`
-	SubscribeCycleForAlarm           int    `gorm:"column:subscribe_cycle_for_alarm"`
-	ServerID                         string `gorm:"column:server_id;size:50"`
-	CreateTime                       string `gorm:"column:create_time;size:50"`
-	UpdateTime                       string `gorm:"column:update_time;size:50"`
-}
-
-func (GBDevice) TableName() string { return "zws_device" }
-
-type GBDeviceChannel struct {
-	ID                   int     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	InternalCode         string  `gorm:"column:internal_code;size:32;uniqueIndex:uk_channel_internal_code" json:"internalCode"`
-	DeviceID             string  `gorm:"column:device_id;size:50" json:"deviceId"`
-	Name                 string  `gorm:"column:name;size:255" json:"name"`
-	Manufacturer         string  `gorm:"column:manufacturer;size:255" json:"manufacturer"`
-	Model                string  `gorm:"column:model;size:255" json:"model"`
-	Owner                string  `gorm:"column:owner;size:50" json:"owner"`
-	CivilCode            string  `gorm:"column:civil_code;size:50" json:"civilCode"`
-	Block                string  `gorm:"column:block;size:50" json:"block"`
-	Address              string  `gorm:"column:address;size:50" json:"address"`
-	Parental             int     `gorm:"column:parental" json:"parental"`
-	ParentID             string  `gorm:"column:parent_id;size:50" json:"parentId"`
-	Status               string  `gorm:"column:status;size:50" json:"status"`
-	Longitude            float64 `gorm:"column:longitude" json:"longitude"`
-	Latitude             float64 `gorm:"column:latitude" json:"latitude"`
-	PTZType              int     `gorm:"column:ptz_type" json:"ptzType"`
-	BusinessGroupID      string  `gorm:"column:business_group_id;size:255" json:"businessGroupId"`
-	CreateTime           string  `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime           string  `gorm:"column:update_time;size:50" json:"updateTime"`
-	SubCount             int     `gorm:"column:sub_count" json:"subCount"`
-	HasAudio             bool    `gorm:"column:has_audio" json:"hasAudio"`
-	ChannelType          int     `gorm:"column:channel_type;default:0" json:"channelType"`
-	MapLevel             int     `gorm:"column:map_level;default:0" json:"mapLevel"`
-	GBDeviceID           string  `gorm:"column:gb_device_id;size:50" json:"gbDeviceId"`
-	GBName               string  `gorm:"column:gb_name;size:255" json:"gbName"`
-	GBManufacturer       string  `gorm:"column:gb_manufacturer;size:255" json:"gbManufacturer"`
-	GBModel              string  `gorm:"column:gb_model;size:255" json:"gbModel"`
-	GBCivilCode          string  `gorm:"column:gb_civil_code;size:255" json:"gbCivilCode"`
-	GBParentID           string  `gorm:"column:gb_parent_id;size:255" json:"gbParentId"`
-	GBStatus             string  `gorm:"column:gb_status;size:50" json:"gbStatus"`
-	GBLongitude          float64 `gorm:"column:gb_longitude" json:"gbLongitude"`
-	GBLatitude           float64 `gorm:"column:gb_latitude" json:"gbLatitude"`
-	GBBusinessGroupID    string  `gorm:"column:gb_business_group_id;size:50" json:"gbBusinessGroupId"`
-	GBPTZType            int     `gorm:"column:gb_ptz_type" json:"gbPtzType"`
-	RecordPlanID         int     `gorm:"column:record_plan_id" json:"recordPlanId"`
-	DataType             int     `gorm:"column:data_type" json:"dataType"`
-	DataDeviceID         int     `gorm:"column:data_device_id" json:"dataDeviceId"`
-	StreamIdentification string  `gorm:"column:stream_identification;size:50" json:"streamIdentification"`
-}
-
-func (GBDeviceChannel) TableName() string { return "zws_device_channel" }
-
+// Alarm 报警（处置投影 + 查询字段，1:1 事件）。
 type Alarm struct {
-	ID                  int     `gorm:"column:id;primaryKey;autoIncrement"`
-	ChannelID           int     `gorm:"column:channel_id"`
-	Description         string  `gorm:"column:description;size:255"`
-	SnapPath            string  `gorm:"column:snap_path;size:255"`
-	RecordPath          string  `gorm:"column:record_path;size:255"`
-	Longitude           float64 `gorm:"column:longitude"`
-	Latitude            float64 `gorm:"column:latitude"`
-	AlarmType           int     `gorm:"column:alarm_type"`
-	AlarmCode           string  `gorm:"column:alarm_code;size:64"`
-	AlarmTime           int64   `gorm:"column:alarm_time"`
-	EventID             string  `gorm:"column:event_id;size:128;index"`
-	DeviceInternalCode  string  `gorm:"column:device_internal_code;size:32;index"`
-	ChannelInternalCode string  `gorm:"column:channel_internal_code;size:32;index"`
-	BBoxJSON            string  `gorm:"column:bbox_json;type:text"`
-	Severity            string  `gorm:"column:severity;size:32"`
-	Status              string  `gorm:"column:status;size:32"`
-	HandledBy           string  `gorm:"column:handled_by;size:128"`
-	HandledAt           int64   `gorm:"column:handled_at"`
-	Remark              string  `gorm:"column:remark;size:255"`
+	ID                  int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	EventID             string  `gorm:"column:event_id;size:64;uniqueIndex:uk_alarm_event" json:"eventId"`
+	ChannelID           int64   `gorm:"column:channel_id" json:"channelId"`
+	Description         string  `gorm:"column:description;size:255" json:"description"`
+	AlarmType           int     `gorm:"column:alarm_type;index:idx_alarm_type" json:"alarmType"`
+	AlarmCode           string  `gorm:"column:alarm_code;size:64" json:"alarmCode"`
+	AlarmTime           int64   `gorm:"column:alarm_time;index:idx_alarm_time" json:"alarmTime"`
+	DeviceInternalCode  string  `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
+	ChannelInternalCode string  `gorm:"column:channel_internal_code;size:64" json:"channelInternalCode"`
+	Longitude           float64 `gorm:"column:longitude" json:"longitude"`
+	Latitude            float64 `gorm:"column:latitude" json:"latitude"`
+	BBoxJSON            string  `gorm:"column:bbox_json;type:text" json:"bboxJson"`
+	Status              string  `gorm:"column:status;size:32" json:"status"`
+	Severity            string  `gorm:"column:severity;size:32" json:"severity"`
+	HandedBy            string  `gorm:"column:handed_by;size:128" json:"handedBy"`
+	HandledAt           int64   `gorm:"column:handled_at" json:"handledAt"`
+	SnapPath            string  `gorm:"column:snap_path;size:255" json:"snapPath"`
+	RecordPath          string  `gorm:"column:record_path;size:255" json:"recordPath"`
+	Remark              string  `gorm:"column:remark;size:255" json:"remark"`
+	CreateTime          string  `gorm:"column:create_time;size:50" json:"createTime"`
 }
 
 func (Alarm) TableName() string { return "zws_alarm" }
 
-type MobilePosition struct {
-	ID         int     `gorm:"column:id;primaryKey;autoIncrement"`
-	ChannelID  int     `gorm:"column:channel_id"`
-	Timestamp  int64   `gorm:"column:timestamp"`
-	Longitude  float64 `gorm:"column:longitude"`
-	Latitude   float64 `gorm:"column:latitude"`
-	Altitude   float64 `gorm:"column:altitude"`
-	Speed      float64 `gorm:"column:speed"`
-	Direction  float64 `gorm:"column:direction"`
-	CreateTime string  `gorm:"column:create_time;size:50"`
+// EventSource 事件来源。
+type EventSource struct {
+	ID          int64  `gorm:"column:id;primaryKey;autoIncrement"`
+	DeviceID    int64  `gorm:"column:device_id"`
+	ChannelID   *int64 `gorm:"column:channel_id"`
+	Kind        string `gorm:"column:kind;size:32"`
+	ExternalKey string `gorm:"column:external_key;size:255"`
+	Enabled     bool   `gorm:"column:enabled"`
+	ConfigJSON  string `gorm:"column:config_json;type:text"`
 }
 
-func (MobilePosition) TableName() string { return "zws_mobile_position" }
+func (EventSource) TableName() string { return "zws_event_source" }
 
-type Platform struct {
-	ID              int    `gorm:"column:id;primaryKey;autoIncrement"`
-	Enable          bool   `gorm:"column:enable"`
-	Name            string `gorm:"column:name;size:255"`
-	ServerGBID      string `gorm:"column:server_gb_id;size:50"`
-	ServerGBDomain  string `gorm:"column:server_gb_domain;size:50"`
-	ServerIP        string `gorm:"column:server_ip;size:50"`
-	ServerPort      int    `gorm:"column:server_port"`
-	DeviceGBID      string `gorm:"column:device_gb_id;size:50"`
-	DeviceIP        string `gorm:"column:device_ip;size:50"`
-	DevicePort      string `gorm:"column:device_port;size:50"`
-	Username        string `gorm:"column:username;size:255"`
-	Password        string `gorm:"column:password;size:255"`
-	Expires         string `gorm:"column:expires;size:50"`
-	KeepTimeout     string `gorm:"column:keep_timeout;size:50"`
-	Transport       string `gorm:"column:transport;size:50"`
-	Status          bool   `gorm:"column:status"`
-	AutoPushChannel bool   `gorm:"column:auto_push_channel"`
-	ServerID        string `gorm:"column:server_id;size:50"`
-	CreateTime      string `gorm:"column:create_time;size:50"`
-	UpdateTime      string `gorm:"column:update_time;size:50"`
-}
-
-func (Platform) TableName() string { return "zws_platform" }
-
-type PlatformChannel struct {
-	ID              int    `gorm:"column:id;primaryKey;autoIncrement"`
-	PlatformID      int    `gorm:"column:platform_id"`
-	DeviceChannelID int    `gorm:"column:device_channel_id"`
-	CustomDeviceID  string `gorm:"column:custom_device_id;size:50"`
-	CustomName      string `gorm:"column:custom_name;size:255"`
-}
-
-func (PlatformChannel) TableName() string { return "zws_platform_channel" }
-
-type StreamPush struct {
-	ID               int    `gorm:"column:id;primaryKey;autoIncrement"`
-	App              string `gorm:"column:app;size:255"`
-	Stream           string `gorm:"column:stream;size:255"`
-	MediaServerID    string `gorm:"column:media_server_id;size:50"`
-	ServerID         string `gorm:"column:server_id;size:50"`
-	PushTime         string `gorm:"column:push_time;size:50"`
-	Status           bool   `gorm:"column:status"`
-	UpdateTime       string `gorm:"column:update_time;size:50"`
-	CreateTime       string `gorm:"column:create_time;size:50"`
-	Pushing          bool   `gorm:"column:pushing"`
-	StartOfflinePush bool   `gorm:"column:start_offline_push"`
-}
-
-func (StreamPush) TableName() string { return "zws_stream_push" }
-
-type StreamProxy struct {
-	ID                      int    `gorm:"column:id;primaryKey;autoIncrement"`
-	Type                    string `gorm:"column:type;size:50"`
-	App                     string `gorm:"column:app;size:255"`
-	Stream                  string `gorm:"column:stream;size:255"`
-	SrcURL                  string `gorm:"column:src_url;size:1024"`
-	Timeout                 int    `gorm:"column:timeout"`
-	FFmpegCmdKey            string `gorm:"column:ffmpeg_cmd_key;size:255"`
-	RTSPType                string `gorm:"column:rtsp_type;size:50"`
-	MediaServerID           string `gorm:"column:media_server_id;size:50"`
-	EnableAudio             bool   `gorm:"column:enable_audio"`
-	EnableMP4               bool   `gorm:"column:enable_mp4"`
-	Pulling                 bool   `gorm:"column:pulling"`
-	Enable                  bool   `gorm:"column:enable"`
-	CreateTime              string `gorm:"column:create_time;size:50"`
-	Name                    string `gorm:"column:name;size:255"`
-	UpdateTime              string `gorm:"column:update_time;size:50"`
-	StreamKey               string `gorm:"column:stream_key;size:255"`
-	ServerID                string `gorm:"column:server_id;size:50"`
-	EnableDisableNoneReader bool   `gorm:"column:enable_disable_none_reader"`
-	RelatesMediaServerID    string `gorm:"column:relates_media_server_id;size:50"`
-}
-
-func (StreamProxy) TableName() string { return "zws_stream_proxy" }
-
-type CloudRecord struct {
-	ID            int     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	App           string  `gorm:"column:app;size:255" json:"app"`
-	Stream        string  `gorm:"column:stream;size:255" json:"stream"`
-	CallID        string  `gorm:"column:call_id;size:255" json:"callId"`
-	StartTime     int64   `gorm:"column:start_time" json:"startTime"`
-	EndTime       int64   `gorm:"column:end_time" json:"endTime"`
-	MediaServerID string  `gorm:"column:media_server_id;size:50" json:"mediaServerId"`
-	ServerID      string  `gorm:"column:server_id;size:50" json:"serverId"`
-	FileName      string  `gorm:"column:file_name;size:255" json:"fileName"`
-	Folder        string  `gorm:"column:folder;size:255" json:"folder"`
-	FilePath      string  `gorm:"column:file_path;size:512" json:"filePath"`
-	PlayURL       string  `gorm:"column:play_url;size:768" json:"playUrl"`
-	Collect       bool    `gorm:"column:collect" json:"collect"`
-	FileSize      int64   `gorm:"column:file_size" json:"fileSize"`
-	TimeLen       float64 `gorm:"column:time_len" json:"timeLen"`
-}
-
-func (CloudRecord) TableName() string { return "zws_cloud_record" }
-
-type RecordPlan struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Snap       bool   `gorm:"column:snap" json:"snap"`
-	Name       string `gorm:"column:name;size:255" json:"name"`
-	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
-}
-
-func (RecordPlan) TableName() string { return "zws_record_plan" }
-
-type RecordPlanItem struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Start      int    `gorm:"column:start" json:"start"`
-	Stop       int    `gorm:"column:stop" json:"stop"`
-	WeekDay    int    `gorm:"column:week_day" json:"weekDay"`
-	PlanID     int    `gorm:"column:plan_id" json:"planId"`
-	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
-}
-
-func (RecordPlanItem) TableName() string { return "zws_record_plan_item" }
-
-// CommonGroup 业务分组（组织树）。
-type CommonGroup struct {
-	ID             int    `gorm:"column:id;primaryKey;autoIncrement"`
-	DeviceID       string `gorm:"column:device_id;size:50;not null"`
-	Name           string `gorm:"column:name;size:255;not null"`
-	ParentID       *int   `gorm:"column:parent_id"`
-	ParentDeviceID string `gorm:"column:parent_device_id;size:50"`
-	BusinessGroup  string `gorm:"column:business_group;size:50;not null"`
-	CreateTime     string `gorm:"column:create_time;size:50;not null"`
-	UpdateTime     string `gorm:"column:update_time;size:50;not null"`
-	CivilCode      string `gorm:"column:civil_code;size:50"`
-	Alias          string `gorm:"column:alias;size:255"`
-}
-
-func (CommonGroup) TableName() string { return "zws_common_group" }
-
-// CommonRegion 行政区划。
-type CommonRegion struct {
-	ID             int    `gorm:"column:id;primaryKey;autoIncrement"`
-	DeviceID       string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_common_region_device_id"`
-	Name           string `gorm:"column:name;size:255;not null"`
-	ParentID       *int   `gorm:"column:parent_id"`
-	ParentDeviceID string `gorm:"column:parent_device_id;size:50"`
-	CreateTime     string `gorm:"column:create_time;size:50;not null"`
-	UpdateTime     string `gorm:"column:update_time;size:50;not null"`
-}
-
-func (CommonRegion) TableName() string { return "zws_common_region" }
-
-// GbSipConfig 本平台唯一国标 SIP 配置（设备接入 / 上下级级联共用）。
-type GbSipConfig struct {
-	ID                 int    `gorm:"column:id;primaryKey" json:"id"`
-	IP                 string `gorm:"column:ip;size:64;not null" json:"ip"`
-	Port               int    `gorm:"column:port;not null" json:"port"`
-	Domain             string `gorm:"column:domain;size:32;not null" json:"domain"`
-	DeviceID           string `gorm:"column:device_id;size:32;not null" json:"deviceId"`
-	Password           string `gorm:"column:password;size:64;not null" json:"password"`
-	Alarm              bool   `gorm:"column:alarm;not null;default:0" json:"alarm"`
-	RequirePreRegister bool   `gorm:"column:require_pre_register;not null;default:1" json:"requirePreRegister"`
-	Transport          string `gorm:"column:transport;size:16;not null;default:UDP" json:"transport"`
-	StreamMode         string `gorm:"column:stream_mode;size:16;not null;default:UDP" json:"streamMode"`
-	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime         string `gorm:"column:update_time;size:50" json:"updateTime"`
-}
-
-func (GbSipConfig) TableName() string { return "zws_gb_sip_config" }
-
-// ObjectStoreConfig 对象存储对接配置（MinIO / S3），平台不自建存储。
-type ObjectStoreConfig struct {
-	ID         int    `gorm:"column:id;primaryKey" json:"id"`
-	Enabled    bool   `gorm:"column:enabled;not null;default:0" json:"enabled"`
-	Provider   string `gorm:"column:provider;size:32;not null;default:noop" json:"provider"`
-	Endpoint   string `gorm:"column:endpoint;size:255" json:"endpoint"`
-	Region     string `gorm:"column:region;size:64" json:"region"`
-	Bucket     string `gorm:"column:bucket;size:128" json:"bucket"`
-	AccessKey  string `gorm:"column:access_key;size:128" json:"accessKey"`
-	SecretKey  string `gorm:"column:secret_key;size:256" json:"secretKey"`
-	UseSSL     bool   `gorm:"column:use_ssl;not null;default:0" json:"useSSL"`
-	PathStyle  bool   `gorm:"column:path_style;not null;default:1" json:"pathStyle"`
-	PublicBase string `gorm:"column:public_base;size:255" json:"publicBase"`
-	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
-}
-
-func (ObjectStoreConfig) TableName() string { return "zws_object_store_config" }
-
-// MQTTConfig 消息队列对接配置（平台消费者与插件发布共用，单行）。
-type MQTTConfig struct {
-	ID             int    `gorm:"column:id;primaryKey" json:"id"`
-	Enabled        bool   `gorm:"column:enabled;not null;default:0" json:"enabled"`
-	Broker         string `gorm:"column:broker;size:255" json:"broker"`
-	ClientIDPrefix string `gorm:"column:client_id_prefix;size:64" json:"clientIdPrefix"`
-	Username       string `gorm:"column:username;size:128" json:"username"`
-	Password       string `gorm:"column:password;size:256" json:"password"`
-	TopicPrefix    string `gorm:"column:topic_prefix;size:128;default:zws/events" json:"topicPrefix"`
-	QoS            int    `gorm:"column:qos;default:1" json:"qos"`
-	KeepAliveSec   int    `gorm:"column:keepalive_sec;default:30" json:"keepAliveSec"`
-	TLSEnabled     bool   `gorm:"column:tls_enabled;not null;default:0" json:"tlsEnabled"`
-	CACert         string `gorm:"column:ca_cert;type:text" json:"caCert"`
-	ClientCert     string `gorm:"column:client_cert;type:text" json:"clientCert"`
-	ClientKey      string `gorm:"column:client_key;type:text" json:"clientKey"`
-	CreateTime     string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime     string `gorm:"column:update_time;size:50" json:"updateTime"`
-}
-
-func (MQTTConfig) TableName() string { return "zws_mqtt_config" }
-
-// EventSubscription 插件设备事件订阅/布防状态。
+// EventSubscription 事件订阅/布防。
 type EventSubscription struct {
-	ID                 int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	DeviceID           int    `gorm:"column:device_id;uniqueIndex:uk_event_sub_device" json:"deviceId"`
-	PluginID           string `gorm:"column:plugin_instance_id;size:128;index" json:"pluginId"`
-	DeviceUID          string `gorm:"column:device_uid;size:128" json:"deviceUid"`
+	ID                 int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	DeviceID           int64  `gorm:"column:device_id;uniqueIndex:uk_event_sub,priority:1" json:"deviceId"`
+	ChannelID          *int64 `gorm:"column:channel_id;uniqueIndex:uk_event_sub,priority:2" json:"channelId"`
 	DeviceInternalCode string `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
+	PluginInstanceID   string `gorm:"column:plugin_instance_id;size:128" json:"pluginInstanceId"`
+	DeviceUID          string `gorm:"column:device_uid;size:255" json:"deviceUid"`
 	EventTypesJSON     string `gorm:"column:event_types;type:text" json:"-"`
 	Armed              bool   `gorm:"column:armed;not null;default:0" json:"armed"`
 	Status             string `gorm:"column:status;size:16" json:"status"`
@@ -450,38 +269,228 @@ type EventSubscription struct {
 
 func (EventSubscription) TableName() string { return "zws_event_subscription" }
 
-// Event 平台事件记录（来自 MQTT 等）。
-type Event struct {
-	ID                  string `gorm:"column:id;primaryKey;size:36" json:"id"`
-	EventID             string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
-	SchemaVersion       string `gorm:"column:schema_version;size:16" json:"schemaVersion"`
-	SourceID            string `gorm:"column:source_id;size:36" json:"sourceId"`
-	DeviceID            string `gorm:"column:device_id;size:36;index" json:"deviceId"`
-	BindingID           string `gorm:"column:binding_id;size:36" json:"bindingId"`
-	ResourceID          string `gorm:"column:resource_id;size:36" json:"resourceId"`
-	DeviceInternalCode  string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
-	DeviceUID           string `gorm:"column:device_uid;size:128" json:"deviceUid"`
-	ChannelExternalKey  string `gorm:"column:channel_external_key;size:128" json:"channelExternalKey"`
-	ChannelInternalCode string `gorm:"column:channel_internal_code;size:32;index" json:"channelInternalCode"`
-	EventType           string `gorm:"column:event_type;size:64;index" json:"eventType"`
-	Severity            string `gorm:"column:severity;size:16" json:"severity"`
-	OccurredAt          int64  `gorm:"column:occurred_at;index" json:"occurredAt"`
-	ReceivedAt          int64  `gorm:"column:received_at" json:"receivedAt"`
-	ImageKey            string `gorm:"column:image_key;size:512" json:"imageKey"`
+// CustomEvent 自定义事件（raw 原样保存，与统一事件隔离）。
+type CustomEvent struct {
+	ID                  int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	EventID             string `gorm:"column:event_id;size:64" json:"eventId"`
+	DeviceInternalCode  string `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
+	ChannelInternalCode string `gorm:"column:channel_internal_code;size:64" json:"channelInternalCode"`
+	DeviceID            string `gorm:"column:device_id;size:64" json:"deviceId"`
+	ResourceID          string `gorm:"column:resource_id;size:64" json:"resourceId"`
+	MajorType           string `gorm:"column:major_type;size:64" json:"majorType"`
+	MinorType           string `gorm:"column:minor_type;size:64" json:"minorType"`
+	OccurAt             int64  `gorm:"column:occur_at" json:"occurAt"`
+	Level               string `gorm:"column:level;size:32" json:"level"`
+	ImageKey            string `gorm:"column:image_key;size:255" json:"imageKey"`
 	ImageURL            string `gorm:"column:image_url;size:1024" json:"imageUrl"`
-	ImageExpiresAt      int64  `gorm:"column:image_expires_at" json:"imageExpiresAt"`
-	BBoxJSON            string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
 	RawJSON             string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
-	Status              string `gorm:"column:status;size:16" json:"status"`
-	AlarmID             int    `gorm:"column:alarm_id;default:0" json:"alarmId"`
 	CreateTime          string `gorm:"column:create_time;size:50" json:"createTime"`
 }
 
-func (Event) TableName() string { return "zws_event" }
+func (CustomEvent) TableName() string { return "zws_custom_event" }
 
-// SubordinatePlatform 下级国标平台（向本级 REGISTER，与摄像机设备表分离）。
+// ===========================================================================
+// D. 媒体 / 录像 / 位置
+// ===========================================================================
+
+// MediaServer 媒体服务器节点。
+type MediaServer struct {
+	ID                   string `gorm:"column:id;primaryKey;size:255" json:"id"`
+	Name                 string `gorm:"column:name;size:128" json:"name"`
+	IP                   string `gorm:"column:ip;size:50" json:"ip"`
+	HookIP               string `gorm:"column:hook_ip;size:50" json:"hookIp"`
+	SDPIP                string `gorm:"column:sdp_ip;size:50" json:"sdpIp"`
+	StreamIP             string `gorm:"column:stream_ip;size:50" json:"streamIp"`
+	HTTPPort             int    `gorm:"column:http_port" json:"httpPort"`
+	HTTPSSLPort          int    `gorm:"column:http_ssl_port" json:"httpSSlPort"`
+	RTMPPort             int    `gorm:"column:rtmp_port" json:"rtmpPort"`
+	RTMPSSLPort          int    `gorm:"column:rtmp_ssl_port" json:"rtmpSslPort"`
+	RTSPPort             int    `gorm:"column:rtsp_port" json:"rtspPort"`
+	RTSPSSLPort          int    `gorm:"column:rtsp_ssl_port" json:"rtspSslPort"`
+	SRTPort              int    `gorm:"column:srt_port" json:"srtPort"`
+	RTPProxyPort         int    `gorm:"column:rtp_proxy_port" json:"rtpProxyPort"`
+	WebRTCPortMin        int    `gorm:"column:webrtc_port_min" json:"webrtcPortMin"`
+	WebRTCPortMax        int    `gorm:"column:webrtc_port_max" json:"webrtcPortMax"`
+	CapabilitiesReported bool   `gorm:"column:capabilities_reported" json:"capabilitiesReported"`
+	EnableRTSP           bool   `gorm:"column:enable_rtsp" json:"enableRtsp"`
+	EnableRTMP           bool   `gorm:"column:enable_rtmp" json:"enableRtmp"`
+	EnableHLS            bool   `gorm:"column:enable_hls" json:"enableHls"`
+	EnableSRT            bool   `gorm:"column:enable_srt" json:"enableSrt"`
+	EnableWebRTC         bool   `gorm:"column:enable_webrtc" json:"enableWebrtc"`
+	Secret               string `gorm:"column:secret;size:50" json:"secret"`
+	Type                 string `gorm:"column:type;size:32" json:"type"`
+	Version              string `gorm:"column:version;size:50" json:"version"`
+	ServerID             string `gorm:"column:server_id;size:50" json:"serverId"`
+	DefaultServer        bool   `gorm:"column:default_server" json:"defaultServer"`
+	HookAliveInterval    int    `gorm:"column:hook_alive_interval" json:"hookAliveInterval"`
+	RecordPath           string `gorm:"column:record_path;size:255" json:"recordPath"`
+	RecordDay            int    `gorm:"column:record_day" json:"recordDay"`
+	TranscodeSuffix      string `gorm:"column:transcode_suffix;size:255" json:"transcodeSuffix"`
+	AutoConfig           bool   `gorm:"column:auto_config" json:"autoConfig"`
+	LastSeen             int64  `gorm:"column:last_seen" json:"lastSeen"`
+	CreateTime           string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime           string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (MediaServer) TableName() string { return "zws_media_server" }
+
+// RecordPlan 录像计划。
+type RecordPlan struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name       string `gorm:"column:name;size:255" json:"name"`
+	Snap       bool   `gorm:"column:snap" json:"snap"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (RecordPlan) TableName() string { return "zws_record_plan" }
+
+// RecordPlanItem 录像计划时段。
+type RecordPlanItem struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlanID     int64  `gorm:"column:plan_id" json:"planId"`
+	WeekDay    int    `gorm:"column:week_day" json:"weekDay"`
+	Start      int    `gorm:"column:start_min" json:"start"`
+	Stop       int    `gorm:"column:stop_min" json:"stop"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (RecordPlanItem) TableName() string { return "zws_record_plan_item" }
+
+// CloudRecord 云端录像。
+type CloudRecord struct {
+	ID            int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ChannelID     *int64  `gorm:"column:channel_id;index:idx_cloud_channel_time,priority:1" json:"channelId"`
+	App           string  `gorm:"column:app;size:64" json:"app"`
+	Stream        string  `gorm:"column:stream;size:255" json:"stream"`
+	CallID        string  `gorm:"column:call_id;size:255" json:"callId"`
+	MediaServerID string  `gorm:"column:media_server_id;size:255" json:"mediaServerId"`
+	StartTime     int64   `gorm:"column:start_time" json:"startTime"`
+	EndTime       int64   `gorm:"column:end_time" json:"endTime"`
+	FileName      string  `gorm:"column:file_name;size:255" json:"fileName"`
+	Folder        string  `gorm:"column:folder;size:255" json:"folder"`
+	FilePath      string  `gorm:"column:file_path;size:512" json:"filePath"`
+	Collect       bool    `gorm:"column:collect" json:"collect"`
+	FileSize      int64   `gorm:"column:file_size" json:"fileSize"`
+	TimeLen       float64 `gorm:"column:time_len" json:"timeLen"`
+	PlayURL       string  `gorm:"column:play_url;size:512" json:"playUrl"`
+	ServerID      string  `gorm:"column:server_id;size:50" json:"serverId"`
+}
+
+func (CloudRecord) TableName() string { return "zws_cloud_record" }
+
+// StreamProxy 拉流代理。
+type StreamProxy struct {
+	ID                      int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name                    string `gorm:"column:name;size:255" json:"name"`
+	Type                    string `gorm:"column:type;size:50" json:"type"`
+	App                     string `gorm:"column:app;size:64" json:"app"`
+	Stream                  string `gorm:"column:stream;size:255" json:"stream"`
+	SrcURL                  string `gorm:"column:src_url;size:1024" json:"srcUrl"`
+	Timeout                 int    `gorm:"column:timeout" json:"timeout"`
+	FFmpegCmdKey            string `gorm:"column:ffmpeg_cmd_key;size:255" json:"ffmpegCmdKey"`
+	RTSPType                string `gorm:"column:rtsp_type;size:50" json:"rtspType"`
+	MediaServerID           string `gorm:"column:media_server_id;size:255" json:"mediaServerId"`
+	EnableAudio             bool   `gorm:"column:enable_audio" json:"enableAudio"`
+	EnableMP4               bool   `gorm:"column:enable_mp4" json:"enableMp4"`
+	Enable                  bool   `gorm:"column:enable" json:"enable"`
+	Pulling                 bool   `gorm:"column:pulling" json:"pulling"`
+	StreamKey               string `gorm:"column:stream_key;size:255" json:"streamKey"`
+	ServerID                string `gorm:"column:server_id;size:50" json:"serverId"`
+	EnableDisableNoneReader bool   `gorm:"column:enable_disable_none_reader" json:"enableDisableNoneReader"`
+	RelatesMediaServerID    string `gorm:"column:relates_media_server_id;size:255" json:"relatesMediaServerId"`
+	GbCode                  string `gorm:"column:gb_code;size:50" json:"gbCode"`
+	GbName                  string `gorm:"column:gb_name;size:255" json:"gbName"`
+	CreateTime              string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime              string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (StreamProxy) TableName() string { return "zws_stream_proxy" }
+
+// StreamPush 推流会话。
+type StreamPush struct {
+	ID               int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	App              string `gorm:"column:app;size:64" json:"app"`
+	Stream           string `gorm:"column:stream;size:255" json:"stream"`
+	MediaServerID    string `gorm:"column:media_server_id;size:255" json:"mediaServerId"`
+	Status           bool   `gorm:"column:status" json:"status"`
+	Pushing          bool   `gorm:"column:pushing" json:"pushing"`
+	Self             bool   `gorm:"column:self" json:"self"`
+	PushTime         string `gorm:"column:push_time;size:50" json:"pushTime"`
+	ServerID         string `gorm:"column:server_id;size:50" json:"serverId"`
+	StartOfflinePush bool   `gorm:"column:start_offline_push" json:"startOfflinePush"`
+	GbCode           string `gorm:"column:gb_code;size:50" json:"gbCode"`
+	GbName           string `gorm:"column:gb_name;size:255" json:"gbName"`
+	CreateTime       string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime       string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (StreamPush) TableName() string { return "zws_stream_push" }
+
+// MobilePosition 移动位置上报。
+type MobilePosition struct {
+	ID         int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ChannelID  int64   `gorm:"column:channel_id;index:idx_pos_channel_time,priority:1" json:"channelId"`
+	Timestamp  int64   `gorm:"column:timestamp" json:"timestamp"`
+	Longitude  float64 `gorm:"column:longitude" json:"longitude"`
+	Latitude   float64 `gorm:"column:latitude" json:"latitude"`
+	Altitude   float64 `gorm:"column:altitude" json:"altitude"`
+	Speed      float64 `gorm:"column:speed" json:"speed"`
+	Direction  float64 `gorm:"column:direction" json:"direction"`
+	CreateTime string  `gorm:"column:create_time;size:50" json:"createTime"`
+}
+
+func (MobilePosition) TableName() string { return "zws_mobile_position" }
+
+// ===========================================================================
+// E. 级联
+// ===========================================================================
+
+// UpperPlatform 上级国标平台。
+type UpperPlatform struct {
+	ID                  int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Enable              bool   `gorm:"column:enable" json:"enable"`
+	Name                string `gorm:"column:name;size:255" json:"name"`
+	ServerGBID          string `gorm:"column:server_gb_id;size:50;uniqueIndex:uk_upper_server_gb" json:"serverGbId"`
+	ServerGBDomain      string `gorm:"column:server_gb_domain;size:50" json:"serverGbDomain"`
+	ServerIP            string `gorm:"column:server_ip;size:50" json:"serverIp"`
+	ServerPort          int    `gorm:"column:server_port" json:"serverPort"`
+	DeviceGBID          string `gorm:"column:device_gb_id;size:50" json:"deviceGbId"`
+	DeviceIP            string `gorm:"column:device_ip;size:50" json:"deviceIp"`
+	DevicePort          string `gorm:"column:device_port;size:50" json:"devicePort"`
+	Username            string `gorm:"column:username;size:255" json:"username"`
+	Password            string `gorm:"column:password;size:255" json:"password"`
+	Expires             string `gorm:"column:expires;size:50" json:"expires"`
+	KeepTimeout         string `gorm:"column:keep_timeout;size:50" json:"keepTimeout"`
+	Transport           string `gorm:"column:transport;size:50" json:"transport"`
+	CivilCode           string `gorm:"column:civil_code;size:50" json:"civilCode"`
+	Manufacturer        string `gorm:"column:manufacturer;size:255" json:"manufacturer"`
+	Model               string `gorm:"column:model;size:255" json:"model"`
+	Address             string `gorm:"column:address;size:255" json:"address"`
+	CharacterSet        string `gorm:"column:character_set;size:50" json:"characterSet"`
+	PTZ                 bool   `gorm:"column:ptz" json:"ptz"`
+	RTCP                bool   `gorm:"column:rtcp" json:"rtcp"`
+	Status              bool   `gorm:"column:status" json:"status"`
+	CatalogGroup        int    `gorm:"column:catalog_group" json:"catalogGroup"`
+	RegisterWay         int    `gorm:"column:register_way" json:"registerWay"`
+	Secrecy             int    `gorm:"column:secrecy" json:"secrecy"`
+	AsMessageChannel    bool   `gorm:"column:as_message_channel" json:"asMessageChannel"`
+	CatalogWithPlatform int    `gorm:"column:catalog_with_platform" json:"catalogWithPlatform"`
+	CatalogWithGroup    int    `gorm:"column:catalog_with_group" json:"catalogWithGroup"`
+	CatalogWithRegion   int    `gorm:"column:catalog_with_region" json:"catalogWithRegion"`
+	AutoPushChannel     bool   `gorm:"column:auto_push_channel" json:"autoPushChannel"`
+	SendStreamIP        string `gorm:"column:send_stream_ip;size:50" json:"sendStreamIp"`
+	ServerID            string `gorm:"column:server_id;size:50" json:"serverId"`
+	CreateTime          string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime          string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (UpperPlatform) TableName() string { return "zws_upper_platform" }
+
+// SubordinatePlatform 下级国标平台。
 type SubordinatePlatform struct {
-	ID           int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Enable       bool   `gorm:"column:enable;not null;default:1" json:"enable"`
 	Name         string `gorm:"column:name;size:255" json:"name"`
 	DeviceGBID   string `gorm:"column:device_gb_id;size:50;uniqueIndex:uk_sub_gb_id" json:"deviceGBId"`
@@ -500,11 +509,11 @@ type SubordinatePlatform struct {
 
 func (SubordinatePlatform) TableName() string { return "zws_subordinate_platform" }
 
-// SubordinateCatalog 下级平台推送来的目录项（级联接收，独立于本机设备表）。
+// SubordinateCatalog 下级平台推送来的目录项。
 type SubordinateCatalog struct {
-	ID           int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	PlatformID   int    `gorm:"column:platform_id;not null;uniqueIndex:uk_sub_catalog" json:"platformId"`
-	DeviceID     string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_sub_catalog" json:"deviceId"`
+	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlatformID   int64  `gorm:"column:platform_id;not null;uniqueIndex:uk_sub_catalog,priority:1" json:"platformId"`
+	DeviceID     string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_sub_catalog,priority:2" json:"deviceId"`
 	Name         string `gorm:"column:name;size:255" json:"name"`
 	ParentID     string `gorm:"column:parent_id;size:50;index:idx_sub_catalog_parent" json:"parentId"`
 	TypeCode     string `gorm:"column:type_code;size:8" json:"typeCode"`
@@ -521,11 +530,11 @@ type SubordinateCatalog struct {
 
 func (SubordinateCatalog) TableName() string { return "zws_subordinate_catalog" }
 
-// PlatformCatalogSnapshot 记录向上级平台推送的目录快照（级联推送差分）。
+// PlatformCatalogSnapshot 向上级推送目录快照。
 type PlatformCatalogSnapshot struct {
-	ID         int    `gorm:"column:id;primaryKey;autoIncrement"`
-	PlatformID int    `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_catalog_snap" json:"platformId"`
-	DeviceID   string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_plat_catalog_snap" json:"deviceId"`
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlatformID int64  `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_catalog_snap,priority:1" json:"platformId"`
+	DeviceID   string `gorm:"column:device_id;size:50;not null;uniqueIndex:uk_plat_catalog_snap,priority:2" json:"deviceId"`
 	Name       string `gorm:"column:name;size:255" json:"name"`
 	ParentID   string `gorm:"column:parent_id;size:50" json:"parentId"`
 	ItemType   string `gorm:"column:item_type;size:16" json:"itemType"`
@@ -535,16 +544,38 @@ type PlatformCatalogSnapshot struct {
 
 func (PlatformCatalogSnapshot) TableName() string { return "zws_platform_catalog_snapshot" }
 
-// PlatformGroupShare 上级平台按业务分组/虚拟组织节点的共享（级联只共享业务目录）。
+// PlatformGroupShare 上级平台按业务分组共享。
 type PlatformGroupShare struct {
-	ID            int    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	PlatformID    int    `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_group" json:"platformId"`
-	GroupDeviceID string `gorm:"column:group_device_id;size:50;not null;uniqueIndex:uk_plat_group" json:"groupDeviceId"`
+	ID         int64 `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlatformID int64 `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_group,priority:1" json:"platformId"`
+	GroupID    int64 `gorm:"column:group_id;not null;uniqueIndex:uk_plat_group,priority:2" json:"groupId"`
 }
 
 func (PlatformGroupShare) TableName() string { return "zws_platform_group_share" }
 
-// GBCodeSeq 平台分配的国标码序号（按 14 位前缀隔离，防重复）。
+// PlatformChannel 通道对外映射（级联 overrides）。
+type PlatformChannel struct {
+	ID            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	PlatformID    int64  `gorm:"column:platform_id;not null;uniqueIndex:uk_plat_channel,priority:1" json:"platformId"`
+	ChannelID     int64  `gorm:"column:channel_id;not null;uniqueIndex:uk_plat_channel,priority:2" json:"channelId"`
+	CustomGBCode  string `gorm:"column:custom_gb_code;size:50" json:"customGbCode"`
+	OverridesJSON string `gorm:"column:overrides_json;type:longtext" json:"overridesJson"`
+	CreateTime    string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime    string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (PlatformChannel) TableName() string { return "zws_platform_channel" }
+
+// RegionCodeMapping 区划节点对外编码映射。
+type RegionCodeMapping struct {
+	RegionID   int64  `gorm:"column:region_id;primaryKey" json:"regionId"`
+	GBCode     string `gorm:"column:gb_code;size:20" json:"gbCode"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (RegionCodeMapping) TableName() string { return "zws_region_code_mapping" }
+
+// GBCodeSeq 国标码序号分配。
 type GBCodeSeq struct {
 	Prefix string `gorm:"column:prefix;primaryKey;size:14" json:"prefix"`
 	Next   int64  `gorm:"column:next;not null;default:0" json:"next"`
@@ -552,14 +583,24 @@ type GBCodeSeq struct {
 
 func (GBCodeSeq) TableName() string { return "zws_gb_code_seq" }
 
-// RegionCodeMapping 区划节点对外国标码映射（公安等上级指定编码场景）。
-type RegionCodeMapping struct {
-	RegionDeviceID string `gorm:"column:region_device_id;primaryKey;size:50" json:"regionDeviceId"`
-	GBCode         string `gorm:"column:gb_code;size:20" json:"gbCode"`
-	UpdateTime     string `gorm:"column:update_time;size:50" json:"updateTime"`
+// ===========================================================================
+// F. 接入 / 插件
+// ===========================================================================
+
+// Agent 接入侧 zero-agent 实例。
+type Agent struct {
+	ID         string `gorm:"column:id;primaryKey;size:128"`
+	Hostname   string `gorm:"column:hostname;size:255"`
+	IP         string `gorm:"column:ip;size:64"`
+	Version    string `gorm:"column:version;size:64"`
+	Endpoint   string `gorm:"column:endpoint;size:255"`
+	Status     string `gorm:"column:status;size:32"`
+	LastSeen   int64  `gorm:"column:last_seen"`
+	CreateTime string `gorm:"column:create_time;size:50"`
+	UpdateTime string `gorm:"column:update_time;size:50"`
 }
 
-func (RegionCodeMapping) TableName() string { return "zws_region_code_mapping" }
+func (Agent) TableName() string { return "zws_agent" }
 
 // Plugin 是 sidecar 插件实例注册信息。
 type Plugin struct {
@@ -580,26 +621,11 @@ type Plugin struct {
 
 func (Plugin) TableName() string { return "zws_plugin" }
 
-// Agent 是接入侧 zero-agent 实例。
-type Agent struct {
-	ID         string `gorm:"column:id;primaryKey;size:128"`
-	Hostname   string `gorm:"column:hostname;size:255"`
-	IP         string `gorm:"column:ip;size:64"`
-	Version    string `gorm:"column:version;size:64"`
-	Endpoint   string `gorm:"column:endpoint;size:255"`
-	Status     string `gorm:"column:status;size:32"`
-	LastSeen   int64  `gorm:"column:last_seen"`
-	CreateTime string `gorm:"column:create_time;size:50"`
-	UpdateTime string `gorm:"column:update_time;size:50"`
-}
-
-func (Agent) TableName() string { return "zws_agent" }
-
 // AgentPlugin 是 Agent 上报的插件清单与运行状态。
 type AgentPlugin struct {
 	ID               string `gorm:"column:id;primaryKey;size:160"`
 	AgentID          string `gorm:"column:agent_id;size:128;index"`
-	PluginID         string `gorm:"column:plugin_id;size:128;index"`
+	PluginID         string `gorm:"column:plugin_id;size:128"`
 	Name             string `gorm:"column:name;size:255"`
 	Vendor           string `gorm:"column:vendor;size:128"`
 	Version          string `gorm:"column:version;size:64"`
@@ -649,8 +675,8 @@ func (PluginPackage) TableName() string { return "zws_plugin_package" }
 type PluginInstall struct {
 	ID         string `gorm:"column:id;primaryKey;size:64"`
 	AgentID    string `gorm:"column:agent_id;size:128;index"`
-	PackageID  string `gorm:"column:package_id;size:64;index"`
-	PluginID   string `gorm:"column:plugin_id;size:64;index"`
+	PackageID  string `gorm:"column:package_id;size:64"`
+	PluginID   string `gorm:"column:plugin_id;size:64"`
 	Version    string `gorm:"column:version;size:64"`
 	Status     string `gorm:"column:status;size:32"`
 	LastError  string `gorm:"column:last_error;type:text"`
@@ -660,197 +686,136 @@ type PluginInstall struct {
 
 func (PluginInstall) TableName() string { return "zws_plugin_install" }
 
-// EventType 是统一事件类型注册表。
-type EventType struct {
-	Code           string `gorm:"column:code;primaryKey;size:64"`
-	Name           string `gorm:"column:name;size:128"`
-	Category       string `gorm:"column:category;size:32"`
-	Severity       string `gorm:"column:severity;size:32"`
-	AlarmEligible  bool   `gorm:"column:alarm_eligible"`
-	RequiresVideo  bool   `gorm:"column:requires_video"`
-	BBoxCapable    bool   `gorm:"column:bbox_capable"`
-	VendorMappings string `gorm:"column:vendor_mappings;type:text"`
-	Enabled        bool   `gorm:"column:enabled"`
-	UpdateTime     string `gorm:"column:update_time;size:50"`
+// ===========================================================================
+// G. 用户 / 权限
+// ===========================================================================
+
+type UserRole struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name       string `gorm:"column:name;size:50" json:"name"`
+	Authority  string `gorm:"column:authority;size:512" json:"authority"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
-func (EventType) TableName() string { return "zws_event_type" }
+func (UserRole) TableName() string { return "zws_user_role" }
 
-// CustomEvent 是自定义事件（平台不理解语义，只按基础字段存 raw）。与 zws_event 隔离。
-type CustomEvent struct {
-	ID                  string `gorm:"column:id;primaryKey;size:36" json:"id"`
-	EventID             string `gorm:"column:event_id;size:64;uniqueIndex:uk_custom_event_id" json:"eventId"`
-	DeviceInternalCode  string `gorm:"column:device_internal_code;size:64;index" json:"deviceInternalCode"`
-	ChannelInternalCode string `gorm:"column:channel_internal_code;size:32;index" json:"channelInternalCode"`
-	DeviceID            string `gorm:"column:device_id;size:36;index" json:"deviceId"`
-	ResourceID          string `gorm:"column:resource_id;size:36;index" json:"resourceId"`
-	MajorType           string `gorm:"column:major_type;size:64;index" json:"majorType"`
-	MinorType           string `gorm:"column:minor_type;size:128;index" json:"minorType"`
-	OccurAt             int64  `gorm:"column:occur_at;index" json:"occurAt"`
-	Level               string `gorm:"column:level;size:16" json:"level"`
-	ImageKey            string `gorm:"column:image_key;size:512" json:"imageKey"`
-	ImageURL            string `gorm:"column:image_url;size:1024" json:"imageUrl"`
-	RawJSON             string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
-	CreateTime          string `gorm:"column:create_time;size:50" json:"createTime"`
+type User struct {
+	ID         int64    `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Username   string   `gorm:"column:username;size:255;uniqueIndex:uk_user_username" json:"username"`
+	Password   string   `gorm:"column:password;size:255" json:"password,omitempty"`
+	RoleID     *int64   `gorm:"column:role_id" json:"roleId"`
+	CreateTime string   `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string   `gorm:"column:update_time;size:50" json:"updateTime"`
+	Role       UserRole `gorm:"foreignKey:RoleID;references:ID" json:"role"`
 }
 
-func (CustomEvent) TableName() string { return "zws_custom_event" }
+func (User) TableName() string { return "zws_user" }
 
-// PluginDevice 是通过插件接入的设备。
-type PluginDevice struct {
-	ID           int    `gorm:"column:id;primaryKey;autoIncrement"`
-	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_plugin_device_code"`
-	PluginID     string `gorm:"column:plugin_id;size:128;uniqueIndex:uk_plugin_device_uid"`
-	Protocol     string `gorm:"column:protocol;size:64"`
-	DeviceUID    string `gorm:"column:device_uid;size:128;uniqueIndex:uk_plugin_device_uid"`
-	Name         string `gorm:"column:name;size:255"`
-	Enabled      bool   `gorm:"column:enabled;default:1"`
-	Online       bool   `gorm:"column:online"`
-	DriverParams string `gorm:"column:driver_params;type:longtext"`
-	Manufacturer string `gorm:"column:manufacturer;size:255"`
-	Model        string `gorm:"column:model;size:255"`
-	Firmware     string `gorm:"column:firmware;size:255"`
-	SerialNumber string `gorm:"column:serial_number;size:255"`
-	CreateTime   string `gorm:"column:create_time;size:50"`
-	UpdateTime   string `gorm:"column:update_time;size:50"`
+type UserAPIKey struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UserID     *int64 `gorm:"column:user_id" json:"userId"`
+	App        string `gorm:"column:app;size:255" json:"app"`
+	APIKey     string `gorm:"column:api_key;type:text" json:"apiKey"`
+	ExpiredAt  int64  `gorm:"column:expired_at" json:"expiredAt"`
+	Remark     string `gorm:"column:remark;size:255" json:"remark"`
+	Enable     bool   `gorm:"column:enable" json:"enable"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
-func (PluginDevice) TableName() string { return "zws_plugin_device" }
+func (UserAPIKey) TableName() string { return "zws_user_api_key" }
 
-// PluginChannel 是插件设备的通道。
-type PluginChannel struct {
-	ID           int    `gorm:"column:id;primaryKey;autoIncrement"`
-	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_plugin_channel_code"`
-	DeviceDBID   int    `gorm:"column:device_db_id;index"`
-	ChannelID    string `gorm:"column:channel_id;size:128"`
-	Name         string `gorm:"column:name;size:255"`
-	Status       string `gorm:"column:status;size:32"`
-	PTZType      int    `gorm:"column:ptz_type"`
-	HasAudio     bool   `gorm:"column:has_audio"`
-	CreateTime   string `gorm:"column:create_time;size:50"`
-	UpdateTime   string `gorm:"column:update_time;size:50"`
-}
-
-func (PluginChannel) TableName() string { return "zws_plugin_channel" }
-
-// PhysicalDevice 统一物理设备资产。
-type PhysicalDevice struct {
-	ID           string `gorm:"column:id;primaryKey;size:36"`
-	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_physical_code"`
-	Name         string `gorm:"column:name;size:255"`
-	Vendor       string `gorm:"column:vendor;size:128"`
-	Model        string `gorm:"column:model;size:128"`
-	SerialNumber string `gorm:"column:serial_number;size:128"`
-	Enabled      bool   `gorm:"column:enabled;default:1"`
-	Online       bool   `gorm:"column:online"`
-	CreateTime   string `gorm:"column:create_time;size:50"`
-	UpdateTime   string `gorm:"column:update_time;size:50"`
-}
-
-func (PhysicalDevice) TableName() string { return "zws_physical_device" }
-
-// AccessBinding 设备唯一接入绑定。
-type AccessBinding struct {
-	ID               string `gorm:"column:id;primaryKey;size:36"`
-	DeviceID         string `gorm:"column:device_id;size:36;uniqueIndex:uk_binding_device"`
-	Protocol         string `gorm:"column:protocol;size:32"`
-	Mode             string `gorm:"column:mode;size:16"`
-	ExternalID       string `gorm:"column:external_id;size:255"`
-	Endpoint         string `gorm:"column:endpoint;size:255"`
-	PluginInstanceID string `gorm:"column:plugin_instance_id;size:128"`
-	ConfigJSON       string `gorm:"column:config_json;type:longtext"`
-	Status           string `gorm:"column:status;size:32"`
-	LastSeen         int64  `gorm:"column:last_seen"`
-	LegacyDeviceID   int    `gorm:"column:legacy_device_id"`
-	CreateTime       string `gorm:"column:create_time;size:50"`
-	UpdateTime       string `gorm:"column:update_time;size:50"`
-}
-
-func (AccessBinding) TableName() string { return "zws_access_binding" }
-
-// AssetResource 统一设备资源。
-type AssetResource struct {
-	ID              string `gorm:"column:id;primaryKey;size:36"`
-	InternalCode    string `gorm:"column:internal_code;size:32;index" json:"internalCode"`
-	DeviceID        string `gorm:"column:device_id;size:36;index"`
-	BindingID       string `gorm:"column:binding_id;size:36"`
-	Kind            string `gorm:"column:kind;size:32"`
-	ExternalKey     string `gorm:"column:external_key;size:255"`
-	Name            string `gorm:"column:name;size:255"`
-	Status          string `gorm:"column:status;size:32"`
-	LegacyChannelID int    `gorm:"column:legacy_channel_id"`
-	AttrsJSON       string `gorm:"column:attrs_json;type:longtext"`
-	CreateTime      string `gorm:"column:create_time;size:50"`
-	UpdateTime      string `gorm:"column:update_time;size:50"`
-}
-
-func (AssetResource) TableName() string { return "zws_resource" }
-
-// AssetStreamProfile 资源码流。
-type AssetStreamProfile struct {
-	ID           string `gorm:"column:id;primaryKey;size:36"`
-	ResourceID   string `gorm:"column:resource_id;size:36;index"`
-	Role         string `gorm:"column:role;size:16"`
-	Name         string `gorm:"column:name;size:128"`
-	SelectorJSON string `gorm:"column:selector_json;type:text"`
-	Codec        string `gorm:"column:codec;size:64"`
-	Resolution   string `gorm:"column:resolution;size:64"`
-	IsDefault    bool   `gorm:"column:is_default"`
-	CreateTime   string `gorm:"column:create_time;size:50"`
-	UpdateTime   string `gorm:"column:update_time;size:50"`
-}
-
-func (AssetStreamProfile) TableName() string { return "zws_stream_profile" }
-
-// AssetCapability 能力事实。
-type AssetCapability struct {
-	ID         string `gorm:"column:id;primaryKey;size:36"`
-	ScopeType  string `gorm:"column:scope_type;size:16;index"`
-	ScopeID    string `gorm:"column:scope_id;size:36;index"`
-	Operation  string `gorm:"column:operation;size:64"`
-	Supported  bool   `gorm:"column:supported"`
-	Configured bool   `gorm:"column:configured"`
-	Available  bool   `gorm:"column:available"`
-	ParamsJSON string `gorm:"column:params_json;type:text"`
-	Source     string `gorm:"column:source;size:32"`
-	UpdateTime string `gorm:"column:update_time;size:50"`
-}
-
-func (AssetCapability) TableName() string { return "zws_capability" }
-
-// AssetEventSource 事件来源。
-type AssetEventSource struct {
-	ID          string `gorm:"column:id;primaryKey;size:36"`
-	DeviceID    string `gorm:"column:device_id;size:36;index"`
-	ResourceID  string `gorm:"column:resource_id;size:36"`
-	Kind        string `gorm:"column:kind;size:32"`
-	ExternalKey string `gorm:"column:external_key;size:255"`
-	Enabled     bool   `gorm:"column:enabled"`
-	ConfigJSON  string `gorm:"column:config_json;type:text"`
-}
-
-func (AssetEventSource) TableName() string { return "zws_event_source" }
-
-// UnifiedRef 旧对象到统一对象的映射。
-type UnifiedRef struct {
-	ID          int    `gorm:"column:id;primaryKey;autoIncrement"`
-	LegacyTable string `gorm:"column:legacy_table;size:64;uniqueIndex:uk_legacy_ref"`
-	LegacyID    string `gorm:"column:legacy_id;size:64;uniqueIndex:uk_legacy_ref"`
-	EntityType  string `gorm:"column:entity_type;size:32"`
-	UnifiedID   string `gorm:"column:unified_id;size:36"`
-}
-
-func (UnifiedRef) TableName() string { return "zws_unified_ref" }
-
-// AccessToken 对外接入密钥（可视化配置的外部集成凭证）。
+// AccessToken 对外接入密钥。
 type AccessToken struct {
 	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	Name       string `gorm:"column:name;size:128" json:"name"`
 	Token      string `gorm:"column:token;size:128;uniqueIndex:uk_access_token_token" json:"token"`
-	Enabled    bool   `gorm:"column:enabled;index" json:"enabled"`
+	Enabled    bool   `gorm:"column:enabled" json:"enabled"`
 	Remark     string `gorm:"column:remark;size:255" json:"remark"`
 	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
 	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
 func (AccessToken) TableName() string { return "zws_access_token" }
+
+// ===========================================================================
+// H. 系统配置
+// ===========================================================================
+
+// GbSipConfig 本平台唯一国标 SIP 配置。
+type GbSipConfig struct {
+	ID                 int64  `gorm:"column:id;primaryKey" json:"id"`
+	IP                 string `gorm:"column:ip;size:64;not null" json:"ip"`
+	Port               int    `gorm:"column:port;not null" json:"port"`
+	Domain             string `gorm:"column:domain;size:32;not null" json:"domain"`
+	DeviceID           string `gorm:"column:device_id;size:32;not null" json:"deviceId"`
+	Password           string `gorm:"column:password;size:64;not null" json:"password"`
+	Alarm              bool   `gorm:"column:alarm;not null;default:0" json:"alarm"`
+	RequirePreRegister bool   `gorm:"column:require_pre_register;not null;default:1" json:"requirePreRegister"`
+	Transport          string `gorm:"column:transport;size:16;not null;default:UDP" json:"transport"`
+	StreamMode         string `gorm:"column:stream_mode;size:16;not null;default:UDP" json:"streamMode"`
+	CreateTime         string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime         string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (GbSipConfig) TableName() string { return "zws_gb_sip_config" }
+
+// ObjectStoreConfig 对象存储对接配置。
+type ObjectStoreConfig struct {
+	ID         int64  `gorm:"column:id;primaryKey" json:"id"`
+	Enabled    bool   `gorm:"column:enabled;not null;default:0" json:"enabled"`
+	Provider   string `gorm:"column:provider;size:32;not null;default:noop" json:"provider"`
+	Endpoint   string `gorm:"column:endpoint;size:255" json:"endpoint"`
+	Region     string `gorm:"column:region;size:64" json:"region"`
+	Bucket     string `gorm:"column:bucket;size:128" json:"bucket"`
+	AccessKey  string `gorm:"column:access_key;size:128" json:"accessKey"`
+	SecretKey  string `gorm:"column:secret_key;size:256" json:"secretKey"`
+	UseSSL     bool   `gorm:"column:use_ssl;not null;default:0" json:"useSSL"`
+	PathStyle  bool   `gorm:"column:path_style;not null;default:1" json:"pathStyle"`
+	PublicBase string `gorm:"column:public_base;size:255" json:"publicBase"`
+	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (ObjectStoreConfig) TableName() string { return "zws_object_store_config" }
+
+// MQTTConfig 消息队列对接配置。
+type MQTTConfig struct {
+	ID             int64  `gorm:"column:id;primaryKey" json:"id"`
+	Enabled        bool   `gorm:"column:enabled;not null;default:0" json:"enabled"`
+	Broker         string `gorm:"column:broker;size:255" json:"broker"`
+	ClientIDPrefix string `gorm:"column:client_id_prefix;size:64" json:"clientIdPrefix"`
+	Username       string `gorm:"column:username;size:128" json:"username"`
+	Password       string `gorm:"column:password;size:256" json:"password"`
+	TopicPrefix    string `gorm:"column:topic_prefix;size:128;default:zws/events" json:"topicPrefix"`
+	QoS            int    `gorm:"column:qos;default:1" json:"qos"`
+	KeepAliveSec   int    `gorm:"column:keepalive_sec;default:30" json:"keepAliveSec"`
+	TLSEnabled     bool   `gorm:"column:tls_enabled;not null;default:0" json:"tlsEnabled"`
+	CACert         string `gorm:"column:ca_cert;type:text" json:"caCert"`
+	ClientCert     string `gorm:"column:client_cert;type:text" json:"clientCert"`
+	ClientKey      string `gorm:"column:client_key;type:text" json:"clientKey"`
+	CreateTime     string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime     string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (MQTTConfig) TableName() string { return "zws_mqtt_config" }
+
+// ===========================================================================
+// I. 审计
+// ===========================================================================
+
+// AuditLog 操作审计日志。
+type AuditLog struct {
+	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	UserID     *int64 `gorm:"column:user_id;index:idx_audit_user_time,priority:1" json:"userId"`
+	Username   string `gorm:"column:username;size:255" json:"username"`
+	Action     string `gorm:"column:action;size:64" json:"action"`
+	TargetType string `gorm:"column:target_type;size:32;index:idx_audit_target,priority:1" json:"targetType"`
+	TargetID   string `gorm:"column:target_id;size:64;index:idx_audit_target,priority:2" json:"targetId"`
+	Detail     string `gorm:"column:detail;type:longtext" json:"detail"`
+	IP         string `gorm:"column:ip;size:64" json:"ip"`
+	CreateTime string `gorm:"column:create_time;size:50;index:idx_audit_user_time,priority:2" json:"createTime"`
+}
+
+func (AuditLog) TableName() string { return "zws_audit_log" }

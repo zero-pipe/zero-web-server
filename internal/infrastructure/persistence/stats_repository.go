@@ -13,20 +13,18 @@ type StatsRepository struct{ db *gorm.DB }
 func NewStatsRepository(db *gorm.DB) *StatsRepository { return &StatsRepository{db: db} }
 
 func (r *StatsRepository) DeviceCount() (total, online int64, err error) {
-	if err = r.db.Model(&model.GBDevice{}).Count(&total).Error; err != nil {
+	if err = r.db.Model(&model.Device{}).Count(&total).Error; err != nil {
 		return
 	}
-	err = r.db.Model(&model.GBDevice{}).Where("on_line = ?", true).Count(&online).Error
+	err = r.db.Model(&model.Device{}).Where("online = ?", true).Count(&online).Error
 	return
 }
 
 func (r *StatsRepository) ChannelCount() (total, online int64, err error) {
-	if err = r.db.Model(&model.GBDeviceChannel{}).Count(&total).Error; err != nil {
+	if err = r.db.Model(&model.Channel{}).Count(&total).Error; err != nil {
 		return
 	}
-	err = r.db.Model(&model.GBDeviceChannel{}).
-		Where("UPPER(COALESCE(NULLIF(TRIM(gb_status), ''), NULLIF(TRIM(status), ''), 'OFF')) = ?", "ON").
-		Count(&online).Error
+	err = r.db.Model(&model.Channel{}).Where("online = ?", true).Count(&online).Error
 	return
 }
 

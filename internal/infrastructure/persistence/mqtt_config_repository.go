@@ -27,7 +27,7 @@ func (r *MQTTConfigRepository) Get() (*domaininfra.MQTTConfig, error) {
 		return nil, err
 	}
 	return &domaininfra.MQTTConfig{
-		ID: m.ID, Enabled: m.Enabled, Broker: m.Broker, ClientIDPrefix: m.ClientIDPrefix,
+		ID: int(m.ID), Enabled: m.Enabled, Broker: m.Broker, ClientIDPrefix: m.ClientIDPrefix,
 		Username: m.Username, Password: m.Password, TopicPrefix: m.TopicPrefix,
 		QoS: m.QoS, KeepAliveSec: m.KeepAliveSec, TLSEnabled: m.TLSEnabled,
 		CACert: m.CACert, ClientCert: m.ClientCert, ClientKey: m.ClientKey,

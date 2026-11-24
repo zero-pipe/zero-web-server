@@ -62,7 +62,7 @@ func (r *ObjectStoreConfigRepository) Save(d *domainobjectstore.Config) error {
 
 func toModelObjectStoreConfig(d *domainobjectstore.Config) *model.ObjectStoreConfig {
 	return &model.ObjectStoreConfig{
-		ID: d.ID, Enabled: d.Enabled, Provider: d.Provider, Endpoint: d.Endpoint,
+		ID: int64(d.ID), Enabled: d.Enabled, Provider: d.Provider, Endpoint: d.Endpoint,
 		Region: d.Region, Bucket: d.Bucket, AccessKey: d.AccessKey, SecretKey: d.SecretKey,
 		UseSSL: d.UseSSL, PathStyle: d.PathStyle, PublicBase: d.PublicBase,
 		CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
@@ -71,7 +71,7 @@ func toModelObjectStoreConfig(d *domainobjectstore.Config) *model.ObjectStoreCon
 
 func toDomainObjectStoreConfig(m *model.ObjectStoreConfig) *domainobjectstore.Config {
 	return &domainobjectstore.Config{
-		ID: m.ID, Enabled: m.Enabled, Provider: m.Provider, Endpoint: m.Endpoint,
+		ID: int(m.ID), Enabled: m.Enabled, Provider: m.Provider, Endpoint: m.Endpoint,
 		Region: m.Region, Bucket: m.Bucket, AccessKey: m.AccessKey, SecretKey: m.SecretKey,
 		UseSSL: m.UseSSL, PathStyle: m.PathStyle, PublicBase: m.PublicBase,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,

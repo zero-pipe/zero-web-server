@@ -232,7 +232,4 @@ type Repository interface {
 
 	UpsertEventSource(e *EventSource) error
 	ListEventSources(deviceID string) ([]*EventSource, error)
-
-	GetLegacyRef(table string, legacyID string) (entityType, unifiedID string, err error)
-	UpsertLegacyRef(table, legacyID, entityType, unifiedID string) error
 }

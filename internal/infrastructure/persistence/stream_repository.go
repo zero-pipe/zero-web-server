@@ -1,9 +1,11 @@
 package persistence
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	domaincloudrecord "zero-web-server/internal/domain/cloudrecord"
@@ -12,7 +14,6 @@ import (
 	domainstreamproxy "zero-web-server/internal/domain/streamproxy"
 	domainstreampush "zero-web-server/internal/domain/streampush"
 	"zero-web-server/internal/infrastructure/persistence/model"
-	"zero-web-server/pkg/idcode"
 
 	"gorm.io/gorm"
 )
@@ -20,24 +21,6 @@ import (
 var _ domaincloudrecord.Repository = (*CloudRecordRepository)(nil)
 
 // --- Stream Push ---
-
-type StreamPushView struct {
-	ID               int    `json:"id"`
-	App              string `json:"app"`
-	Stream           string `json:"stream"`
-	MediaServerID    string `json:"mediaServerId"`
-	ServerID         string `json:"serverId"`
-	PushTime         string `json:"pushTime"`
-	CreateTime       string `json:"createTime"`
-	UpdateTime       string `json:"updateTime"`
-	Pushing          bool   `json:"pushing"`
-	StartOfflinePush bool   `json:"startOfflinePush"`
-	GbID             int    `json:"gbId"`
-	GbDeviceID       string `json:"gbDeviceId"`
-	GbName           string `json:"gbName"`
-	Name             string `json:"name"`
-	DataType         int    `json:"dataType"`
-}
 
 type StreamPushRepository struct{ db *gorm.DB }
 
@@ -48,7 +31,7 @@ func (r *StreamPushRepository) Create(d *domainstreampush.StreamPush) error {
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	d.ID = m.ID
+	d.ID = int(m.ID)
 	return nil
 }
 
@@ -83,41 +66,38 @@ func (r *StreamPushRepository) List(page, count int, query string, pushing *bool
 	if count <= 0 {
 		count = 15
 	}
-	base := r.db.Table("zws_stream_push st").
-		Select(`st.id, st.app, st.stream, st.media_server_id, st.server_id, st.push_time, st.create_time, st.update_time, st.pushing, st.start_offline_push,
-			wdc.id as gb_id, wdc.gb_device_id, wdc.name as gb_name, wdc.name, wdc.data_type`).
-		Joins("LEFT JOIN zws_device_channel wdc ON wdc.data_type = 2 AND st.id = wdc.data_device_id")
+	q := r.db.Model(&model.StreamPush{})
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		base = base.Where("st.app LIKE ? OR st.stream LIKE ? OR wdc.gb_device_id LIKE ? OR wdc.name LIKE ?", like, like, like, like)
+		q = q.Where("app LIKE ? OR stream LIKE ? OR gb_code LIKE ? OR gb_name LIKE ?", like, like, like, like)
 	}
 	if pushing != nil {
-		base = base.Where("st.pushing = ?", *pushing)
+		q = q.Where("pushing = ?", *pushing)
 	}
 	if mediaServerID != "" {
-		base = base.Where("st.media_server_id = ?", mediaServerID)
+		q = q.Where("media_server_id = ?", mediaServerID)
 	}
 	var total int64
-	if err := base.Count(&total).Error; err != nil {
+	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	var rows []StreamPushView
-	if err := base.Order("st.pushing DESC, st.create_time DESC").Offset((page - 1) * count).Limit(count).Scan(&rows).Error; err != nil {
+	var rows []model.StreamPush
+	if err := q.Order("pushing DESC, create_time DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	out := make([]domainstreampush.View, 0, len(rows))
 	for i := range rows {
-		dt := rows[i].DataType
-		if dt == 0 {
-			dt = shared.ChannelDataTypeStreamPush
+		name := rows[i].GbName
+		if strings.TrimSpace(name) == "" {
+			name = rows[i].Stream
 		}
 		out = append(out, domainstreampush.View{
-			ID: rows[i].ID, App: rows[i].App, Stream: rows[i].Stream,
+			ID: int(rows[i].ID), App: rows[i].App, Stream: rows[i].Stream,
 			MediaServerID: rows[i].MediaServerID, ServerID: rows[i].ServerID,
 			PushTime: rows[i].PushTime, CreateTime: rows[i].CreateTime, UpdateTime: rows[i].UpdateTime,
 			Pushing: rows[i].Pushing, StartOfflinePush: rows[i].StartOfflinePush,
-			GbID: rows[i].GbID, GbDeviceID: rows[i].GbDeviceID, GbName: rows[i].GbName,
-			Name: rows[i].Name, DataType: dt,
+			GbID: 0, GbDeviceID: rows[i].GbCode, GbName: rows[i].GbName,
+			Name: name, DataType: shared.ChannelDataTypeStreamPush,
 		})
 	}
 	return out, total, nil
@@ -129,33 +109,15 @@ func (r *StreamPushRepository) UpdatePushing(id int, pushing bool, mediaServerID
 	}).Error
 }
 
+// UpsertGBChannel 推流外出国标码：直接记在推流行上（统一模型下不再造无主通道）。
 func (r *StreamPushRepository) UpsertGBChannel(pushID int, gbDeviceID, gbName string) error {
-	var ch model.GBDeviceChannel
-	err := r.db.Where("data_type = ? AND data_device_id = ?", shared.ChannelDataTypeStreamPush, pushID).First(&ch).Error
-	now := nowTimeStr()
-	if err == gorm.ErrRecordNotFound {
-		code, genErr := idcode.Channel()
-		if genErr != nil {
-			return genErr
-		}
-		return r.db.Create(&model.GBDeviceChannel{
-			InternalCode: code,
-			DataType:     shared.ChannelDataTypeStreamPush, DataDeviceID: pushID,
-			GBDeviceID: gbDeviceID, Name: gbName, Status: "ON", CreateTime: now, UpdateTime: now,
-		}).Error
-	}
-	if err != nil {
-		return err
-	}
-	ch.GBDeviceID = gbDeviceID
-	ch.Name = gbName
-	ch.UpdateTime = now
-	return r.db.Save(&ch).Error
+	return r.db.Model(&model.StreamPush{}).Where("id = ?", pushID).
+		Updates(map[string]any{"gb_code": gbDeviceID, "gb_name": gbName, "update_time": nowTimeStr()}).Error
 }
 
 func (r *StreamPushRepository) RemoveGBChannel(pushID int) error {
-	return r.db.Where("data_type = ? AND data_device_id = ?", shared.ChannelDataTypeStreamPush, pushID).
-		Delete(&model.GBDeviceChannel{}).Error
+	return r.db.Model(&model.StreamPush{}).Where("id = ?", pushID).
+		Updates(map[string]any{"gb_code": "", "gb_name": "", "update_time": nowTimeStr()}).Error
 }
 
 // --- Stream Proxy ---
@@ -171,7 +133,7 @@ func (r *StreamProxyRepository) Create(d *domainstreamproxy.StreamProxy) error {
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	d.ID = m.ID
+	d.ID = int(m.ID)
 	return nil
 }
 
@@ -233,27 +195,8 @@ func (r *StreamProxyRepository) GetByAppStream(app, stream string) (*domainstrea
 }
 
 func (r *StreamProxyRepository) UpsertGBChannel(proxyID int, gbDeviceID, gbName, app, stream string) error {
-	var ch model.GBDeviceChannel
-	err := r.db.Where("data_type = ? AND data_device_id = ?", shared.ChannelDataTypeStreamProxy, proxyID).First(&ch).Error
-	now := nowTimeStr()
-	if err == gorm.ErrRecordNotFound {
-		code, genErr := idcode.Channel()
-		if genErr != nil {
-			return genErr
-		}
-		return r.db.Create(&model.GBDeviceChannel{
-			InternalCode: code,
-			DeviceID:     app, DataType: shared.ChannelDataTypeStreamProxy, DataDeviceID: proxyID,
-			GBDeviceID: gbDeviceID, Name: gbName, Status: "ON", CreateTime: now, UpdateTime: now,
-		}).Error
-	}
-	if err != nil {
-		return err
-	}
-	ch.GBDeviceID = gbDeviceID
-	ch.Name = gbName
-	ch.UpdateTime = now
-	return r.db.Save(&ch).Error
+	return r.db.Model(&model.StreamProxy{}).Where("id = ?", proxyID).
+		Updates(map[string]any{"gb_code": gbDeviceID, "gb_name": gbName, "update_time": nowTimeStr()}).Error
 }
 
 // --- Cloud Record ---
@@ -269,7 +212,7 @@ func (r *CloudRecordRepository) Create(rec *domaincloudrecord.Record) error {
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	rec.ID = m.ID
+	rec.ID = int(m.ID)
 	return nil
 }
 
@@ -321,7 +264,6 @@ func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID
 		q = q.Where("media_server_id = ?", mediaServerID)
 	}
 	if startTime > 0 {
-		// 前端多为毫秒；库内可能是秒或毫秒
 		sec, ms := startTime, startTime
 		if startTime >= 1_000_000_000_000 {
 			sec = startTime / 1000
@@ -364,7 +306,7 @@ func (r *CloudRecordRepository) List(page, count int, app, stream, query, callID
 
 func toModelCloudRecord(d *domaincloudrecord.Record) *model.CloudRecord {
 	return &model.CloudRecord{
-		ID: d.ID, App: d.App, Stream: d.Stream, CallID: d.CallID,
+		ID: int64(d.ID), App: d.App, Stream: d.Stream, CallID: d.CallID,
 		StartTime: d.StartTime, EndTime: d.EndTime,
 		MediaServerID: d.MediaServerID, ServerID: d.ServerID,
 		FileName: d.FileName, Folder: d.Folder, FilePath: d.FilePath,
@@ -374,7 +316,7 @@ func toModelCloudRecord(d *domaincloudrecord.Record) *model.CloudRecord {
 
 func toDomainCloudRecord(m *model.CloudRecord) *domaincloudrecord.Record {
 	return &domaincloudrecord.Record{
-		ID: m.ID, App: m.App, Stream: m.Stream, CallID: m.CallID,
+		ID: int(m.ID), App: m.App, Stream: m.Stream, CallID: m.CallID,
 		StartTime: m.StartTime, EndTime: m.EndTime,
 		MediaServerID: m.MediaServerID, ServerID: m.ServerID,
 		FileName: m.FileName, Folder: m.Folder, FilePath: m.FilePath,
@@ -400,7 +342,7 @@ func (r *CloudRecordRepository) DateList(app, stream, mediaServerID string, year
 	set := make(map[string]struct{})
 	for _, row := range rows {
 		ts := row.StartTime
-		if ts >= 1_000_000_000_000 { // 毫秒
+		if ts >= 1_000_000_000_000 {
 			ts = ts / 1000
 		}
 		d := time.Unix(ts, 0).In(time.Local).Format("2006-01-02")
@@ -426,14 +368,14 @@ func (r *RecordPlanRepository) Create(plan *domainrecordplan.Plan, items []domai
 		if err := tx.Create(mp).Error; err != nil {
 			return err
 		}
-		plan.ID = mp.ID
+		plan.ID = int(mp.ID)
 		for i := range items {
 			items[i].PlanID = plan.ID
 			mi := toModelRecordPlanItem(&items[i])
 			if err := tx.Create(mi).Error; err != nil {
 				return err
 			}
-			items[i].ID = mi.ID
+			items[i].ID = int(mi.ID)
 		}
 		return nil
 	})
@@ -459,7 +401,7 @@ func (r *RecordPlanRepository) Update(plan *domainrecordplan.Plan, items []domai
 
 func (r *RecordPlanRepository) Delete(id int) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		_ = tx.Model(&model.GBDeviceChannel{}).Where("record_plan_id = ?", id).Update("record_plan_id", 0)
+		_ = tx.Model(&model.ChannelExt{}).Where("record_plan_id = ?", id).Update("record_plan_id", 0)
 		_ = tx.Where("plan_id = ?", id).Delete(&model.RecordPlanItem{})
 		return tx.Delete(&model.RecordPlan{}, id).Error
 	})
@@ -506,32 +448,43 @@ func (r *RecordPlanRepository) List(page, count int, query string) ([]domainreco
 }
 
 func (r *RecordPlanRepository) LinkChannels(planID int, channelIDs []int) error {
-	return r.db.Model(&model.GBDeviceChannel{}).Where("id IN ?", channelIDs).Update("record_plan_id", planID).Error
+	if len(channelIDs) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.ChannelExt{}).Where("channel_id IN ?", channelIDs).Update("record_plan_id", planID).Error
 }
 
 func (r *RecordPlanRepository) UnlinkChannels(channelIDs []int) error {
-	return r.db.Model(&model.GBDeviceChannel{}).Where("id IN ?", channelIDs).Update("record_plan_id", 0).Error
+	if len(channelIDs) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.ChannelExt{}).Where("channel_id IN ?", channelIDs).Update("record_plan_id", 0).Error
 }
 
 func (r *RecordPlanRepository) LinkChannelsByDevice(planID int, deviceDbIDs []int) error {
-	return r.db.Model(&model.GBDeviceChannel{}).
-		Where("data_type = ? AND data_device_id IN ?", shared.ChannelDataTypeGB28181, deviceDbIDs).
+	if len(deviceDbIDs) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.ChannelExt{}).
+		Where("channel_id IN (SELECT id FROM zws_channel WHERE device_id IN ?)", deviceDbIDs).
 		Update("record_plan_id", planID).Error
 }
 
 func (r *RecordPlanRepository) UnlinkChannelsByDevice(deviceDbIDs []int) error {
-	return r.db.Model(&model.GBDeviceChannel{}).
-		Where("data_type = ? AND data_device_id IN ?", shared.ChannelDataTypeGB28181, deviceDbIDs).
+	if len(deviceDbIDs) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.ChannelExt{}).
+		Where("channel_id IN (SELECT id FROM zws_channel WHERE device_id IN ?)", deviceDbIDs).
 		Update("record_plan_id", 0).Error
 }
 
 func (r *RecordPlanRepository) LinkAll(planID int) error {
-	return r.db.Model(&model.GBDeviceChannel{}).Where("data_type = ?", shared.ChannelDataTypeGB28181).
-		Update("record_plan_id", planID).Error
+	return r.db.Model(&model.ChannelExt{}).Where("1=1").Update("record_plan_id", planID).Error
 }
 
 func (r *RecordPlanRepository) UnlinkAll(planID int) error {
-	return r.db.Model(&model.GBDeviceChannel{}).Where("record_plan_id = ?", planID).Update("record_plan_id", 0).Error
+	return r.db.Model(&model.ChannelExt{}).Where("record_plan_id = ?", planID).Update("record_plan_id", 0).Error
 }
 
 func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query string, hasLink *bool, online, channelType string) ([]domainrecordplan.ChannelRecord, int64, error) {
@@ -541,76 +494,120 @@ func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query st
 	if count <= 0 {
 		count = 15
 	}
-	q := r.db.Model(&model.GBDeviceChannel{}).Where("data_type = ?", shared.ChannelDataTypeGB28181)
+	q := r.db.Table("zws_channel c").
+		Joins("LEFT JOIN zws_channel_ext e ON e.channel_id = c.id").
+		Where("c.kind = ?", "video_sensor")
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("(name LIKE ? OR gb_name LIKE ? OR gb_device_id LIKE ? OR device_id LIKE ?)", like, like, like, like)
+		q = q.Where("(c.name LIKE ? OR c.gb_code LIKE ? OR c.internal_code LIKE ?)", like, like, like)
 	}
 	if hasLink != nil {
 		if *hasLink {
-			q = q.Where("record_plan_id = ?", planID)
+			q = q.Where("e.record_plan_id = ?", planID)
 		} else {
-			q = q.Where("(record_plan_id = 0 OR record_plan_id IS NULL OR record_plan_id <> ?)", planID)
+			q = q.Where("(e.record_plan_id = 0 OR e.record_plan_id IS NULL OR e.record_plan_id <> ?)", planID)
 		}
 	}
 	if online == "true" {
-		q = q.Where("UPPER(COALESCE(NULLIF(gb_status,''), status)) = ?", "ON")
+		q = q.Where("c.status = ?", "ON")
 	} else if online == "false" {
-		q = q.Where("UPPER(COALESCE(NULLIF(gb_status,''), status)) <> ? OR (gb_status IS NULL AND status IS NULL)", "ON")
+		q = q.Where("c.status <> ?", "ON")
 	}
 	if channelType != "" {
-		if n, err := strconv.Atoi(channelType); err == nil {
-			q = q.Where("data_type = ?", n)
+		// 统一模型下所有通道均为视频；保留参数以兼容调用方。
+		if _, err := strconv.Atoi(channelType); err != nil {
+			_ = err
 		}
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	var rows []model.GBDeviceChannel
-	if err := q.Order("id ASC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
+	var rows []struct {
+		model.Channel
+		ExtRecordPlanID int64  `gorm:"column:ext_record_plan_id"`
+		ExtLongitude    float64 `gorm:"column:ext_longitude"`
+		ExtLatitude     float64 `gorm:"column:ext_latitude"`
+		ExtPTZType      int    `gorm:"column:ext_ptz_type"`
+		ExtHasAudio     bool   `gorm:"column:ext_has_audio"`
+		ExtGBJSON       string `gorm:"column:ext_gb_json"`
+		DeviceInternalCode string `gorm:"column:device_internal_code"`
+	}
+	err := q.Select(`c.*, COALESCE(e.record_plan_id,0) AS ext_record_plan_id,
+		COALESCE(e.longitude,0) AS ext_longitude, COALESCE(e.latitude,0) AS ext_latitude,
+		COALESCE(e.ptz_type,0) AS ext_ptz_type, COALESCE(e.has_audio,0) AS ext_has_audio,
+		COALESCE(e.gb_json,'') AS ext_gb_json, d.internal_code AS device_internal_code`).
+		Joins("LEFT JOIN zws_device d ON d.id = c.device_id").
+		Order("c.id ASC").Offset((page - 1) * count).Limit(count).Scan(&rows).Error
+	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
-		out = append(out, *toDomainChannelRecord(&rows[i]))
+		out = append(out, channelRowToRecord(&rows[i].Channel, int(rows[i].ExtRecordPlanID),
+			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].DeviceInternalCode))
 	}
 	return out, total, nil
 }
 
 func (r *RecordPlanRepository) CountChannels(planID int) int64 {
 	var n int64
-	_ = r.db.Model(&model.GBDeviceChannel{}).Where("record_plan_id = ?", planID).Count(&n)
+	_ = r.db.Model(&model.ChannelExt{}).Where("record_plan_id = ?", planID).Count(&n)
 	return n
 }
 
 func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) ([]domainrecordplan.ChannelRecord, error) {
 	var rows []struct {
-		model.GBDeviceChannel
-		DeviceInternalCode string `gorm:"column:device_internal_code"`
+		model.Channel
+		ExtRecordPlanID    int64   `gorm:"column:ext_record_plan_id"`
+		ExtLongitude       float64 `gorm:"column:ext_longitude"`
+		ExtLatitude        float64 `gorm:"column:ext_latitude"`
+		ExtPTZType         int     `gorm:"column:ext_ptz_type"`
+		ExtHasAudio        bool    `gorm:"column:ext_has_audio"`
+		ExtGBJSON          string  `gorm:"column:ext_gb_json"`
+		DeviceInternalCode string  `gorm:"column:device_internal_code"`
 	}
-	err := r.db.Table("zws_device_channel wdc").
-		Select("wdc.*, MAX(wd.internal_code) AS device_internal_code").
-		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = wdc.record_plan_id").
-		Joins("LEFT JOIN zws_device wd ON wd.device_id = wdc.device_id").
-		Where("wrpi.week_day = ? AND wrpi.start <= ? AND wrpi.stop >= ?", weekDay, minuteIndex, minuteIndex).
-		Group("wdc.id").
-		Find(&rows).Error
+	err := r.db.Table("zws_channel c").
+		Select(`c.*, e.record_plan_id AS ext_record_plan_id, COALESCE(e.longitude,0) AS ext_longitude,
+			COALESCE(e.latitude,0) AS ext_latitude, COALESCE(e.ptz_type,0) AS ext_ptz_type,
+			COALESCE(e.has_audio,0) AS ext_has_audio, COALESCE(e.gb_json,'') AS ext_gb_json,
+			d.internal_code AS device_internal_code`).
+		Joins("JOIN zws_channel_ext e ON e.channel_id = c.id").
+		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = e.record_plan_id").
+		Joins("LEFT JOIN zws_device d ON d.id = c.device_id").
+		Where("wrpi.week_day = ? AND wrpi.start_min <= ? AND wrpi.stop_min >= ?", weekDay, minuteIndex, minuteIndex).
+		Group("c.id").Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
-		rec := toDomainChannelRecord(&rows[i].GBDeviceChannel)
-		rec.DeviceInternalCode = rows[i].DeviceInternalCode
-		out = append(out, *rec)
+		out = append(out, channelRowToRecord(&rows[i].Channel, int(rows[i].ExtRecordPlanID),
+			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].DeviceInternalCode))
 	}
 	return out, nil
 }
 
+// channelRowToRecord 把统一通道行拼成录像计划用的扁平 ChannelRecord。
+func channelRowToRecord(m *model.Channel, recordPlanID int, lon, lat float64, ptz int, hasAudio bool, gbJSON, deviceInternalCode string) domainrecordplan.ChannelRecord {
+	var g gbChannelJSON
+	if strings.TrimSpace(gbJSON) != "" {
+		_ = json.Unmarshal([]byte(gbJSON), &g)
+	}
+	return domainrecordplan.ChannelRecord{
+		ID: int(m.ID), InternalCode: m.InternalCode, DeviceInternalCode: deviceInternalCode,
+		Name: m.Name, Status: m.Status, Longitude: lon, Latitude: lat, PTZType: ptz,
+		HasAudio: hasAudio, RecordPlanID: recordPlanID, GBDeviceID: m.GbCode,
+		CivilCode: g.CivilCode, ParentID: g.ParentID, BusinessGroupID: g.BusinessGroupID,
+		Manufacturer: g.Manufacturer, Model: g.Model, Parental: g.Parental, SubCount: g.SubCount,
+		DataType: shared.ChannelDataTypeGB28181, DataDeviceID: int(m.DeviceID),
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+}
+
 func toModelStreamPush(d *domainstreampush.StreamPush) *model.StreamPush {
 	return &model.StreamPush{
-		ID: d.ID, App: d.App, Stream: d.Stream, MediaServerID: d.MediaServerID,
+		ID: int64(d.ID), App: d.App, Stream: d.Stream, MediaServerID: d.MediaServerID,
 		ServerID: d.ServerID, PushTime: d.PushTime, Status: d.Status, UpdateTime: d.UpdateTime,
 		CreateTime: d.CreateTime, Pushing: d.Pushing, StartOfflinePush: d.StartOfflinePush,
 	}
@@ -618,7 +615,7 @@ func toModelStreamPush(d *domainstreampush.StreamPush) *model.StreamPush {
 
 func toDomainStreamPush(m *model.StreamPush) *domainstreampush.StreamPush {
 	return &domainstreampush.StreamPush{
-		ID: m.ID, App: m.App, Stream: m.Stream, MediaServerID: m.MediaServerID,
+		ID: int(m.ID), App: m.App, Stream: m.Stream, MediaServerID: m.MediaServerID,
 		ServerID: m.ServerID, PushTime: m.PushTime, Status: m.Status, UpdateTime: m.UpdateTime,
 		CreateTime: m.CreateTime, Pushing: m.Pushing, StartOfflinePush: m.StartOfflinePush,
 	}
@@ -626,7 +623,7 @@ func toDomainStreamPush(m *model.StreamPush) *domainstreampush.StreamPush {
 
 func toModelStreamProxy(d *domainstreamproxy.StreamProxy) *model.StreamProxy {
 	return &model.StreamProxy{
-		ID: d.ID, Type: d.Type, App: d.App, Stream: d.Stream, SrcURL: d.SrcURL, Timeout: d.Timeout,
+		ID: int64(d.ID), Type: d.Type, App: d.App, Stream: d.Stream, SrcURL: d.SrcURL, Timeout: d.Timeout,
 		FFmpegCmdKey: d.FFmpegCmdKey, RTSPType: d.RTSPType, MediaServerID: d.MediaServerID,
 		EnableAudio: d.EnableAudio, EnableMP4: d.EnableMP4, Pulling: d.Pulling, Enable: d.Enable,
 		CreateTime: d.CreateTime, Name: d.Name, UpdateTime: d.UpdateTime, StreamKey: d.StreamKey,
@@ -637,7 +634,7 @@ func toModelStreamProxy(d *domainstreamproxy.StreamProxy) *model.StreamProxy {
 
 func toDomainStreamProxy(m *model.StreamProxy) *domainstreamproxy.StreamProxy {
 	return &domainstreamproxy.StreamProxy{
-		ID: m.ID, Type: m.Type, App: m.App, Stream: m.Stream, SrcURL: m.SrcURL, Timeout: m.Timeout,
+		ID: int(m.ID), Type: m.Type, App: m.App, Stream: m.Stream, SrcURL: m.SrcURL, Timeout: m.Timeout,
 		FFmpegCmdKey: m.FFmpegCmdKey, RTSPType: m.RTSPType, MediaServerID: m.MediaServerID,
 		EnableAudio: m.EnableAudio, EnableMP4: m.EnableMP4, Pulling: m.Pulling, Enable: m.Enable,
 		CreateTime: m.CreateTime, Name: m.Name, UpdateTime: m.UpdateTime, StreamKey: m.StreamKey,
@@ -652,39 +649,24 @@ var (
 )
 
 func toModelRecordPlan(d *domainrecordplan.Plan) *model.RecordPlan {
-	return &model.RecordPlan{ID: d.ID, Snap: d.Snap, Name: d.Name, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime}
+	return &model.RecordPlan{ID: int64(d.ID), Snap: d.Snap, Name: d.Name, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime}
 }
 
 func toDomainRecordPlan(m *model.RecordPlan) *domainrecordplan.Plan {
-	return &domainrecordplan.Plan{ID: m.ID, Snap: m.Snap, Name: m.Name, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime}
+	return &domainrecordplan.Plan{ID: int(m.ID), Snap: m.Snap, Name: m.Name, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime}
 }
 
 func toModelRecordPlanItem(d *domainrecordplan.Item) *model.RecordPlanItem {
 	return &model.RecordPlanItem{
-		ID: d.ID, Start: d.Start, Stop: d.Stop, WeekDay: d.WeekDay, PlanID: d.PlanID,
+		ID: int64(d.ID), Start: d.Start, Stop: d.Stop, WeekDay: d.WeekDay, PlanID: int64(d.PlanID),
 		CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
 	}
 }
 
 func toDomainRecordPlanItem(m *model.RecordPlanItem) *domainrecordplan.Item {
 	return &domainrecordplan.Item{
-		ID: m.ID, Start: m.Start, Stop: m.Stop, WeekDay: m.WeekDay, PlanID: m.PlanID,
+		ID: int(m.ID), Start: m.Start, Stop: m.Stop, WeekDay: m.WeekDay, PlanID: int(m.PlanID),
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
-	}
-}
-
-func toDomainChannelRecord(m *model.GBDeviceChannel) *domainrecordplan.ChannelRecord {
-	return &domainrecordplan.ChannelRecord{
-		ID: m.ID, InternalCode: m.InternalCode, DeviceID: m.DeviceID, Name: m.Name,
-		Manufacturer: m.Manufacturer, Model: m.Model, Owner: m.Owner, CivilCode: m.CivilCode,
-		Block: m.Block, Address: m.Address, Parental: m.Parental, ParentID: m.ParentID,
-		Status: m.Status, Longitude: m.Longitude, Latitude: m.Latitude, PTZType: m.PTZType,
-		BusinessGroupID: m.BusinessGroupID, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
-		SubCount: m.SubCount, HasAudio: m.HasAudio, ChannelType: m.ChannelType, MapLevel: m.MapLevel,
-		GBDeviceID: m.GBDeviceID, GBName: m.GBName, GBManufacturer: m.GBManufacturer, GBModel: m.GBModel,
-		GBCivilCode: m.GBCivilCode, GBParentID: m.GBParentID, GBStatus: m.GBStatus,
-		GBLongitude: m.GBLongitude, GBLatitude: m.GBLatitude, GBBusinessGroupID: m.GBBusinessGroupID,
-		GBPTZType: m.GBPTZType, RecordPlanID: m.RecordPlanID, DataType: m.DataType, DataDeviceID: m.DataDeviceID,
 	}
 }
 

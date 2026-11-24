@@ -12,6 +12,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// AssetRepository 统一资产仓储。
+// 统一 schema 下：
+//   设备 = zws_device（身份稳定）+ zws_access_binding（接入参数/协议）
+//   通道 = zws_channel（身份/状态）+ zws_channel_ext（经纬度/PTZ/有音频/启用/标签）
+//   码流 = zws_stream_profile；能力 = zws_capability；事件源 = zws_event_source
+// 对外（domain asset）字符串 ID = 库内 BIGINT 主键的十进制字符串。
 type AssetRepository struct{ db *gorm.DB }
 
 func NewAssetRepository(db *gorm.DB) *AssetRepository { return &AssetRepository{db: db} }
@@ -20,39 +26,48 @@ var _ domainasset.Repository = (*AssetRepository)(nil)
 
 func nowText() string { return time.Now().Format("2006-01-02 15:04:05") }
 
+// --- Device ---
+
 func (r *AssetRepository) CreateDevice(d *domainasset.PhysicalDevice) error {
 	now := nowText()
-	m := &model.PhysicalDevice{
-		ID: d.ID, InternalCode: d.InternalCode, Name: d.Name, Vendor: d.Vendor,
+	m := &model.Device{
+		InternalCode: d.InternalCode, Name: d.Name, Manufacturer: d.Vendor,
 		Model: d.Model, SerialNumber: d.SerialNumber, Enabled: d.Enabled, Online: d.Online,
-		CreateTime: now, UpdateTime: now,
+		Status: onlineStatus(d.Online), CreateTime: now, UpdateTime: now,
 	}
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
+	d.ID = formatID(m.ID)
 	d.CreateTime, d.UpdateTime = now, now
 	return nil
 }
 
 func (r *AssetRepository) UpsertDevice(d *domainasset.PhysicalDevice) error {
-	now := nowText()
-	return r.db.Save(&model.PhysicalDevice{
-		ID: d.ID, InternalCode: d.InternalCode, Name: d.Name, Vendor: d.Vendor,
-		Model: d.Model, SerialNumber: d.SerialNumber, Enabled: d.Enabled, Online: d.Online,
-		CreateTime: d.CreateTime, UpdateTime: now,
-	}).Error
+	if id, ok := parseID(d.ID); ok && id > 0 {
+		return r.db.Model(&model.Device{}).Where("id = ?", id).Updates(map[string]any{
+			"internal_code": d.InternalCode, "name": d.Name, "manufacturer": d.Vendor,
+			"model": d.Model, "serial_number": d.SerialNumber, "enabled": d.Enabled,
+			"online": d.Online, "status": onlineStatus(d.Online), "update_time": nowText(),
+		}).Error
+	}
+	return r.CreateDevice(d)
 }
 
 func (r *AssetRepository) GetDevice(id string) (*domainasset.PhysicalDevice, error) {
-	var m model.PhysicalDevice
-	if err := r.db.Where("id = ?", id).First(&m).Error; err != nil {
+	pk, ok := parseID(id)
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var m model.Device
+	if err := r.db.First(&m, pk).Error; err != nil {
 		return nil, err
 	}
 	return toDomainAssetDevice(&m), nil
 }
 
 func (r *AssetRepository) GetDeviceByInternalCode(code string) (*domainasset.PhysicalDevice, error) {
-	var m model.PhysicalDevice
+	var m model.Device
 	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
 		return nil, err
 	}
@@ -66,7 +81,7 @@ func (r *AssetRepository) ListDevices(page, count int, query, protocol, status s
 	if count <= 0 {
 		count = 15
 	}
-	q := r.db.Table("zws_physical_device d").
+	q := r.db.Table("zws_device d").
 		Joins("LEFT JOIN zws_access_binding b ON b.device_id = d.id")
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
@@ -86,54 +101,54 @@ func (r *AssetRepository) ListDevices(page, count int, query, protocol, status s
 		return nil, 0, err
 	}
 	type row struct {
-		model.PhysicalDevice
-		BID              string `gorm:"column:b_id"`
+		model.Device
+		BID              int64  `gorm:"column:b_id"`
 		Protocol         string `gorm:"column:b_protocol"`
 		Mode             string `gorm:"column:b_mode"`
 		ExternalID       string `gorm:"column:b_external_id"`
 		Endpoint         string `gorm:"column:b_endpoint"`
 		PluginInstanceID string `gorm:"column:b_plugin_instance_id"`
 		ConfigJSON       string `gorm:"column:b_config_json"`
-		Status           string `gorm:"column:b_status"`
+		BStatus          string `gorm:"column:b_status"`
 		LastSeen         int64  `gorm:"column:b_last_seen"`
-		LegacyDeviceID   int    `gorm:"column:b_legacy_device_id"`
 		BCreateTime      string `gorm:"column:b_create_time"`
 		BUpdateTime      string `gorm:"column:b_update_time"`
 	}
 	var rows []row
-	err := q.Select(`d.*, b.id AS b_id, b.protocol AS b_protocol, b.mode AS b_mode,
+	err := q.Select(`d.*, COALESCE(b.id,0) AS b_id, b.protocol AS b_protocol, b.mode AS b_mode,
 		b.external_id AS b_external_id, b.endpoint AS b_endpoint,
 		b.plugin_instance_id AS b_plugin_instance_id, b.config_json AS b_config_json,
-		b.status AS b_status, b.last_seen AS b_last_seen, b.legacy_device_id AS b_legacy_device_id,
+		b.status AS b_status, b.last_seen AS b_last_seen,
 		b.create_time AS b_create_time, b.update_time AS b_update_time`).
 		Order("d.update_time DESC").
 		Offset((page - 1) * count).Limit(count).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}
-	counts := map[string]int{}
+	counts := map[int64]int{}
 	var res []struct {
-		DeviceID string `gorm:"column:device_id"`
-		N        int    `gorm:"column:n"`
+		DeviceID int64 `gorm:"column:device_id"`
+		N        int   `gorm:"column:n"`
 	}
-	_ = r.db.Table("zws_resource").Select("device_id, COUNT(*) AS n").Group("device_id").Scan(&res).Error
+	_ = r.db.Table("zws_channel").Select("device_id, COUNT(*) AS n").Group("device_id").Scan(&res).Error
 	for _, c := range res {
 		counts[c.DeviceID] = c.N
 	}
 	out := make([]*domainasset.DeviceSummary, 0, len(rows))
 	for i := range rows {
-		b := &domainasset.AccessBinding{
-			ID: rows[i].BID, DeviceID: rows[i].ID, Protocol: rows[i].Protocol, Mode: rows[i].Mode,
-			ExternalID: rows[i].ExternalID, Endpoint: rows[i].Endpoint,
-			PluginInstanceID: rows[i].PluginInstanceID, ConfigJSON: rows[i].ConfigJSON,
-			Status: rows[i].Status, LastSeen: rows[i].LastSeen, LegacyDeviceID: rows[i].LegacyDeviceID,
-			CreateTime: rows[i].BCreateTime, UpdateTime: rows[i].BUpdateTime,
-		}
-		if b.ID == "" {
-			b = nil
+		var b *domainasset.AccessBinding
+		if rows[i].BID > 0 {
+			b = &domainasset.AccessBinding{
+				ID: formatID(rows[i].BID), DeviceID: formatID(rows[i].ID),
+				Protocol: rows[i].Protocol, Mode: rows[i].Mode,
+				ExternalID: rows[i].ExternalID, Endpoint: rows[i].Endpoint,
+				PluginInstanceID: rows[i].PluginInstanceID, ConfigJSON: rows[i].ConfigJSON,
+				Status: rows[i].BStatus, LastSeen: rows[i].LastSeen,
+				CreateTime: rows[i].BCreateTime, UpdateTime: rows[i].BUpdateTime,
+			}
 		}
 		out = append(out, &domainasset.DeviceSummary{
-			Device:        toDomainAssetDevice(&rows[i].PhysicalDevice),
+			Device:        toDomainAssetDevice(&rows[i].Device),
 			Binding:       b,
 			ResourceCount: counts[rows[i].ID],
 		})
@@ -141,83 +156,17 @@ func (r *AssetRepository) ListDevices(page, count int, query, protocol, status s
 	return out, total, nil
 }
 
-func (r *AssetRepository) CreateBinding(b *domainasset.AccessBinding) error {
-	now := nowText()
-	if err := r.db.Create(&model.AccessBinding{
-		ID: b.ID, DeviceID: b.DeviceID, Protocol: b.Protocol, Mode: b.Mode,
-		ExternalID: b.ExternalID, Endpoint: b.Endpoint, PluginInstanceID: b.PluginInstanceID,
-		ConfigJSON: b.ConfigJSON, Status: b.Status, LastSeen: b.LastSeen,
-		LegacyDeviceID: b.LegacyDeviceID, CreateTime: now, UpdateTime: now,
-	}).Error; err != nil {
-		return err
-	}
-	b.CreateTime, b.UpdateTime = now, now
-	return nil
-}
-
-func (r *AssetRepository) UpsertBinding(b *domainasset.AccessBinding) error {
-	now := nowText()
-	return r.db.Save(&model.AccessBinding{
-		ID: b.ID, DeviceID: b.DeviceID, Protocol: b.Protocol, Mode: b.Mode,
-		ExternalID: b.ExternalID, Endpoint: b.Endpoint, PluginInstanceID: b.PluginInstanceID,
-		ConfigJSON: b.ConfigJSON, Status: b.Status, LastSeen: b.LastSeen,
-		LegacyDeviceID: b.LegacyDeviceID, CreateTime: b.CreateTime, UpdateTime: now,
-	}).Error
-}
-
-func (r *AssetRepository) GetBindingByDevice(deviceID string) (*domainasset.AccessBinding, error) {
-	var m model.AccessBinding
-	if err := r.db.Where("device_id = ?", deviceID).First(&m).Error; err != nil {
-		return nil, err
-	}
-	return toDomainAssetBinding(&m), nil
-}
-
-func (r *AssetRepository) UpsertResource(res *domainasset.Resource) error {
-	now := nowText()
-	return r.db.Save(&model.AssetResource{
-		ID: res.ID, DeviceID: res.DeviceID, BindingID: res.BindingID, Kind: res.Kind,
-		ExternalKey: res.ExternalKey, Name: res.Name, Status: res.Status,
-		LegacyChannelID: res.LegacyChannelID, AttrsJSON: res.AttrsJSON,
-		CreateTime: res.CreateTime, UpdateTime: now,
-	}).Error
-}
-
-func (r *AssetRepository) ListResources(deviceID string) ([]*domainasset.Resource, error) {
-	var rows []model.AssetResource
-	if err := r.db.Where("device_id = ?", deviceID).Order("kind, name").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]*domainasset.Resource, 0, len(rows))
-	for i := range rows {
-		out = append(out, toDomainAssetResource(&rows[i]))
-	}
-	return out, nil
-}
-
-func (r *AssetRepository) GetResource(id string) (*domainasset.Resource, error) {
-	var m model.AssetResource
-	if err := r.db.Where("id = ?", id).First(&m).Error; err != nil {
-		return nil, err
-	}
-	return toDomainAssetResource(&m), nil
-}
-
-func (r *AssetRepository) GetResourceByInternalCode(code string) (*domainasset.Resource, error) {
-	var m model.AssetResource
-	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
-		return nil, err
-	}
-	return toDomainAssetResource(&m), nil
-}
-
 func (r *AssetRepository) UpdateDeviceFields(id string, patch domainasset.DevicePatch) error {
+	pk, ok := parseID(id)
+	if !ok {
+		return gorm.ErrRecordNotFound
+	}
 	fields := map[string]any{"update_time": nowText()}
 	if patch.Name != nil {
 		fields["name"] = strings.TrimSpace(*patch.Name)
 	}
 	if patch.Vendor != nil {
-		fields["vendor"] = strings.TrimSpace(*patch.Vendor)
+		fields["manufacturer"] = strings.TrimSpace(*patch.Vendor)
 	}
 	if patch.Model != nil {
 		fields["model"] = strings.TrimSpace(*patch.Model)
@@ -228,205 +177,269 @@ func (r *AssetRepository) UpdateDeviceFields(id string, patch domainasset.Device
 	if patch.Enabled != nil {
 		fields["enabled"] = *patch.Enabled
 	}
-	return r.db.Model(&model.PhysicalDevice{}).Where("id = ?", id).Updates(fields).Error
+	return r.db.Model(&model.Device{}).Where("id = ?", pk).Updates(fields).Error
 }
 
-func (r *AssetRepository) UpdateResourceFields(id string, patch domainasset.ResourcePatch) error {
-	var m model.AssetResource
-	if err := r.db.Where("id = ?", id).First(&m).Error; err != nil {
+// --- Binding ---
+
+func (r *AssetRepository) CreateBinding(b *domainasset.AccessBinding) error {
+	now := nowText()
+	devID, ok := parseID(b.DeviceID)
+	if !ok {
+		return fmt.Errorf("invalid device id: %s", b.DeviceID)
+	}
+	m := &model.AccessBinding{
+		DeviceID: devID, Protocol: b.Protocol, Mode: b.Mode,
+		ExternalID: b.ExternalID, Endpoint: b.Endpoint, PluginInstanceID: b.PluginInstanceID,
+		ConfigJSON: b.ConfigJSON, Status: b.Status, LastSeen: b.LastSeen,
+		CreateTime: now, UpdateTime: now,
+	}
+	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	attrs := map[string]any{}
-	if strings.TrimSpace(m.AttrsJSON) != "" {
-		_ = json.Unmarshal([]byte(m.AttrsJSON), &attrs)
+	b.ID = formatID(m.ID)
+	b.CreateTime, b.UpdateTime = now, now
+	return nil
+}
+
+func (r *AssetRepository) UpsertBinding(b *domainasset.AccessBinding) error {
+	devID, ok := parseID(b.DeviceID)
+	if !ok {
+		return fmt.Errorf("invalid device id: %s", b.DeviceID)
 	}
-	edited := false
-	if patch.Longitude != nil {
-		attrs["longitude"] = *patch.Longitude
-		edited = true
+	var existing model.AccessBinding
+	err := r.db.Where("device_id = ?", devID).First(&existing).Error
+	now := nowText()
+	if err == gorm.ErrRecordNotFound {
+		return r.CreateBinding(b)
 	}
-	if patch.Latitude != nil {
-		attrs["latitude"] = *patch.Latitude
-		edited = true
-	}
-	if patch.MapLevel != nil {
-		attrs["mapLevel"] = *patch.MapLevel
-		edited = true
-	}
-	if patch.PTZType != nil {
-		attrs["ptzType"] = *patch.PTZType
-		edited = true
-	}
-	if patch.HasAudio != nil {
-		attrs["hasAudio"] = *patch.HasAudio
-		edited = true
-	}
-	if patch.Tags != nil {
-		attrs["tags"] = strings.TrimSpace(*patch.Tags)
-		edited = true
-	}
-	if patch.Enabled != nil {
-		attrs["enabled"] = *patch.Enabled
-		edited = true
-	}
-	// 非国标通道的国标编码与国标属性表单：无 zws_device_channel 行，落在 attrs_json。
-	if patch.GBCode != nil {
-		attrs["gbCode"] = strings.TrimSpace(*patch.GBCode)
-		edited = true
-	}
-	if patch.GBFields != nil {
-		merged := map[string]any{}
-		if old, ok := attrs["gb"].(map[string]any); ok {
-			for k, v := range old {
-				merged[k] = v
-			}
-		}
-		for k, v := range patch.GBFields {
-			merged[k] = v
-		}
-		attrs["gb"] = merged
-		edited = true
-	}
-	if edited {
-		attrs["userEdited"] = true
-	}
-	raw, err := json.Marshal(attrs)
 	if err != nil {
 		return err
 	}
-	updates := map[string]any{"attrs_json": string(raw), "update_time": nowText()}
-	if patch.Name != nil {
-		updates["name"] = strings.TrimSpace(*patch.Name)
+	if err := r.db.Model(&model.AccessBinding{}).Where("id = ?", existing.ID).Updates(map[string]any{
+		"protocol": b.Protocol, "mode": b.Mode, "external_id": b.ExternalID,
+		"endpoint": b.Endpoint, "plugin_instance_id": b.PluginInstanceID,
+		"config_json": b.ConfigJSON, "status": b.Status, "last_seen": b.LastSeen,
+		"update_time": now,
+	}).Error; err != nil {
+		return err
 	}
-	return r.db.Model(&model.AssetResource{}).Where("id = ?", id).Updates(updates).Error
+	b.ID = formatID(existing.ID)
+	return nil
 }
 
-func (r *AssetRepository) UpsertProfile(p *domainasset.StreamProfile) error {
+func (r *AssetRepository) GetBindingByDevice(deviceID string) (*domainasset.AccessBinding, error) {
+	devID, ok := parseID(deviceID)
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var m model.AccessBinding
+	if err := r.db.Where("device_id = ?", devID).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return toDomainAssetBinding(&m), nil
+}
+
+// --- Resource (= Channel) ---
+
+func (r *AssetRepository) UpsertResource(res *domainasset.Resource) error {
 	now := nowText()
-	return r.db.Save(&model.AssetStreamProfile{
-		ID: p.ID, ResourceID: p.ResourceID, Role: p.Role, Name: p.Name,
-		SelectorJSON: p.SelectorJSON, Codec: p.Codec, Resolution: p.Resolution,
-		IsDefault: p.IsDefault, CreateTime: p.CreateTime, UpdateTime: now,
-	}).Error
-}
-
-func (r *AssetRepository) ListProfiles(resourceID string) ([]*domainasset.StreamProfile, error) {
-	var rows []model.AssetStreamProfile
-	if err := r.db.Where("resource_id = ?", resourceID).Order("is_default DESC, role").Find(&rows).Error; err != nil {
-		return nil, err
+	devID, ok := parseID(res.DeviceID)
+	if !ok {
+		return fmt.Errorf("invalid device id: %s", res.DeviceID)
 	}
-	out := make([]*domainasset.StreamProfile, 0, len(rows))
-	for i := range rows {
-		out = append(out, toDomainAssetProfile(&rows[i]))
+	var existing model.Channel
+	var err error
+	if pk, has := parseID(res.ID); has && pk > 0 {
+		err = r.db.First(&existing, pk).Error
+	} else {
+		err = r.db.Where("device_id = ? AND external_key = ?", devID, res.ExternalKey).First(&existing).Error
 	}
-	return out, nil
-}
-
-func (r *AssetRepository) GetProfile(id string) (*domainasset.StreamProfile, error) {
-	var m model.AssetStreamProfile
-	if err := r.db.Where("id = ?", id).First(&m).Error; err != nil {
-		return nil, err
-	}
-	return toDomainAssetProfile(&m), nil
-}
-
-func (r *AssetRepository) ReplaceCapabilities(scopeType, scopeID string, caps []*domainasset.Capability) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("scope_type = ? AND scope_id = ?", scopeType, scopeID).Delete(&model.AssetCapability{}).Error; err != nil {
+	if err == gorm.ErrRecordNotFound {
+		m := &model.Channel{
+			DeviceID: devID, InternalCode: res.InternalCode, ExternalKey: res.ExternalKey,
+			Kind: kindOrDefault(res.Kind), Name: res.Name, Status: res.Status, Online: res.Status == "ON",
+			CreateTime: now, UpdateTime: now,
+		}
+		if err := r.db.Create(m).Error; err != nil {
 			return err
 		}
-		now := nowText()
-		for _, c := range caps {
-			if err := tx.Create(&model.AssetCapability{
-				ID: c.ID, ScopeType: c.ScopeType, ScopeID: c.ScopeID, Operation: c.Operation,
-				Supported: c.Supported, Configured: c.Configured, Available: c.Available,
-				ParamsJSON: c.ParamsJSON, Source: c.Source, UpdateTime: now,
-			}).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+		res.ID = formatID(m.ID)
+		return r.upsertChannelExt(m.ID, res, now)
+	}
+	if err != nil {
+		return err
+	}
+	if err := r.db.Model(&model.Channel{}).Where("id = ?", existing.ID).Updates(map[string]any{
+		"internal_code": firstNonEmptyStr(res.InternalCode, existing.InternalCode),
+		"external_key":  firstNonEmptyStr(res.ExternalKey, existing.ExternalKey),
+		"kind":          kindOrDefault(res.Kind), "name": res.Name, "status": res.Status,
+		"online": res.Status == "ON", "update_time": now,
+	}).Error; err != nil {
+		return err
+	}
+	res.ID = formatID(existing.ID)
+	return r.upsertChannelExt(existing.ID, res, now)
 }
 
-func (r *AssetRepository) ListCapabilities(scopeType, scopeID string) ([]*domainasset.Capability, error) {
-	var rows []model.AssetCapability
-	if err := r.db.Where("scope_type = ? AND scope_id = ?", scopeType, scopeID).Order("operation").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]*domainasset.Capability, 0, len(rows))
-	for i := range rows {
-		out = append(out, &domainasset.Capability{
-			ID: rows[i].ID, ScopeType: rows[i].ScopeType, ScopeID: rows[i].ScopeID,
-			Operation: rows[i].Operation, Supported: rows[i].Supported,
-			Configured: rows[i].Configured, Available: rows[i].Available,
-			ParamsJSON: rows[i].ParamsJSON, Source: rows[i].Source, UpdateTime: rows[i].UpdateTime,
-		})
-	}
-	return out, nil
-}
-
-func (r *AssetRepository) UpsertEventSource(e *domainasset.EventSource) error {
-	return r.db.Save(&model.AssetEventSource{
-		ID: e.ID, DeviceID: e.DeviceID, ResourceID: e.ResourceID, Kind: e.Kind,
-		ExternalKey: e.ExternalKey, Enabled: e.Enabled, ConfigJSON: e.ConfigJSON,
-	}).Error
-}
-
-func (r *AssetRepository) ListEventSources(deviceID string) ([]*domainasset.EventSource, error) {
-	var rows []model.AssetEventSource
-	if err := r.db.Where("device_id = ?", deviceID).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make([]*domainasset.EventSource, 0, len(rows))
-	for i := range rows {
-		out = append(out, &domainasset.EventSource{
-			ID: rows[i].ID, DeviceID: rows[i].DeviceID, ResourceID: rows[i].ResourceID,
-			Kind: rows[i].Kind, ExternalKey: rows[i].ExternalKey,
-			Enabled: rows[i].Enabled, ConfigJSON: rows[i].ConfigJSON,
-		})
-	}
-	return out, nil
-}
-
-func (r *AssetRepository) GetLegacyRef(table, legacyID string) (string, string, error) {
-	var m model.UnifiedRef
-	if err := r.db.Where("legacy_table = ? AND legacy_id = ?", table, legacyID).First(&m).Error; err != nil {
-		return "", "", err
-	}
-	return m.EntityType, m.UnifiedID, nil
-}
-
-func (r *AssetRepository) UpsertLegacyRef(table, legacyID, entityType, unifiedID string) error {
-	var m model.UnifiedRef
-	err := r.db.Where("legacy_table = ? AND legacy_id = ?", table, legacyID).First(&m).Error
+func (r *AssetRepository) upsertChannelExt(channelID int64, res *domainasset.Resource, now string) error {
+	var ext model.ChannelExt
+	err := r.db.Where("channel_id = ?", channelID).First(&ext).Error
 	if err == gorm.ErrRecordNotFound {
-		return r.db.Create(&model.UnifiedRef{
-			LegacyTable: table, LegacyID: legacyID, EntityType: entityType, UnifiedID: unifiedID,
+		return r.db.Create(&model.ChannelExt{
+			ChannelID: channelID, Longitude: res.Longitude, Latitude: res.Latitude,
+			MapLevel: res.MapLevel, PTZType: res.PTZType, HasAudio: res.HasAudio,
+			Enabled: res.Enabled, Tags: res.Tags, ExtraJSON: res.AttrsJSON,
+			CreateTime: now, UpdateTime: now,
 		}).Error
 	}
 	if err != nil {
 		return err
 	}
-	return r.db.Model(&model.UnifiedRef{}).Where("id = ?", m.ID).
-		Updates(map[string]any{"entity_type": entityType, "unified_id": unifiedID}).Error
+	return r.db.Model(&model.ChannelExt{}).Where("id = ?", ext.ID).Updates(map[string]any{
+		"longitude": res.Longitude, "latitude": res.Latitude, "map_level": res.MapLevel,
+		"ptz_type": res.PTZType, "has_audio": res.HasAudio, "enabled": res.Enabled,
+		"tags": res.Tags, "extra_json": res.AttrsJSON, "update_time": now,
+	}).Error
 }
 
-func toDomainAssetDevice(m *model.PhysicalDevice) *domainasset.PhysicalDevice {
-	return &domainasset.PhysicalDevice{
-		ID: m.ID, InternalCode: m.InternalCode, Name: m.Name, Vendor: m.Vendor,
-		Model: m.Model, SerialNumber: m.SerialNumber, Enabled: m.Enabled, Online: m.Online,
-		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+func (r *AssetRepository) ListResources(deviceID string) ([]*domainasset.Resource, error) {
+	devID, ok := parseID(deviceID)
+	if !ok {
+		return []*domainasset.Resource{}, nil
 	}
+	var rows []model.Channel
+	if err := r.db.Where("device_id = ?", devID).Order("kind, name").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainasset.Resource, 0, len(rows))
+	for i := range rows {
+		out = append(out, r.hydrateAssetResource(&rows[i]))
+	}
+	return out, nil
 }
 
-func toDomainAssetBinding(m *model.AccessBinding) *domainasset.AccessBinding {
-	return &domainasset.AccessBinding{
-		ID: m.ID, DeviceID: m.DeviceID, Protocol: m.Protocol, Mode: m.Mode,
-		ExternalID: m.ExternalID, Endpoint: m.Endpoint, PluginInstanceID: m.PluginInstanceID,
-		ConfigJSON: m.ConfigJSON, Status: m.Status, LastSeen: m.LastSeen,
-		LegacyDeviceID: m.LegacyDeviceID, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+func (r *AssetRepository) GetResource(id string) (*domainasset.Resource, error) {
+	pk, ok := parseID(id)
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
 	}
+	var m model.Channel
+	if err := r.db.First(&m, pk).Error; err != nil {
+		return nil, err
+	}
+	return r.hydrateAssetResource(&m), nil
+}
+
+func (r *AssetRepository) GetResourceByInternalCode(code string) (*domainasset.Resource, error) {
+	var m model.Channel
+	if err := r.db.Where("internal_code = ?", code).First(&m).Error; err != nil {
+		return nil, err
+	}
+	return r.hydrateAssetResource(&m), nil
+}
+
+func (r *AssetRepository) hydrateAssetResource(m *model.Channel) *domainasset.Resource {
+	res := &domainasset.Resource{
+		ID: formatID(m.ID), InternalCode: m.InternalCode, DeviceID: formatID(m.DeviceID),
+		Kind: m.Kind, ExternalKey: m.ExternalKey, Name: m.Name, Status: m.Status,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime, Enabled: true,
+	}
+	var b model.AccessBinding
+	if err := r.db.Where("device_id = ?", m.DeviceID).First(&b).Error; err == nil {
+		res.BindingID = formatID(b.ID)
+	}
+	var ext model.ChannelExt
+	if err := r.db.Where("channel_id = ?", m.ID).First(&ext).Error; err == nil {
+		res.Longitude = ext.Longitude
+		res.Latitude = ext.Latitude
+		res.MapLevel = ext.MapLevel
+		res.PTZType = ext.PTZType
+		res.HasAudio = ext.HasAudio
+		res.Enabled = ext.Enabled
+		res.Tags = ext.Tags
+		res.AttrsJSON = ext.ExtraJSON
+	}
+	return res
+}
+
+func (r *AssetRepository) UpdateResourceFields(id string, patch domainasset.ResourcePatch) error {
+	pk, ok := parseID(id)
+	if !ok {
+		return gorm.ErrRecordNotFound
+	}
+	var m model.Channel
+	if err := r.db.First(&m, pk).Error; err != nil {
+		return err
+	}
+	if patch.Name != nil {
+		if err := r.db.Model(&model.Channel{}).Where("id = ?", pk).
+			Updates(map[string]any{"name": strings.TrimSpace(*patch.Name), "update_time": nowText()}).Error; err != nil {
+			return err
+		}
+	}
+	var ext model.ChannelExt
+	err := r.db.Where("channel_id = ?", pk).First(&ext).Error
+	if err == gorm.ErrRecordNotFound {
+		ext = model.ChannelExt{ChannelID: pk, Enabled: true, CreateTime: nowText(), UpdateTime: nowText()}
+		if err := r.db.Create(&ext).Error; err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	updates := map[string]any{"update_time": nowText()}
+	if patch.Longitude != nil {
+		updates["longitude"] = *patch.Longitude
+	}
+	if patch.Latitude != nil {
+		updates["latitude"] = *patch.Latitude
+	}
+	if patch.MapLevel != nil {
+		updates["map_level"] = *patch.MapLevel
+	}
+	if patch.PTZType != nil {
+		updates["ptz_type"] = *patch.PTZType
+	}
+	if patch.HasAudio != nil {
+		updates["has_audio"] = *patch.HasAudio
+	}
+	if patch.Tags != nil {
+		updates["tags"] = strings.TrimSpace(*patch.Tags)
+	}
+	if patch.Enabled != nil {
+		updates["enabled"] = *patch.Enabled
+	}
+	// 非国标通道的国标编码/属性落 gb_json
+	if patch.GBCode != nil || patch.GBFields != nil {
+		var g gbChannelJSON
+		if strings.TrimSpace(ext.GBJSON) != "" {
+			_ = json.Unmarshal([]byte(ext.GBJSON), &g)
+		}
+		if patch.GBCode != nil {
+			g.GBName = strings.TrimSpace(*patch.GBCode)
+		}
+		// GBFields 覆盖到 gb_json 的 CivilCode/ParentID 等常见键
+		for k, v := range patch.GBFields {
+			if s, ok := v.(string); ok {
+				switch k {
+				case "civilCode":
+					g.CivilCode = s
+				case "parentId":
+					g.ParentID = s
+				case "businessGroupId":
+					g.BusinessGroupID = s
+				case "manufacturer":
+					g.Manufacturer = s
+				case "model":
+					g.Model = s
+				}
+			}
+		}
+		gj, _ := json.Marshal(g)
+		updates["gb_json"] = string(gj)
+	}
+	return r.db.Model(&model.ChannelExt{}).Where("id = ?", ext.ID).Updates(updates).Error
 }
 
 func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceInternalCode string) ([]*domainasset.ChannelView, int64, error) {
@@ -436,12 +449,12 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 	if count <= 0 {
 		count = 15
 	}
-	q := r.db.Table("zws_resource r").
-		Joins("JOIN zws_physical_device d ON d.id = r.device_id").
+	q := r.db.Table("zws_channel c").
+		Joins("JOIN zws_device d ON d.id = c.device_id").
 		Joins("LEFT JOIN zws_access_binding b ON b.device_id = d.id")
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
-		q = q.Where("r.name LIKE ? OR r.internal_code LIKE ? OR r.external_key LIKE ? OR d.name LIKE ?",
+		q = q.Where("c.name LIKE ? OR c.internal_code LIKE ? OR c.gb_code LIKE ? OR d.name LIKE ?",
 			like, like, like, like)
 	}
 	if protocol != "" {
@@ -455,15 +468,16 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		return nil, 0, err
 	}
 	type row struct {
-		ResourceID         string  `gorm:"column:resource_id"`
+		ChannelID          int64   `gorm:"column:channel_id"`
 		InternalCode       string  `gorm:"column:internal_code"`
-		DeviceID           string  `gorm:"column:device_id"`
+		DeviceID           int64   `gorm:"column:device_id"`
 		DeviceInternalCode string  `gorm:"column:device_internal_code"`
 		DeviceName         string  `gorm:"column:device_name"`
 		Protocol           string  `gorm:"column:protocol"`
 		Name               string  `gorm:"column:name"`
 		Kind               string  `gorm:"column:kind"`
 		ExternalKey        string  `gorm:"column:external_key"`
+		GbCode             string  `gorm:"column:gb_code"`
 		Status             string  `gorm:"column:status"`
 		Online             bool    `gorm:"column:online"`
 		PTZType            int     `gorm:"column:ptz_type"`
@@ -472,23 +486,19 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		Latitude           float64 `gorm:"column:latitude"`
 		MapLevel           int     `gorm:"column:map_level"`
 		Tags               string  `gorm:"column:tags"`
-		Enabled            int     `gorm:"column:enabled"`
-		AttrsJSON          string  `gorm:"column:attrs_json"`
+		Enabled            bool    `gorm:"column:enabled"`
+		GBJSON             string  `gorm:"column:gb_json"`
 	}
 	var rows []row
-	err := q.Select(`r.id AS resource_id, r.internal_code, r.device_id, d.internal_code AS device_internal_code,
-			d.name AS device_name, b.protocol, r.name, r.kind, r.external_key, r.status, d.online,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.ptzType') AS SIGNED), 0) AS ptz_type,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.hasAudio') AS SIGNED), 0) AS has_audio,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.longitude') AS DOUBLE), 0) AS longitude,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.latitude') AS DOUBLE), 0) AS latitude,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.mapLevel') AS SIGNED), 0) AS map_level,
-			COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.attrs_json, '$.tags')), '') AS tags,
-			COALESCE(CAST(JSON_EXTRACT(r.attrs_json, '$.enabled') AS SIGNED), 1) AS enabled,
-			COALESCE(r.attrs_json, '') AS attrs_json`).
-		Order("d.internal_code ASC, r.id ASC").
-		Offset((page - 1) * count).Limit(count).
-		Scan(&rows).Error
+	err := q.Select(`c.id AS channel_id, c.internal_code, c.device_id, d.internal_code AS device_internal_code,
+			d.name AS device_name, b.protocol, c.name, c.kind, c.external_key, c.gb_code, c.status, c.online,
+			COALESCE(e.ptz_type,0) AS ptz_type, COALESCE(e.has_audio,0) AS has_audio,
+			COALESCE(e.longitude,0) AS longitude, COALESCE(e.latitude,0) AS latitude,
+			COALESCE(e.map_level,0) AS map_level, COALESCE(e.tags,'') AS tags,
+			COALESCE(e.enabled,1) AS enabled, COALESCE(e.gb_json,'') AS gb_json`).
+		Joins("LEFT JOIN zws_channel_ext e ON e.channel_id = c.id").
+		Order("d.internal_code ASC, c.id ASC").
+		Offset((page - 1) * count).Limit(count).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, err
 	}
@@ -496,25 +506,17 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 	for i := range rows {
 		x := &rows[i]
 		view := &domainasset.ChannelView{
-			ResourceID: x.ResourceID, InternalCode: x.InternalCode, DeviceID: x.DeviceID,
+			ResourceID: formatID(x.ChannelID), InternalCode: x.InternalCode, DeviceID: formatID(x.DeviceID),
 			DeviceInternalCode: x.DeviceInternalCode, DeviceName: x.DeviceName, Protocol: x.Protocol,
-			Name: x.Name, Kind: x.Kind, ExternalKey: x.ExternalKey, Status: x.Status,
+			Name: x.Name, Kind: x.Kind, ExternalKey: x.ExternalKey, GBCode: x.GbCode, Status: x.Status,
 			Online: x.Online, PTZType: x.PTZType, HasAudio: x.HasAudio,
 			Longitude: x.Longitude, Latitude: x.Latitude, MapLevel: x.MapLevel,
-			Tags: x.Tags, Enabled: x.Enabled == 1,
+			Tags: x.Tags, Enabled: x.Enabled,
 		}
-		if strings.EqualFold(x.Protocol, "gb28181") {
-			view.GBCode = x.ExternalKey
-		} else {
-			// 非国标通道：国标编码与国标属性由通道编辑页手工填写，存在 attrs_json。
-			var attrs map[string]any
-			if x.AttrsJSON != "" && json.Unmarshal([]byte(x.AttrsJSON), &attrs) == nil {
-				if code, ok := attrs["gbCode"].(string); ok {
-					view.GBCode = code
-				}
-				if gb, ok := attrs["gb"].(map[string]any); ok {
-					view.GB = gb
-				}
+		if strings.TrimSpace(x.GBJSON) != "" {
+			var g map[string]any
+			if json.Unmarshal([]byte(x.GBJSON), &g) == nil {
+				view.GB = g
 			}
 		}
 		out = append(out, view)
@@ -522,52 +524,220 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 	return out, total, nil
 }
 
-func toDomainAssetResource(m *model.AssetResource) *domainasset.Resource {
-	res := &domainasset.Resource{
-		ID: m.ID, InternalCode: m.InternalCode, DeviceID: m.DeviceID, BindingID: m.BindingID, Kind: m.Kind,
-		ExternalKey: m.ExternalKey, Name: m.Name, Status: m.Status,
-		LegacyChannelID: m.LegacyChannelID, AttrsJSON: m.AttrsJSON,
-		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
-		Enabled: true,
+// --- Profile ---
+
+func (r *AssetRepository) UpsertProfile(p *domainasset.StreamProfile) error {
+	now := nowText()
+	chID, ok := parseID(p.ResourceID)
+	if !ok {
+		return fmt.Errorf("invalid resource id: %s", p.ResourceID)
 	}
-	var attrs map[string]any
-	if json.Unmarshal([]byte(m.AttrsJSON), &attrs) == nil {
-		if v, ok := attrs["longitude"].(float64); ok {
-			res.Longitude = v
+	var existing model.StreamProfile
+	err := r.db.Where("channel_id = ? AND role = ?", chID, p.Role).First(&existing).Error
+	if err == gorm.ErrRecordNotFound {
+		m := &model.StreamProfile{
+			ChannelID: chID, Role: p.Role, Name: p.Name, SelectorJSON: p.SelectorJSON,
+			Codec: p.Codec, Resolution: p.Resolution, IsDefault: p.IsDefault,
+			CreateTime: now, UpdateTime: now,
 		}
-		if v, ok := attrs["latitude"].(float64); ok {
-			res.Latitude = v
+		if err := r.db.Create(m).Error; err != nil {
+			return err
 		}
-		if v, ok := attrs["mapLevel"].(float64); ok {
-			res.MapLevel = int(v)
-		}
-		if v, ok := attrs["ptzType"].(float64); ok {
-			res.PTZType = int(v)
-		}
-		if v, ok := attrs["hasAudio"].(bool); ok {
-			res.HasAudio = v
-		}
-		if v, ok := attrs["tags"].(string); ok {
-			res.Tags = v
-		}
-		if v, ok := attrs["enabled"].(bool); ok {
-			res.Enabled = v
-		}
+		p.ID = formatID(m.ID)
+		return nil
 	}
-	return res
+	if err != nil {
+		return err
+	}
+	if err := r.db.Model(&model.StreamProfile{}).Where("id = ?", existing.ID).Updates(map[string]any{
+		"name": p.Name, "selector_json": p.SelectorJSON, "codec": p.Codec,
+		"resolution": p.Resolution, "is_default": p.IsDefault, "update_time": now,
+	}).Error; err != nil {
+		return err
+	}
+	p.ID = formatID(existing.ID)
+	return nil
 }
 
-func toDomainAssetProfile(m *model.AssetStreamProfile) *domainasset.StreamProfile {
+func (r *AssetRepository) ListProfiles(resourceID string) ([]*domainasset.StreamProfile, error) {
+	chID, ok := parseID(resourceID)
+	if !ok {
+		return []*domainasset.StreamProfile{}, nil
+	}
+	var rows []model.StreamProfile
+	if err := r.db.Where("channel_id = ?", chID).Order("is_default DESC, role").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainasset.StreamProfile, 0, len(rows))
+	for i := range rows {
+		out = append(out, toDomainAssetProfile(&rows[i]))
+	}
+	return out, nil
+}
+
+func (r *AssetRepository) GetProfile(id string) (*domainasset.StreamProfile, error) {
+	pk, ok := parseID(id)
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
+	}
+	var m model.StreamProfile
+	if err := r.db.First(&m, pk).Error; err != nil {
+		return nil, err
+	}
+	return toDomainAssetProfile(&m), nil
+}
+
+// --- Capability ---
+
+func (r *AssetRepository) ReplaceCapabilities(scopeType, scopeID string, caps []*domainasset.Capability) error {
+	chID, ok := parseID(scopeID)
+	if !ok {
+		return fmt.Errorf("invalid scope id: %s", scopeID)
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("channel_id = ?", chID).Delete(&model.Capability{}).Error; err != nil {
+			return err
+		}
+		now := nowText()
+		for _, c := range caps {
+			if err := tx.Create(&model.Capability{
+				ChannelID: chID, Operation: c.Operation, Supported: c.Supported,
+				Configured: c.Configured, Available: c.Available, ParamsJSON: c.ParamsJSON,
+				Source: c.Source, UpdateTime: now,
+			}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *AssetRepository) ListCapabilities(scopeType, scopeID string) ([]*domainasset.Capability, error) {
+	chID, ok := parseID(scopeID)
+	if !ok {
+		return []*domainasset.Capability{}, nil
+	}
+	var rows []model.Capability
+	if err := r.db.Where("channel_id = ?", chID).Order("operation").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainasset.Capability, 0, len(rows))
+	for i := range rows {
+		out = append(out, &domainasset.Capability{
+			ID: formatID(rows[i].ID), ScopeType: scopeType, ScopeID: scopeID,
+			Operation: rows[i].Operation, Supported: rows[i].Supported,
+			Configured: rows[i].Configured, Available: rows[i].Available,
+			ParamsJSON: rows[i].ParamsJSON, Source: rows[i].Source, UpdateTime: rows[i].UpdateTime,
+		})
+	}
+	return out, nil
+}
+
+func (r *AssetRepository) SetCapabilityAvailable(scopeType, scopeID, operation string, available bool) error {
+	chID, ok := parseID(scopeID)
+	if !ok {
+		return nil
+	}
+	return r.db.Model(&model.Capability{}).
+		Where("channel_id = ? AND operation = ?", chID, operation).
+		Updates(map[string]any{"available": available, "update_time": nowText()}).Error
+}
+
+// --- EventSource ---
+
+func (r *AssetRepository) UpsertEventSource(e *domainasset.EventSource) error {
+	devID, ok := parseID(e.DeviceID)
+	if !ok {
+		return fmt.Errorf("invalid device id: %s", e.DeviceID)
+	}
+	var chID *int64
+	if id, ok := parseID(e.ResourceID); ok && id > 0 {
+		chID = &id
+	}
+	var existing model.EventSource
+	q := r.db.Where("device_id = ?", devID)
+	if chID != nil {
+		q = q.Where("channel_id = ?", *chID)
+	} else {
+		q = q.Where("channel_id IS NULL")
+	}
+	err := q.Where("kind = ?", e.Kind).First(&existing).Error
+	if err == gorm.ErrRecordNotFound {
+		m := &model.EventSource{
+			DeviceID: devID, ChannelID: chID, Kind: e.Kind,
+			ExternalKey: e.ExternalKey, Enabled: e.Enabled, ConfigJSON: e.ConfigJSON,
+		}
+		if err := r.db.Create(m).Error; err != nil {
+			return err
+		}
+		e.ID = formatID(m.ID)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := r.db.Model(&model.EventSource{}).Where("id = ?", existing.ID).Updates(map[string]any{
+		"external_key": e.ExternalKey, "enabled": e.Enabled, "config_json": e.ConfigJSON,
+	}).Error; err != nil {
+		return err
+	}
+	e.ID = formatID(existing.ID)
+	return nil
+}
+
+func (r *AssetRepository) ListEventSources(deviceID string) ([]*domainasset.EventSource, error) {
+	devID, ok := parseID(deviceID)
+	if !ok {
+		return []*domainasset.EventSource{}, nil
+	}
+	var rows []model.EventSource
+	if err := r.db.Where("device_id = ?", devID).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainasset.EventSource, 0, len(rows))
+	for i := range rows {
+		es := &domainasset.EventSource{
+			ID: formatID(rows[i].ID), DeviceID: deviceID, Kind: rows[i].Kind,
+			ExternalKey: rows[i].ExternalKey, Enabled: rows[i].Enabled, ConfigJSON: rows[i].ConfigJSON,
+		}
+		if rows[i].ChannelID != nil {
+			es.ResourceID = formatID(*rows[i].ChannelID)
+		}
+		out = append(out, es)
+	}
+	return out, nil
+}
+
+// --- helpers ---
+
+func toDomainAssetDevice(m *model.Device) *domainasset.PhysicalDevice {
+	return &domainasset.PhysicalDevice{
+		ID: formatID(m.ID), InternalCode: m.InternalCode, Name: m.Name, Vendor: m.Manufacturer,
+		Model: m.Model, SerialNumber: m.SerialNumber, Enabled: m.Enabled, Online: m.Online,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+}
+
+func toDomainAssetBinding(m *model.AccessBinding) *domainasset.AccessBinding {
+	return &domainasset.AccessBinding{
+		ID: formatID(m.ID), DeviceID: formatID(m.DeviceID), Protocol: m.Protocol, Mode: m.Mode,
+		ExternalID: m.ExternalID, Endpoint: m.Endpoint, PluginInstanceID: m.PluginInstanceID,
+		ConfigJSON: m.ConfigJSON, Status: m.Status, LastSeen: m.LastSeen,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+}
+
+func toDomainAssetProfile(m *model.StreamProfile) *domainasset.StreamProfile {
 	return &domainasset.StreamProfile{
-		ID: m.ID, ResourceID: m.ResourceID, Role: m.Role, Name: m.Name,
+		ID: formatID(m.ID), ResourceID: formatID(m.ChannelID), Role: m.Role, Name: m.Name,
 		SelectorJSON: m.SelectorJSON, Codec: m.Codec, Resolution: m.Resolution,
 		IsDefault: m.IsDefault, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }
 
-// SetCapabilityAvailable 运行时更新能力可用性。
-func (r *AssetRepository) SetCapabilityAvailable(scopeType, scopeID, operation string, available bool) error {
-	return r.db.Model(&model.AssetCapability{}).
-		Where("scope_type = ? AND scope_id = ? AND operation = ?", scopeType, scopeID, operation).
-		Updates(map[string]any{"available": available, "update_time": nowText()}).Error
+func kindOrDefault(k string) string {
+	if strings.TrimSpace(k) == "" {
+		return "video_sensor"
+	}
+	return k
 }

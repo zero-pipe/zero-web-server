@@ -13,6 +13,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// PluginRepository 插件接入持久化。
+// 插件设备 → zws_device + zws_access_binding(protocol=插件协议, plugin_instance_id=运行时ID,
+// external_id=DeviceUID, config_json=DriverParams)；插件通道 → zws_channel + zws_channel_ext。
 type PluginRepository struct{ db *gorm.DB }
 
 func NewPluginRepository(db *gorm.DB) *PluginRepository { return &PluginRepository{db: db} }
@@ -33,29 +36,24 @@ func (r *PluginRepository) UpsertPlugin(p *domainplugin.Plugin) error {
 			ConfigSchema: p.ConfigSchema, Endpoint: p.Endpoint, Online: true,
 			LastSeen: time.Now().UnixMilli(), CreateTime: now, UpdateTime: now,
 		}
-		if err := r.db.Create(m).Error; err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	} else {
-		if err := r.db.Model(&model.Plugin{}).Where("id = ?", p.ID).Updates(map[string]any{
-			"plugin_id":         p.PluginID,
-			"vendor":            p.Vendor,
-			"version":           p.Version,
-			"protocols":         string(protocols),
-			"capabilities":      string(caps),
-			"stream_transports": string(transports),
-			"config_schema":     p.ConfigSchema,
-			"endpoint":          p.Endpoint,
-			"online":            true,
-			"last_seen":         time.Now().UnixMilli(),
-			"update_time":       now,
-		}).Error; err != nil {
-			return err
-		}
+		return r.db.Create(m).Error
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	return r.db.Model(&model.Plugin{}).Where("id = ?", p.ID).Updates(map[string]any{
+		"plugin_id":         p.PluginID,
+		"vendor":            p.Vendor,
+		"version":           p.Version,
+		"protocols":         string(protocols),
+		"capabilities":      string(caps),
+		"stream_transports": string(transports),
+		"config_schema":     p.ConfigSchema,
+		"endpoint":          p.Endpoint,
+		"online":            true,
+		"last_seen":         time.Now().UnixMilli(),
+		"update_time":       now,
+	}).Error
 }
 
 func (r *PluginRepository) UpdatePluginSeen(id string, ts int64, online bool) error {
@@ -68,11 +66,13 @@ func (r *PluginRepository) MarkPluginOffline(id string) error {
 		if err := tx.Model(&model.Plugin{}).Where("id = ?", id).Update("online", false).Error; err != nil {
 			return err
 		}
-		return tx.Model(&model.PluginDevice{}).Where("plugin_id = ?", id).Update("online", false).Error
+		// 该插件实例下的设备置离线
+		return tx.Model(&model.Device{}).
+			Where("id IN (SELECT device_id FROM zws_access_binding WHERE plugin_instance_id = ?)", id).
+			Update("online", false).Error
 	})
 }
 
-// DeletePlugin 删除插件运行时记录（内置插件被移除后清理）。
 func (r *PluginRepository) DeletePlugin(id string) error {
 	return r.db.Where("id = ?", id).Delete(&model.Plugin{}).Error
 }
@@ -113,6 +113,14 @@ func (r *PluginRepository) ResolvePlugin(protocol string) (*domainplugin.Plugin,
 	return nil, gorm.ErrRecordNotFound
 }
 
+// pluginDeviceRow 便于 join 出绑定的插件信息。
+type pluginBinding struct {
+	Protocol         string `gorm:"column:protocol"`
+	ExternalID       string `gorm:"column:external_id"`
+	PluginInstanceID string `gorm:"column:plugin_instance_id"`
+	ConfigJSON       string `gorm:"column:config_json"`
+}
+
 func (r *PluginRepository) CreateDevice(d *domainplugin.Device) error {
 	if strings.TrimSpace(d.InternalCode) == "" {
 		code, err := idcode.Device()
@@ -122,46 +130,47 @@ func (r *PluginRepository) CreateDevice(d *domainplugin.Device) error {
 		d.InternalCode = code
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	m := &model.PluginDevice{
-		InternalCode: d.InternalCode, PluginID: d.PluginID, Protocol: d.Protocol,
-		DeviceUID: d.DeviceUID, Name: d.Name, Enabled: true, Online: d.Online,
-		DriverParams: d.DriverParams, Manufacturer: d.Manufacturer, Model: d.Model,
-		Firmware: d.Firmware, SerialNumber: d.SerialNumber,
+	m := &model.Device{
+		InternalCode: d.InternalCode, Name: d.Name, Manufacturer: d.Manufacturer,
+		Model: d.Model, Firmware: d.Firmware, SerialNumber: d.SerialNumber,
+		Online: d.Online, Enabled: d.Enabled, Status: onlineStatus(d.Online),
 		CreateTime: now, UpdateTime: now,
 	}
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	d.ID = m.ID
+	cfg, _ := json.Marshal(map[string]string{"driverParams": d.DriverParams})
+	if err := r.db.Create(&model.AccessBinding{
+		DeviceID: m.ID, Protocol: d.Protocol, Mode: "active",
+		ExternalID: d.DeviceUID, PluginInstanceID: d.PluginID,
+		ConfigJSON: string(cfg), Status: onlineStatus(d.Online), CreateTime: now, UpdateTime: now,
+	}).Error; err != nil {
+		return err
+	}
+	d.ID = int(m.ID)
 	d.CreateTime, d.UpdateTime = now, now
 	return nil
 }
 
 func (r *PluginRepository) UpdateDevice(d *domainplugin.Device) error {
-	return r.db.Model(&model.PluginDevice{}).Where("id = ?", d.ID).Updates(map[string]any{
-		"name":          d.Name,
-		"enabled":       d.Enabled,
-		"online":        d.Online,
-		"driver_params": d.DriverParams,
-		"manufacturer":  d.Manufacturer,
-		"model":         d.Model,
-		"firmware":      d.Firmware,
-		"serial_number": d.SerialNumber,
-		"update_time":   time.Now().Format("2006-01-02 15:04:05"),
-	}).Error
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if err := r.db.Model(&model.Device{}).Where("id = ?", d.ID).Updates(map[string]any{
+		"name": d.Name, "enabled": d.Enabled, "online": d.Online,
+		"manufacturer": d.Manufacturer, "model": d.Model, "firmware": d.Firmware,
+		"serial_number": d.SerialNumber, "status": onlineStatus(d.Online), "update_time": now,
+	}).Error; err != nil {
+		return err
+	}
+	cfg, _ := json.Marshal(map[string]string{"driverParams": d.DriverParams})
+	return r.db.Model(&model.AccessBinding{}).Where("device_id = ?", d.ID).
+		Updates(map[string]any{"config_json": string(cfg), "update_time": now}).Error
 }
 
 func (r *PluginRepository) DeleteDevice(id int) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("device_db_id = ?", id).Delete(&model.PluginChannel{}).Error; err != nil {
-			return err
-		}
-		return tx.Delete(&model.PluginDevice{}, id).Error
-	})
+	// 绑定/通道/扩展通过外键级联删除。
+	return r.db.Delete(&model.Device{}, id).Error
 }
 
-// CountDevicesByPlugin 统计某插件（按清单 plugin_id，如 hikvision-ipc）接入的设备数。
-// 设备表存的是运行时实例 ID（agentId-pluginId），故按运行时实例反查。
 func (r *PluginRepository) CountDevicesByPlugin(pluginID string) (int, error) {
 	var ids []string
 	if err := r.db.Model(&model.Plugin{}).Where("plugin_id = ?", pluginID).Pluck("id", &ids).Error; err != nil {
@@ -171,63 +180,94 @@ func (r *PluginRepository) CountDevicesByPlugin(pluginID string) (int, error) {
 		return 0, nil
 	}
 	var n int64
-	if err := r.db.Model(&model.PluginDevice{}).Where("plugin_id IN ?", ids).Count(&n).Error; err != nil {
-		return 0, err
-	}
-	return int(n), nil
+	err := r.db.Model(&model.AccessBinding{}).Where("plugin_instance_id IN ?", ids).Count(&n).Error
+	return int(n), err
 }
 
 func (r *PluginRepository) ListDevices() ([]*domainplugin.Device, error) {
-	var rows []model.PluginDevice
-	if err := r.db.Order("id DESC").Find(&rows).Error; err != nil {
+	var rows []model.Device
+	if err := r.db.Where("id IN (SELECT device_id FROM zws_access_binding WHERE plugin_instance_id <> '')").
+		Order("id DESC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	counts := map[int]int{}
-	var chs []model.PluginChannel
-	_ = r.db.Find(&chs).Error
-	for i := range chs {
-		counts[chs[i].DeviceDBID]++
+	counts := map[int64]int{}
+	var agg []struct {
+		DeviceID int64 `gorm:"column:device_id"`
+		N        int   `gorm:"column:n"`
+	}
+	_ = r.db.Table("zws_channel").Select("device_id, COUNT(*) AS n").Group("device_id").Scan(&agg).Error
+	for _, c := range agg {
+		counts[c.DeviceID] = c.N
 	}
 	out := make([]*domainplugin.Device, 0, len(rows))
 	for i := range rows {
-		d := toDomainPluginDevice(&rows[i])
-		d.ChannelCount = counts[d.ID]
+		d := r.hydratePluginDevice(&rows[i])
+		d.ChannelCount = counts[rows[i].ID]
 		out = append(out, d)
 	}
 	return out, nil
 }
 
 func (r *PluginRepository) GetDevice(id int) (*domainplugin.Device, error) {
-	var row model.PluginDevice
+	var row model.Device
 	if err := r.db.First(&row, id).Error; err != nil {
 		return nil, err
 	}
-	return toDomainPluginDevice(&row), nil
+	return r.hydratePluginDevice(&row), nil
 }
 
 func (r *PluginRepository) GetDeviceByUID(pluginID, deviceUID string) (*domainplugin.Device, error) {
-	var row model.PluginDevice
-	if err := r.db.Where("plugin_id = ? AND device_uid = ?", pluginID, deviceUID).First(&row).Error; err != nil {
+	var b model.AccessBinding
+	if err := r.db.Where("plugin_instance_id = ? AND external_id = ?", pluginID, deviceUID).First(&b).Error; err != nil {
 		return nil, err
 	}
-	return toDomainPluginDevice(&row), nil
+	var row model.Device
+	if err := r.db.First(&row, b.DeviceID).Error; err != nil {
+		return nil, err
+	}
+	return r.hydratePluginDevice(&row), nil
+}
+
+func (r *PluginRepository) hydratePluginDevice(m *model.Device) *domainplugin.Device {
+	d := &domainplugin.Device{
+		ID: int(m.ID), InternalCode: m.InternalCode, Name: m.Name, Enabled: m.Enabled,
+		Online: m.Online, Manufacturer: m.Manufacturer, Model: m.Model,
+		Firmware: m.Firmware, SerialNumber: m.SerialNumber,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+	var b model.AccessBinding
+	if err := r.db.Where("device_id = ?", m.ID).First(&b).Error; err == nil {
+		d.Protocol = b.Protocol
+		d.PluginID = b.PluginInstanceID
+		d.DeviceUID = b.ExternalID
+		if strings.TrimSpace(b.ConfigJSON) != "" {
+			var cfg struct {
+				DriverParams string `json:"driverParams"`
+			}
+			if json.Unmarshal([]byte(b.ConfigJSON), &cfg) == nil {
+				d.DriverParams = cfg.DriverParams
+			}
+		}
+	}
+	return d
 }
 
 func (r *PluginRepository) ReplaceChannels(deviceDBID int, channels []*domainplugin.Channel) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		var existing []model.PluginChannel
-		_ = tx.Where("device_db_id = ?", deviceDBID).Find(&existing).Error
+		var existing []model.Channel
+		_ = tx.Where("device_id = ?", deviceDBID).Find(&existing).Error
 		keep := map[string]string{}
 		keepName := map[string]string{}
 		for i := range existing {
-			keep[existing[i].ChannelID] = existing[i].InternalCode
+			key := strings.TrimSpace(existing[i].ExternalKey)
+			keep[key] = existing[i].InternalCode
 			if strings.TrimSpace(existing[i].Name) != "" {
-				keepName[existing[i].ChannelID] = existing[i].Name
+				keepName[key] = existing[i].Name
 			}
 		}
-		var dev model.PluginDevice
+		var dev model.Device
 		_ = tx.First(&dev, deviceDBID).Error
-		if err := tx.Where("device_db_id = ?", deviceDBID).Delete(&model.PluginChannel{}).Error; err != nil {
+		if err := tx.Where("device_id = ?", deviceDBID).Delete(&model.Channel{}).Error; err != nil {
 			return err
 		}
 		now := time.Now().Format("2006-01-02 15:04:05")
@@ -249,10 +289,17 @@ func (r *PluginRepository) ReplaceChannels(deviceDBID int, channels []*domainplu
 			}
 			ch.ID, ch.InternalCode, ch.DeviceDBID = 0, code, deviceDBID
 			ch.CreateTime, ch.UpdateTime = now, now
-			if err := tx.Create(&model.PluginChannel{
-				InternalCode: code, DeviceDBID: deviceDBID, ChannelID: ch.ChannelID,
-				Name: name, Status: ch.Status, PTZType: ch.PTZType, HasAudio: ch.HasAudio,
+			m := &model.Channel{
+				DeviceID: int64(deviceDBID), InternalCode: code, ExternalKey: ch.ChannelID,
+				Kind: "video_sensor", Name: name, Online: ch.Status == "ON", Status: ch.Status,
 				CreateTime: now, UpdateTime: now,
+			}
+			if err := tx.Create(m).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&model.ChannelExt{
+				ChannelID: m.ID, PTZType: ch.PTZType, HasAudio: ch.HasAudio,
+				Enabled: true, CreateTime: now, UpdateTime: now,
 			}).Error; err != nil {
 				return err
 			}
@@ -262,23 +309,37 @@ func (r *PluginRepository) ReplaceChannels(deviceDBID int, channels []*domainplu
 }
 
 func (r *PluginRepository) ListChannels(deviceDBID int) ([]*domainplugin.Channel, error) {
-	var rows []model.PluginChannel
-	if err := r.db.Where("device_db_id = ?", deviceDBID).Order("id ASC").Find(&rows).Error; err != nil {
+	var rows []model.Channel
+	if err := r.db.Where("device_id = ?", deviceDBID).Order("id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]*domainplugin.Channel, 0, len(rows))
 	for i := range rows {
-		out = append(out, toDomainPluginChannel(&rows[i]))
+		out = append(out, r.hydratePluginChannel(&rows[i]))
 	}
 	return out, nil
 }
 
 func (r *PluginRepository) GetChannel(deviceDBID int, channelID string) (*domainplugin.Channel, error) {
-	var row model.PluginChannel
-	if err := r.db.Where("device_db_id = ? AND channel_id = ?", deviceDBID, channelID).First(&row).Error; err != nil {
+	var row model.Channel
+	if err := r.db.Where("device_id = ? AND external_key = ?", deviceDBID, channelID).First(&row).Error; err != nil {
 		return nil, err
 	}
-	return toDomainPluginChannel(&row), nil
+	return r.hydratePluginChannel(&row), nil
+}
+
+func (r *PluginRepository) hydratePluginChannel(m *model.Channel) *domainplugin.Channel {
+	ch := &domainplugin.Channel{
+		ID: int(m.ID), InternalCode: m.InternalCode, DeviceDBID: int(m.DeviceID),
+		ChannelID: m.ExternalKey, Name: m.Name, Status: m.Status,
+		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
+	}
+	var ext model.ChannelExt
+	if err := r.db.Where("channel_id = ?", m.ID).First(&ext).Error; err == nil {
+		ch.PTZType = ext.PTZType
+		ch.HasAudio = ext.HasAudio
+	}
+	return ch
 }
 
 func toDomainPlugin(m *model.Plugin) *domainplugin.Plugin {
@@ -288,25 +349,6 @@ func toDomainPlugin(m *model.Plugin) *domainplugin.Plugin {
 		StreamTransports: decodeStrings(m.StreamTransports),
 		ConfigSchema:     m.ConfigSchema, Endpoint: m.Endpoint, Online: m.Online,
 		LastSeen: m.LastSeen, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
-	}
-}
-
-func toDomainPluginDevice(m *model.PluginDevice) *domainplugin.Device {
-	return &domainplugin.Device{
-		ID: m.ID, InternalCode: m.InternalCode, PluginID: m.PluginID, Protocol: m.Protocol,
-		DeviceUID: m.DeviceUID, Name: m.Name, Enabled: m.Enabled, Online: m.Online,
-		DriverParams: m.DriverParams, Manufacturer: m.Manufacturer, Model: m.Model,
-		Firmware: m.Firmware, SerialNumber: m.SerialNumber,
-		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
-	}
-}
-
-func toDomainPluginChannel(m *model.PluginChannel) *domainplugin.Channel {
-	return &domainplugin.Channel{
-		ID: m.ID, InternalCode: m.InternalCode, DeviceDBID: m.DeviceDBID,
-		ChannelID: m.ChannelID, Name: m.Name, Status: m.Status,
-		PTZType: m.PTZType, HasAudio: m.HasAudio,
-		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }
 

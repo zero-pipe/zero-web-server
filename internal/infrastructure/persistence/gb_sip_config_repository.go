@@ -70,7 +70,7 @@ func (r *GbSipConfigRepository) Save(d *domaingbsipconfig.Config) error {
 
 func toModelGbSipConfig(d *domaingbsipconfig.Config) *model.GbSipConfig {
 	return &model.GbSipConfig{
-		ID: d.ID, IP: d.IP, Port: d.Port, Domain: d.Domain, DeviceID: d.DeviceID,
+		ID: int64(d.ID), IP: d.IP, Port: d.Port, Domain: d.Domain, DeviceID: d.DeviceID,
 		Password: d.Password, Alarm: d.Alarm, RequirePreRegister: d.RequirePreRegister,
 		Transport: d.Transport, StreamMode: d.StreamMode, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime,
 	}
@@ -78,7 +78,7 @@ func toModelGbSipConfig(d *domaingbsipconfig.Config) *model.GbSipConfig {
 
 func toDomainGbSipConfig(m *model.GbSipConfig) *domaingbsipconfig.Config {
 	return &domaingbsipconfig.Config{
-		ID: m.ID, IP: m.IP, Port: m.Port, Domain: m.Domain, DeviceID: m.DeviceID,
+		ID: int(m.ID), IP: m.IP, Port: m.Port, Domain: m.Domain, DeviceID: m.DeviceID,
 		Password: m.Password, Alarm: m.Alarm, RequirePreRegister: m.RequirePreRegister,
 		Transport: m.Transport, StreamMode: m.StreamMode, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}

@@ -71,7 +71,7 @@ func (r *UserRepository) List(page, count int) ([]*domainuser.User, int64, error
 func (r *UserRepository) Create(username, password string, roleID int) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	return r.db.Create(&model.User{
-		Username: username, Password: password, RoleID: roleID,
+		Username: username, Password: password, RoleID: int64Ptr(int64(roleID)),
 		CreateTime: now, UpdateTime: now,
 	}).Error
 }
@@ -129,7 +129,7 @@ func (r *UserRepository) CountUsersByRole(roleID int) (int64, error) {
 
 func toDomainRole(m *model.UserRole) *domainuser.Role {
 	return &domainuser.Role{
-		ID:         m.ID,
+		ID:         int(m.ID),
 		Name:       m.Name,
 		Authority:  m.Authority,
 		CreateTime: m.CreateTime,
@@ -139,7 +139,7 @@ func toDomainRole(m *model.UserRole) *domainuser.Role {
 
 func toDomainUser(m *model.User) *domainuser.User {
 	u := &domainuser.User{
-		ID:         m.ID,
+		ID:         int(m.ID),
 		Username:   m.Username,
 		Password:   m.Password,
 		CreateTime: m.CreateTime,

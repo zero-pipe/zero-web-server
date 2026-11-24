@@ -97,62 +97,62 @@ func ensureDatabase(cfg config.MySQLConfig) error {
 
 func autoMigrateAll(db *gorm.DB) error {
 	models := []any{
-		&model.UserRole{},
-		&model.User{},
-		&model.MediaServer{},
-		&model.GBDevice{},
-		&model.GBDeviceChannel{},
+		// 物模型
+		&model.Device{},
+		&model.AccessBinding{},
+		&model.Channel{},
+		&model.DeviceExt{},
+		&model.ChannelExt{},
+		&model.StreamProfile{},
+		&model.Capability{},
+		// 目录树
+		&model.Region{},
+		&model.Group{},
+		&model.Catalog{},
+		// 事件
+		&model.EventType{},
+		&model.Event{},
 		&model.Alarm{},
+		&model.EventSource{},
+		&model.EventSubscription{},
+		// 媒体 / 录像 / 位置
+		&model.MediaServer{},
+		&model.RecordPlan{},
+		&model.RecordPlanItem{},
+		&model.CloudRecord{},
+		&model.StreamProxy{},
+		&model.StreamPush{},
 		&model.MobilePosition{},
-		&model.Platform{},
-		&model.PlatformChannel{},
+		// 级联
+		&model.UpperPlatform{},
 		&model.SubordinatePlatform{},
 		&model.SubordinateCatalog{},
 		&model.PlatformCatalogSnapshot{},
 		&model.PlatformGroupShare{},
-		&model.GBCodeSeq{},
+		&model.PlatformChannel{},
 		&model.RegionCodeMapping{},
-		&model.StreamPush{},
-		&model.StreamProxy{},
-		&model.CloudRecord{},
-		&model.RecordPlan{},
-		&model.RecordPlanItem{},
-		&model.OnvifDevice{},
-		&model.OnvifChannel{},
-		&model.CommonGroup{},
-		&model.CommonRegion{},
-		&model.GbSipConfig{},
-		&model.ObjectStoreConfig{},
-		&model.MQTTConfig{},
-		&model.EventSubscription{},
-		&model.Event{},
-		&model.EventType{},
-		&model.CustomEvent{},
-		&model.Plugin{},
+		&model.GBCodeSeq{},
+		// 接入 / 插件
 		&model.Agent{},
+		&model.Plugin{},
 		&model.AgentPlugin{},
 		&model.PluginPackage{},
 		&model.PluginInstall{},
-		&model.PluginDevice{},
-		&model.PluginChannel{},
-		&model.PhysicalDevice{},
-		&model.AccessBinding{},
-		&model.AssetResource{},
-		&model.AssetStreamProfile{},
-		&model.AssetCapability{},
-		&model.AssetEventSource{},
-		&model.UnifiedRef{},
+		// 用户 / 权限
+		&model.UserRole{},
+		&model.User{},
+		&model.UserAPIKey{},
 		&model.AccessToken{},
+		// 系统配置
+		&model.GbSipConfig{},
+		&model.ObjectStoreConfig{},
+		&model.MQTTConfig{},
+		// 审计
+		&model.AuditLog{},
 	}
 	for _, m := range models {
 		exists := db.Migrator().HasTable(m)
 		if err := db.AutoMigrate(m); err != nil {
-			// 旧库可能已存在重复区划编号，唯一索引创建失败不应阻塞启动；
-			// 清理重复数据（见 sql/migrate_region_dedupe.sql）后重启即自动补索引。
-			if _, ok := m.(*model.CommonRegion); ok && isDuplicateEntryErr(err) {
-				applog.Warn("zws_common_region 存在重复区划编号，跳过唯一索引创建；请清理重复数据后重启", "err", err)
-				continue
-			}
 			return fmt.Errorf("%T: %w", m, err)
 		}
 		if !exists {
@@ -177,6 +177,8 @@ func isDuplicateEntryErr(err error) bool {
 	return strings.Contains(msg, "duplicate entry") || strings.Contains(msg, "error 1062") || strings.Contains(msg, "1062")
 }
 
+func ptrInt64(v int64) *int64 { return &v }
+
 // seedEventTypes 写入内置事件类型；已存在的类型不覆盖，便于后续页面定制。
 func seedEventTypes(db *gorm.DB) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
@@ -200,7 +202,7 @@ func seedEventTypes(db *gorm.DB) error {
 	return nil
 }
 
-// ensureInternalCodes 为空内码行补生成（开发期未清库时 AutoMigrate 补列后用）。
+// ensureInternalCodes 为空内码行补生成（开发期未清库/手工插行兜底）。
 func ensureInternalCodes(db *gorm.DB) error {
 	type rowID struct {
 		ID int64 `gorm:"column:id"`
@@ -235,71 +237,8 @@ func ensureInternalCodes(db *gorm.DB) error {
 	if err := backfill("zws_device", idcode.Device); err != nil {
 		return err
 	}
-	if err := backfill("zws_device_channel", idcode.Channel); err != nil {
+	if err := backfill("zws_channel", idcode.Channel); err != nil {
 		return err
-	}
-	if err := backfill("zws_onvif_device", idcode.Device); err != nil {
-		return err
-	}
-	if err := backfill("zws_onvif_channel", idcode.Channel); err != nil {
-		return err
-	}
-	// 统一资产通道（zws_resource）用字符串主键，单独回填通道内码。
-	if err := backfillResourceCodes(db); err != nil {
-		return err
-	}
-	return nil
-}
-
-// legacyChannelCode 通过 zws_unified_ref 找到资源对应的 legacy 通道内码。
-func legacyChannelCode(db *gorm.DB, resourceID string) string {
-	for _, table := range []string{"zws_device_channel", "zws_onvif_channel", "zws_plugin_channel"} {
-		var code string
-		_ = db.Raw(
-			"SELECT c.internal_code FROM zws_unified_ref u JOIN `"+table+"` c ON CAST(u.legacy_id AS UNSIGNED) = c.id "+
-				"WHERE u.entity_type = 'resource' AND u.legacy_table = ? AND u.unified_id = ? LIMIT 1",
-			table, resourceID,
-		).Scan(&code).Error
-		if strings.TrimSpace(code) != "" {
-			return code
-		}
-	}
-	return ""
-}
-
-// backfillResourceCodes 为 zws_resource 空内码补通道内码（开发期 AutoMigrate 补列后用）。
-func backfillResourceCodes(db *gorm.DB) error {
-	type rowID struct {
-		ID string `gorm:"column:id"`
-	}
-	var rows []rowID
-	if err := db.Raw(
-		"SELECT id FROM zws_resource WHERE internal_code IS NULL OR TRIM(internal_code) = ''",
-	).Scan(&rows).Error; err != nil {
-		if strings.Contains(err.Error(), "doesn't exist") {
-			return nil
-		}
-		return fmt.Errorf("list empty internal_code on zws_resource: %w", err)
-	}
-	for _, row := range rows {
-		// 优先继承 legacy 通道表已有内码，保持与协议侧身份一致。
-		code := legacyChannelCode(db, row.ID)
-		if code == "" {
-			var err error
-			code, err = idcode.Channel()
-			if err != nil {
-				return err
-			}
-		}
-		if err := db.Exec(
-			"UPDATE zws_resource SET internal_code = ? WHERE id = ? AND (internal_code IS NULL OR TRIM(internal_code) = '')",
-			code, row.ID,
-		).Error; err != nil {
-			return fmt.Errorf("backfill zws_resource id=%s: %w", row.ID, err)
-		}
-	}
-	if len(rows) > 0 {
-		applog.Info("backfilled internal codes", "table", "zws_resource", "count", len(rows))
 	}
 	return nil
 }
@@ -328,7 +267,7 @@ func seedAdminIfEmpty(db *gorm.DB) error {
 		user := &model.User{
 			ID: 1, Username: "admin",
 			Password:   "21232f297a57a5a743894a0e4a801fc3", // admin
-			RoleID:     1,
+			RoleID:     ptrInt64(1),
 			CreateTime: now, UpdateTime: now,
 		}
 		if err := db.Create(user).Error; err != nil {
@@ -349,7 +288,7 @@ func seedDefaultRoles(db *gorm.DB) error {
 		Update("name", "管理员").Error
 
 	presets := []struct {
-		PreferID  int
+		PreferID  int64
 		Name      string
 		Authority string
 	}{

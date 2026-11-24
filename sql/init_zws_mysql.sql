@@ -1,518 +1,640 @@
 # zero-web-server MySQL 8 schema（全量建表，唯一权威）
+-- 设计权威文档：docs/数据模型ER.md
 -- 开发期：空库执行本脚本即可；表结构变更只改本文件，不维护增量合并 SQL。
--- See schema_manifest.yaml
+-- 设计原则：BIGINT 自增主键；稳定/易变分表（*_ext）；真实外键 + CASCADE；
+--           internal_code / gb_code 业务唯一；长尾字段进 JSON。
+-- 时间沿用 VARCHAR(50)，与全库 Go 字段/JSON 契约一致（改 DATETIME 属全局改动，单独立项）。
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 存储国标设备的基础信息及在线状态
+-- ===========================================================================
+-- A. 物模型：设备 / 接入绑定 / 通道 / 扩展 / 码流 / 能力
+-- ===========================================================================
+
 DROP TABLE IF EXISTS zws_device;
 CREATE TABLE IF NOT EXISTS zws_device
 (
-    id                                  INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    device_id                           VARCHAR(50) not null COMMENT '国标设备编号',
-    internal_code                       VARCHAR(32) COMMENT '平台内码（Open API）',
-    name                                VARCHAR(255) COMMENT '设备名称',
-    manufacturer                        VARCHAR(255) COMMENT '设备厂商',
-    model                               VARCHAR(255) COMMENT '设备型号',
-    firmware                            VARCHAR(255) COMMENT '固件版本号',
-    transport                           VARCHAR(50) COMMENT '信令传输协议（TCP/UDP）',
-    stream_mode                         VARCHAR(50) COMMENT '拉流方式（主动/被动）',
-    on_line                             TINYINT(1) DEFAULT 0 COMMENT '在线状态',
-    ip                                  VARCHAR(50) COMMENT '设备IP地址',
-    create_time                         VARCHAR(50) COMMENT '创建时间',
-    update_time                         VARCHAR(50) COMMENT '更新时间',
-    port                                INT COMMENT '信令端口',
-    expires                             INT COMMENT '注册有效期',
-    subscribe_cycle_for_catalog         INT DEFAULT 0 COMMENT '目录订阅周期',
-    subscribe_cycle_for_mobile_position INT DEFAULT 0 COMMENT '移动位置订阅周期',
-    mobile_position_submission_interval INT DEFAULT 5 COMMENT '移动位置上报间隔',
-    subscribe_cycle_for_alarm           INT DEFAULT 0 COMMENT '报警订阅周期',
-    host_address                        VARCHAR(50) COMMENT '设备域名/主机地址',
-    charset                             VARCHAR(50) COMMENT '信令字符集',
-    ssrc_check                          TINYINT(1) DEFAULT 0 COMMENT '是否校验SSRC',
-    geo_coord_sys                       VARCHAR(50) COMMENT '坐标系类型',
-    media_server_id                     VARCHAR(50) default 'auto' COMMENT '绑定的流媒体服务ID',
-    custom_name                         VARCHAR(255) COMMENT '自定义显示名称',
-    sdp_ip                              VARCHAR(50) COMMENT 'SDP中携带的IP',
-    local_ip                            VARCHAR(50) COMMENT '本地局域网IP',
-    password                            VARCHAR(255) COMMENT '设备鉴权密码',
-    as_message_channel                  TINYINT(1) DEFAULT 0 COMMENT '是否作为消息通道',
-    heart_beat_interval                 INT COMMENT '心跳间隔',
-    heart_beat_count                    INT COMMENT '心跳失败次数',
-    position_capability                 INT COMMENT '定位能力标识',
-    broadcast_push_after_ack            TINYINT(1) DEFAULT 0 COMMENT 'ACK后是否自动推流',
-    server_id                           VARCHAR(50) COMMENT '所属信令服务器ID',
-    UNIQUE KEY uk_device_device (device_id),
-    UNIQUE KEY uk_device_internal_code (internal_code)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id             BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    internal_code  VARCHAR(32)  NOT NULL COMMENT '平台内码 D…（对外身份/流名/事件）',
+    gb_code        VARCHAR(20)  DEFAULT NULL COMMENT '国标设备码（国标接入/级联；纯本地其它协议可空）',
+    name           VARCHAR(255) NOT NULL DEFAULT '',
+    manufacturer   VARCHAR(255),
+    model          VARCHAR(255),
+    firmware       VARCHAR(255),
+    serial_number  VARCHAR(255),
+    online         TINYINT(1) NOT NULL DEFAULT 0 COMMENT '运行时在线',
+    enabled        TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用（停用不参与调度）',
+    status         VARCHAR(32)  NOT NULL DEFAULT 'OFF' COMMENT '注册状态',
+    create_time    VARCHAR(50)  NOT NULL DEFAULT '',
+    update_time    VARCHAR(50)  NOT NULL DEFAULT '',
+    UNIQUE KEY uk_device_internal_code (internal_code),
+    UNIQUE KEY uk_device_gb_code (gb_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备（物理资产，稳定信息）';
 
--- 存储移动位置订阅上报的数据
-DROP TABLE IF EXISTS zws_mobile_position;
-CREATE TABLE IF NOT EXISTS zws_mobile_position
+DROP TABLE IF EXISTS zws_access_binding;
+CREATE TABLE IF NOT EXISTS zws_access_binding
 (
-    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    channel_id      INT NOT NULL COMMENT '通道数据库主键ID',
-    timestamp       BIGINT COMMENT '上报时间',
-    longitude       DOUBLE COMMENT '经度',
-    latitude        DOUBLE COMMENT '纬度',
-    altitude        DOUBLE COMMENT '海拔',
-    speed           DOUBLE COMMENT '速度',
-    direction       DOUBLE COMMENT '方向角',
-    create_time     VARCHAR(50) COMMENT '入库时间'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id                 BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_id          BIGINT NOT NULL COMMENT '所属设备',
+    protocol           VARCHAR(16) NOT NULL COMMENT 'gb28181 | onvif | plugin',
+    mode               VARCHAR(16) NOT NULL DEFAULT '' COMMENT 'passive | active',
+    external_id        VARCHAR(255) NOT NULL DEFAULT '' COMMENT '协议侧设备号（GB码/ONVIF地址/插件uid）',
+    endpoint           VARCHAR(255) DEFAULT NULL COMMENT 'ip:port',
+    plugin_instance_id VARCHAR(128) DEFAULT NULL,
+    config_json        LONGTEXT COMMENT '协议凭据/参数',
+    status             VARCHAR(32) NOT NULL DEFAULT '' COMMENT '接入状态',
+    last_seen          BIGINT NOT NULL DEFAULT 0 COMMENT '最近心跳(unix ms)',
+    create_time        VARCHAR(50) NOT NULL DEFAULT '',
+    update_time        VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_binding_device (device_id),
+    UNIQUE KEY uk_binding_external (protocol, external_id),
+    CONSTRAINT fk_binding_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备接入绑定(1:1)';
 
--- 保存设备下的通道信息以及扩展属性
-DROP TABLE IF EXISTS zws_device_channel;
-CREATE TABLE IF NOT EXISTS zws_device_channel
+DROP TABLE IF EXISTS zws_channel;
+CREATE TABLE IF NOT EXISTS zws_channel
 (
-    id                           INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    internal_code                VARCHAR(32) COMMENT '平台内码（Open API）',
-    device_id                    VARCHAR(50) COMMENT '所属设备ID',
-    name                         VARCHAR(255) COMMENT '通道名称',
-    manufacturer                 VARCHAR(255) COMMENT '厂商',
-    model                        VARCHAR(255) COMMENT '型号',
-    owner                        VARCHAR(50) COMMENT '归属单位',
-    civil_code                   VARCHAR(50) COMMENT '行政区划代码',
-    block                        VARCHAR(50) COMMENT '区域/小区编号',
-    address                      VARCHAR(50) COMMENT '安装地址',
-    parental                     INT COMMENT '是否有子节点',
-    parent_id                    VARCHAR(50) COMMENT '父级通道ID',
-    safety_way                   INT COMMENT '安全防范等级',
-    register_way                 INT COMMENT '注册方式',
-    cert_num                     VARCHAR(50) COMMENT '证书编号',
-    certifiable                  INT COMMENT '是否可认证',
-    err_code                     INT COMMENT '故障状态码',
-    end_time                     VARCHAR(50) COMMENT '服务截止时间',
-    secrecy                      INT COMMENT '保密级别',
-    ip_address                   VARCHAR(50) COMMENT '设备IP地址',
-    port                         INT COMMENT '设备端口',
-    password                     VARCHAR(255) COMMENT '访问密码',
-    status                       VARCHAR(50) COMMENT '在线状态',
-    longitude                    DOUBLE COMMENT '经度',
-    latitude                     DOUBLE COMMENT '纬度',
-    ptz_type                     INT COMMENT '云台类型',
-    position_type                INT COMMENT '点位类型',
-    room_type                    INT COMMENT '房间类型',
-    use_type                     INT COMMENT '使用性质',
-    supply_light_type            INT COMMENT '补光方式',
-    direction_type               INT COMMENT '朝向',
-    resolution                   VARCHAR(255) COMMENT '分辨率',
-    business_group_id            VARCHAR(255) COMMENT '业务分组ID',
-    download_speed               VARCHAR(255) COMMENT '下载/码流速率',
-    svc_space_support_mod        INT COMMENT '空域SVC能力',
-    svc_time_support_mode        INT COMMENT '时域SVC能力',
-    create_time                  VARCHAR(50) not null COMMENT '创建时间',
-    update_time                  VARCHAR(50) not null COMMENT '更新时间',
-    sub_count                    INT COMMENT '子节点数量',
-    stream_id                    VARCHAR(255) COMMENT '绑定的流ID',
-    has_audio                    TINYINT(1) DEFAULT 0 COMMENT '是否有音频',
-    gps_time                     VARCHAR(50) COMMENT 'GPS定位时间',
-    stream_identification        VARCHAR(50) COMMENT '流标识',
-    channel_type                 int  default 0 not null COMMENT '通道类型',
-    map_level                    int  default 0 COMMENT '地图层级',
-    gb_device_id                 VARCHAR(50) COMMENT 'GB内的设备ID',
-    gb_name                      VARCHAR(255) COMMENT 'GB上报的名称',
-    gb_manufacturer              VARCHAR(255) COMMENT 'GB厂商',
-    gb_model                     VARCHAR(255) COMMENT 'GB型号',
-    gb_owner                     VARCHAR(255) COMMENT 'GB归属',
-    gb_civil_code                VARCHAR(255) COMMENT 'GB行政区划',
-    gb_block                     VARCHAR(255) COMMENT 'GB区域',
-    gb_address                   VARCHAR(255) COMMENT 'GB地址',
-    gb_parental                  INT COMMENT 'GB子节点标识',
-    gb_parent_id                 VARCHAR(255) COMMENT 'GB父通道',
-    gb_safety_way                INT COMMENT 'GB安全防范',
-    gb_register_way              INT COMMENT 'GB注册方式',
-    gb_cert_num                  VARCHAR(50) COMMENT 'GB证书编号',
-    gb_certifiable               INT COMMENT 'GB认证标志',
-    gb_err_code                  INT COMMENT 'GB错误码',
-    gb_end_time                  VARCHAR(50) COMMENT 'GB截止时间',
-    gb_secrecy                   INT COMMENT 'GB保密级别',
-    gb_ip_address                VARCHAR(50) COMMENT 'GB IP',
-    gb_port                      INT COMMENT 'GB端口',
-    gb_password                  VARCHAR(50) COMMENT 'GB接入密码',
-    gb_status                    VARCHAR(50) COMMENT 'GB状态',
-    gb_longitude                 double COMMENT 'GB经度',
-    gb_latitude                  double COMMENT 'GB纬度',
-    gb_business_group_id         VARCHAR(50) COMMENT 'GB业务分组',
-    gb_ptz_type                  INT COMMENT 'GB云台类型',
-    gb_position_type             INT COMMENT 'GB点位类型',
-    gb_room_type                 INT COMMENT 'GB房间类型',
-    gb_use_type                  INT COMMENT 'GB用途',
-    gb_supply_light_type         INT COMMENT 'GB补光',
-    gb_direction_type            INT COMMENT 'GB朝向',
-    gb_resolution                VARCHAR(255) COMMENT 'GB分辨率',
-    gb_download_speed            VARCHAR(255) COMMENT 'GB码流速率',
-    gb_svc_space_support_mod     INT COMMENT 'GB空域SVC',
-    gb_svc_time_support_mode     INT COMMENT 'GB时域SVC',
-    record_plan_id               INT COMMENT '绑定的录像计划ID',
-    data_type                    INT not null COMMENT '数据类型标识',
-    data_device_id               INT not null COMMENT '数据来源设备主键',
-    gps_speed                    DOUBLE COMMENT 'GPS速度',
-    gps_altitude                 DOUBLE COMMENT 'GPS海拔',
-    gps_direction                DOUBLE COMMENT 'GPS方向',
-    enable_broadcast             INT default 0 COMMENT '是否支持广播',
-    KEY idx_data_type (data_type),
-    KEY idx_data_device_id (data_device_id),
-    UNIQUE KEY uk_zws_unique_channel (gb_device_id),
-    UNIQUE KEY uk_device_channel_source (data_device_id, device_id),
-    UNIQUE KEY uk_channel_internal_code (internal_code)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id            BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_id     BIGINT NOT NULL COMMENT '所属设备',
+    internal_code VARCHAR(32) NOT NULL COMMENT '平台内码 C…（对外身份/流名/事件）',
+    gb_code       VARCHAR(20) DEFAULT NULL COMMENT '国标通道码（国标接入；其它协议可空）',
+    external_key  VARCHAR(255) NOT NULL DEFAULT '' COMMENT '协议侧通道标识（GB通道码/ONVIF token/插件通道号）',
+    kind          VARCHAR(32) NOT NULL DEFAULT 'video_sensor' COMMENT 'video_sensor|audio_input|alarm_input|metadata_source',
+    name          VARCHAR(255) NOT NULL DEFAULT '',
+    online        TINYINT(1) NOT NULL DEFAULT 0,
+    status        VARCHAR(32) NOT NULL DEFAULT 'OFF',
+    create_time   VARCHAR(50) NOT NULL DEFAULT '',
+    update_time   VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_channel_internal_code (internal_code),
+    UNIQUE KEY uk_channel_gb_code (gb_code),
+    KEY idx_channel_device (device_id),
+    CONSTRAINT fk_channel_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通道（业务唯一事实来源）';
 
--- 媒体服务器（zero-media-server / ZMS）节点信息
+DROP TABLE IF EXISTS zws_device_ext;
+CREATE TABLE IF NOT EXISTS zws_device_ext
+(
+    id            BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_id     BIGINT NOT NULL,
+    longitude     DECIMAL(10, 7) DEFAULT NULL,
+    latitude      DECIMAL(10, 7) DEFAULT NULL,
+    address       VARCHAR(255) DEFAULT NULL,
+    geo_coord_sys VARCHAR(50) DEFAULT NULL,
+    remark        VARCHAR(255) DEFAULT NULL,
+    tags          VARCHAR(255) DEFAULT NULL,
+    extra_json    LONGTEXT,
+    create_time   VARCHAR(50) NOT NULL DEFAULT '',
+    update_time   VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_device_ext_device (device_id),
+    CONSTRAINT fk_device_ext_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备扩展信息（易变）';
+
+DROP TABLE IF EXISTS zws_channel_ext;
+CREATE TABLE IF NOT EXISTS zws_channel_ext
+(
+    id             BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    channel_id     BIGINT NOT NULL,
+    longitude      DECIMAL(10, 7) DEFAULT NULL,
+    latitude       DECIMAL(10, 7) DEFAULT NULL,
+    map_level      INT NOT NULL DEFAULT 0,
+    ptz_type       INT NOT NULL DEFAULT 0,
+    has_audio      TINYINT(1) NOT NULL DEFAULT 0,
+    enabled        TINYINT(1) NOT NULL DEFAULT 1,
+    tags           VARCHAR(255) DEFAULT NULL,
+    record_plan_id BIGINT DEFAULT NULL COMMENT '绑定的录像计划',
+    gb_json        LONGTEXT COMMENT '国标原始属性（原 gb_* 列存档）',
+    extra_json     LONGTEXT COMMENT '协议长尾（profileToken/resolution/codec…）',
+    create_time    VARCHAR(50) NOT NULL DEFAULT '',
+    update_time    VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_channel_ext_channel (channel_id),
+    KEY idx_channel_ext_geo (longitude, latitude),
+    KEY idx_channel_ext_plan (record_plan_id),
+    CONSTRAINT fk_channel_ext_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通道扩展信息（易变：经纬度/PTZ/标签/录像计划）';
+
+DROP TABLE IF EXISTS zws_stream_profile;
+CREATE TABLE IF NOT EXISTS zws_stream_profile
+(
+    id            BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    channel_id    BIGINT NOT NULL,
+    role          VARCHAR(16) NOT NULL DEFAULT 'main' COMMENT 'main|sub|third',
+    name          VARCHAR(128) NOT NULL DEFAULT '',
+    selector_json TEXT,
+    codec         VARCHAR(64) DEFAULT NULL,
+    resolution    VARCHAR(64) DEFAULT NULL,
+    is_default    TINYINT(1) NOT NULL DEFAULT 0,
+    create_time   VARCHAR(50) NOT NULL DEFAULT '',
+    update_time   VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_profile_channel_role (channel_id, role),
+    CONSTRAINT fk_profile_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视频通道码流';
+
+DROP TABLE IF EXISTS zws_capability;
+CREATE TABLE IF NOT EXISTS zws_capability
+(
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    channel_id  BIGINT NOT NULL,
+    operation   VARCHAR(64) NOT NULL COMMENT 'play|playback|ptz|record|snapshot|event',
+    supported   TINYINT(1) NOT NULL DEFAULT 1 COMMENT '驱动声明支持',
+    configured  TINYINT(1) NOT NULL DEFAULT 1 COMMENT '平台已配置',
+    available   TINYINT(1) NOT NULL DEFAULT 0 COMMENT '当前可用',
+    params_json TEXT,
+    source      VARCHAR(32) DEFAULT NULL,
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_cap_channel_op (channel_id, operation),
+    CONSTRAINT fk_cap_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通道能力集合（三态制约操作）';
+
+-- ===========================================================================
+-- B. 目录树：行政区划 / 业务分组 / 多挂载
+-- ===========================================================================
+
+DROP TABLE IF EXISTS zws_region;
+CREATE TABLE IF NOT EXISTS zws_region
+(
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    parent_id   BIGINT DEFAULT NULL,
+    code        VARCHAR(20) NOT NULL COMMENT '区划码（国标 215 节点码/行政区划码）',
+    name        VARCHAR(255) NOT NULL DEFAULT '',
+    sort        INT NOT NULL DEFAULT 0,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_region_code (code),
+    KEY idx_region_parent (parent_id),
+    CONSTRAINT fk_region_parent FOREIGN KEY (parent_id) REFERENCES zws_region (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行政区划目录';
+
+DROP TABLE IF EXISTS zws_group;
+CREATE TABLE IF NOT EXISTS zws_group
+(
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    parent_id   BIGINT DEFAULT NULL,
+    code        VARCHAR(20) NOT NULL COMMENT '业务分组码（国标 215/216 节点码）',
+    name        VARCHAR(255) NOT NULL DEFAULT '',
+    sort        INT NOT NULL DEFAULT 0,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_group_code (code),
+    KEY idx_group_parent (parent_id),
+    CONSTRAINT fk_group_parent FOREIGN KEY (parent_id) REFERENCES zws_group (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务分组目录';
+
+-- 目录挂载：一通道/设备可挂多个区划/分组节点；靠 (节点,对象) 唯一防重复。
+DROP TABLE IF EXISTS zws_catalog;
+CREATE TABLE IF NOT EXISTS zws_catalog
+(
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    region_id   BIGINT DEFAULT NULL COMMENT '挂在行政区划节点',
+    group_id    BIGINT DEFAULT NULL COMMENT '挂在业务分组节点',
+    target_type VARCHAR(16) NOT NULL COMMENT 'device | channel',
+    target_id   BIGINT NOT NULL COMMENT '设备/通道主键',
+    sort        INT NOT NULL DEFAULT 0,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_catalog_region (region_id, target_type, target_id),
+    UNIQUE KEY uk_catalog_group (group_id, target_type, target_id),
+    KEY idx_catalog_target (target_type, target_id),
+    CONSTRAINT fk_catalog_region FOREIGN KEY (region_id) REFERENCES zws_region (id) ON DELETE CASCADE,
+    CONSTRAINT fk_catalog_group FOREIGN KEY (group_id) REFERENCES zws_group (id) ON DELETE CASCADE,
+    CONSTRAINT ck_catalog_one_parent CHECK ((region_id IS NULL) <> (group_id IS NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='目录挂载（多对多，可多挂）';
+
+-- ===========================================================================
+-- C. 事件
+-- ===========================================================================
+
+DROP TABLE IF EXISTS zws_event_type;
+CREATE TABLE IF NOT EXISTS zws_event_type
+(
+    code            VARCHAR(64) NOT NULL PRIMARY KEY,
+    name            VARCHAR(128) NOT NULL DEFAULT '',
+    category        VARCHAR(32) DEFAULT NULL,
+    severity        VARCHAR(32) DEFAULT NULL,
+    alarm_eligible  TINYINT(1) NOT NULL DEFAULT 0,
+    requires_video  TINYINT(1) NOT NULL DEFAULT 0,
+    bbox_capable    TINYINT(1) NOT NULL DEFAULT 0,
+    vendor_mappings TEXT,
+    enabled         TINYINT(1) NOT NULL DEFAULT 1,
+    update_time     VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件类型注册表';
+
+DROP TABLE IF EXISTS zws_event;
+CREATE TABLE IF NOT EXISTS zws_event
+(
+    id                   BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    event_id             VARCHAR(64) NOT NULL COMMENT '外部事件号（幂等去重）',
+    device_id            BIGINT NOT NULL,
+    channel_id           BIGINT DEFAULT NULL COMMENT '可空；通道关联即间接关联设备',
+    event_type           VARCHAR(64) NOT NULL DEFAULT '' COMMENT '指向 zws_event_type.code；未注册即自定义',
+    severity             VARCHAR(16) NOT NULL DEFAULT '',
+    status               VARCHAR(16) NOT NULL DEFAULT '',
+    occurred_at          BIGINT NOT NULL DEFAULT 0 COMMENT '发生时间(unix ms)',
+    received_at          BIGINT NOT NULL DEFAULT 0 COMMENT '接收时间(unix ms)',
+    device_internal_code VARCHAR(64) NOT NULL DEFAULT '' COMMENT '冗余便于检索',
+    channel_internal_code VARCHAR(64) NOT NULL DEFAULT '',
+    bbox_json            TEXT,
+    image_url            VARCHAR(1024) DEFAULT NULL,
+    raw_json             LONGTEXT,
+    create_time          VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_event_id (event_id),
+    KEY idx_event_device_time (device_id, occurred_at),
+    KEY idx_event_channel_time (channel_id, occurred_at),
+    KEY idx_event_type_time (event_type, occurred_at),
+    CONSTRAINT fk_event_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE,
+    CONSTRAINT fk_event_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件（统一信封）';
+
+DROP TABLE IF EXISTS zws_alarm;
+CREATE TABLE IF NOT EXISTS zws_alarm
+(
+    id           BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    event_id     VARCHAR(64) NOT NULL COMMENT '关联事件',
+    channel_id   BIGINT DEFAULT NULL COMMENT '关联通道',
+    description  VARCHAR(255) DEFAULT NULL,
+    alarm_type   INT NOT NULL DEFAULT 0 COMMENT '报警大类（旧）',
+    alarm_code   VARCHAR(64) DEFAULT NULL COMMENT '事件类型码',
+    alarm_time   BIGINT NOT NULL DEFAULT 0 COMMENT '发生时间(unix ms)',
+    device_internal_code  VARCHAR(64) NOT NULL DEFAULT '',
+    channel_internal_code VARCHAR(64) NOT NULL DEFAULT '',
+    longitude    DOUBLE DEFAULT NULL,
+    latitude     DOUBLE DEFAULT NULL,
+    bbox_json    TEXT,
+    status       VARCHAR(32) NOT NULL DEFAULT 'unhandled' COMMENT '处置状态',
+    severity     VARCHAR(32) DEFAULT NULL,
+    handed_by    VARCHAR(128) DEFAULT NULL,
+    handled_at   BIGINT DEFAULT NULL,
+    snap_path    VARCHAR(255) DEFAULT NULL,
+    record_path  VARCHAR(255) DEFAULT NULL,
+    remark       VARCHAR(255) DEFAULT NULL,
+    create_time  VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_alarm_event (event_id),
+    KEY idx_alarm_time (alarm_time),
+    KEY idx_alarm_type (alarm_type),
+    CONSTRAINT fk_alarm_event FOREIGN KEY (event_id) REFERENCES zws_event (event_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报警（处置投影 + 查询字段，1:1 事件）';
+
+DROP TABLE IF EXISTS zws_event_source;
+CREATE TABLE IF NOT EXISTS zws_event_source
+(
+    id           BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_id    BIGINT NOT NULL,
+    channel_id   BIGINT DEFAULT NULL,
+    kind         VARCHAR(32) DEFAULT NULL,
+    external_key VARCHAR(255) DEFAULT NULL,
+    enabled      TINYINT(1) NOT NULL DEFAULT 0,
+    config_json  TEXT,
+    CONSTRAINT fk_evsrc_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE,
+    CONSTRAINT fk_evsrc_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件来源';
+
+DROP TABLE IF EXISTS zws_event_subscription;
+CREATE TABLE IF NOT EXISTS zws_event_subscription
+(
+    id                   BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    device_id            BIGINT NOT NULL,
+    channel_id           BIGINT DEFAULT NULL,
+    device_internal_code VARCHAR(64) NOT NULL DEFAULT '',
+    plugin_instance_id   VARCHAR(128) NOT NULL DEFAULT '' COMMENT '插件实例ID（插件托管设备订阅用）',
+    device_uid           VARCHAR(255) NOT NULL DEFAULT '' COMMENT '插件侧设备唯一号',
+    event_types          TEXT,
+    armed                TINYINT(1) NOT NULL DEFAULT 0,
+    status               VARCHAR(16) DEFAULT NULL,
+    last_error           VARCHAR(500) DEFAULT NULL,
+    remote_id            VARCHAR(128) DEFAULT NULL,
+    last_armed_at        BIGINT NOT NULL DEFAULT 0,
+    create_time          VARCHAR(50) NOT NULL DEFAULT '',
+    update_time          VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_event_sub (device_id, channel_id),
+    CONSTRAINT fk_evsub_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE,
+    CONSTRAINT fk_evsub_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件订阅/布防';
+
+-- 自定义事件：平台不理解语义，仅按基础信封 + raw 原样保存（与统一事件隔离）。
+DROP TABLE IF EXISTS zws_custom_event;
+CREATE TABLE IF NOT EXISTS zws_custom_event
+(
+    id                    BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    event_id              VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '外部事件号（幂等）',
+    device_internal_code  VARCHAR(64)  NOT NULL DEFAULT '',
+    channel_internal_code VARCHAR(64)  NOT NULL DEFAULT '',
+    device_id             VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '上报设备标识（插件侧）',
+    resource_id           VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '上报通道标识（插件侧）',
+    major_type            VARCHAR(64)  NOT NULL DEFAULT '',
+    minor_type            VARCHAR(64)  NOT NULL DEFAULT '',
+    occur_at              BIGINT       NOT NULL DEFAULT 0,
+    level                 VARCHAR(32)  DEFAULT NULL,
+    image_key             VARCHAR(255) DEFAULT NULL,
+    image_url             VARCHAR(1024) DEFAULT NULL,
+    raw_json              LONGTEXT,
+    create_time           VARCHAR(50)  NOT NULL DEFAULT '',
+    KEY idx_cevent_device (device_internal_code, occur_at),
+    KEY idx_cevent_event (event_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='自定义事件（raw 原样保存）';
+
+-- ===========================================================================
+-- D. 媒体 / 录像 / 位置
+-- ===========================================================================
+
 DROP TABLE IF EXISTS zws_media_server;
 CREATE TABLE IF NOT EXISTS zws_media_server
 (
-    id                  VARCHAR(255) PRIMARY KEY COMMENT '媒体服务器ID',
-    ip                  VARCHAR(50) COMMENT '服务器IP',
-    hook_ip             VARCHAR(50) COMMENT 'hook回调IP',
-    sdp_ip              VARCHAR(50) COMMENT 'SDP中使用的IP',
-    stream_ip           VARCHAR(50) COMMENT '推流使用的IP',
-    http_port           INT COMMENT 'HTTP端口',
-    http_ssl_port       INT COMMENT 'HTTPS端口',
-    rtmp_port           INT COMMENT 'RTMP端口',
-    rtmp_ssl_port       INT COMMENT 'RTMPS端口',
-    rtp_proxy_port      INT COMMENT 'RTP代理端口',
-    rtsp_port           INT COMMENT 'RTSP端口',
-    rtsp_ssl_port       INT COMMENT 'RTSPS端口',
-    flv_port            INT COMMENT 'FLV端口',
-    flv_ssl_port        INT COMMENT 'FLV HTTPS端口',
-    mp4_port            INT COMMENT 'MP4点播端口',
-    mp4_ssl_port        INT COMMENT 'MP4 HTTPS端口',
-    ws_flv_port         INT COMMENT 'WS-FLV端口',
-    ws_flv_ssl_port     INT COMMENT 'WS-FLV HTTPS端口',
-    jtt_proxy_port      INT COMMENT 'JT/T代理端口',
-    auto_config         TINYINT(1) DEFAULT 0 COMMENT '是否自动配置',
-    secret              VARCHAR(50) COMMENT 'API校验密钥',
-    type                VARCHAR(50) default 'zms' COMMENT '节点类型（zms）',
-    rtp_enable          TINYINT(1) DEFAULT 0 COMMENT '是否开启RTP',
-    rtp_port_range      VARCHAR(50) COMMENT 'RTP端口范围',
-    send_rtp_port_range VARCHAR(50) COMMENT '发送RTP端口范围',
-    record_assist_port  INT COMMENT '录像辅助端口（预留）',
-    default_server      TINYINT(1) DEFAULT 0 COMMENT '是否默认节点',
-    create_time         VARCHAR(50) COMMENT '创建时间',
-    update_time         VARCHAR(50) COMMENT '更新时间',
-    hook_alive_interval INT COMMENT 'hook心跳间隔',
-    record_path         VARCHAR(255) COMMENT '录像目录',
-    record_day          INT               default 7 COMMENT '录像保留天数',
-    transcode_suffix    VARCHAR(255) COMMENT '转码指令后缀',
-    server_id           VARCHAR(50) COMMENT '对应信令服务器ID',
-    srt_port            INT COMMENT 'SRT端口',
-    webrtc_port_min     INT COMMENT 'WebRTC ICE UDP 起始端口',
-    webrtc_port_max     INT COMMENT 'WebRTC ICE UDP 结束端口',
-    capabilities_reported TINYINT(1) DEFAULT 0 COMMENT '端口与能力是否由节点自注册上报',
-    enable_rtsp         TINYINT(1) DEFAULT 0 COMMENT '是否开启RTSP',
-    enable_rtmp         TINYINT(1) DEFAULT 0 COMMENT '是否开启RTMP',
-    enable_hls          TINYINT(1) DEFAULT 0 COMMENT '是否开启HLS',
-    enable_srt          TINYINT(1) DEFAULT 0 COMMENT '是否开启SRT',
-    enable_webrtc       TINYINT(1) DEFAULT 0 COMMENT '是否开启WebRTC',
-    version             VARCHAR(50) COMMENT '节点版本',
-    last_seen           BIGINT DEFAULT 0 COMMENT '最近一次注册/心跳时间(unix ms)'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id                    VARCHAR(255) NOT NULL PRIMARY KEY COMMENT '节点ID',
+    name                  VARCHAR(128) NOT NULL DEFAULT '',
+    ip                    VARCHAR(50) DEFAULT NULL,
+    hook_ip               VARCHAR(50) DEFAULT NULL,
+    sdp_ip                VARCHAR(50) DEFAULT NULL,
+    stream_ip             VARCHAR(50) DEFAULT NULL,
+    http_port             INT DEFAULT NULL,
+    http_ssl_port         INT DEFAULT NULL,
+    rtmp_port             INT DEFAULT NULL,
+    rtmp_ssl_port         INT DEFAULT NULL,
+    rtp_proxy_port        INT DEFAULT NULL,
+    rtsp_port             INT DEFAULT NULL,
+    rtsp_ssl_port         INT DEFAULT NULL,
+    flv_port              INT DEFAULT NULL,
+    flv_ssl_port          INT DEFAULT NULL,
+    mp4_port              INT DEFAULT NULL,
+    mp4_ssl_port          INT DEFAULT NULL,
+    ws_flv_port           INT DEFAULT NULL,
+    ws_flv_ssl_port       INT DEFAULT NULL,
+    jtt_proxy_port        INT DEFAULT NULL,
+    srt_port              INT DEFAULT NULL,
+    webrtc_port_min       INT DEFAULT NULL,
+    webrtc_port_max       INT DEFAULT NULL,
+    rtp_enable            TINYINT(1) NOT NULL DEFAULT 0,
+    rtp_port_range        VARCHAR(50) DEFAULT NULL,
+    send_rtp_port_range   VARCHAR(50) DEFAULT NULL,
+    enable_rtsp           TINYINT(1) NOT NULL DEFAULT 0,
+    enable_rtmp           TINYINT(1) NOT NULL DEFAULT 0,
+    enable_hls            TINYINT(1) NOT NULL DEFAULT 0,
+    enable_srt            TINYINT(1) NOT NULL DEFAULT 0,
+    enable_webrtc         TINYINT(1) NOT NULL DEFAULT 0,
+    secret                VARCHAR(50) DEFAULT NULL COMMENT 'API校验密钥',
+    type                  VARCHAR(32) NOT NULL DEFAULT 'zms',
+    default_server        TINYINT(1) NOT NULL DEFAULT 0,
+    auto_config           TINYINT(1) NOT NULL DEFAULT 0,
+    capabilities_reported TINYINT(1) NOT NULL DEFAULT 0,
+    record_path           VARCHAR(255) DEFAULT NULL,
+    record_day            INT NOT NULL DEFAULT 7,
+    transcode_suffix      VARCHAR(255) DEFAULT NULL,
+    hook_alive_interval   INT DEFAULT NULL,
+    version               VARCHAR(50) DEFAULT NULL,
+    server_id             VARCHAR(50) DEFAULT NULL,
+    last_seen             BIGINT NOT NULL DEFAULT 0,
+    create_time           VARCHAR(50) NOT NULL DEFAULT '',
+    update_time           VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='媒体服务器节点';
 
--- 上级国标平台注册信息
-DROP TABLE IF EXISTS zws_platform;
-CREATE TABLE IF NOT EXISTS zws_platform
+DROP TABLE IF EXISTS zws_record_plan;
+CREATE TABLE IF NOT EXISTS zws_record_plan
 (
-    id                    INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    enable                TINYINT(1) DEFAULT 0 COMMENT '是否启用该平台注册',
-    name                  VARCHAR(255) COMMENT '平台名称',
-    server_gb_id          VARCHAR(50) COMMENT '上级平台国标编码',
-    server_gb_domain      VARCHAR(50) COMMENT '上级平台域编码',
-    server_ip             VARCHAR(50) COMMENT '上级平台IP',
-    server_port           INT COMMENT '上级平台注册端口',
-    device_gb_id          VARCHAR(50) COMMENT '本平台向上注册的国标编码',
-    device_ip             VARCHAR(50) COMMENT '本平台信令IP',
-    device_port           VARCHAR(50) COMMENT '本平台信令端口',
-    username              VARCHAR(255) COMMENT '注册用户名',
-    password              VARCHAR(50) COMMENT '注册密码',
-    expires               VARCHAR(50) COMMENT '注册有效期',
-    keep_timeout          VARCHAR(50) COMMENT '心跳超时时间',
-    transport             VARCHAR(50) COMMENT '传输协议（UDP/TCP）',
-    civil_code            VARCHAR(50) COMMENT '行政区划代码',
-    manufacturer          VARCHAR(255) COMMENT '厂商',
-    model                 VARCHAR(255) COMMENT '型号',
-    address               VARCHAR(255) COMMENT '地址',
-    character_set         VARCHAR(50) COMMENT '字符集',
-    ptz                   TINYINT(1) DEFAULT 0 COMMENT '是否支持PTZ',
-    rtcp                  TINYINT(1) DEFAULT 0 COMMENT '是否开启RTCP',
-    status                TINYINT(1) DEFAULT 0 COMMENT '注册状态',
-    catalog_group         INT COMMENT '目录分组方式',
-    register_way          INT COMMENT '注册方式',
-    secrecy               INT COMMENT '保密级别',
-    create_time           VARCHAR(50) COMMENT '创建时间',
-    update_time           VARCHAR(50) COMMENT '更新时间',
-    as_message_channel    TINYINT(1) DEFAULT 0 COMMENT '是否作为消息通道',
-    catalog_with_platform INT default 1 COMMENT '是否推送平台目录',
-    catalog_with_group    INT default 1 COMMENT '是否推送分组目录',
-    catalog_with_region   INT default 1 COMMENT '是否推送区域目录',
-    auto_push_channel     TINYINT(1) DEFAULT 1 COMMENT '是否自动推送通道',
-    send_stream_ip        VARCHAR(50) COMMENT '推流时使用的IP',
-    server_id             VARCHAR(50) COMMENT '对应信令服务器ID',
-    UNIQUE KEY uk_platform_unique_server_gb_id (server_gb_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(255) NOT NULL DEFAULT '',
+    snap        TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否抓图计划',
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='录像计划';
 
--- 国标平台下发的通道映射关系
-DROP TABLE IF EXISTS zws_platform_channel;
-CREATE TABLE IF NOT EXISTS zws_platform_channel
+DROP TABLE IF EXISTS zws_record_plan_item;
+CREATE TABLE IF NOT EXISTS zws_record_plan_item
 (
-    id                           INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    platform_id                  INT COMMENT '平台ID',
-    device_channel_id            INT COMMENT '本地通道表主键',
-    custom_device_id             VARCHAR(50) COMMENT '自定义国标编码',
-    custom_name                  VARCHAR(255) COMMENT '自定义名称',
-    custom_manufacturer          VARCHAR(50) COMMENT '自定义厂商',
-    custom_model                 VARCHAR(50) COMMENT '自定义型号',
-    custom_owner                 VARCHAR(50) COMMENT '自定义归属',
-    custom_civil_code            VARCHAR(50) COMMENT '自定义行政区划',
-    custom_block                 VARCHAR(50) COMMENT '自定义区域',
-    custom_address               VARCHAR(50) COMMENT '自定义地址',
-    custom_parental              INT COMMENT '自定义父/子标识',
-    custom_parent_id             VARCHAR(50) COMMENT '自定义父节点',
-    custom_safety_way            INT COMMENT '自定义安全防范',
-    custom_register_way          INT COMMENT '自定义注册方式',
-    custom_cert_num              VARCHAR(50) COMMENT '自定义证书编号',
-    custom_certifiable           INT COMMENT '自定义可认证标志',
-    custom_err_code              INT COMMENT '自定义错误码',
-    custom_end_time              VARCHAR(50) COMMENT '自定义截止时间',
-    custom_secrecy               INT COMMENT '自定义保密级别',
-    custom_ip_address            VARCHAR(50) COMMENT '自定义IP',
-    custom_port                  INT COMMENT '自定义端口',
-    custom_password              VARCHAR(255) COMMENT '自定义密码',
-    custom_status                VARCHAR(50) COMMENT '自定义状态',
-    custom_longitude             DOUBLE COMMENT '自定义经度',
-    custom_latitude              DOUBLE COMMENT '自定义纬度',
-    custom_ptz_type              INT COMMENT '自定义云台类型',
-    custom_position_type         INT COMMENT '自定义点位类型',
-    custom_room_type             INT COMMENT '自定义房间类型',
-    custom_use_type              INT COMMENT '自定义用途',
-    custom_supply_light_type     INT COMMENT '自定义补光',
-    custom_direction_type        INT COMMENT '自定义朝向',
-    custom_resolution            VARCHAR(255) COMMENT '自定义分辨率',
-    custom_business_group_id     VARCHAR(255) COMMENT '自定义业务分组',
-    custom_download_speed        VARCHAR(255) COMMENT '自定义码流速率',
-    custom_svc_space_support_mod INT COMMENT '自定义空域SVC',
-    custom_svc_time_support_mode INT COMMENT '自定义时域SVC',
-    UNIQUE KEY uk_platform_gb_channel_platform_id_catalog_id_device_channel_id (platform_id, device_channel_id),
-    UNIQUE KEY uk_platform_gb_channel_device_id (custom_device_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    plan_id     BIGINT NOT NULL,
+    week_day    INT NOT NULL DEFAULT 0 COMMENT '0-6',
+    start_min   INT NOT NULL DEFAULT 0 COMMENT '开始（当天分钟）',
+    stop_min    INT NOT NULL DEFAULT 0 COMMENT '结束（当天分钟）',
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    KEY idx_plan_item_plan (plan_id),
+    CONSTRAINT fk_plan_item_plan FOREIGN KEY (plan_id) REFERENCES zws_record_plan (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='录像计划时段';
 
--- 平台与分组（行政区划/组织）关系
-DROP TABLE IF EXISTS zws_platform_group;
-CREATE TABLE IF NOT EXISTS zws_platform_group
-(
-    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    platform_id INT COMMENT '平台ID',
-    group_id    INT COMMENT '分组ID',
-    UNIQUE KEY uk_zws_platform_group_platform_id_group_id (platform_id, group_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 平台与区域关系
-DROP TABLE IF EXISTS zws_platform_region;
-CREATE TABLE IF NOT EXISTS zws_platform_region
-(
-    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    platform_id INT COMMENT '平台ID',
-    region_id   INT COMMENT '区域ID',
-    UNIQUE KEY uk_zws_platform_region_platform_id_group_id (platform_id, region_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 拉流代理/转推配置
-DROP TABLE IF EXISTS zws_stream_proxy;
-CREATE TABLE IF NOT EXISTS zws_stream_proxy
-(
-    id                         INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    type                       VARCHAR(50) COMMENT '代理类型（拉流/推流）',
-    app                        VARCHAR(255) COMMENT '应用名',
-    stream                     VARCHAR(255) COMMENT '流ID',
-    src_url                    VARCHAR(1024) COMMENT '源地址',
-    timeout                    INT COMMENT '拉流超时时间',
-    ffmpeg_cmd_key             VARCHAR(255) COMMENT 'FFmpeg命令模板键',
-    rtsp_type                  VARCHAR(50) COMMENT 'RTSP拉流方式',
-    media_server_id            VARCHAR(50) COMMENT '指定媒体服务器ID',
-    enable_audio               TINYINT(1) DEFAULT 0 COMMENT '是否启用音频',
-    enable_mp4                 TINYINT(1) DEFAULT 0 COMMENT '是否录制MP4',
-    pulling                    TINYINT(1) DEFAULT 0 COMMENT '当前是否在拉流',
-    enable                     TINYINT(1) DEFAULT 0 COMMENT '是否启用该代理',
-    create_time                VARCHAR(50) COMMENT '创建时间',
-    name                       VARCHAR(255) COMMENT '代理名称',
-    update_time                VARCHAR(50) COMMENT '更新时间',
-    stream_key                 VARCHAR(255) COMMENT '唯一流标识',
-    server_id                  VARCHAR(50) COMMENT '信令服务器ID',
-    enable_disable_none_reader TINYINT(1) DEFAULT 0 COMMENT '是否无人观看时自动停流',
-    relates_media_server_id    VARCHAR(50) COMMENT '关联的媒体服务器ID',
-    UNIQUE KEY uk_stream_proxy_app_stream (app, stream)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 推流会话记录
-DROP TABLE IF EXISTS zws_stream_push;
-CREATE TABLE IF NOT EXISTS zws_stream_push
-(
-    id                 INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    app                VARCHAR(255) COMMENT '应用名',
-    stream             VARCHAR(255) COMMENT '流ID',
-    create_time        VARCHAR(50) COMMENT '创建时间',
-    media_server_id    VARCHAR(50) COMMENT '推流所在媒体服务器',
-    server_id          VARCHAR(50) COMMENT '信令服务器ID',
-    push_time          VARCHAR(50) COMMENT '推流开始时间',
-    status             TINYINT(1) DEFAULT 0 COMMENT '推流状态',
-    update_time        VARCHAR(50) COMMENT '更新时间',
-    pushing            TINYINT(1) DEFAULT 0 COMMENT '是否正在推流',
-    self               TINYINT(1) DEFAULT 0 COMMENT '是否本地发起',
-    start_offline_push TINYINT(1) DEFAULT 1 COMMENT '是否离线后自动重推',
-    UNIQUE KEY uk_stream_push_app_stream (app, stream)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 云端录像记录
 DROP TABLE IF EXISTS zws_cloud_record;
 CREATE TABLE IF NOT EXISTS zws_cloud_record
 (
-    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    app             VARCHAR(255) COMMENT '应用名',
-    stream          VARCHAR(255) COMMENT '流ID',
-    call_id         VARCHAR(255) COMMENT '会话ID（推流鉴权事务号，可空）',
-    start_time      bigint COMMENT '录像开始时间',
-    end_time        bigint COMMENT '录像结束时间',
-    media_server_id VARCHAR(50) COMMENT '媒体服务器ID',
-    server_id       VARCHAR(50) COMMENT '信令服务器ID',
-    file_name       VARCHAR(255) COMMENT '文件名',
-    folder          VARCHAR(255) COMMENT '目录',
-    file_path       VARCHAR(512) COMMENT '完整路径',
-    play_url        VARCHAR(768) COMMENT 'HTTP-MP4 直出播放地址',
-    collect         TINYINT(1) DEFAULT 0 COMMENT '是否收藏',
-    file_size       bigint COMMENT '文件大小',
-    time_len        DOUBLE COMMENT '时长'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id              BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    channel_id      BIGINT DEFAULT NULL COMMENT '关联通道（按流名回填）',
+    app             VARCHAR(64) NOT NULL DEFAULT '',
+    stream          VARCHAR(255) NOT NULL DEFAULT '',
+    call_id         VARCHAR(255) DEFAULT NULL,
+    media_server_id VARCHAR(255) DEFAULT NULL,
+    start_time      BIGINT DEFAULT 0,
+    end_time        BIGINT DEFAULT 0,
+    file_name       VARCHAR(255) DEFAULT NULL,
+    folder          VARCHAR(255) DEFAULT NULL,
+    file_path       VARCHAR(512) DEFAULT NULL,
+    file_size       BIGINT DEFAULT 0,
+    time_len        DOUBLE DEFAULT 0,
+    play_url        VARCHAR(512) DEFAULT NULL,
+    server_id       VARCHAR(50) DEFAULT NULL,
+    collect         TINYINT(1) NOT NULL DEFAULT 0,
+    KEY idx_cloud_channel_time (channel_id, start_time),
+    KEY idx_cloud_app_stream (app, stream),
+    CONSTRAINT fk_cloud_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='云端录像';
 
--- 平台用户信息
-DROP TABLE IF EXISTS zws_user;
-CREATE TABLE IF NOT EXISTS zws_user
+DROP TABLE IF EXISTS zws_stream_proxy;
+CREATE TABLE IF NOT EXISTS zws_stream_proxy
 (
-    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    username    VARCHAR(255) COMMENT '用户名',
-    password    VARCHAR(255) COMMENT '密码（MD5）',
-    role_id     INT COMMENT '角色ID',
-    create_time VARCHAR(50) COMMENT '创建时间',
-    update_time VARCHAR(50) COMMENT '更新时间',
-    UNIQUE KEY uk_user_username (username)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id             BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name           VARCHAR(255) DEFAULT NULL,
+    type           VARCHAR(50) DEFAULT NULL,
+    app            VARCHAR(64) NOT NULL DEFAULT '',
+    stream         VARCHAR(255) NOT NULL DEFAULT '',
+    src_url        VARCHAR(1024) DEFAULT NULL,
+    timeout        INT DEFAULT NULL,
+    ffmpeg_cmd_key VARCHAR(255) DEFAULT NULL,
+    rtsp_type      VARCHAR(50) DEFAULT NULL,
+    media_server_id VARCHAR(255) DEFAULT NULL,
+    enable_audio   TINYINT(1) NOT NULL DEFAULT 0,
+    enable_mp4     TINYINT(1) NOT NULL DEFAULT 0,
+    enable         TINYINT(1) NOT NULL DEFAULT 0,
+    pulling        TINYINT(1) NOT NULL DEFAULT 0,
+    stream_key     VARCHAR(255) DEFAULT NULL,
+    server_id      VARCHAR(50) DEFAULT NULL,
+    enable_disable_none_reader TINYINT(1) NOT NULL DEFAULT 0,
+    relates_media_server_id VARCHAR(255) DEFAULT NULL,
+    gb_code        VARCHAR(50) DEFAULT NULL COMMENT '对外国标通道码（可选）',
+    gb_name        VARCHAR(255) DEFAULT NULL COMMENT '对外国标通道名（可选）',
+    create_time    VARCHAR(50) NOT NULL DEFAULT '',
+    update_time    VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_proxy_app_stream (app, stream)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='拉流代理';
 
--- 用户角色信息
-DROP TABLE IF EXISTS zws_user_role;
-CREATE TABLE IF NOT EXISTS zws_user_role
+DROP TABLE IF EXISTS zws_stream_push;
+CREATE TABLE IF NOT EXISTS zws_stream_push
 (
-    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    name        VARCHAR(50) COMMENT '角色名称',
-    authority   VARCHAR(512) COMMENT '菜单权限：* 全部，或 JSON 数组如 ["map","live"]',
-    create_time VARCHAR(50) COMMENT '创建时间',
-    update_time VARCHAR(50) COMMENT '更新时间'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id              BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    app             VARCHAR(64) NOT NULL DEFAULT '',
+    stream          VARCHAR(255) NOT NULL DEFAULT '',
+    media_server_id VARCHAR(255) DEFAULT NULL,
+    status          TINYINT(1) NOT NULL DEFAULT 0,
+    pushing         TINYINT(1) NOT NULL DEFAULT 0,
+    self            TINYINT(1) NOT NULL DEFAULT 0,
+    push_time       VARCHAR(50) DEFAULT NULL,
+    server_id       VARCHAR(50) DEFAULT NULL,
+    start_offline_push TINYINT(1) NOT NULL DEFAULT 0,
+    gb_code         VARCHAR(50) DEFAULT NULL COMMENT '对外国标通道码（可选）',
+    gb_name         VARCHAR(255) DEFAULT NULL COMMENT '对外国标通道名（可选）',
+    create_time     VARCHAR(50) NOT NULL DEFAULT '',
+    update_time     VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_push_app_stream (app, stream)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推流会话';
 
-
-DROP TABLE IF EXISTS zws_user_api_key;
-CREATE TABLE IF NOT EXISTS zws_user_api_key
+DROP TABLE IF EXISTS zws_mobile_position;
+CREATE TABLE IF NOT EXISTS zws_mobile_position
 (
-    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    user_id     bigint COMMENT '关联用户ID',
-    app         VARCHAR(255) COMMENT '应用标识',
-    api_key     text COMMENT 'API Key',
-    expired_at  bigint COMMENT '过期时间戳',
-    remark      VARCHAR(255) COMMENT '备注',
-    enable      TINYINT(1) DEFAULT 1 COMMENT '是否启用',
-    create_time VARCHAR(50) COMMENT '创建时间',
-    update_time VARCHAR(50) COMMENT '更新时间'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    channel_id  BIGINT NOT NULL,
+    timestamp   BIGINT DEFAULT NULL,
+    longitude   DOUBLE DEFAULT NULL,
+    latitude    DOUBLE DEFAULT NULL,
+    altitude    DOUBLE DEFAULT NULL,
+    speed       DOUBLE DEFAULT NULL,
+    direction   DOUBLE DEFAULT NULL,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    KEY idx_pos_channel_time (channel_id, timestamp),
+    CONSTRAINT fk_pos_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='移动位置上报';
 
+-- ===========================================================================
+-- E. 级联
+-- ===========================================================================
 
--- 本平台唯一国标 SIP 配置（设备接入 / 上下级级联共用，固定 id=1）
-DROP TABLE IF EXISTS zws_gb_sip_config;
-CREATE TABLE IF NOT EXISTS zws_gb_sip_config
+DROP TABLE IF EXISTS zws_upper_platform;
+CREATE TABLE IF NOT EXISTS zws_upper_platform
 (
-    id                   INT NOT NULL PRIMARY KEY COMMENT '固定为1',
-    ip                   VARCHAR(64)  NOT NULL COMMENT 'SIP 监听/对外 IP',
-    port                 INT NOT NULL COMMENT 'SIP 端口',
-    domain               VARCHAR(32)  NOT NULL COMMENT 'SIP 域',
-    device_id            VARCHAR(32)  NOT NULL COMMENT '本平台国标编号',
-    password             VARCHAR(64)  NOT NULL COMMENT '接入密码',
-    alarm                TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否处理报警',
-    require_pre_register TINYINT(1) NOT NULL DEFAULT 1 COMMENT '强制预登记',
-    transport            VARCHAR(16) NOT NULL DEFAULT 'UDP' COMMENT '信令传输偏好',
-    stream_mode          VARCHAR(16) NOT NULL DEFAULT 'UDP' COMMENT '媒体流传输模式(UDP/TCP-ACTIVE/TCP-PASSIVE)',
-    create_time          VARCHAR(50) COMMENT '创建时间',
-    update_time          VARCHAR(50) COMMENT '更新时间'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
+    id                    BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    enable                TINYINT(1) NOT NULL DEFAULT 0,
+    name                  VARCHAR(255) DEFAULT NULL,
+    server_gb_id          VARCHAR(50) NOT NULL COMMENT '上级平台国标编码',
+    server_gb_domain      VARCHAR(50) DEFAULT NULL,
+    server_ip             VARCHAR(50) DEFAULT NULL,
+    server_port           INT DEFAULT NULL,
+    device_gb_id          VARCHAR(50) DEFAULT NULL COMMENT '本级向上注册的国标编码',
+    device_ip             VARCHAR(50) DEFAULT NULL,
+    device_port           VARCHAR(50) DEFAULT NULL,
+    username              VARCHAR(255) DEFAULT NULL,
+    password              VARCHAR(255) DEFAULT NULL,
+    expires               VARCHAR(50) DEFAULT NULL,
+    keep_timeout          VARCHAR(50) DEFAULT NULL,
+    transport             VARCHAR(50) DEFAULT NULL,
+    civil_code            VARCHAR(50) DEFAULT NULL,
+    manufacturer          VARCHAR(255) DEFAULT NULL,
+    model                 VARCHAR(255) DEFAULT NULL,
+    address               VARCHAR(255) DEFAULT NULL,
+    character_set         VARCHAR(50) DEFAULT NULL,
+    ptz                   TINYINT(1) NOT NULL DEFAULT 0,
+    rtcp                  TINYINT(1) NOT NULL DEFAULT 0,
+    status                TINYINT(1) NOT NULL DEFAULT 0,
+    catalog_group         INT DEFAULT NULL,
+    register_way          INT DEFAULT NULL,
+    secrecy               INT DEFAULT NULL,
+    as_message_channel    TINYINT(1) NOT NULL DEFAULT 0,
+    catalog_with_platform INT NOT NULL DEFAULT 1,
+    catalog_with_group    INT NOT NULL DEFAULT 1,
+    catalog_with_region   INT NOT NULL DEFAULT 1,
+    auto_push_channel     TINYINT(1) NOT NULL DEFAULT 1,
+    send_stream_ip        VARCHAR(50) DEFAULT NULL,
+    server_id             VARCHAR(50) DEFAULT NULL,
+    create_time           VARCHAR(50) NOT NULL DEFAULT '',
+    update_time           VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_upper_server_gb (server_gb_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上级国标平台';
 
--- 默认国标 SIP（与 configs/config.yaml 对齐；新装可随后在页面改编码，无需重启）
-INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, require_pre_register, transport, stream_mode, create_time, update_time)
-VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0, 1, 'UDP', 'UDP',
-        '2021-04-13 14:14:57', '2021-04-13 14:14:57');
-
--- 下级国标平台（向本级 REGISTER，与 zws_device 分离）
 DROP TABLE IF EXISTS zws_subordinate_platform;
 CREATE TABLE IF NOT EXISTS zws_subordinate_platform
 (
-    id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    id               BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     enable           TINYINT(1) NOT NULL DEFAULT 1,
-    name             VARCHAR(255),
+    name             VARCHAR(255) DEFAULT NULL,
     device_gb_id     VARCHAR(50) NOT NULL COMMENT '下级向上注册的国标编号',
-    password         VARCHAR(64) NOT NULL,
-    transport        VARCHAR(16) DEFAULT 'UDP',
+    password         VARCHAR(64) NOT NULL DEFAULT '',
+    transport        VARCHAR(16) NOT NULL DEFAULT 'UDP',
     status           TINYINT(1) NOT NULL DEFAULT 0,
-    ip               VARCHAR(64),
-    port             INT,
-    host_address     VARCHAR(128),
-    expires          INT,
-    register_call_id VARCHAR(128),
-    server_id        VARCHAR(50),
-    create_time      VARCHAR(50),
-    update_time      VARCHAR(50),
+    ip               VARCHAR(64) DEFAULT NULL,
+    port             INT DEFAULT NULL,
+    host_address     VARCHAR(128) DEFAULT NULL,
+    expires          INT DEFAULT NULL,
+    register_call_id VARCHAR(128) DEFAULT NULL,
+    server_id        VARCHAR(50) DEFAULT NULL,
+    create_time      VARCHAR(50) NOT NULL DEFAULT '',
+    update_time      VARCHAR(50) NOT NULL DEFAULT '',
     UNIQUE KEY uk_sub_gb_id (device_gb_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下级国标平台';
 
 DROP TABLE IF EXISTS zws_subordinate_catalog;
 CREATE TABLE IF NOT EXISTS zws_subordinate_catalog
 (
-    id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    platform_id  INT NOT NULL,
-    device_id    VARCHAR(50) NOT NULL COMMENT '下级目录项国标编号',
-    name         VARCHAR(255),
-    parent_id    VARCHAR(50) COMMENT '父节点国标编号',
-    type_code    VARCHAR(8) COMMENT '类型编码(11-13位)',
-    item_type    VARCHAR(16) COMMENT 'node/channel',
-    status       VARCHAR(16),
-    civil_code   VARCHAR(16),
-    manufacturer VARCHAR(128),
-    model        VARCHAR(128),
-    orphan       TINYINT(1) NOT NULL DEFAULT 0 COMMENT '父节点不存在，未挂载',
-    raw_json     TEXT,
-    create_time  VARCHAR(50),
-    update_time  VARCHAR(50),
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id BIGINT NOT NULL,
+    device_id   VARCHAR(50) NOT NULL COMMENT '目录项国标编号',
+    name        VARCHAR(255) DEFAULT NULL,
+    parent_id   VARCHAR(50) DEFAULT NULL,
+    type_code   VARCHAR(8) DEFAULT NULL,
+    item_type   VARCHAR(16) DEFAULT NULL COMMENT 'node|channel',
+    status      VARCHAR(16) DEFAULT NULL,
+    civil_code  VARCHAR(16) DEFAULT NULL,
+    manufacturer VARCHAR(128) DEFAULT NULL,
+    model       VARCHAR(128) DEFAULT NULL,
+    orphan      TINYINT(1) NOT NULL DEFAULT 0,
+    raw_json    TEXT,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
     UNIQUE KEY uk_sub_catalog (platform_id, device_id),
-    KEY idx_sub_catalog_parent (parent_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下级平台推送的国标目录';
+    KEY idx_sub_catalog_parent (parent_id),
+    CONSTRAINT fk_subcat_platform FOREIGN KEY (platform_id) REFERENCES zws_subordinate_platform (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='下级平台推送的目录';
 
 DROP TABLE IF EXISTS zws_platform_catalog_snapshot;
 CREATE TABLE IF NOT EXISTS zws_platform_catalog_snapshot
 (
-    id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    platform_id INT NOT NULL,
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id BIGINT NOT NULL,
     device_id   VARCHAR(50) NOT NULL,
-    name        VARCHAR(255),
-    parent_id   VARCHAR(50),
-    item_type   VARCHAR(16),
-    status      VARCHAR(16),
-    hash        VARCHAR(64) COMMENT '内容指纹，用于差分推送',
-    UNIQUE KEY uk_plat_catalog_snap (platform_id, device_id)
+    name        VARCHAR(255) DEFAULT NULL,
+    parent_id   VARCHAR(50) DEFAULT NULL,
+    item_type   VARCHAR(16) DEFAULT NULL,
+    status      VARCHAR(16) DEFAULT NULL,
+    hash        VARCHAR(64) DEFAULT NULL,
+    UNIQUE KEY uk_plat_catalog_snap (platform_id, device_id),
+    CONSTRAINT fk_snap_platform FOREIGN KEY (platform_id) REFERENCES zws_upper_platform (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='向上级推送目录快照';
 
 DROP TABLE IF EXISTS zws_platform_group_share;
 CREATE TABLE IF NOT EXISTS zws_platform_group_share
 (
-    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    platform_id     INT NOT NULL,
-    group_device_id VARCHAR(50) NOT NULL COMMENT '共享的业务目录节点(215/216)国标编号',
-    UNIQUE KEY uk_plat_group (platform_id, group_device_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上级平台按业务目录共享';
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id BIGINT NOT NULL,
+    group_id    BIGINT NOT NULL COMMENT '共享的业务分组节点',
+    UNIQUE KEY uk_plat_group (platform_id, group_id),
+    CONSTRAINT fk_share_platform FOREIGN KEY (platform_id) REFERENCES zws_upper_platform (id) ON DELETE CASCADE,
+    CONSTRAINT fk_share_group FOREIGN KEY (group_id) REFERENCES zws_group (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='上级平台按业务分组共享';
+
+DROP TABLE IF EXISTS zws_platform_channel;
+CREATE TABLE IF NOT EXISTS zws_platform_channel
+(
+    id             BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    platform_id    BIGINT NOT NULL,
+    channel_id     BIGINT NOT NULL,
+    custom_gb_code VARCHAR(50) DEFAULT NULL COMMENT '对外国标通道码',
+    overrides_json LONGTEXT COMMENT '对外字段覆盖（名称/经纬度/PTZ…原 custom_* 收进 JSON）',
+    create_time    VARCHAR(50) NOT NULL DEFAULT '',
+    update_time    VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_plat_channel (platform_id, channel_id),
+    CONSTRAINT fk_pch_platform FOREIGN KEY (platform_id) REFERENCES zws_upper_platform (id) ON DELETE CASCADE,
+    CONSTRAINT fk_pch_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通道对外映射（级联 overrides）';
+
+DROP TABLE IF EXISTS zws_region_code_mapping;
+CREATE TABLE IF NOT EXISTS zws_region_code_mapping
+(
+    region_id   BIGINT NOT NULL PRIMARY KEY COMMENT '区划节点',
+    gb_code     VARCHAR(20) NOT NULL COMMENT '对外国标码',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    CONSTRAINT fk_recmap_region FOREIGN KEY (region_id) REFERENCES zws_region (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='区划节点对外编码映射';
 
 DROP TABLE IF EXISTS zws_gb_code_seq;
 CREATE TABLE IF NOT EXISTS zws_gb_code_seq
@@ -521,243 +643,41 @@ CREATE TABLE IF NOT EXISTS zws_gb_code_seq
     next   BIGINT NOT NULL DEFAULT 0 COMMENT '已分配的最大序号'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标码序号分配';
 
-DROP TABLE IF EXISTS zws_region_code_mapping;
-CREATE TABLE IF NOT EXISTS zws_region_code_mapping
-(
-    region_device_id VARCHAR(50) NOT NULL PRIMARY KEY COMMENT '区划编号',
-    gb_code          VARCHAR(20) NOT NULL COMMENT '对外国标码',
-    update_time      VARCHAR(50)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='区划节点对外编码映射';
+-- ===========================================================================
+-- F. 接入 / 插件
+-- ===========================================================================
 
--- 对象存储对接配置（MinIO / S3），平台不自建存储
-DROP TABLE IF EXISTS zws_object_store_config;
-CREATE TABLE IF NOT EXISTS zws_object_store_config
-(
-    id          INT NOT NULL PRIMARY KEY COMMENT '固定为1',
-    enabled     TINYINT(1) NOT NULL DEFAULT 0,
-    provider    VARCHAR(32) NOT NULL DEFAULT 'noop',
-    endpoint    VARCHAR(255),
-    region      VARCHAR(64),
-    bucket      VARCHAR(128),
-    access_key  VARCHAR(128),
-    secret_key  VARCHAR(256),
-    use_ssl     TINYINT(1) NOT NULL DEFAULT 0,
-    path_style  TINYINT(1) NOT NULL DEFAULT 1,
-    public_base VARCHAR(255),
-    create_time VARCHAR(50),
-    update_time VARCHAR(50)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对象存储对接';
-
-INSERT INTO zws_object_store_config (id, enabled, provider, path_style, create_time, update_time)
-VALUES (1, 0, 'noop', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57');
-
--- 初始数据
--- 初始化角色：管理员 / 运维 / 视频值班
-INSERT INTO zws_user_role
-VALUES (1, '管理员', '*', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
-INSERT INTO zws_user_role
-VALUES (2, '运维', '["ops","access","media","storage"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
-INSERT INTO zws_user_role
-VALUES (3, '视频值班', '["observe","media","access"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
--- 初始化管理员账号，账号admin 密码admin（MD5加密后）
-INSERT INTO zws_user
-VALUES (1, 'admin', '21232f297a57a5a743894a0e4a801fc3', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57',
-        '3e80d1762a324d5b0ff636e0bd16f1e3');
-
--- 通用分组表，存储行业或组织结构
-DROP TABLE IF EXISTS zws_common_group;
-CREATE TABLE IF NOT EXISTS zws_common_group
-(
-    id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    device_id        varchar(50)  NOT NULL COMMENT '分组对应的平台或设备ID',
-    name             varchar(255) NOT NULL COMMENT '分组名称',
-    parent_id        int COMMENT '父级分组ID',
-    parent_device_id varchar(50) DEFAULT NULL COMMENT '父级分组对应的设备ID',
-    business_group   varchar(50)  NOT NULL COMMENT '业务分组编码',
-    create_time      varchar(50)  NOT NULL COMMENT '创建时间',
-    update_time      varchar(50)  NOT NULL COMMENT '更新时间',
-    civil_code       varchar(50) default null COMMENT '行政区划代码',
-    alias            varchar(255) default null COMMENT '别名',
-    UNIQUE KEY uk_common_group_device_platform (device_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 通用行政区域表
-DROP TABLE IF EXISTS zws_common_region;
-CREATE TABLE IF NOT EXISTS zws_common_region
-(
-    id               INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    device_id        varchar(50)  NOT NULL COMMENT '区域对应的平台或设备ID',
-    name             varchar(255) NOT NULL COMMENT '区域名称',
-    parent_id        int COMMENT '父级区域ID',
-    parent_device_id varchar(50) DEFAULT NULL COMMENT '父级区域的设备ID',
-    create_time      varchar(50)  NOT NULL COMMENT '创建时间',
-    update_time      varchar(50)  NOT NULL COMMENT '更新时间',
-    UNIQUE KEY uk_common_region_device_id (device_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 录像计划基础信息
-DROP TABLE IF EXISTS zws_record_plan;
-CREATE TABLE IF NOT EXISTS zws_record_plan
-(
-    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    snap            TINYINT(1) DEFAULT 0 COMMENT '是否抓图计划',
-    name            varchar(255) NOT NULL COMMENT '计划名称',
-    create_time     VARCHAR(50) COMMENT '创建时间',
-    update_time     VARCHAR(50) COMMENT '更新时间'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 录像计划条目表
-DROP TABLE IF EXISTS zws_record_plan_item;
-CREATE TABLE IF NOT EXISTS zws_record_plan_item
-(
-    id              INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    start           int COMMENT '开始时间（分钟）',
-    stop            int COMMENT '结束时间（分钟）',
-    week_day        int COMMENT '星期（0-6）',
-    plan_id         int COMMENT '所属录像计划ID',
-    create_time     VARCHAR(50) COMMENT '创建时间',
-    update_time     VARCHAR(50) COMMENT '更新时间'
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 交通部 JT/T 1076 终端信息
-DROP TABLE IF EXISTS zws_jt_terminal;
-CREATE TABLE IF NOT EXISTS zws_jt_terminal (
-                                 id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                                 phone_number VARCHAR(50) COMMENT '终端SIM卡号',
-                                 terminal_id VARCHAR(50) COMMENT '终端设备ID',
-                                 province_id VARCHAR(50) COMMENT '所在省份ID',
-                                 province_text VARCHAR(100) COMMENT '所在省份名称',
-                                 city_id VARCHAR(50) COMMENT '所在城市ID',
-                                 city_text VARCHAR(100) COMMENT '所在城市名称',
-                                 maker_id VARCHAR(50) COMMENT '厂商ID',
-                                 model VARCHAR(50) COMMENT '终端型号',
-                                 plate_color VARCHAR(50) COMMENT '车牌颜色',
-                                 plate_no VARCHAR(50) COMMENT '车牌号码',
-                                 longitude DOUBLE COMMENT '经度',
-                                 latitude DOUBLE COMMENT '纬度',
-                                 status TINYINT(1) DEFAULT 0 COMMENT '在线状态',
-                                 register_time VARCHAR(50) default null COMMENT '注册时间',
-                                 update_time VARCHAR(50) not null COMMENT '更新时间',
-                                 create_time VARCHAR(50) not null COMMENT '创建时间',
-                                 geo_coord_sys VARCHAR(50) COMMENT '坐标系',
-                                 media_server_id VARCHAR(50) default 'auto' COMMENT '媒体服务器ID',
-                                 sdp_ip VARCHAR(50) COMMENT 'SDP IP',
-                                 UNIQUE KEY uk_jt_device_id_device_id (id, phone_number)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 交通部 JT/T 1076 通道信息
-DROP TABLE IF EXISTS zws_jt_channel;
-CREATE TABLE IF NOT EXISTS zws_jt_channel (
-                               id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                               terminal_db_id INT COMMENT '所属终端记录ID',
-                               channel_id INT COMMENT '通道号',
-                               has_audio TINYINT(1) DEFAULT 0 COMMENT '是否有音频',
-                               name VARCHAR(255) COMMENT '通道名称',
-                               update_time VARCHAR(50) not null COMMENT '更新时间',
-                               create_time VARCHAR(50) not null COMMENT '创建时间',
-                               UNIQUE KEY uk_jt_channel_id_device_id (terminal_db_id, channel_id)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 报警信息表，表结构参考alarm类
-DROP TABLE IF EXISTS zws_alarm;
-CREATE TABLE IF NOT EXISTS zws_alarm (
-                          id INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-                          channel_id INT COMMENT '关联通道的数据库id',
-                          description VARCHAR(255) COMMENT '报警描述',
-                          snap_path VARCHAR(255) COMMENT '报警快照路径',
-                          record_path VARCHAR(255) COMMENT '报警录像路径',
-                          longitude DOUBLE COMMENT '报警附带的经度',
-                          latitude DOUBLE COMMENT '报警附带的纬度',
-                          alarm_type INT COMMENT '报警类别（旧数字码）',
-                          alarm_code VARCHAR(64) COMMENT '统一报警码',
-                          alarm_time bigint COMMENT '报警时间',
-                          event_id VARCHAR(128) COMMENT '关联事件ID',
-                          device_internal_code VARCHAR(32) COMMENT '设备内码',
-                          channel_internal_code VARCHAR(32) COMMENT '通道内码',
-                          bbox_json TEXT COMMENT 'AI目标框',
-                          severity VARCHAR(32) COMMENT '级别',
-                          status VARCHAR(32) DEFAULT 'unhandled' COMMENT '处置状态',
-                          handled_by VARCHAR(128),
-                          handled_at BIGINT,
-                          remark VARCHAR(255),
-                          KEY idx_alarm_event (event_id),
-                          KEY idx_alarm_device (device_internal_code),
-                          KEY idx_alarm_channel (channel_internal_code)
- ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ONVIF 设备 / 通道
-DROP TABLE IF EXISTS zws_onvif_channel;
-DROP TABLE IF EXISTS zws_onvif_device;
-CREATE TABLE IF NOT EXISTS zws_onvif_device (
-    id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    internal_code   VARCHAR(32) COMMENT '平台内码（Open API）',
-    gb_code         VARCHAR(50) COMMENT '可选国标编号（级联上级时手填）',
-    name            VARCHAR(255) COMMENT '设备名称',
-    ip              VARCHAR(64) NOT NULL COMMENT '设备IP',
-    port            INT DEFAULT 80 COMMENT 'ONVIF端口',
-    username        VARCHAR(128) COMMENT '认证用户名',
-    password        VARCHAR(128) COMMENT '认证密码',
-    manufacturer    VARCHAR(255) COMMENT '厂商',
-    model           VARCHAR(255) COMMENT '型号',
-    firmware        VARCHAR(255) COMMENT '固件版本',
-    serial_number   VARCHAR(255) COMMENT '序列号',
-    hardware_id     VARCHAR(255) COMMENT '硬件ID',
-    device_uri      VARCHAR(512) COMMENT 'Device Service URI',
-    media_uri       VARCHAR(512) COMMENT 'Media Service URI',
-    ptz_uri         VARCHAR(512) COMMENT 'PTZ Service URI',
-    on_line         TINYINT(1) DEFAULT 0 COMMENT '在线状态',
-    event_subscribe TINYINT(1) DEFAULT 1 COMMENT '事件订阅开关（1=开启 PullPoint）',
-    discovery_mode  INT DEFAULT 0 COMMENT '0=手动 1=自动发现',
-    media_server_id VARCHAR(255) DEFAULT 'auto',
-    custom_name     VARCHAR(255),
-    server_id       VARCHAR(50),
-    create_time     VARCHAR(50),
-    update_time     VARCHAR(50),
-    UNIQUE KEY uk_onvif_ip_port (ip, port),
-    UNIQUE KEY uk_onvif_device_internal_code (internal_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF设备';
-
-CREATE TABLE IF NOT EXISTS zws_onvif_channel (
-    id              BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
-    internal_code   VARCHAR(32) COMMENT '平台内码（Open API）',
-    gb_code         VARCHAR(50) COMMENT '可选国标通道编号',
-    device_id       BIGINT NOT NULL COMMENT '关联 zws_onvif_device.id',
-    profile_token   VARCHAR(255) NOT NULL COMMENT 'ONVIF Profile Token',
-    name            VARCHAR(255) COMMENT '通道名称',
-    video_source    VARCHAR(255) COMMENT 'VideoSource Token',
-    encoder_token   VARCHAR(255) COMMENT 'VideoEncoder Token',
-    resolution      VARCHAR(64) COMMENT '分辨率',
-    codec           VARCHAR(64) COMMENT '编码格式',
-    has_audio       TINYINT(1) DEFAULT 0,
-    has_ptz         TINYINT(1) DEFAULT 0,
-    stream_uri      VARCHAR(1024) COMMENT 'RTSP地址',
-    status          VARCHAR(50) DEFAULT 'OFF',
-    profiles_json   TEXT COMMENT '同视频源下可选码流 JSON',
-    create_time     VARCHAR(50),
-    update_time     VARCHAR(50),
-    UNIQUE KEY uk_device_profile (device_id, profile_token),
-    UNIQUE KEY uk_onvif_channel_internal_code (internal_code),
-    KEY idx_device_id (device_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ONVIF通道';
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- ---------------------------------------------------------------------------
--- zero-agent 控制面
--- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS zws_agent;
 CREATE TABLE IF NOT EXISTS zws_agent
 (
     id          VARCHAR(128) NOT NULL PRIMARY KEY COMMENT 'Agent ID',
-    hostname    VARCHAR(255),
-    ip          VARCHAR(64),
-    version     VARCHAR(64),
-    endpoint    VARCHAR(255) COMMENT '平台可达地址',
+    hostname    VARCHAR(255) DEFAULT NULL,
+    ip          VARCHAR(64) DEFAULT NULL,
+    version     VARCHAR(64) DEFAULT NULL,
+    endpoint    VARCHAR(255) DEFAULT NULL COMMENT '平台可达地址',
     status      VARCHAR(32) NOT NULL DEFAULT 'offline',
     last_seen   BIGINT NOT NULL DEFAULT 0,
-    create_time VARCHAR(50),
-    update_time VARCHAR(50)
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='zero-agent';
+
+DROP TABLE IF EXISTS zws_plugin;
+CREATE TABLE IF NOT EXISTS zws_plugin
+(
+    id                VARCHAR(128) NOT NULL PRIMARY KEY COMMENT '插件实例ID',
+    plugin_id         VARCHAR(128) DEFAULT NULL,
+    vendor            VARCHAR(128) DEFAULT NULL,
+    version           VARCHAR(64) DEFAULT NULL,
+    protocols         TEXT,
+    capabilities      TEXT,
+    stream_transports TEXT,
+    config_schema     LONGTEXT,
+    endpoint          VARCHAR(255) DEFAULT NULL,
+    online            TINYINT(1) NOT NULL DEFAULT 0,
+    last_seen         BIGINT NOT NULL DEFAULT 0,
+    create_time       VARCHAR(50) NOT NULL DEFAULT '',
+    update_time       VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IPC 插件实例';
 
 DROP TABLE IF EXISTS zws_agent_plugin;
 CREATE TABLE IF NOT EXISTS zws_agent_plugin
@@ -765,45 +685,25 @@ CREATE TABLE IF NOT EXISTS zws_agent_plugin
     id                VARCHAR(160) NOT NULL PRIMARY KEY COMMENT '运行时插件实例ID',
     agent_id          VARCHAR(128) NOT NULL,
     plugin_id         VARCHAR(128) NOT NULL,
-    name              VARCHAR(255),
-    vendor            VARCHAR(128),
-    version           VARCHAR(64),
+    name              VARCHAR(255) DEFAULT NULL,
+    vendor            VARCHAR(128) DEFAULT NULL,
+    version           VARCHAR(64) DEFAULT NULL,
     protocols         TEXT,
     capabilities      TEXT,
     stream_transports TEXT,
     event_types       TEXT,
     config_schema     LONGTEXT,
-    enabled           TINYINT NOT NULL DEFAULT 1,
+    enabled           TINYINT(1) NOT NULL DEFAULT 1,
     desired_state     VARCHAR(32) NOT NULL DEFAULT 'enabled',
     actual_state      VARCHAR(32) NOT NULL DEFAULT 'discovered',
-    source            VARCHAR(32) COMMENT '来源 platform|manual',
+    source            VARCHAR(32) DEFAULT NULL,
     last_error        TEXT,
     last_seen         BIGINT NOT NULL DEFAULT 0,
-    create_time       VARCHAR(50),
-    update_time       VARCHAR(50),
+    create_time       VARCHAR(50) NOT NULL DEFAULT '',
+    update_time       VARCHAR(50) NOT NULL DEFAULT '',
     KEY idx_agent_plugin_agent (agent_id),
-    KEY idx_agent_plugin_plugin (plugin_id)
+    CONSTRAINT fk_ap_agent FOREIGN KEY (agent_id) REFERENCES zws_agent (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent 托管的插件';
-
--- ---------------------------------------------------------------------------
--- 插件安装包与安装任务（平台分发 .zwplugin 到 zero-agent）
--- ---------------------------------------------------------------------------
-DROP TABLE IF EXISTS zws_plugin_install;
-CREATE TABLE IF NOT EXISTS zws_plugin_install
-(
-    id          VARCHAR(64) NOT NULL PRIMARY KEY,
-    agent_id    VARCHAR(128) NOT NULL,
-    package_id  VARCHAR(64) NOT NULL,
-    plugin_id   VARCHAR(64) NOT NULL,
-    version     VARCHAR(64),
-    status      VARCHAR(32) NOT NULL DEFAULT 'pending',
-    last_error  TEXT,
-    create_time VARCHAR(50),
-    update_time VARCHAR(50),
-    KEY idx_plugin_install_agent (agent_id),
-    KEY idx_plugin_install_pkg (package_id),
-    KEY idx_plugin_install_plugin (plugin_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件包安装任务';
 
 DROP TABLE IF EXISTS zws_plugin_package;
 CREATE TABLE IF NOT EXISTS zws_plugin_package
@@ -811,10 +711,10 @@ CREATE TABLE IF NOT EXISTS zws_plugin_package
     id                VARCHAR(64) NOT NULL PRIMARY KEY,
     plugin_id         VARCHAR(64) NOT NULL,
     version           VARCHAR(64) NOT NULL,
-    name              VARCHAR(255),
-    vendor            VARCHAR(128),
-    object_key        VARCHAR(512),
-    sha256            VARCHAR(64),
+    name              VARCHAR(255) DEFAULT NULL,
+    vendor            VARCHAR(128) DEFAULT NULL,
+    object_key        VARCHAR(512) DEFAULT NULL,
+    sha256            VARCHAR(64) DEFAULT NULL,
     size_bytes        BIGINT NOT NULL DEFAULT 0,
     manifest_json     LONGTEXT,
     config_schema     LONGTEXT,
@@ -825,305 +725,181 @@ CREATE TABLE IF NOT EXISTS zws_plugin_package
     architectures     TEXT,
     status            VARCHAR(32) NOT NULL DEFAULT 'valid',
     error_msg         TEXT,
-    create_time       VARCHAR(50),
-    update_time       VARCHAR(50),
+    create_time       VARCHAR(50) NOT NULL DEFAULT '',
+    update_time       VARCHAR(50) NOT NULL DEFAULT '',
     UNIQUE KEY uk_plugin_pkg_version (plugin_id, version)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件安装包';
 
--- ---------------------------------------------------------------------------
--- IPC 私有 SDK 插件（sidecar）注册与设备
--- ---------------------------------------------------------------------------
-DROP TABLE IF EXISTS zws_plugin;
-CREATE TABLE IF NOT EXISTS zws_plugin
+DROP TABLE IF EXISTS zws_plugin_install;
+CREATE TABLE IF NOT EXISTS zws_plugin_install
 (
-    id            VARCHAR(128) NOT NULL PRIMARY KEY COMMENT '插件实例ID',
-    plugin_id     VARCHAR(128) COMMENT '插件标识',
-    vendor        VARCHAR(128) COMMENT '厂商',
-    version       VARCHAR(64) COMMENT '插件版本',
-    protocols     TEXT COMMENT '协议列表 JSON',
-    capabilities  TEXT COMMENT '能力列表 JSON',
-    stream_transports TEXT COMMENT '支持的流传输方式 JSON',
-    config_schema LONGTEXT COMMENT '设备配置 JSON Schema',
-    endpoint      VARCHAR(255) COMMENT '插件 RPC 地址',
-    online        TINYINT NOT NULL DEFAULT 0 COMMENT '在线',
-    last_seen     BIGINT NOT NULL DEFAULT 0 COMMENT '最后心跳(ms)',
-    create_time   VARCHAR(50),
-    update_time   VARCHAR(50)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IPC 插件实例';
+    id          VARCHAR(64) NOT NULL PRIMARY KEY,
+    agent_id    VARCHAR(128) NOT NULL,
+    package_id  VARCHAR(64) NOT NULL,
+    plugin_id   VARCHAR(64) NOT NULL,
+    version     VARCHAR(64) DEFAULT NULL,
+    status      VARCHAR(32) NOT NULL DEFAULT 'pending',
+    last_error  TEXT,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    KEY idx_plugin_install_agent (agent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件包安装任务';
 
-DROP TABLE IF EXISTS zws_plugin_device;
-CREATE TABLE IF NOT EXISTS zws_plugin_device
+-- ===========================================================================
+-- G. 用户 / 权限
+-- ===========================================================================
+
+DROP TABLE IF EXISTS zws_user_role;
+CREATE TABLE IF NOT EXISTS zws_user_role
 (
-    id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    internal_code VARCHAR(32) COMMENT '平台内码',
-    plugin_id     VARCHAR(128) NOT NULL COMMENT '插件实例ID',
-    protocol      VARCHAR(64) NOT NULL COMMENT '协议',
-    device_uid    VARCHAR(128) NOT NULL COMMENT '插件侧设备ID',
-    name          VARCHAR(255) COMMENT '设备名称',
-    enabled       TINYINT NOT NULL DEFAULT 1,
-    online        TINYINT NOT NULL DEFAULT 0,
-    driver_params LONGTEXT COMMENT '厂商参数 JSON（含凭据）',
-    manufacturer  VARCHAR(255),
-    model         VARCHAR(255),
-    firmware      VARCHAR(255),
-    serial_number VARCHAR(255),
-    create_time   VARCHAR(50),
-    update_time   VARCHAR(50),
-    UNIQUE KEY uk_plugin_device_code (internal_code),
-    UNIQUE KEY uk_plugin_device_uid (plugin_id, device_uid)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备';
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(50) NOT NULL DEFAULT '',
+    authority   VARCHAR(512) NOT NULL DEFAULT '' COMMENT '菜单权限：* 或 JSON 数组',
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户角色';
 
-DROP TABLE IF EXISTS zws_plugin_channel;
-CREATE TABLE IF NOT EXISTS zws_plugin_channel
+DROP TABLE IF EXISTS zws_user;
+CREATE TABLE IF NOT EXISTS zws_user
 (
-    id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    internal_code VARCHAR(32) COMMENT '平台内码',
-    device_db_id  INT NOT NULL COMMENT '插件设备ID',
-    channel_id    VARCHAR(128) NOT NULL COMMENT '插件侧通道ID',
-    name          VARCHAR(255) COMMENT '通道名称',
-    status        VARCHAR(32) COMMENT '状态',
-    ptz_type      INT NOT NULL DEFAULT 0,
-    has_audio     TINYINT NOT NULL DEFAULT 0,
-    create_time   VARCHAR(50),
-    update_time   VARCHAR(50),
-    KEY idx_plugin_channel_device (device_db_id),
-    UNIQUE KEY uk_plugin_channel_code (internal_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备通道';
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    username    VARCHAR(255) NOT NULL,
+    password    VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'MD5',
+    role_id     BIGINT DEFAULT NULL,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_user_username (username),
+    CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES zws_user_role (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台用户';
 
--- ---------------------------------------------------------------------------
--- 统一设备资产 / 资源模型（单接入；一个物理设备一个 AccessBinding）
--- ---------------------------------------------------------------------------
-DROP TABLE IF EXISTS zws_physical_device;
-CREATE TABLE IF NOT EXISTS zws_physical_device
+DROP TABLE IF EXISTS zws_user_api_key;
+CREATE TABLE IF NOT EXISTS zws_user_api_key
 (
-    id            VARCHAR(36) NOT NULL PRIMARY KEY,
-    internal_code VARCHAR(32),
-    name          VARCHAR(255),
-    vendor        VARCHAR(128),
-    model         VARCHAR(128),
-    serial_number VARCHAR(128),
-    enabled       TINYINT NOT NULL DEFAULT 1,
-    online        TINYINT NOT NULL DEFAULT 0,
-    create_time   VARCHAR(50),
-    update_time   VARCHAR(50),
-    UNIQUE KEY uk_physical_code (internal_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物理设备资产';
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT DEFAULT NULL,
+    app         VARCHAR(255) DEFAULT NULL,
+    api_key     TEXT,
+    expired_at  BIGINT DEFAULT NULL,
+    remark      VARCHAR(255) DEFAULT NULL,
+    enable      TINYINT(1) NOT NULL DEFAULT 1,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    CONSTRAINT fk_apikey_user FOREIGN KEY (user_id) REFERENCES zws_user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户 API Key';
 
-DROP TABLE IF EXISTS zws_access_binding;
-CREATE TABLE IF NOT EXISTS zws_access_binding
+CREATE TABLE IF NOT EXISTS zws_access_token
 (
-    id                 VARCHAR(36) NOT NULL PRIMARY KEY,
-    device_id          VARCHAR(36) NOT NULL,
-    protocol           VARCHAR(32) NOT NULL,
-    mode               VARCHAR(16),
-    external_id        VARCHAR(255),
-    endpoint           VARCHAR(255),
-    plugin_instance_id VARCHAR(128),
-    config_json        LONGTEXT,
-    status             VARCHAR(32),
-    last_seen          BIGINT NOT NULL DEFAULT 0,
-    legacy_device_id   INT NOT NULL DEFAULT 0,
-    create_time        VARCHAR(50),
-    update_time        VARCHAR(50),
-    UNIQUE KEY uk_binding_device (device_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备接入绑定(1:1)';
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(128) NOT NULL DEFAULT '' COMMENT '集成方名称',
+    token       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '密钥串',
+    enabled     TINYINT(1) NOT NULL DEFAULT 1,
+    remark      VARCHAR(255) NOT NULL DEFAULT '',
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_access_token_token (token),
+    KEY idx_access_token_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对外接入密钥';
 
-DROP TABLE IF EXISTS zws_resource;
-CREATE TABLE IF NOT EXISTS zws_resource
+-- ===========================================================================
+-- H. 系统配置
+-- ===========================================================================
+
+DROP TABLE IF EXISTS zws_gb_sip_config;
+CREATE TABLE IF NOT EXISTS zws_gb_sip_config
 (
-    id                VARCHAR(36) NOT NULL PRIMARY KEY,
-    internal_code     VARCHAR(32) NOT NULL DEFAULT '',
-    device_id         VARCHAR(36) NOT NULL,
-    binding_id        VARCHAR(36),
-    kind              VARCHAR(32) NOT NULL,
-    external_key      VARCHAR(255),
-    name              VARCHAR(255),
-    status            VARCHAR(32),
-    legacy_channel_id INT NOT NULL DEFAULT 0,
-    attrs_json        LONGTEXT,
-    create_time       VARCHAR(50),
-    update_time       VARCHAR(50),
-    KEY idx_resource_internal (internal_code),
-    KEY idx_resource_device (device_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备资源';
+    id                   BIGINT NOT NULL PRIMARY KEY COMMENT '固定为1',
+    ip                   VARCHAR(64)  NOT NULL,
+    port                 INT          NOT NULL,
+    domain               VARCHAR(32)  NOT NULL,
+    device_id            VARCHAR(32)  NOT NULL COMMENT '本平台国标编号',
+    password             VARCHAR(64)  NOT NULL DEFAULT '',
+    alarm                TINYINT(1)   NOT NULL DEFAULT 0,
+    require_pre_register TINYINT(1)   NOT NULL DEFAULT 1,
+    transport            VARCHAR(16)  NOT NULL DEFAULT 'UDP',
+    stream_mode          VARCHAR(16)  NOT NULL DEFAULT 'UDP',
+    create_time          VARCHAR(50) NOT NULL DEFAULT '',
+    update_time          VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='国标SIP配置';
 
-DROP TABLE IF EXISTS zws_stream_profile;
-CREATE TABLE IF NOT EXISTS zws_stream_profile
+DROP TABLE IF EXISTS zws_object_store_config;
+CREATE TABLE IF NOT EXISTS zws_object_store_config
 (
-    id            VARCHAR(36) NOT NULL PRIMARY KEY,
-    resource_id   VARCHAR(36) NOT NULL,
-    role          VARCHAR(16),
-    name          VARCHAR(128),
-    selector_json TEXT,
-    codec         VARCHAR(64),
-    resolution    VARCHAR(64),
-    is_default    TINYINT NOT NULL DEFAULT 0,
-    create_time   VARCHAR(50),
-    update_time   VARCHAR(50),
-    KEY idx_profile_resource (resource_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视频资源码流';
-
-DROP TABLE IF EXISTS zws_capability;
-CREATE TABLE IF NOT EXISTS zws_capability
-(
-    id          VARCHAR(36) NOT NULL PRIMARY KEY,
-    scope_type  VARCHAR(16) NOT NULL,
-    scope_id    VARCHAR(36) NOT NULL,
-    operation   VARCHAR(64) NOT NULL,
-    supported   TINYINT NOT NULL DEFAULT 1,
-    configured  TINYINT NOT NULL DEFAULT 1,
-    available   TINYINT NOT NULL DEFAULT 0,
-    params_json TEXT,
-    source      VARCHAR(32),
-    update_time VARCHAR(50),
-    KEY idx_cap_scope (scope_type, scope_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='能力事实';
-
-DROP TABLE IF EXISTS zws_event_source;
-CREATE TABLE IF NOT EXISTS zws_event_source
-(
-    id           VARCHAR(36) NOT NULL PRIMARY KEY,
-    device_id    VARCHAR(36) NOT NULL,
-    resource_id  VARCHAR(36),
-    kind         VARCHAR(32),
-    external_key VARCHAR(255),
-    enabled      TINYINT NOT NULL DEFAULT 0,
-    config_json  TEXT,
-    KEY idx_event_device (device_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事件来源';
-
-DROP TABLE IF EXISTS zws_event_type;
-CREATE TABLE IF NOT EXISTS zws_event_type
-(
-    code            VARCHAR(64) NOT NULL PRIMARY KEY,
-    name            VARCHAR(128),
-    category        VARCHAR(32),
-    severity        VARCHAR(32),
-    alarm_eligible  TINYINT NOT NULL DEFAULT 0,
-    requires_video  TINYINT NOT NULL DEFAULT 0,
-    bbox_capable    TINYINT NOT NULL DEFAULT 0,
-    vendor_mappings TEXT,
-    enabled         TINYINT NOT NULL DEFAULT 1,
-    update_time     VARCHAR(50)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='统一事件类型注册表';
-
-DROP TABLE IF EXISTS zws_unified_ref;
-CREATE TABLE IF NOT EXISTS zws_unified_ref(
-    id           INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    legacy_table VARCHAR(64) NOT NULL,
-    legacy_id    VARCHAR(64) NOT NULL,
-    entity_type  VARCHAR(32),
-    unified_id   VARCHAR(36),
-    UNIQUE KEY uk_legacy_ref (legacy_table, legacy_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='旧对象到统一对象映射';
+    id          BIGINT NOT NULL PRIMARY KEY COMMENT '固定为1',
+    enabled     TINYINT(1) NOT NULL DEFAULT 0,
+    provider    VARCHAR(32) NOT NULL DEFAULT 'noop',
+    endpoint    VARCHAR(255) DEFAULT NULL,
+    region      VARCHAR(64) DEFAULT NULL,
+    bucket      VARCHAR(128) DEFAULT NULL,
+    access_key  VARCHAR(128) DEFAULT NULL,
+    secret_key  VARCHAR(256) DEFAULT NULL,
+    use_ssl     TINYINT(1) NOT NULL DEFAULT 0,
+    path_style  TINYINT(1) NOT NULL DEFAULT 1,
+    public_base VARCHAR(255) DEFAULT NULL,
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    update_time VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对象存储对接';
 
 DROP TABLE IF EXISTS zws_mqtt_config;
 CREATE TABLE IF NOT EXISTS zws_mqtt_config
 (
-    id               INT NOT NULL PRIMARY KEY,
-    enabled          TINYINT NOT NULL DEFAULT 0,
-    broker           VARCHAR(255),
-    client_id_prefix VARCHAR(64) DEFAULT 'zws',
-    username         VARCHAR(128),
-    password         VARCHAR(256),
-    topic_prefix     VARCHAR(128) DEFAULT 'zws/events',
-    qos              TINYINT DEFAULT 1,
-    keepalive_sec    INT DEFAULT 30,
-    tls_enabled      TINYINT NOT NULL DEFAULT 0,
+    id               BIGINT NOT NULL PRIMARY KEY,
+    enabled          TINYINT(1) NOT NULL DEFAULT 0,
+    broker           VARCHAR(255) DEFAULT NULL,
+    client_id_prefix VARCHAR(64) NOT NULL DEFAULT 'zws',
+    username         VARCHAR(128) DEFAULT NULL,
+    password         VARCHAR(256) DEFAULT NULL,
+    topic_prefix     VARCHAR(128) NOT NULL DEFAULT 'zws/events',
+    qos              TINYINT(1) NOT NULL DEFAULT 1,
+    keepalive_sec    INT NOT NULL DEFAULT 30,
+    tls_enabled      TINYINT(1) NOT NULL DEFAULT 0,
     ca_cert          TEXT,
     client_cert      TEXT,
     client_key       TEXT,
-    create_time      VARCHAR(50),
-    update_time      VARCHAR(50)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQTT消息队列配置(单行)';
+    create_time      VARCHAR(50) NOT NULL DEFAULT '',
+    update_time      VARCHAR(50) NOT NULL DEFAULT ''
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQTT消息队列配置';
 
-DROP TABLE IF EXISTS zws_event_subscription;
-CREATE TABLE IF NOT EXISTS zws_event_subscription
+-- ===========================================================================
+-- I. 审计
+-- ===========================================================================
+
+DROP TABLE IF EXISTS zws_audit_log;
+CREATE TABLE IF NOT EXISTS zws_audit_log
 (
-    id                   INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    device_id            INT NOT NULL,
-    plugin_instance_id   VARCHAR(128),
-    device_uid           VARCHAR(128),
-    device_internal_code VARCHAR(64),
-    event_types          TEXT,
-    armed                TINYINT NOT NULL DEFAULT 0,
-    status               VARCHAR(16),
-    last_error           VARCHAR(500),
-    remote_id            VARCHAR(128),
-    last_armed_at        BIGINT NOT NULL DEFAULT 0,
-    create_time          VARCHAR(50),
-    update_time          VARCHAR(50),
-    UNIQUE KEY uk_event_sub_device (device_id),
-    KEY idx_event_sub_plugin (plugin_instance_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='插件设备事件订阅/布防状态';
+    id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     BIGINT DEFAULT NULL,
+    username    VARCHAR(255) NOT NULL DEFAULT '',
+    action      VARCHAR(64) NOT NULL DEFAULT '',
+    target_type VARCHAR(32) NOT NULL DEFAULT '',
+    target_id   VARCHAR(64) NOT NULL DEFAULT '',
+    detail      LONGTEXT,
+    ip          VARCHAR(64) NOT NULL DEFAULT '',
+    create_time VARCHAR(50) NOT NULL DEFAULT '',
+    KEY idx_audit_user_time (user_id, create_time),
+    KEY idx_audit_target (target_type, target_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作审计日志';
 
-DROP TABLE IF EXISTS zws_event;
-CREATE TABLE IF NOT EXISTS zws_event
-(
-    id                   VARCHAR(36) NOT NULL PRIMARY KEY,
-    event_id             VARCHAR(64) NOT NULL,
-    schema_version       VARCHAR(16),
-    source_id            VARCHAR(36),
-    device_id            VARCHAR(36),
-    binding_id           VARCHAR(36),
-    resource_id          VARCHAR(36),
-    device_internal_code VARCHAR(64),
-    device_uid           VARCHAR(128),
-    channel_external_key VARCHAR(128),
-    channel_internal_code VARCHAR(32),
-    event_type           VARCHAR(64),
-    severity             VARCHAR(16),
-    occurred_at          BIGINT NOT NULL DEFAULT 0,
-    received_at          BIGINT NOT NULL DEFAULT 0,
-    image_key            VARCHAR(512),
-    image_url            VARCHAR(1024),
-    image_expires_at     BIGINT NOT NULL DEFAULT 0,
-    bbox_json            TEXT,
-    raw_json             LONGTEXT,
-    status               VARCHAR(16),
-    alarm_id             INT NOT NULL DEFAULT 0,
-    create_time          VARCHAR(50),
-    UNIQUE KEY uk_event_id (event_id),
-    KEY idx_event_device_time (device_id, occurred_at),
-    KEY idx_event_internal (device_internal_code),
-    KEY idx_event_channel_internal (channel_internal_code),
-    KEY idx_event_type_time (event_type, occurred_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台事件记录';
+-- ===========================================================================
+-- 初始数据
+-- ===========================================================================
 
--- 自定义事件：平台未登记的事件类型（driver 自定义语义）。平台只保证内码关联与基础信封，raw 原样保存。
-DROP TABLE IF EXISTS zws_custom_event;
-CREATE TABLE IF NOT EXISTS zws_custom_event
-(
-    id                    VARCHAR(36) NOT NULL PRIMARY KEY,
-    event_id              VARCHAR(64) NOT NULL,
-    device_internal_code  VARCHAR(64),
-    channel_internal_code VARCHAR(32),
-    device_id             VARCHAR(36),
-    resource_id           VARCHAR(36),
-    major_type            VARCHAR(64),
-    minor_type            VARCHAR(128),
-    occur_at              BIGINT NOT NULL DEFAULT 0,
-    level                 VARCHAR(16),
-    image_key             VARCHAR(512),
-    image_url             VARCHAR(1024),
-    raw_json              LONGTEXT,
-    create_time           VARCHAR(50),
-    UNIQUE KEY uk_custom_event_id (event_id),
-    KEY idx_custom_event_device_time (device_internal_code, occur_at),
-    KEY idx_custom_event_channel (channel_internal_code),
-    KEY idx_custom_event_type (major_type, minor_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='自定义事件记录';
+-- 初始化角色：管理员 / 运维 / 视频值班
+INSERT INTO zws_user_role (id, name, authority, create_time, update_time)
+VALUES (1, '管理员', '*', '2021-04-13 14:14:57', '2021-04-13 14:14:57'),
+       (2, '运维', '["ops","access","media","storage"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57'),
+       (3, '视频值班', '["observe","media","access"]', '2021-04-13 14:14:57', '2021-04-13 14:14:57');
 
--- 对外接入密钥（可视化配置的外部集成凭证；平台只做存在+启用校验，不区分接口权限、不限流）
-CREATE TABLE IF NOT EXISTS `zws_access_token` (
-    `id`          BIGINT NOT NULL AUTO_INCREMENT,
-    `name`        VARCHAR(128) NOT NULL DEFAULT '' COMMENT '集成方名称',
-    `token`       VARCHAR(128) NOT NULL DEFAULT '' COMMENT '携带的密钥串',
-    `enabled`     TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-    `remark`      VARCHAR(255) NOT NULL DEFAULT '' COMMENT '备注',
-    `create_time` VARCHAR(50),
-    `update_time` VARCHAR(50),
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_access_token_token` (`token`),
-    KEY `idx_access_token_enabled` (`enabled`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='对外接入密钥';
+-- 初始化管理员账号 admin（密码 admin，MD5）
+INSERT INTO zws_user (id, username, password, role_id, create_time, update_time)
+VALUES (1, 'admin', '21232f297a57a5a743894a0e4a801fc3', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+
+-- 默认国标 SIP（与 configs/config.yaml 对齐；新装可随后在页面改编码）
+INSERT INTO zws_gb_sip_config (id, ip, port, domain, device_id, password, alarm, require_pre_register, transport, stream_mode, create_time, update_time)
+VALUES (1, '127.0.0.1', 5060, '3402000000', '34020000002000000001', '12345678', 0, 1, 'UDP', 'UDP',
+        '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+
+-- 对象存储默认 noop
+INSERT INTO zws_object_store_config (id, enabled, provider, path_style, create_time, update_time)
+VALUES (1, 0, 'noop', 1, '2021-04-13 14:14:57', '2021-04-13 14:14:57');
+
+SET FOREIGN_KEY_CHECKS = 1;

@@ -1,8 +1,9 @@
 package persistence
 
 import (
-	"strings"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	domainalarm "zero-web-server/internal/domain/alarm"
@@ -20,18 +21,19 @@ func NewAlarmRepository(db *gorm.DB) *AlarmRepository { return &AlarmRepository{
 
 func (r *AlarmRepository) Create(alarm *domainalarm.Alarm) error {
 	m := &model.Alarm{
-		ChannelID: alarm.ChannelID, Description: alarm.Description, SnapPath: alarm.SnapPath,
-		RecordPath: alarm.RecordPath, Longitude: alarm.Longitude, Latitude: alarm.Latitude,
+		EventID: alarm.EventID, ChannelID: int64(alarm.ChannelID), Description: alarm.Description,
 		AlarmType: alarm.AlarmType, AlarmCode: alarm.AlarmCode, AlarmTime: alarm.AlarmTime,
-		EventID: alarm.EventID, DeviceInternalCode: alarm.DeviceInternalCode,
-		ChannelInternalCode: alarm.ChannelInternalCode, BBoxJSON: alarm.BBoxJSON,
-		Severity: alarm.Severity, Status: alarm.Status, HandledBy: alarm.HandledBy,
+		DeviceInternalCode: alarm.DeviceInternalCode, ChannelInternalCode: alarm.ChannelInternalCode,
+		Longitude: alarm.Longitude, Latitude: alarm.Latitude, BBoxJSON: alarm.BBoxJSON,
+		SnapPath: alarm.SnapPath, RecordPath: alarm.RecordPath,
+		Severity: alarm.Severity, Status: alarm.Status, HandedBy: alarm.HandledBy,
 		HandledAt: alarm.HandledAt, Remark: alarm.Remark,
+		CreateTime: time.Now().Format("2006-01-02 15:04:05"),
 	}
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	alarm.ID = m.ID
+	alarm.ID = int(m.ID)
 	return nil
 }
 
@@ -95,7 +97,7 @@ func (r *AlarmRepository) Clear(alarmType *int, beginTime, endTime int64) error 
 
 func (r *AlarmRepository) UpdateStatus(id int, status, handledBy, remark string, handledAt int64) error {
 	return r.db.Model(&model.Alarm{}).Where("id = ?", id).Updates(map[string]any{
-		"status": status, "handled_by": handledBy, "remark": remark, "handled_at": handledAt,
+		"status": status, "handed_by": handledBy, "remark": remark, "handled_at": handledAt,
 	}).Error
 }
 
@@ -108,7 +110,7 @@ func (r *PositionRepository) Create(pos *domainposition.MobilePosition) error {
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	pos.ID = m.ID
+	pos.ID = int(m.ID)
 	return nil
 }
 
@@ -155,7 +157,7 @@ type PlatformRepository struct{ db *gorm.DB }
 func NewPlatformRepository(db *gorm.DB) *PlatformRepository { return &PlatformRepository{db: db} }
 
 func (r *PlatformRepository) GetByID(id int) (*domainplatform.Platform, error) {
-	var m model.Platform
+	var m model.UpperPlatform
 	if err := r.db.First(&m, id).Error; err != nil {
 		return nil, err
 	}
@@ -163,7 +165,7 @@ func (r *PlatformRepository) GetByID(id int) (*domainplatform.Platform, error) {
 }
 
 func (r *PlatformRepository) GetByServerGBID(serverGBID string) (*domainplatform.Platform, error) {
-	var m model.Platform
+	var m model.UpperPlatform
 	if err := r.db.Where("server_gb_id = ?", serverGBID).First(&m).Error; err != nil {
 		return nil, err
 	}
@@ -177,7 +179,7 @@ func (r *PlatformRepository) List(page, count int, query string) ([]*domainplatf
 	if count <= 0 {
 		count = 15
 	}
-	q := r.db.Model(&model.Platform{})
+	q := r.db.Model(&model.UpperPlatform{})
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
 		q = q.Where("name LIKE ? OR server_gb_id LIKE ?", like, like)
@@ -186,7 +188,7 @@ func (r *PlatformRepository) List(page, count int, query string) ([]*domainplatf
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	var rows []model.Platform
+	var rows []model.UpperPlatform
 	if err := q.Order("id DESC").Offset((page - 1) * count).Limit(count).Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
@@ -202,7 +204,7 @@ func (r *PlatformRepository) Create(p *domainplatform.Platform) error {
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	p.ID = m.ID
+	p.ID = int(m.ID)
 	return nil
 }
 
@@ -211,15 +213,15 @@ func (r *PlatformRepository) Update(p *domainplatform.Platform) error {
 }
 
 func (r *PlatformRepository) Delete(id int) error {
-	return r.db.Delete(&model.Platform{}, id).Error
+	return r.db.Delete(&model.UpperPlatform{}, id).Error
 }
 
 func (r *PlatformRepository) UpdateStatus(id int, online bool) error {
-	return r.db.Model(&model.Platform{}).Where("id = ?", id).Update("status", online).Error
+	return r.db.Model(&model.UpperPlatform{}).Where("id = ?", id).Update("status", online).Error
 }
 
 func (r *PlatformRepository) ListEnabled() ([]*domainplatform.Platform, error) {
-	var rows []model.Platform
+	var rows []model.UpperPlatform
 	if err := r.db.Where("enable = ?", true).Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -232,30 +234,33 @@ func (r *PlatformRepository) ListEnabled() ([]*domainplatform.Platform, error) {
 
 func (r *PlatformRepository) ListChannelIDsByDevice(deviceID string) ([]int, error) {
 	var ids []int
-	err := r.db.Model(&model.GBDeviceChannel{}).Where("device_id = ?", deviceID).Pluck("id", &ids).Error
+	err := r.db.Table("zws_channel").
+		Where("device_id = (SELECT id FROM zws_device WHERE gb_code = ? LIMIT 1)", deviceID).
+		Pluck("id", &ids).Error
 	return ids, err
 }
 
 func (r *PlatformRepository) ListPlatformChannels(platformID int) ([]int, error) {
 	var ids []int
 	err := r.db.Model(&model.PlatformChannel{}).Where("platform_id = ?", platformID).
-		Pluck("device_channel_id", &ids).Error
+		Pluck("channel_id", &ids).Error
 	return ids, err
 }
 
 func (r *PlatformRepository) AddPlatformChannel(platformID, channelID int) error {
-	pc := model.PlatformChannel{PlatformID: platformID, DeviceChannelID: channelID}
-	return r.db.Create(&pc).Error
+	pc := model.PlatformChannel{PlatformID: int64(platformID), ChannelID: int64(channelID),
+		CreateTime: nowTimeStr(), UpdateTime: nowTimeStr()}
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&pc).Error
 }
 
 func (r *PlatformRepository) RemovePlatformChannel(platformID, channelID int) error {
-	return r.db.Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).
+	return r.db.Where("platform_id = ? AND channel_id = ?", platformID, channelID).
 		Delete(&model.PlatformChannel{}).Error
 }
 
 func (r *PlatformRepository) GetPlatformChannel(platformID, channelID int) (*domainplatform.Channel, error) {
 	var row model.PlatformChannel
-	err := r.db.Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).First(&row).Error
+	err := r.db.Where("platform_id = ? AND channel_id = ?", platformID, channelID).First(&row).Error
 	if err != nil {
 		return nil, err
 	}
@@ -264,46 +269,65 @@ func (r *PlatformRepository) GetPlatformChannel(platformID, channelID int) (*dom
 
 func (r *PlatformRepository) GetByCustomDeviceID(platformID int, customID string) (*domainplatform.Channel, error) {
 	var row model.PlatformChannel
-	err := r.db.Where("platform_id = ? AND custom_device_id = ?", platformID, customID).First(&row).Error
+	err := r.db.Where("platform_id = ? AND custom_gb_code = ?", platformID, customID).First(&row).Error
 	if err != nil {
 		return nil, err
 	}
 	return toDomainPlatformChannel(&row), nil
 }
 
-func toDomainPlatformChannel(m *model.PlatformChannel) *domainplatform.Channel {
-	return &domainplatform.Channel{
-		ID: m.ID, PlatformID: m.PlatformID, DeviceChannelID: m.DeviceChannelID,
-		CustomDeviceID: m.CustomDeviceID, CustomName: m.CustomName,
+func (r *PlatformRepository) UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error {
+	overrides := map[string]any{}
+	var row model.PlatformChannel
+	if err := r.db.Where("platform_id = ? AND channel_id = ?", platformID, channelID).First(&row).Error; err == nil {
+		if strings.TrimSpace(row.OverridesJSON) != "" {
+			_ = json.Unmarshal([]byte(row.OverridesJSON), &overrides)
+		}
 	}
+	if strings.TrimSpace(customName) != "" {
+		overrides["customName"] = customName
+	} else {
+		delete(overrides, "customName")
+	}
+	raw, _ := json.Marshal(overrides)
+	return r.db.Model(&model.PlatformChannel{}).
+		Where("platform_id = ? AND channel_id = ?", platformID, channelID).
+		Updates(map[string]any{
+			"custom_gb_code": customID, "overrides_json": string(raw), "update_time": nowTimeStr(),
+		}).Error
 }
 
-var _ domainplatform.ChannelRepository = (*PlatformRepository)(nil)
-
-func (r *PlatformRepository) UpdatePlatformChannelCustom(platformID, channelID int, customID, customName string) error {
-	return r.db.Model(&model.PlatformChannel{}).
-		Where("platform_id = ? AND device_channel_id = ?", platformID, channelID).
-		Updates(map[string]any{
-			"custom_device_id": customID,
-			"custom_name":      customName,
-		}).Error
+func toDomainPlatformChannel(m *model.PlatformChannel) *domainplatform.Channel {
+	ch := &domainplatform.Channel{
+		ID: int(m.ID), PlatformID: int(m.PlatformID), DeviceChannelID: int(m.ChannelID),
+		CustomDeviceID: m.CustomGBCode,
+	}
+	if strings.TrimSpace(m.OverridesJSON) != "" {
+		var ov map[string]any
+		if json.Unmarshal([]byte(m.OverridesJSON), &ov) == nil {
+			if v, ok := ov["customName"].(string); ok {
+				ch.CustomName = v
+			}
+		}
+	}
+	return ch
 }
 
 func toDomainAlarm(m *model.Alarm) *domainalarm.Alarm {
 	return &domainalarm.Alarm{
-		ID: m.ID, ChannelID: m.ChannelID, Description: m.Description, SnapPath: m.SnapPath,
+		ID: int(m.ID), ChannelID: int(m.ChannelID), Description: m.Description, SnapPath: m.SnapPath,
 		RecordPath: m.RecordPath, Longitude: m.Longitude, Latitude: m.Latitude,
 		AlarmType: m.AlarmType, AlarmCode: m.AlarmCode, AlarmTime: m.AlarmTime,
 		EventID: m.EventID, DeviceInternalCode: m.DeviceInternalCode,
 		ChannelInternalCode: m.ChannelInternalCode, BBoxJSON: m.BBoxJSON,
-		Severity: m.Severity, Status: m.Status, HandledBy: m.HandledBy,
+		Severity: m.Severity, Status: m.Status, HandledBy: m.HandedBy,
 		HandledAt: m.HandledAt, Remark: m.Remark,
 	}
 }
 
 func toModelPosition(p *domainposition.MobilePosition) *model.MobilePosition {
 	return &model.MobilePosition{
-		ID: p.ID, ChannelID: p.ChannelID, Timestamp: p.Timestamp,
+		ID: int64(p.ID), ChannelID: int64(p.ChannelID), Timestamp: p.Timestamp,
 		Longitude: p.Longitude, Latitude: p.Latitude, Altitude: p.Altitude,
 		Speed: p.Speed, Direction: p.Direction, CreateTime: p.CreateTime,
 	}
@@ -311,15 +335,15 @@ func toModelPosition(p *domainposition.MobilePosition) *model.MobilePosition {
 
 func toDomainPosition(m *model.MobilePosition) *domainposition.MobilePosition {
 	return &domainposition.MobilePosition{
-		ID: m.ID, ChannelID: m.ChannelID, Timestamp: m.Timestamp,
+		ID: int(m.ID), ChannelID: int(m.ChannelID), Timestamp: m.Timestamp,
 		Longitude: m.Longitude, Latitude: m.Latitude, Altitude: m.Altitude,
 		Speed: m.Speed, Direction: m.Direction, CreateTime: m.CreateTime,
 	}
 }
 
-func toModelPlatform(p *domainplatform.Platform) *model.Platform {
-	return &model.Platform{
-		ID: p.ID, Enable: p.Enable, Name: p.Name, ServerGBID: p.ServerGBID,
+func toModelPlatform(p *domainplatform.Platform) *model.UpperPlatform {
+	return &model.UpperPlatform{
+		ID: int64(p.ID), Enable: p.Enable, Name: p.Name, ServerGBID: p.ServerGBID,
 		ServerGBDomain: p.ServerGBDomain, ServerIP: p.ServerIP, ServerPort: p.ServerPort,
 		DeviceGBID: p.DeviceGBID, DeviceIP: p.DeviceIP, DevicePort: p.DevicePort,
 		Username: p.Username, Password: p.Password, Expires: p.Expires,
@@ -329,9 +353,9 @@ func toModelPlatform(p *domainplatform.Platform) *model.Platform {
 	}
 }
 
-func toDomainPlatform(m *model.Platform) *domainplatform.Platform {
+func toDomainPlatform(m *model.UpperPlatform) *domainplatform.Platform {
 	return &domainplatform.Platform{
-		ID: m.ID, Enable: m.Enable, Name: m.Name, ServerGBID: m.ServerGBID,
+		ID: int(m.ID), Enable: m.Enable, Name: m.Name, ServerGBID: m.ServerGBID,
 		ServerGBDomain: m.ServerGBDomain, ServerIP: m.ServerIP, ServerPort: m.ServerPort,
 		DeviceGBID: m.DeviceGBID, DeviceIP: m.DeviceIP, DevicePort: m.DevicePort,
 		Username: m.Username, Password: m.Password, Expires: m.Expires,
@@ -351,7 +375,7 @@ func (r *PlatformRepository) ListCatalogSnapshot(platformID int) ([]*domainplatf
 	out := make([]*domainplatform.CatalogSnapshot, 0, len(rows))
 	for i := range rows {
 		out = append(out, &domainplatform.CatalogSnapshot{
-			PlatformID: rows[i].PlatformID, DeviceID: rows[i].DeviceID, Name: rows[i].Name,
+			PlatformID: int(rows[i].PlatformID), DeviceID: rows[i].DeviceID, Name: rows[i].Name,
 			ParentID: rows[i].ParentID, ItemType: rows[i].ItemType, Status: rows[i].Status,
 			Hash: rows[i].Hash,
 		})
@@ -370,7 +394,7 @@ func (r *PlatformRepository) ReplaceCatalogSnapshot(platformID int, list []*doma
 		rows := make([]model.PlatformCatalogSnapshot, 0, len(list))
 		for _, e := range list {
 			rows = append(rows, model.PlatformCatalogSnapshot{
-				PlatformID: platformID, DeviceID: e.DeviceID, Name: e.Name,
+				PlatformID: int64(platformID), DeviceID: e.DeviceID, Name: e.Name,
 				ParentID: e.ParentID, ItemType: e.ItemType, Status: e.Status, Hash: e.Hash,
 			})
 		}
@@ -385,11 +409,16 @@ func (r *PlatformRepository) ListGroupShares(platformID int) ([]string, error) {
 	}
 	out := make([]string, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, row.GroupDeviceID)
+		var code string
+		_ = r.db.Table("zws_group").Select("code").Where("id = ?", row.GroupID).Scan(&code).Error
+		if strings.TrimSpace(code) != "" {
+			out = append(out, code)
+		}
 	}
 	return out, nil
 }
 
+// AddGroupShares 入参为业务分组 deviceID（=zws_group.code），解析为 group.id 后落表。
 func (r *PlatformRepository) AddGroupShares(platformID int, groupDeviceIDs []string) error {
 	if len(groupDeviceIDs) == 0 {
 		return nil
@@ -400,7 +429,12 @@ func (r *PlatformRepository) AddGroupShares(platformID int, groupDeviceIDs []str
 		if id == "" {
 			continue
 		}
-		rows = append(rows, model.PlatformGroupShare{PlatformID: platformID, GroupDeviceID: id})
+		var gid int64
+		_ = r.db.Table("zws_group").Select("id").Where("code = ?", id).Scan(&gid).Error
+		if gid == 0 {
+			continue
+		}
+		rows = append(rows, model.PlatformGroupShare{PlatformID: int64(platformID), GroupID: gid})
 	}
 	if len(rows) == 0 {
 		return nil
@@ -412,6 +446,17 @@ func (r *PlatformRepository) RemoveGroupShares(platformID int, groupDeviceIDs []
 	if len(groupDeviceIDs) == 0 {
 		return nil
 	}
-	return r.db.Where("platform_id = ? AND group_device_id IN ?", platformID, groupDeviceIDs).
+	gids := make([]int64, 0, len(groupDeviceIDs))
+	for _, id := range groupDeviceIDs {
+		var gid int64
+		_ = r.db.Table("zws_group").Select("id").Where("code = ?", strings.TrimSpace(id)).Scan(&gid).Error
+		if gid > 0 {
+			gids = append(gids, gid)
+		}
+	}
+	if len(gids) == 0 {
+		return nil
+	}
+	return r.db.Where("platform_id = ? AND group_id IN ?", platformID, gids).
 		Delete(&model.PlatformGroupShare{}).Error
 }

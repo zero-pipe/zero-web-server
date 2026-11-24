@@ -67,7 +67,7 @@ func (r *SubordinateRepository) Create(p *domainsub.Platform) error {
 	if err := r.db.Create(row).Error; err != nil {
 		return err
 	}
-	p.ID = row.ID
+	p.ID = int(row.ID)
 	return nil
 }
 
@@ -113,7 +113,7 @@ func toSubDomain(row *model.SubordinatePlatform) *domainsub.Platform {
 		return nil
 	}
 	return &domainsub.Platform{
-		ID:           row.ID,
+		ID:           int(row.ID),
 		Enable:       row.Enable,
 		Name:         row.Name,
 		DeviceGBID:   row.DeviceGBID,
@@ -133,7 +133,7 @@ func toSubDomain(row *model.SubordinatePlatform) *domainsub.Platform {
 
 func toSubModel(p *domainsub.Platform) *model.SubordinatePlatform {
 	return &model.SubordinatePlatform{
-		ID:           p.ID,
+		ID:           int64(p.ID),
 		Enable:       p.Enable,
 		Name:         p.Name,
 		DeviceGBID:   p.DeviceGBID,
@@ -155,7 +155,7 @@ func toSubModel(p *domainsub.Platform) *model.SubordinatePlatform {
 
 func toCatalogEntry(m *model.SubordinateCatalog) *domainsub.CatalogEntry {
 	return &domainsub.CatalogEntry{
-		ID: m.ID, PlatformID: m.PlatformID, DeviceID: m.DeviceID, Name: m.Name,
+		ID: int(m.ID), PlatformID: int(m.PlatformID), DeviceID: m.DeviceID, Name: m.Name,
 		ParentID: m.ParentID, TypeCode: m.TypeCode, ItemType: m.ItemType,
 		Status: m.Status, CivilCode: m.CivilCode, Manufacturer: m.Manufacturer,
 		Model: m.Model, Orphan: m.Orphan, RawJSON: m.RawJSON,
@@ -190,7 +190,7 @@ func (r *SubordinateRepository) UpsertCatalog(e *domainsub.CatalogEntry) error {
 	err := r.db.Where("platform_id = ? AND device_id = ?", e.PlatformID, e.DeviceID).First(&row).Error
 	if err == gorm.ErrRecordNotFound {
 		row = model.SubordinateCatalog{
-			PlatformID: e.PlatformID, DeviceID: e.DeviceID, CreateTime: now,
+			PlatformID: int64(e.PlatformID), DeviceID: e.DeviceID, CreateTime: now,
 		}
 		e.CreateTime = now
 	} else if err != nil {
