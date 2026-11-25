@@ -81,6 +81,14 @@ export const primaryMenus = [
       { title: '用户列表', path: '/user', icon: 'user' },
       { title: '角色管理', path: '/role', icon: 'role' }
     ]
+  },
+  {
+    id: 'config',
+    title: '系统配置',
+    icon: 'el-icon-setting',
+    children: [
+      { title: '数据字典', path: '/dict', icon: 'el-icon-collection' }
+    ]
   }
 ]
 

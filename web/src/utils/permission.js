@@ -21,7 +21,8 @@ const PATH_RULES = [
   { prefix: '/dashboard', menu: 'ops' },
   { prefix: '/operations', menu: 'ops' },
   { prefix: '/user', menu: 'user' },
-  { prefix: '/role', menu: 'user' }
+  { prefix: '/role', menu: 'user' },
+  { prefix: '/dict', menu: 'config' }
 ]
 
 function resolveMenuCode(code) {

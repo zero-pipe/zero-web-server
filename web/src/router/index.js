@@ -320,6 +320,19 @@ export const constantRoutes = [
     ]
   },
   {
+    path: '/dict',
+    component: Layout,
+    redirect: '/dict',
+    children: [
+      {
+        path: '',
+        name: 'DictManage',
+        component: () => import('@/views/dict/index'),
+        meta: { title: '数据字典', icon: 'el-icon-collection' }
+      }
+    ]
+  },
+  {
     path: '/operations',
     component: Layout,
     redirect: '/operations/systemInfo',

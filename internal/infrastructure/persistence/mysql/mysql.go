@@ -147,6 +147,9 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.GbSipConfig{},
 		&model.ObjectStoreConfig{},
 		&model.MQTTConfig{},
+		// 数据字典
+		&model.DictType{},
+		&model.DictItem{},
 		// 审计
 		&model.AuditLog{},
 	}

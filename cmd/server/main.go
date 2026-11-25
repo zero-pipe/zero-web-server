@@ -16,6 +16,7 @@ import (
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	"zero-web-server/internal/adapter/mqttbus"
 	accesstokenapp "zero-web-server/internal/application/accesstoken"
+	dictapp "zero-web-server/internal/application/dict"
 	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
@@ -160,6 +161,8 @@ func main() {
 	// 对外接入密钥：可视化配置 + 同步到媒体节点本地验签。
 	accessTokenRepo := persistence.NewAccessTokenRepository(db)
 	accessTokenService := accesstokenapp.NewService(accessTokenRepo)
+	dictRepo := persistence.NewDictRepository(db)
+	dictService := dictapp.NewService(dictRepo)
 	// token 只在启用集合变化时推送：节点每次心跳都会触发重推，若每 30s 都推一遍空列表，
 	// ZMS 会持续打 "token list cleared" 噪声日志。
 	var (
@@ -461,6 +464,7 @@ func main() {
 		EventService:         eventIngest,
 		CustomEventService:   customEventService,
 		AccessTokenService:   accessTokenService,
+		DictService:          dictService,
 	})
 
 	go func() {

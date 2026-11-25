@@ -14,6 +14,7 @@ const (
 	MenuApp     = "app"     // 应用（地图/分屏/报警）
 	MenuOps     = "ops"     // 运维
 	MenuUser    = "user"    // 用户
+	MenuConfig  = "config"  // 系统配置（数据字典等）
 
 	// 兼容旧码（角色 authority 历史数据）
 	MenuMap     = "map"
@@ -27,7 +28,7 @@ const (
 
 // AllMenus 全部一级菜单权限（新能力域）。
 var AllMenus = []string{
-	MenuApp, MenuAccess, MenuMedia, MenuStorage, MenuOrg, MenuOps, MenuUser,
+	MenuApp, MenuAccess, MenuMedia, MenuStorage, MenuOrg, MenuOps, MenuUser, MenuConfig,
 }
 
 // legacyAlias 旧一级码映射到新能力码。
@@ -53,6 +54,7 @@ var MenuDefs = []struct {
 	{MenuOrg, "组织管理"},
 	{MenuOps, "运维管理"},
 	{MenuUser, "用户管理"},
+	{MenuConfig, "系统配置"},
 }
 
 const (

@@ -12,6 +12,7 @@ import (
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
 	downstreamapp "zero-web-server/internal/application/downstream"
+	dictapp "zero-web-server/internal/application/dict"
 	eventingest "zero-web-server/internal/application/eventingest"
 	eventsubapp "zero-web-server/internal/application/eventsub"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
@@ -98,6 +99,7 @@ type Deps struct {
 	EventService         *eventingest.Service
 	CustomEventService   *customeventapp.Service
 	AccessTokenService   *accesstokenapp.Service
+	DictService          *dictapp.Service
 }
 
 func Setup(r *gin.Engine, deps Deps) {
@@ -165,6 +167,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	assetHandler := handler.NewAssetHandler(deps.AssetService)
 	infraHandler := handler.NewInfraHandler(deps.InfraService)
 	accessTokenHandler := handler.NewAccessTokenHandler(deps.AccessTokenService)
+	dictHandler := handler.NewDictHandler(deps.DictService)
 	var accessTokenCheck func(token string) (bool, bool)
 	if deps.AccessTokenService != nil {
 		accessTokenCheck = func(token string) (bool, bool) {
@@ -215,6 +218,8 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerServerAPI(auth, mediaServerHandler, gbSipConfigHandler, objectStoreHandler)
 
 		registerAccessToken(auth, accessTokenHandler)
+
+		registerDict(auth, dictHandler)
 
 		// 设备接入唯一命名空间：/devices（统一）+ /devices/{gb,onvif,plugin}（协议专属动作）
 		registerDevices(auth, deviceAccessHandler, deviceHandler, onvifHandler, pluginHandler, snapHandler)
