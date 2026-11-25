@@ -1,342 +1,154 @@
 <template>
   <div class="app-container asset-page">
-    <!-- 顶部统计卡 -->
-    <div class="stat-row">
-      <div class="stat-card">
-        <div class="stat-head"><span>接入设备总数</span><i class="el-icon-office-building" /></div>
-        <div class="stat-num">{{ deviceTotal }} <span class="unit">台</span></div>
-        <div class="stat-sub"><span class="dot on" /> 在线 {{ deviceOnline }} <span class="dot off" /> 离线 {{ deviceTotal - deviceOnline }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-head"><span>关联通道总数</span><i class="el-icon-video-camera" /></div>
-        <div class="stat-num">{{ channelTotal }} <span class="unit">路</span></div>
-        <div class="stat-sub"><span class="dot on" /> 在线 {{ channelOnline }} <span class="dot off" /> 离线 {{ channelTotal - channelOnline }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-head"><span>协议分布</span></div>
-        <div class="proto-tags">
-          <span class="proto-chip gb">GB28181 · {{ protoCount('gb28181') }}</span>
-          <span class="proto-chip onvif">ONVIF · {{ protoCount('onvif') }}</span>
-          <span class="proto-chip plugin">插件 · {{ protoCount('plugin') }}</span>
-        </div>
-        <div class="proto-bar">
-          <span class="seg gb" :style="{ width: protoPct('gb28181') }" />
-          <span class="seg onvif" :style="{ width: protoPct('onvif') }" />
-          <span class="seg plugin" :style="{ width: protoPct('plugin') }" />
-        </div>
-      </div>
-    </div>
-
     <!-- 过滤栏 -->
     <el-form :inline="true" size="mini" class="asset-filter">
       <el-form-item>
-        <el-input v-model="query" clearable placeholder="设备/通道名称、IP、编号" prefix-icon="el-icon-search" style="width:230px" @input="reload" />
-      </el-form-item>
-      <el-form-item label="协议">
-        <el-select v-model="protocol" clearable placeholder="全部" style="width:120px" @change="reload">
-          <el-option label="GB28181" value="gb28181" />
-          <el-option label="ONVIF" value="onvif" />
-          <el-option label="插件" value="plugin" />
-        </el-select>
+        <el-input v-model="query" clearable placeholder="设备名称 / 厂家 / 型号 / 通道" prefix-icon="el-icon-search" style="width:260px" />
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="status" clearable placeholder="全部" style="width:100px" @change="reload">
+        <el-select v-model="status" clearable placeholder="全部" style="width:110px">
           <el-option label="在线" value="online" />
           <el-option label="离线" value="offline" />
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button-group>
-          <el-button :type="view === 'tree' ? 'primary' : ''" icon="el-icon-s-grid" @click="setView('tree')">设备聚合(树形)</el-button>
-          <el-button :type="view === 'flat' ? 'primary' : ''" icon="el-icon-s-unfold" @click="setView('flat')">通道视角(扁平)</el-button>
-        </el-button-group>
-      </el-form-item>
-      <el-form-item v-if="view === 'tree'">
-        <el-button icon="el-icon-sort" @click="toggleExpandAll">{{ allExpanded ? '全部折叠' : '全部展开' }}</el-button>
+        <span class="summary">共 <b>{{ filteredDevices.length }}</b> 台设备 · 在线 <b class="on">{{ onlineCount }}</b></span>
       </el-form-item>
       <el-form-item style="float:right">
         <el-button icon="el-icon-refresh" circle :loading="loading" @click="loadData" />
       </el-form-item>
     </el-form>
 
-    <!-- 树表：设备父行 + 通道子行 -->
-    <el-table
-      ref="table"
-      v-loading="loading"
-      :data="rows"
-      :row-key="rowKey"
-      :tree-props="{ children: 'children' }"
-      style="width:100%"
-      size="small"
-      header-row-class-name="table-header"
-      :row-class-name="rowClass"
-      max-height="calc(100vh - 300px)"
-    >
-      <el-table-column label="设备 / 通道名称" min-width="220">
-        <template slot-scope="{ row }">
-          <template v-if="row._kind === 'device'">
-            <i class="el-icon-office-building node-ico" />
-            <span class="node-name">{{ row.name }}</span>
-            <span class="node-count">({{ row.channelCount != null ? row.channelCount : (row.children || []).length }} 个通道)</span>
-          </template>
-          <template v-else>
-            <i class="el-icon-video-camera node-ico ch" />
-            <span class="node-name">{{ row.name }}</span>
-            <el-tag v-if="row.kindLabel" size="mini" effect="plain" class="kind-tag">{{ row.kindLabel }}</el-tag>
-          </template>
-        </template>
-      </el-table-column>
+    <!-- 设备卡片网格（纯展示） -->
+    <div v-loading="loading" class="card-grid">
+      <div v-for="d in filteredDevices" :key="d.id" class="dev-card">
+        <div class="dc-head">
+          <img class="dc-icon" :src="iconSrc(d.deviceType, d.online)" alt="">
+          <div class="dc-title">
+            <div class="dc-name" :title="d.name">{{ d.name }}</div>
+            <div class="dc-sub" :title="vendorModel(d)">{{ vendorModel(d) }}</div>
+          </div>
+          <span class="dc-status" :class="d.online ? 'on' : 'off'">{{ d.online ? '在线' : '离线' }}</span>
+        </div>
 
-      <el-table-column label="接入协议 / 厂商型号" min-width="170">
-        <template slot-scope="{ row }">
-          <template v-if="row._kind === 'device'">
-            <el-tag size="mini" :type="protoTagType(row.protocol)">{{ protocolLabel(row.protocol) }}</el-tag>
-            <span class="sub-text">{{ row.vendor }}</span>
-            <span class="sub-text">{{ row.model }}</span>
+        <div class="dc-divider" />
+
+        <div class="dc-row">
+          <span class="dc-label">通道数</span>
+          <span class="dc-value">{{ d.channels.length }} 路</span>
+        </div>
+        <div class="dc-chans">
+          <template v-if="d.channels.length">
+            <div v-for="(ch, i) in d.channels" :key="ch.resourceId || i" class="dc-chan">
+              <span class="dc-chan-idx">{{ i + 1 }}</span>
+              <span class="dc-chan-name" :title="ch.name">{{ ch.name }}</span>
+              <el-tag size="mini" effect="plain" :type="ch.channelType ? '' : 'info'">{{ typeLabel(ch.channelType) }}</el-tag>
+            </div>
           </template>
-          <span v-else class="sub-text">继承设备 [{{ protocolLabel(row.protocol) }}]</span>
-        </template>
-      </el-table-column>
+          <div v-else class="dc-empty">暂无通道</div>
+        </div>
+      </div>
 
-      <el-table-column label="IP / 编号" min-width="180">
-        <template slot-scope="{ row }">
-          <template v-if="row._kind === 'device'">
-            <div class="mono">{{ row.addressText || '—' }}</div>
-            <div class="sub-text mono">{{ deviceCode(row) }}</div>
-          </template>
-          <span v-else class="mono sub-text">{{ row.externalKey || row.gbCode || '—' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="音频 / 通道" width="100" align="center">
-        <template slot-scope="{ row }">
-          <template v-if="row._kind === 'device'"><span class="muted">—</span></template>
-          <i v-else :class="row.hasAudio ? 'el-icon-microphone audio-on' : 'el-icon-microphone audio-off'" :title="row.hasAudio ? '有音频' : '无音频'" />
-        </template>
-      </el-table-column>
-
-      <el-table-column label="设备能力集" min-width="260">
-        <template slot-scope="{ row }">
-          <template v-if="row._kind === 'device'">
-            <el-tag v-for="c in (row.capabilities || [])" :key="c" size="mini" type="info" class="cap-chip">{{ capLabel(c) }}</el-tag>
-          </template>
-          <template v-else>
-            <span v-for="c in row.caps || []" :key="c" class="cap-item cap-on">
-              <i :class="capIcon(c)" /> {{ capLabel(c) }}
-            </span>
-            <span v-if="!(row.caps || []).length" class="muted">—</span>
-          </template>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="状态" width="90" align="center">
-        <template slot-scope="{ row }">
-          <el-tag :type="row.online ? 'success' : 'info'" size="mini">{{ row.online ? '在线' : '离线' }}</el-tag>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="操作" width="200" fixed="right">
-        <template slot-scope="{ row }">
-          <template v-if="row._kind === 'device'">
-            <el-button type="text" size="mini" icon="el-icon-refresh" @click="syncDevice(row)">同步</el-button>
-            <el-divider direction="vertical" />
-            <el-button type="text" size="mini" icon="el-icon-edit" @click="editDevice(row)">配置与详情</el-button>
-          </template>
-          <template v-else>
-            <el-button type="text" size="mini" icon="el-icon-edit" @click="editChannel(row)">编辑</el-button>
-          </template>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 设备编辑弹窗（复用统一设备编辑） -->
-    <edit-dialog :visible.sync="deviceEditVisible" :row="deviceEditRow" @success="loadData" />
-
-    <!-- 通道编辑弹窗（复用统一通道编辑表单） -->
-    <el-dialog title="编辑通道" :visible.sync="channelEditVisible" width="680px" append-to-body @closed="onChannelEditClosed">
-      <channel-edit v-if="channelEditVisible" :internal-code="channelEditCtx.internalCode" :protocol="channelEditCtx.protocol" :close-edit="closeChannelEdit" />
-    </el-dialog>
+      <el-empty v-if="!loading && filteredDevices.length === 0" description="没有匹配的设备" style="grid-column:1/-1" />
+    </div>
   </div>
 </template>
 
 <script>
-import { listDevices, syncDevice as syncUnifiedDevice } from '@/api/devices'
-import { queryChannels } from '@/api/asset'
-import editDialog from '@/views/devices/editDialog.vue'
-import ChannelEdit from '@/views/device/channel/edit.vue'
+import { queryChannels, queryAssets } from '@/api/asset'
+import { listDictItems } from '@/api/dict'
 
-const CAP_LABELS = {
-  play: '预览', playback: '回放', record: '录像', ptz: '云台', snapshot: '抓图',
-  event: '事件', alarm: '报警', subscribe: '订阅', catalog: '目录', sync: '同步',
-  stats: '统计', edit: '编辑', delete: '删除'
-}
-const CAP_ICONS = {
-  play: 'el-icon-video-play', playback: 'el-icon-video-camera-solid', record: 'el-icon-folder-opened',
-  ptz: 'el-icon-aim', snapshot: 'el-icon-camera', event: 'el-icon-bell'
-}
-const KIND_LABELS = {
-  video_sensor: '视频通道', audio_input: '音频输入', audio_output: '音频输出',
-  alarm_input: '报警输入', relay_output: '继电器', metadata_source: '数据通道'
+// 设备类型 → 图标底图：枪机/遥控枪机→camera3，球机→camera2，半球/遥控半球→camera1，其余→camera。
+const ICON_BASE = {
+  bullet: 'camera3', remote_ptz: 'camera3',
+  ptz: 'camera2',
+  dome: 'camera1', remote_dome: 'camera1'
 }
 
 export default {
   name: 'DeviceAssets',
-  components: { editDialog, ChannelEdit },
   data() {
     return {
       loading: false,
       query: '',
-      protocol: '',
       status: '',
-      view: 'tree',
       devices: [],
-      channels: [],
-      allExpanded: true,
-      deviceEditVisible: false,
-      deviceEditRow: null,
-      channelEditVisible: false,
-      channelEditCtx: { internalCode: '', protocol: '' }
+      channelTypeMap: {}
     }
   },
   computed: {
-    deviceTotal() { return this.devices.length },
-    deviceOnline() { return this.devices.filter(d => d.online).length },
-    channelTotal() { return this.channels.length },
-    channelOnline() { return this.channels.filter(c => c.online).length },
-    // 扁平视图：所有通道作为平铺行（设备信息内联在行内）
-    rows() {
-      if (this.view === 'flat') {
-        return this.channels.map(c => ({ ...c, _kind: 'channel' }))
-      }
-      return this.buildTree()
+    onlineCount() {
+      return this.filteredDevices.filter(d => d.online).length
+    },
+    filteredDevices() {
+      const q = this.query.trim().toLowerCase()
+      return this.devices.filter(d => {
+        if (this.status === 'online' && !d.online) return false
+        if (this.status === 'offline' && d.online) return false
+        if (!q) return true
+        const hay = [d.name, d.vendor, d.model, ...d.channels.map(c => c.name)].join(' ').toLowerCase()
+        return hay.includes(q)
+      })
     }
   },
   created() {
-    const q = (this.$route && this.$route.query) || {}
-    if (q.query) this.query = q.query
+    this.loadChannelTypeDict()
     this.loadData()
   },
   methods: {
-    protocolLabel(p) { return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[p] || (p || '—') },
-    // 设备级编号：国标展示 GB 20 位码，其它展示内码
-    deviceCode(row) {
-      if (row.protocol === 'gb28181' && row.gb && row.gb.deviceId) return 'GB ' + row.gb.deviceId
-      return row.internalCode || '—'
+    loadChannelTypeDict() {
+      listDictItems('channel_type', true).then(res => {
+        const map = {}
+        ;((res.data && res.data.list) || []).forEach(it => { map[it.value] = it.label })
+        this.channelTypeMap = map
+      }).catch(() => {})
     },
-    protoTagType(p) { return p === 'onvif' ? '' : (p === 'plugin' ? 'warning' : 'success') },
-    capLabel(c) { return CAP_LABELS[c] || c },
-    capIcon(c) { return CAP_ICONS[c] || 'el-icon-check' },
-    // row-key 用后端保证唯一的 id（gb:xxx / onvif:n / plugin:n），避免内码为空时树表丢行
-    rowKey(row) { return row._kind === 'device' ? 'd:' + row.id : 'r:' + row.resourceId },
-    rowClass({ row }) { return row._kind === 'device' ? 'row-device' : 'row-channel' },
-    protoCount(p) { return this.devices.filter(d => d.protocol === p).length },
-    protoPct(p) {
-      const total = this.deviceTotal || 1
-      return (this.protoCount(p) / total * 100) + '%'
+    typeLabel(v) {
+      if (!v) return '未设'
+      return this.channelTypeMap[v] || v
     },
-    setView(v) {
-      this.view = v
-      // 切回树形且处于「全部展开」时重新展开（扁平视图下无展开概念）
-      if (v === 'tree' && this.allExpanded) {
-        this.$nextTick(() => {
-          const table = this.$refs.table
-          if (!table) return
-          this.rows.forEach(row => {
-            if (row._kind === 'device' && (row.children || []).length) {
-              table.toggleRowExpansion(row, true)
-            }
-          })
-        })
-      }
+    formIconBase(deviceType) {
+      return ICON_BASE[(deviceType || '').trim()] || 'camera'
     },
-    reload() { this.loadData() },
+    iconSrc(deviceType, online) {
+      return `static/images/gis/${this.formIconBase(deviceType)}${online ? '' : '-offline'}.png`
+    },
+    vendorModel(d) {
+      const parts = [d.vendor, d.model].filter(x => x && String(x).trim())
+      return parts.length ? parts.join(' · ') : '—'
+    },
     loadData() {
       this.loading = true
       Promise.all([
-        listDevices({ page: 1, count: 999, query: this.query, protocol: this.protocol || undefined, status: this.status || undefined }),
-        queryChannels({ page: 1, count: 2000, query: this.query, protocol: this.protocol || undefined })
-      ]).then(([devRes, chRes]) => {
-        const dData = (devRes && devRes.data) || {}
-        const cData = (chRes && chRes.data) || {}
-        // DeviceView 的在线态是 status 字符串，统一归一化为 online 布尔供模板使用
-        this.devices = (dData.list || []).map(d => ({ ...d, online: d.status === 'online', _kind: 'device' }))
-        let channels = (cData.list || []).map(c => ({
-          ...c,
-          _kind: 'channel',
-          online: c.online !== undefined ? c.online : c.status === 'online',
-          kindLabel: KIND_LABELS[c.kind] || (c.kind === 'video_sensor' ? '视频通道' : '')
-        }))
-        // 设备已按协议/状态过滤，通道跟随设备可见性
-        if (this.status) {
-          channels = channels.filter(c => (this.status === 'online') === !!c.online)
-        }
-        this.channels = channels
-        // 树形视图且处于「全部展开」时，加载后主动展开所有设备行
-        if (this.view === 'tree' && this.allExpanded) {
-          this.$nextTick(() => {
-            const table = this.$refs.table
-            if (!table) return
-            this.rows.forEach(row => {
-              if (row._kind === 'device' && (row.children || []).length) {
-                table.toggleRowExpansion(row, true)
-              }
-            })
+        queryAssets({ page: 1, count: 1000 }),
+        queryChannels({ page: 1, count: 5000 })
+      ]).then(([assetRes, chRes]) => {
+        const assets = (assetRes && assetRes.data && assetRes.data.list) || []
+        const channels = (chRes && chRes.data && chRes.data.list) || []
+        // 通道按设备分组（channels.deviceId == 设备 id）
+        const byDevice = {}
+        channels.forEach(c => {
+          const k = String(c.deviceId || '')
+          if (!k) return
+          ;(byDevice[k] = byDevice[k] || []).push(c)
+        })
+        this.devices = assets
+          .filter(a => a && a.device)
+          .map(a => {
+            const dev = a.device
+            return {
+              id: String(dev.id),
+              name: dev.name || '未命名设备',
+              deviceType: dev.deviceType || '',
+              vendor: dev.vendor || '',
+              model: dev.model || '',
+              online: !!dev.online,
+              channels: byDevice[String(dev.id)] || []
+            }
           })
-        }
       }).catch(err => {
         this.$message.error((err && err.message) || '加载失败')
       }).finally(() => { this.loading = false })
-    },
-    buildTree() {
-      const byDevice = {}
-      this.channels.forEach(c => {
-        const k = c.deviceInternalCode || c.deviceId || ''
-        ;(byDevice[k] = byDevice[k] || []).push({ ...c, _kind: 'channel' })
-      })
-      return this.devices.map(d => {
-        const kids = byDevice[d.internalCode] || []
-        const node = { ...d, _kind: 'device' }
-        // 仅有子通道时才挂 children，避免 el-table 给空设备画展开箭头
-        if (kids.length) node.children = kids
-        return node
-      })
-    },
-    toggleExpandAll() {
-      this.allExpanded = !this.allExpanded
-      const expand = this.allExpanded
-      // 用 table 实例逐行展开/收起，比纯 expand-row-keys 更可靠（折叠时后者不生效）
-      this.$nextTick(() => {
-        const table = this.$refs.table
-        if (!table) return
-        this.rows.forEach(row => {
-          if (row._kind === 'device' && (row.children || []).length) {
-            table.toggleRowExpansion(row, expand)
-          }
-        })
-      })
-      this.allExpanded = expand
-    },
-    syncDevice(row) {
-      syncUnifiedDevice(row.id).then(() => {
-        this.$message.success('已触发同步')
-        this.loadData()
-      }).catch(err => {
-        this.$message.error((err && err.message) || '同步失败')
-      })
-    },
-    editDevice(row) {
-      this.deviceEditRow = row
-      this.deviceEditVisible = true
-    },
-    editChannel(row) {
-      this.channelEditCtx = { internalCode: row.internalCode, protocol: row.protocol }
-      this.channelEditVisible = true
-    },
-    closeChannelEdit() {
-      this.channelEditVisible = false
-    },
-    onChannelEditClosed() {
-      this.loadData()
     }
   }
 }
@@ -344,46 +156,58 @@ export default {
 
 <style scoped>
 .asset-page { display: flex; flex-direction: column; }
-.stat-row { display: flex; gap: 14px; margin-bottom: 14px; }
-.stat-card {
-  flex: 1;
+.asset-filter { margin-bottom: 6px; }
+.summary { color: #909399; font-size: 13px; }
+.summary b { color: #303133; }
+.summary b.on { color: #34a853; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  padding-bottom: 12px;
+}
+
+.dev-card {
   background: #fff;
   border: 1px solid #ebeef5;
   border-radius: 10px;
-  padding: 14px 18px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+  transition: box-shadow .15s, border-color .15s;
 }
-.stat-head { display: flex; justify-content: space-between; align-items: center; color: #606266; font-size: 13px; }
-.stat-head i { color: #c0c4cc; font-size: 16px; }
-.stat-num { font-size: 26px; font-weight: 700; color: #303133; margin: 6px 0 4px; }
-.stat-num .unit { font-size: 13px; font-weight: 400; color: #909399; }
-.stat-sub { font-size: 12px; color: #909399; display: flex; align-items: center; gap: 5px; }
-.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-left: 6px; }
-.dot.on { background: #34a853; }
-.dot.off { background: #c0c4cc; }
-.proto-tags { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
-.proto-chip { font-size: 12px; padding: 2px 8px; border-radius: 12px; }
-.proto-chip.gb { color: #1A73E8; background: #e8f0fe; }
-.proto-chip.onvif { color: #7c3aed; background: #f5f3ff; }
-.proto-chip.plugin { color: #e6a23c; background: #fdf6ec; }
-.proto-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #f0f2f5; }
-.proto-bar .seg { height: 100%; }
-.proto-bar .seg.gb { background: #1A73E8; }
-.proto-bar .seg.onvif { background: #7c3aed; }
-.proto-bar .seg.plugin { background: #e6a23c; }
-.asset-filter { margin-bottom: 6px; }
-.node-ico { color: #1A73E8; margin-right: 6px; }
-.node-ico.ch { color: #909399; }
-.node-name { font-weight: 600; color: #303133; }
-.node-count { color: #a8abb2; font-size: 12px; margin-left: 6px; }
-.kind-tag { margin-left: 6px; }
-.sub-text { color: #909399; font-size: 12px; margin-left: 6px; }
-.mono { font-family: Menlo, Consolas, monospace; font-size: 12px; color: #606266; }
-.muted { color: #c0c4cc; }
-.cap-chip { margin: 0 4px 3px 0; }
-.cap-item { display: inline-flex; align-items: center; gap: 2px; margin-right: 10px; color: #C0C4CC; white-space: nowrap; font-size: 12px; }
-.cap-item.cap-on { color: #1A73E8; }
-.audio-on { color: #34a853; }
-.audio-off { color: #c0c4cc; }
-::v-deep .row-device { background: #fafbfc; }
+.dev-card:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, .1); border-color: #d9e2ec; }
+
+.dc-head { display: flex; align-items: center; gap: 12px; }
+.dc-icon { width: 44px; height: 44px; flex: 0 0 44px; }
+.dc-title { flex: 1; min-width: 0; }
+.dc-name {
+  font-size: 15px; font-weight: 600; color: #303133;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dc-sub {
+  font-size: 12px; color: #909399; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dc-status { font-size: 12px; padding: 1px 8px; border-radius: 10px; flex: 0 0 auto; }
+.dc-status.on { color: #34a853; background: #e7f6ec; }
+.dc-status.off { color: #909399; background: #f0f2f5; }
+
+.dc-divider { height: 1px; background: #f0f2f5; margin: 12px 0; }
+
+.dc-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dc-label { color: #909399; font-size: 13px; flex: 0 0 48px; }
+.dc-value { color: #303133; font-size: 13px; font-weight: 600; }
+
+.dc-chans { display: flex; flex-direction: column; gap: 6px; }
+.dc-chan { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.dc-chan-idx {
+  flex: 0 0 18px; height: 18px; line-height: 18px; text-align: center;
+  background: #eef2f7; color: #606266; border-radius: 50%; font-size: 11px;
+}
+.dc-chan-name {
+  flex: 1; min-width: 0; color: #303133;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dc-empty { color: #c0c4cc; font-size: 13px; }
 </style>
