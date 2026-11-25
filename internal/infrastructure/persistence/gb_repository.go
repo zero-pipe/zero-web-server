@@ -486,7 +486,9 @@ func (r *ChannelRepository) hydrateChannel(m *model.Channel) (*domainchannel.Cha
 			ch.SubCount = g.SubCount
 			ch.StreamIdentification = g.StreamIdentification
 			ch.DataType = g.DataType
-			if strings.TrimSpace(g.GBName) != "" {
+			// 通道名以 zws_channel.name 为准（改名只更新该列）；gb_json 里的 GBName
+			// 只是同步时的快照，仅在列名为空时兜底，否则改名后仍会显示旧名。
+			if strings.TrimSpace(ch.Name) == "" && strings.TrimSpace(g.GBName) != "" {
 				ch.Name = g.GBName
 			}
 			if strings.TrimSpace(g.GBStatus) != "" {
