@@ -98,6 +98,7 @@
 import PlayerTabs from '../common/playerTabs.vue'
 import PlayerModeSelect from '../common/playerModeSelect.vue'
 import { modeToPreferredPlayer } from '@/utils/playerStrategy'
+import { startResourceLive } from '@/api/asset'
 import DeviceTree from '../common/DeviceTree.vue'
 import channelPtzPanel from '../channel/common/channelPtzPanel.vue'
 import LivePtzPreset from './LivePtzPreset.vue'
@@ -386,8 +387,16 @@ export default {
       this.$set(this.streamInfo, idxTmp, null)
       this.$set(this.videoTip, idxTmp, '')
       this.startPullCountdown(idxTmp)
-      this.$store.dispatch('commonChanel/playChannel', channelId)
-        .then(data => {
+      // channelId 即通道 resourceId，走统一资源取流（GB/ONVIF/插件通用），
+      // 旧的国标专用接口对非国标通道会报“通道编号不完整”。
+      startResourceLive(channelId)
+        .then(res => {
+          const data = (res && res.data) || null
+          if (!data) {
+            this.stopPullCountdown(idxTmp)
+            this.$set(this.videoTip, idxTmp, '播放失败: 未返回播放地址')
+            return
+          }
           // 接口很快返回，真正出画才停倒计时；先挂播放器在底层拉流
           this.setPlayStream(data.transcodeStream || data, idxTmp)
           // 兜底：部分播放器不抛 play 事件时，最多等 12s 后仍停表，避免永远挡画面
@@ -401,7 +410,7 @@ export default {
         })
         .catch(err => {
           this.stopPullCountdown(idxTmp)
-          this.$set(this.videoTip, idxTmp, '播放失败: ' + err)
+          this.$set(this.videoTip, idxTmp, '播放失败: ' + ((err && err.message) || err))
         })
         .finally(() => {
           this.loading = false
