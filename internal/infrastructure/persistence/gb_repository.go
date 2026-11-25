@@ -241,7 +241,8 @@ func (r *DeviceRepository) List(page, count int, query string, online *bool) ([]
 		count = 15
 	}
 	q := r.db.Table("zws_device de").
-		Select(`de.*, (SELECT COUNT(0) FROM zws_channel c WHERE c.device_id = de.id) AS channel_count`)
+		Select(`de.*, (SELECT COUNT(0) FROM zws_channel c WHERE c.device_id = de.id) AS channel_count`).
+		Where("de.id IN (SELECT device_id FROM zws_access_binding WHERE protocol = ?)", "gb28181")
 	if query != "" {
 		like := fmt.Sprintf("%%%s%%", query)
 		q = q.Where("de.gb_code LIKE ? OR de.internal_code LIKE ? OR de.name LIKE ?", like, like, like)
@@ -275,7 +276,9 @@ func (r *DeviceRepository) List(page, count int, query string, online *bool) ([]
 
 func (r *DeviceRepository) ListOnline() ([]*domaindevice.Device, error) {
 	var rows []model.Device
-	if err := r.db.Where("online = ?", true).Find(&rows).Error; err != nil {
+	if err := r.db.Where("online = ?", true).
+		Where("id IN (SELECT device_id FROM zws_access_binding WHERE protocol = ?)", "gb28181").
+		Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*domaindevice.Device, 0, len(rows))
