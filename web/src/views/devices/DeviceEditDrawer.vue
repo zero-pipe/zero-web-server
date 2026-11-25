@@ -7,103 +7,100 @@
     @close="reset"
   >
     <div v-loading="loading" class="de-wrap">
-      <el-tabs v-model="activeTab">
-        <!-- 基本信息 -->
-        <el-tab-pane label="基本信息" name="basic">
-          <el-form :model="form" label-width="110px" size="small">
-            <el-form-item label="设备名称" required>
-              <el-input v-model="form.name" maxlength="64" show-word-limit />
-            </el-form-item>
-            <el-form-item label="设备类型">
-              <el-select v-model="form.deviceType" clearable placeholder="请选择" style="width: 100%">
-                <el-option v-for="it in dicts.device_type" :key="it.value" :label="it.label" :value="it.value" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="厂商">
-              <el-select v-model="form.vendor" clearable placeholder="请选择" style="width: 100%">
-                <el-option v-for="it in dicts.manufacturer" :key="it.value" :label="it.label" :value="it.value" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="型号">
-              <el-input v-model="form.model" />
-            </el-form-item>
-            <el-form-item label="序列号">
-              <el-input v-model="form.serialNumber" />
-            </el-form-item>
-            <el-divider content-position="left">接入信息（只读）</el-divider>
-            <el-form-item label="协议">
-              <el-tag size="small">{{ protocolLabel }}</el-tag>
-              <span class="ro">{{ info.accessMode === 'passive' ? '被动接入' : '主动接入' }}</span>
-            </el-form-item>
-            <el-form-item label="编号/地址">
-              <el-input :value="bindingText" disabled />
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
+      <!-- 基本信息 -->
+      <el-divider content-position="left">基本信息</el-divider>
+      <el-form :model="form" label-width="110px" size="small">
+        <el-form-item label="设备名称" required>
+          <el-input v-model="form.name" maxlength="64" show-word-limit />
+        </el-form-item>
+        <el-form-item label="设备类型">
+          <el-select v-model="form.deviceType" clearable placeholder="请选择" style="width: 100%">
+            <el-option v-for="it in dicts.device_type" :key="it.value" :label="it.label" :value="it.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="厂商">
+          <el-select v-model="form.vendor" clearable placeholder="请选择" style="width: 100%">
+            <el-option v-for="it in dicts.manufacturer" :key="it.value" :label="it.label" :value="it.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="型号">
+          <el-input v-model="form.model" />
+        </el-form-item>
+        <el-form-item label="序列号">
+          <el-input v-model="form.serialNumber" />
+        </el-form-item>
+      </el-form>
 
-        <!-- 扩展信息（位置） -->
-        <el-tab-pane label="扩展信息（位置）" name="ext">
-          <el-form :model="form" label-width="110px" size="small">
-            <el-form-item label="安装位置">
-              <el-input v-model="form.address" placeholder="如 安徽省合肥市xx路与xx交口" />
-            </el-form-item>
-            <el-form-item label="经度">
-              <el-input v-model="form.longitude" type="number" placeholder="如 117.227239" />
-            </el-form-item>
-            <el-form-item label="纬度">
-              <el-input v-model="form.latitude" type="number" placeholder="如 31.820586" />
-            </el-form-item>
-            <el-form-item label="坐标系">
-              <el-select v-model="form.geoCoordSys" clearable placeholder="请选择" style="width: 100%">
-                <el-option v-for="it in dicts.coordinate_system" :key="it.value" :label="it.label" :value="it.value" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="地图选点">
-              <el-button size="mini" icon="el-icon-location-outline" @click="openMapPick">在地图上选点</el-button>
-              <span class="pick-hint">点选后按 WGS84 回填经纬度</span>
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input v-model="form.remark" />
-            </el-form-item>
-            <el-form-item label="标签">
-              <el-input v-model="form.tags" placeholder="逗号分隔" />
-            </el-form-item>
-            <el-alert type="info" :closable="false" show-icon
-              title="经纬度/安装位置在设备上维护，保存后会同步到该设备的全部通道。" />
-          </el-form>
-        </el-tab-pane>
+      <!-- 接入信息 -->
+      <el-divider content-position="left">接入信息</el-divider>
+      <el-form :model="form" label-width="110px" size="small">
+        <el-form-item label="协议">
+          <el-tag size="small">{{ protocolLabel }}</el-tag>
+        </el-form-item>
+        <el-form-item label="编号/地址">
+          <el-input :value="bindingText" disabled />
+        </el-form-item>
+      </el-form>
 
-        <!-- 通道列表 -->
-        <el-tab-pane label="通道列表" name="channels">
-          <el-table :data="channels" size="small" border>
-            <el-table-column label="通道名称" min-width="160">
-              <template v-slot:default="{ row }">
-                <el-input v-model="row.name" size="mini" />
-              </template>
-            </el-table-column>
-            <el-table-column label="通道类型" width="150">
-              <template v-slot:default="{ row }">
-                <el-select v-model="row.channelType" size="mini" clearable placeholder="未设">
-                  <el-option v-for="it in dicts.channel_type" :key="it.value" :label="it.label" :value="it.value" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="监视方位" width="140">
-              <template v-slot:default="{ row }">
-                <el-select v-model="row.direction" size="mini" clearable placeholder="未设">
-                  <el-option v-for="o in directionOptions" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column prop="kind" label="类型" width="110" />
-            <el-table-column prop="status" label="状态" width="80" />
-            <el-table-column label="编码" min-width="150" show-overflow-tooltip>
-              <template v-slot:default="{ row }">{{ row.gbCode || row.externalKey || '—' }}</template>
-            </el-table-column>
-          </el-table>
-          <div class="tip">通道只能改名称 / 通道类型 / 监视方位；IP、编号等不在此修改。</div>
-        </el-tab-pane>
-      </el-tabs>
+      <!-- 扩展信息 -->
+      <el-divider content-position="left">扩展信息</el-divider>
+      <el-form :model="form" label-width="110px" size="small">
+        <el-form-item label="安装位置">
+          <el-input v-model="form.address" placeholder="如 安徽省合肥市xx路与xx交口" />
+        </el-form-item>
+        <el-form-item label="经度">
+          <el-input v-model="form.longitude" type="number" placeholder="如 117.227239" />
+        </el-form-item>
+        <el-form-item label="纬度">
+          <el-input v-model="form.latitude" type="number" placeholder="如 31.820586" />
+        </el-form-item>
+        <el-form-item label="坐标系">
+          <el-select v-model="form.geoCoordSys" clearable placeholder="请选择" style="width: 100%">
+            <el-option v-for="it in dicts.coordinate_system" :key="it.value" :label="it.label" :value="it.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="地图选点">
+          <el-button size="mini" icon="el-icon-location-outline" @click="openMapPick">在地图上选点</el-button>
+          <span class="pick-hint">点选后按 WGS84 回填经纬度</span>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-input v-model="form.tags" placeholder="逗号分隔" />
+        </el-form-item>
+        <el-alert type="info" :closable="false" show-icon
+          title="经纬度/安装位置在设备上维护，保存后会同步到该设备的全部通道。" />
+      </el-form>
+
+      <!-- 通道列表 -->
+      <el-divider content-position="left">通道列表</el-divider>
+      <el-table :data="channels" size="small" border>
+        <el-table-column label="通道名称" min-width="160">
+          <template v-slot:default="{ row }">
+            <el-input v-model="row.name" size="mini" />
+          </template>
+        </el-table-column>
+        <el-table-column label="通道类型" width="150">
+          <template v-slot:default="{ row }">
+            <el-select v-model="row.channelType" size="mini" clearable placeholder="未设">
+              <el-option v-for="it in dicts.channel_type" :key="it.value" :label="it.label" :value="it.value" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="监视方位" width="140">
+          <template v-slot:default="{ row }">
+            <el-select v-model="row.direction" size="mini" clearable placeholder="未设">
+              <el-option v-for="o in directionOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column prop="kind" label="类型" width="110" />
+        <el-table-column prop="status" label="状态" width="80" />
+        <el-table-column label="编码" min-width="150" show-overflow-tooltip>
+          <template v-slot:default="{ row }">{{ row.gbCode || row.externalKey || '—' }}</template>
+        </el-table-column>
+      </el-table>
     </div>
     <div class="de-footer">
       <el-button size="small" @click="innerVisible = false">取消</el-button>
@@ -139,7 +136,6 @@ export default {
   },
   data() {
     return {
-      activeTab: 'basic',
       loading: false,
       saving: false,
       info: {},
@@ -190,7 +186,6 @@ export default {
       })
     },
     open(row) {
-      this.activeTab = 'basic'
       this.channels = []
       this.loadDicts()
       this.loading = true
@@ -294,18 +289,8 @@ export default {
   text-align: right;
   background: #fff;
 }
-.ro {
-  margin-left: 8px;
-  color: #909399;
-  font-size: 12px;
-}
 .pick-hint {
   margin-left: 10px;
-  color: #909399;
-  font-size: 12px;
-}
-.tip {
-  margin-top: 8px;
   color: #909399;
   font-size: 12px;
 }
