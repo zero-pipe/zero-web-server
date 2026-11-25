@@ -146,8 +146,7 @@ import MapComponent from '../common/MapComponent.vue'
 import player from '../channel/player.vue'
 import DeviceEditDrawer from '@/views/devices/DeviceEditDrawer.vue'
 import DrawThinProgress from './dialog/drawThinProgress.vue'
-import { queryChannels, queryAssets, getAssetDetail } from '@/api/asset'
-import { stopPlayChannel } from '@/api/commonChannel'
+import { queryChannels, queryAssets, getAssetDetail, startResourceLive, stopResourceLive } from '@/api/asset'
 
 let channelLayer, channelTileLayer = null
 export default {
@@ -208,7 +207,13 @@ export default {
       this.loadDeviceMeta()
 
       queryChannels({ page: 1, count: 5000 }).then(res => {
-        const list = (res.data && res.data.list) || []
+        // 只显示已纳入目录（行政区划 civilCode 或业务分组 parentId）的通道：
+        // 仅仅配置了经纬度、未加入任何目录的设备不上图。
+        const raw = (res.data && res.data.list) || []
+        const list = raw.filter(c => {
+          const gb = c.gb || {}
+          return !!String(gb.civilCode || '').trim() || !!String(gb.parentId || '').trim()
+        })
         // 一个设备一个图标：按 deviceId 归并同设备通道；通道统一成 {gbId, gbName, gbStatus, channelType}。
         const groups = {}
         list.forEach(c => {
@@ -380,7 +385,7 @@ export default {
     playChannelOfDevice(ch) {
       if (!ch) return
       if (this.playingChannelId && this.playingChannelId !== ch.gbId) {
-        stopPlayChannel(this.playingChannelId).catch(() => {})
+        stopResourceLive(this.playingChannelId).catch(() => {})
       }
       this.playingChannelId = ch.gbId
       this.play(ch)
@@ -484,19 +489,23 @@ export default {
       this.deviceInfo = null
     },
     play: function (channel) {
+      // gbId 即通道 resourceId，走统一资源取流（GB/ONVIF/插件通用），不再走旧的国标专用接口。
       this.$refs.player.openDialog('codec', channel.gbId, {
         pending: true,
         name: channel.gbName,
         hasAudio: channel.hasAudio,
         ptzType: channel.ptzType
       })
-      this.$store.dispatch('commonChanel/playChannel', channel.gbId)
-        .then((data) => {
-          this.$refs.player.onStreamReady(data, channel.hasAudio)
-        })
-        .catch((error) => {
-          this.$refs.player.onStreamError(error)
-        })
+      startResourceLive(channel.gbId).then(res => {
+        const content = (res && res.data) || null
+        if (!content) {
+          this.$refs.player.onStreamError('未返回播放地址')
+          return
+        }
+        this.$refs.player.onStreamReady(content, channel.hasAudio)
+      }).catch(error => {
+        this.$refs.player.onStreamError((error && error.message) || '取流失败')
+      })
     },
     showDrawThinBox: function(show){
       this.showDrawThin = show
