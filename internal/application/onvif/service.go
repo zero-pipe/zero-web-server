@@ -156,7 +156,7 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 		MediaURI:      endpoint,
 		PTZURI:        endpoint,
 		OnLine:        true,
-		EventSubscribe: true,
+		EventSubscribe: false,
 		DiscoveryMode: 0,
 		MediaServerID: "auto",
 		ServerID:      s.serverID,

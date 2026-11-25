@@ -139,9 +139,9 @@ func (r *PluginRepository) CreateDevice(d *domainplugin.Device) error {
 	if err := r.db.Create(m).Error; err != nil {
 		return err
 	}
-	cfg, _ := json.Marshal(map[string]string{"driverParams": d.DriverParams})
+	cfg, _ := json.Marshal(map[string]string{"driverParams": d.DriverParams, "protocol": d.Protocol})
 	if err := r.db.Create(&model.AccessBinding{
-		DeviceID: m.ID, Protocol: d.Protocol, Mode: "active",
+		DeviceID: m.ID, Protocol: "plugin", Mode: "active",
 		ExternalID: d.DeviceUID, PluginInstanceID: d.PluginID,
 		ConfigJSON: string(cfg), Status: onlineStatus(d.Online), CreateTime: now, UpdateTime: now,
 	}).Error; err != nil {
@@ -161,7 +161,7 @@ func (r *PluginRepository) UpdateDevice(d *domainplugin.Device) error {
 	}).Error; err != nil {
 		return err
 	}
-	cfg, _ := json.Marshal(map[string]string{"driverParams": d.DriverParams})
+	cfg, _ := json.Marshal(map[string]string{"driverParams": d.DriverParams, "protocol": d.Protocol})
 	return r.db.Model(&model.AccessBinding{}).Where("device_id = ?", d.ID).
 		Updates(map[string]any{"config_json": string(cfg), "update_time": now}).Error
 }
@@ -243,9 +243,13 @@ func (r *PluginRepository) hydratePluginDevice(m *model.Device) *domainplugin.De
 		if strings.TrimSpace(b.ConfigJSON) != "" {
 			var cfg struct {
 				DriverParams string `json:"driverParams"`
+				Protocol     string `json:"protocol"`
 			}
 			if json.Unmarshal([]byte(b.ConfigJSON), &cfg) == nil {
 				d.DriverParams = cfg.DriverParams
+				if strings.TrimSpace(cfg.Protocol) != "" {
+					d.Protocol = cfg.Protocol
+				}
 			}
 		}
 	}
