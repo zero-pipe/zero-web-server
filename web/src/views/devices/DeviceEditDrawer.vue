@@ -58,6 +58,10 @@
                 <el-option v-for="it in dicts.coordinate_system" :key="it.value" :label="it.label" :value="it.value" />
               </el-select>
             </el-form-item>
+            <el-form-item label="地图选点">
+              <el-button size="mini" icon="el-icon-location-outline" @click="openMapPick">在地图上选点</el-button>
+              <span class="pick-hint">点选后按 WGS84 回填经纬度</span>
+            </el-form-item>
             <el-form-item label="备注">
               <el-input v-model="form.remark" />
             </el-form-item>
@@ -105,12 +109,14 @@
       <el-button size="small" @click="innerVisible = false">取消</el-button>
       <el-button type="primary" size="small" :loading="saving" @click="save">保存</el-button>
     </div>
+    <MapPickDialog ref="mapPick" />
   </el-drawer>
 </template>
 
 <script>
 import { getAssetDetail, updateAsset, updateChannel } from '@/api/asset'
 import { listDictItems } from '@/api/dict'
+import MapPickDialog from './MapPickDialog.vue'
 
 const DIRECTION_OPTIONS = [
   { value: 0, label: '未设置' },
@@ -126,6 +132,7 @@ const dictTypes = ['device_type', 'manufacturer', 'coordinate_system', 'channel_
 
 export default {
   name: 'DeviceEditDrawer',
+  components: { MapPickDialog },
   props: {
     visible: { type: Boolean, default: false },
     row: { type: Object, default: null }
@@ -159,6 +166,16 @@ export default {
     }
   },
   methods: {
+    openMapPick() {
+      const lon = parseFloat(this.form.longitude)
+      const lat = parseFloat(this.form.latitude)
+      const center = (!isNaN(lon) && !isNaN(lat) && lon && lat) ? [lon, lat] : null
+      this.$refs.mapPick.openDialog(center, ([plon, plat]) => {
+        this.form.longitude = plon.toFixed(6)
+        this.form.latitude = plat.toFixed(6)
+        this.form.geoCoordSys = 'WGS84'
+      })
+    },
     emptyForm() {
       return {
         name: '', deviceType: '', vendor: '', model: '', serialNumber: '',
@@ -279,6 +296,11 @@ export default {
 }
 .ro {
   margin-left: 8px;
+  color: #909399;
+  font-size: 12px;
+}
+.pick-hint {
+  margin-left: 10px;
   color: #909399;
   font-size: 12px;
 }

@@ -55,7 +55,7 @@
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="add()">
-              添加通道
+              添加设备
             </el-button>
             <el-button :disabled="multipleSelection.length === 0" type="danger" @click="remove()">
               移除通道
@@ -124,7 +124,7 @@
         @current-change="currentChange"
       />
     </div>
-    <GbChannelSelect ref="gbChannelSelect" data-type="civilCode" />
+    <DeviceSelectDialog ref="deviceSelect" />
     <UnusualRegionChannelSelect ref="unusualRegionChannelSelect" />
     <el-dialog title="按行政区划建树" :visible.sync="buildDialog" width="460px" @open="loadProvinces">
       <el-alert type="info" :closable="false" style="margin-bottom:12px;"
@@ -175,14 +175,14 @@
 
 <script>
 import RegionTree from '../..//common/RegionTree.vue'
-import GbChannelSelect from '../../dialog/GbChannelSelect.vue'
+import DeviceSelectDialog from '@/views/devices/DeviceSelectDialog.vue'
 import UnusualRegionChannelSelect from './UnusualRegionChannelSelect.vue'
 import { addByCivilCode, queryChildListInBase, codeMappingList, saveCodeMapping, deleteCodeMapping } from '@/api/region'
 
 export default {
   name: 'Region',
   components: {
-    GbChannelSelect,
+    DeviceSelectDialog,
     RegionTree,
     UnusualRegionChannelSelect
   },
@@ -332,10 +332,22 @@ export default {
         })
         return
       }
-      this.$refs.gbChannelSelect.openDialog((data) => {
-        console.log('选择的数据')
-        console.log(data)
-        this.addChannelToCivilCode(this.regionDeviceId, data)
+      this.$refs.deviceSelect.openDialog((rows) => {
+        const deviceIds = rows.map(r => r.dbId)
+        if (deviceIds.length === 0) return
+        this.loading = true
+        this.$store.dispatch('commonChanel/addDeviceToRegion', {
+          civilCode: this.regionDeviceId,
+          deviceIds: deviceIds
+        }).then(() => {
+          this.$message.success({ showClose: true, message: '保存成功' })
+          this.getChannelList()
+          this.$refs.regionTree.refresh(this.regionDeviceId)
+        }).catch((error) => {
+          this.$message.error({ showClose: true, message: error })
+        }).finally(() => {
+          this.loading = false
+        })
       })
     },
     addChannelToCivilCode: function(regionDeviceId, data) {

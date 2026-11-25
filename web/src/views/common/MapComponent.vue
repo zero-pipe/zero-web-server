@@ -754,6 +754,42 @@ export default {
         olMap.removeLayer(vectorLayer)
       })
     },
+    // 地图选点：点击地图返回 WGS84 [经度, 纬度]，并在点击位置放置临时标记。
+    // 用于设备位置录入的“地图选点/拖点回填”。多次点击以最后一次为准。
+    pickPoint(callback) {
+      if (!olMap) return
+      this.cancelPick()
+      this._pickMarkerLayer = null
+      const container = this.$refs.mapContainer
+      if (container) container.style.cursor = 'crosshair'
+      this._pickHandler = (event) => {
+        // toLonLat 内部会按当前瓦片坐标系换算，输出统一为 WGS84
+        const lonlat = toLonLat(event.coordinate)
+        if (this._pickMarkerLayer) {
+          olMap.removeLayer(this._pickMarkerLayer)
+          this._pickMarkerLayer = null
+        }
+        this._pickMarkerLayer = this.addPointLayer(
+          [{ id: 'pick', position: lonlat, data: {}, status: 'checked' }],
+          null,
+          null
+        )
+        if (callback) callback(lonlat)
+      }
+      olMap.on('click', this._pickHandler)
+    },
+    cancelPick() {
+      if (olMap && this._pickHandler) {
+        olMap.un('click', this._pickHandler)
+        this._pickHandler = null
+      }
+      if (this._pickMarkerLayer) {
+        olMap.removeLayer(this._pickMarkerLayer)
+        this._pickMarkerLayer = null
+      }
+      const container = this.$refs.mapContainer
+      if (container) container.style.cursor = ''
+    },
     getCoordSys(){
       return this.mapTileList[this.mapTileIndex].coordinateSystem
     },

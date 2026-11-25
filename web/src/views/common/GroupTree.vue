@@ -21,7 +21,7 @@
             icon="el-icon-plus"
             :disabled="!canMountChannel"
             @click="toolbarAddChannel"
-          >添加通道</el-button>
+          >添加设备</el-button>
           <el-dropdown size="mini" @command="toolbarMoreCommand">
             <el-button size="mini" :disabled="!activeCatalogNode">
               操作<i class="el-icon-arrow-down el-icon--right" />
@@ -133,22 +133,20 @@
       </div>
     </div>
     <groupEdit ref="groupEdit" />
-    <gbDeviceSelect ref="gbDeviceSelect" />
-    <gbChannelSelect ref="gbChannelSelect" data-type="group" />
+    <DeviceSelectDialog ref="gbDeviceSelect" />
   </div>
 </template>
 
 <script>
 import VueEasyTree from '@wchbrad/vue-easy-tree'
 import groupEdit from './../dialog/groupEdit'
-import gbDeviceSelect from './../dialog/GbDeviceSelect'
-import GbChannelSelect from '../dialog/GbChannelSelect.vue'
+import DeviceSelectDialog from '@/views/devices/DeviceSelectDialog.vue'
 
 export default {
   name: 'DeviceTree',
   components: {
-    GbChannelSelect,
-    VueEasyTree, groupEdit, gbDeviceSelect
+    DeviceSelectDialog,
+    VueEasyTree, groupEdit
   },
   props: ['edit', 'enableAddChannel', 'onChannelChange', 'showHeader', 'hasChannel', 'addChannelToGroup', 'treeHeight', 'showPosition', 'contextmenu'],
   data() {
@@ -338,7 +336,7 @@ export default {
       this.$refs.gbDeviceSelect.openDialog((rows) => {
         const deviceIds = []
         for (let i = 0; i < rows.length; i++) {
-          deviceIds.push(rows[i].id)
+          deviceIds.push(rows[i].dbId)
         }
         this.$store.dispatch('commonChanel/addDeviceToGroup', {
           parentId: node.data.deviceId,
@@ -370,7 +368,7 @@ export default {
       this.$refs.gbDeviceSelect.openDialog((rows) => {
         const deviceIds = []
         for (let i = 0; i < rows.length; i++) {
-          deviceIds.push(rows[i].id)
+          deviceIds.push(rows[i].dbId)
         }
         this.$store.dispatch('commonChanel/deleteDeviceFromGroup', deviceIds)
           .then(data => {
@@ -395,11 +393,8 @@ export default {
       })
     },
     addChannel: function(id, node) {
-      this.$refs.gbChannelSelect.openDialog((data) => {
-        console.log('选择的数据')
-        console.log(data)
-        this.addChannelToGroup(node.data.deviceId, node.data.businessGroup, data)
-      })
+      // 添加按设备：选中设备即挂载其全部通道。
+      this.addChannelFormDevice(id, node)
     },
     refreshNode: function(node) {
       console.log(node)
@@ -497,7 +492,7 @@ export default {
       if (!this.activeCatalogNode || !this.canMountChannel) {
         this.$message.warning({
           showClose: true,
-          message: '请先选中虚拟组织(216)节点再添加通道'
+          message: '请先选中虚拟组织(216)节点再添加设备'
         })
         return
       }

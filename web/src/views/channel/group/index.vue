@@ -55,7 +55,7 @@
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="add()">
-              添加通道
+              添加设备
             </el-button>
             <el-button :disabled="multipleSelection.length === 0" type="danger" @click="remove()">
               移除通道
@@ -124,21 +124,21 @@
       />
     </div>
 
-    <GbChannelSelect ref="gbChannelSelect" data-type="group" />
+    <DeviceSelectDialog ref="deviceSelect" />
     <UnusualGroupChannelSelect ref="unusualGroupChannelSelect" />
   </div>
 </template>
 
 <script>
 import GroupTree from '../../common/GroupTree.vue'
-import GbChannelSelect from '../../dialog/GbChannelSelect.vue'
+import DeviceSelectDialog from '@/views/devices/DeviceSelectDialog.vue'
 import UnusualGroupChannelSelect from './UnusualGroupChannelSelect.vue'
 import { isBusinessGroupNode } from '@/utils/gbCode'
 
 export default {
   name: 'Group',
   components: {
-    GbChannelSelect,
+    DeviceSelectDialog,
     UnusualGroupChannelSelect,
     GroupTree
   },
@@ -217,10 +217,23 @@ export default {
         })
         return
       }
-      this.$refs.gbChannelSelect.openDialog((data) => {
-        console.log('选择的数据')
-        console.log(data)
-        this.addChannelToGroup(this.groupDeviceId, this.businessGroup, data)
+      this.$refs.deviceSelect.openDialog((rows) => {
+        const deviceIds = rows.map(r => r.dbId)
+        if (deviceIds.length === 0) return
+        this.loading = true
+        this.$store.dispatch('commonChanel/addDeviceToGroup', {
+          parentId: this.groupDeviceId,
+          businessGroup: this.businessGroup,
+          deviceIds: deviceIds
+        }).then(() => {
+          this.$message.success({ showClose: true, message: '保存成功' })
+          this.getChannelList()
+          this.$refs.groupTree.refresh(this.groupDeviceId)
+        }).catch((error) => {
+          this.$message.error({ showClose: true, message: error })
+        }).finally(() => {
+          this.loading = false
+        })
       })
     },
     addChannelToGroup: function(groupDeviceId, businessGroup, data) {
