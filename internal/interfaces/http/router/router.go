@@ -127,7 +127,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	onvifHandler := handler.NewONVIFHandler(deps.ONVIFService, deps.AssetService)
 	deviceHandler := handler.NewDeviceHandler(deps.DeviceService).WithAssetPruner(deps.AssetService)
 	deviceAccessHandler := handler.NewDeviceAccessHandler(deps.DeviceAccessService, deps.AssetService)
-	playHandler := handler.NewPlayHandler(deps.PlayService, deps.PlayTimeoutMs)
+	playHandler := handler.NewPlayHandler(deps.PlayService, deps.AssetService, deps.PlayTimeoutMs)
 	playbackHandler := handler.NewPlaybackHandler(deps.PlaybackService, deps.PlayTimeoutMs)
 	gbRecordHandler := handler.NewGBRecordHandler(deps.PlaybackService, deps.RecordInfoTimeoutMs)
 	ptzHandler := handler.NewPTZHandler(deps.PTZService)
