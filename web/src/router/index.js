@@ -78,19 +78,6 @@ export const constantRoutes = [
     }]
   },
   {
-    path: '/channel',
-    component: Layout,
-    redirect: '/assets',
-    children: [
-    {
-      path: '/channel/record/:channelId',
-      name: 'CommonRecord',
-      component: () => import('@/views/channel/record'),
-      meta: { title: '设备录像' }
-    }
-    ]
-  },
-  {
     path: '/devices',
     component: Layout,
     children: [
@@ -127,38 +114,12 @@ export const constantRoutes = [
     ]
   },
   {
-    path: '/device',
+    path: '/mediaSession',
     component: Layout,
+    redirect: '/mediaSession',
     children: [
       {
-        // 遗留入口：统一设备列表
-        path: '/device',
-        redirect: '/devices'
-      },
-      {
-        hidden: true,
-        path: '/device/record/:deviceId/:channelDeviceId',
-        name: 'DeviceRecord',
-        component: () => import('@/views/device/channel/record'),
-        meta: { title: '国标录像' }
-      },
-      {
-        path: '/jtDevice',
-        redirect: '/devices'
-      },
-      {
-        path: '/onvifDevice',
-        redirect: '/devices'
-      },
-      {
-        hidden: true,
-        path: '/jtDevice/record/:phoneNumber/:channelId',
-        name: 'JTDeviceRecord',
-        component: () => import('@/views/jtDevice/channel/record'),
-        meta: { title: '部标录像' }
-      },
-      {
-        path: '/mediaSession',
+        path: '',
         name: 'MediaSession',
         component: () => import('@/views/mediaSession/index'),
         meta: { title: '媒体会话', icon: 'streamPush' }

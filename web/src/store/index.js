@@ -19,7 +19,6 @@ import role from './modules/role'
 import gbRecord from './modules/gbRecord'
 import log from './modules/log'
 import frontEnd from './modules/frontEnd'
-import jtDevice from './modules/jtDevice'
 import alarm from './modules/alarm'
 import player from './modules/player'
 
@@ -45,7 +44,6 @@ const store = new Vuex.Store({
     gbRecord,
     log,
     frontEnd,
-    jtDevice,
     alarm,
     player
   },

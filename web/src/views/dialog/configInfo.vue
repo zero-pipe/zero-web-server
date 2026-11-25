@@ -20,12 +20,6 @@
             <el-tag size="small">{{ configInfoData.sip.password }}</el-tag>
           </el-descriptions-item>
         </el-descriptions>
-        <el-descriptions v-if="key === 'jt1078Config' && configInfoData.jt1078Config" title="部标服务信息" :span="2">
-          <el-descriptions-item label="端口">{{ configInfoData.jt1078Config.port }}</el-descriptions-item>
-          <el-descriptions-item label="密码">
-            <el-tag size="small">{{ configInfoData.jt1078Config.password }}</el-tag>
-          </el-descriptions-item>
-        </el-descriptions>
       </div>
     </el-dialog>
   </div>

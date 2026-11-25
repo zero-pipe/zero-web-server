@@ -5,10 +5,6 @@ import { primaryMenus, legacyMenuAlias } from '@/layout/menu'
 
 const PATH_RULES = [
   { prefix: '/devices', menu: 'access' },
-  { prefix: '/device', menu: 'access' },
-  { prefix: '/onvifDevice', menu: 'access' },
-  { prefix: '/jtDevice', menu: 'access' },
-  { prefix: '/channel', menu: 'access' },
   { prefix: '/gbConfig', menu: 'access' },
   { prefix: '/platform', menu: 'access' },
   { prefix: '/mediaServer', menu: 'media' },
