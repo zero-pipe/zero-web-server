@@ -115,6 +115,29 @@
           </div>
         </transition>
       </div>
+      <div ref="deviceInfoBox">
+        <transition name="el-zoom-in-center">
+          <div class="infobox-content" v-if="deviceInfo">
+            <el-descriptions class="margin-top" :title="deviceInfo.name" :column="1" :colon="true" size="mini" :labelStyle="labelStyle">
+              <el-descriptions-item label="通道数">{{ deviceInfo.channels.length }}</el-descriptions-item>
+              <el-descriptions-item label="状态">{{ deviceOnline ? '有通道在线' : '全部离线' }}</el-descriptions-item>
+            </el-descriptions>
+            <div class="chan-switch">
+              <div class="chan-switch-title">点击通道播放（默认第一个在线通道）</div>
+              <el-button
+                v-for="ch in deviceInfo.channels"
+                :key="ch.gbId"
+                size="mini"
+                :type="playingChannelId === ch.gbId ? 'primary' : 'default'"
+                :disabled="(ch.gbStatus || ch.status) !== 'ON'"
+                @click="playChannelOfDevice(ch)"
+              >{{ ch.gbName }}</el-button>
+            </div>
+            <span class="infobox-close el-icon-close" @click="closeInfoBox"></span>
+          </div>
+        </transition>
+      </div>
+
       <player ref="player" ></player>
       <queryTrace ref="queryTrace" ></queryTrace>
       <CommonChannelEditDialog ref="commonChannelEditDialog" ></CommonChannelEditDialog>
@@ -129,6 +152,8 @@ import MapComponent from '../common/MapComponent.vue'
 import player from '../channel/player.vue'
 import CommonChannelEditDialog from '../dialog/commonChannelEditDialog.vue'
 import DrawThinProgress from './dialog/drawThinProgress.vue'
+import { listDevices } from '@/api/devices'
+import { stopPlayChannel } from '@/api/commonChannel'
 
 let channelLayer, channelTileLayer = null
 export default {
@@ -146,6 +171,11 @@ export default {
       layer: null,
       channel: null,
       dragChannel: {},
+      deviceInfo: null,
+      deviceInfoBoxId: null,
+      deviceNameMap: {},
+      deviceGroups: {},
+      playingChannelId: null,
       feature: null,
       device: null,
       infoBoxId: null,
@@ -173,38 +203,54 @@ export default {
   destroyed() {
 
   },
+  computed: {
+    deviceOnline() {
+      return !!(this.deviceInfo && this.deviceInfo.channels.some(c => (c.gbStatus || c.status) === 'ON'))
+    }
+  },
   methods: {
     initChannelLayer: function () {
       this.mapTileList = this.$refs.mapComponent.mapTileList
       this.closeInfoBox()
-
-      const clientEvent = data => {
-        this.closeInfoBox()
-        this.$nextTick(() => {
-          if (data[0].edit) {
-            this.showEditInfo(data[0])
-          } else {
-            this.showChannelInfo(data[0])
-          }
-        })
-      }
 
       if (channelLayer) {
         this.$refs.mapComponent.removeLayer(channelLayer)
         channelLayer = null
       }
 
+      this.loadDeviceNameMap()
+
       this.$store.dispatch('commonChanel/getAllForMap', {})
         .then(list => {
-          const points = (list || [])
-            .filter(ch => ch.gbLongitude > 0 && ch.gbLatitude > 0)
-            .map(ch => ({
-              id: ch.gbId,
-              position: [ch.gbLongitude, ch.gbLatitude],
-              data: ch,
-              status: ch.gbStatus || ch.status || 'OFF'
-            }))
-          channelLayer = this.$refs.mapComponent.addPointLayer(points, clientEvent, null)
+          // 一个设备一个图标：按 dataDeviceId 分组合并同设备的多个通道（位置取设备首个有坐标的通道）。
+          const groups = {}
+          ;(list || []).forEach(ch => {
+            const key = ch.dataDeviceId || ('ch' + ch.gbId)
+            if (!groups[key]) groups[key] = { key, channels: [], position: null }
+            groups[key].channels.push(ch)
+            if (!groups[key].position && ch.gbLongitude > 0 && ch.gbLatitude > 0) {
+              groups[key].position = [ch.gbLongitude, ch.gbLatitude]
+            }
+          })
+          this.deviceGroups = groups
+          const points = []
+          Object.keys(groups).forEach(k => {
+            const g = groups[k]
+            if (!g.position) return
+            const online = g.channels.some(c => (c.gbStatus || c.status) === 'ON')
+            points.push({
+              id: 'dev-' + k,
+              position: g.position,
+              status: online ? 'ON' : 'OFF',
+              data: {
+                deviceId: k,
+                name: this.deviceNameMap[k] || this.guessDeviceName(g.channels),
+                channels: g.channels,
+                position: g.position
+              }
+            })
+          })
+          channelLayer = this.$refs.mapComponent.addPointLayer(points, this.deviceClickEvent, null)
           if (points.length === 1) {
             this.$refs.mapComponent.panTo(points[0].position, window.mapParam.zoom || 15)
           } else if (points.length > 1) {
@@ -218,8 +264,42 @@ export default {
           }
         })
         .catch(() => {
-          channelLayer = this.$refs.mapComponent.addPointLayer([], clientEvent, null)
+          channelLayer = this.$refs.mapComponent.addPointLayer([], this.deviceClickEvent, null)
         })
+    },
+    // 统一设备列表 → { 设备dbid: 设备名 }，用于设备图标标题。
+    loadDeviceNameMap() {
+      listDevices({ page: 1, count: 1000 }).then(res => {
+        const map = {}
+        ;((res.data && res.data.list) || []).forEach(d => { map[d.dbId] = d.name })
+        this.deviceNameMap = map
+      }).catch(() => {})
+    },
+    // 兜底设备名：通道名去掉尾部 _序号（ipc_onvif_01 → ipc_onvif）。
+    guessDeviceName(channels) {
+      const n = (channels && channels[0] && channels[0].gbName) || ''
+      return n.replace(/_\d+$/, '') || n || '设备'
+    },
+    // 点击设备图标：弹设备信息 + 通道按钮，默认自动播放第一个在线通道。
+    deviceClickEvent(items) {
+      const dev = (items && items[0]) || null
+      if (!dev || !dev.position) return
+      this.closeInfoBox()
+      this.deviceInfo = dev
+      const first = dev.channels.find(c => (c.gbStatus || c.status) === 'ON') || dev.channels[0]
+      if (first) this.playChannelOfDevice(first)
+      this.$nextTick(() => {
+        this.deviceInfoBoxId = this.$refs.mapComponent.openInfoBox(dev.position, this.$refs.deviceInfoBox, [0, -50])
+      })
+    },
+    // 切换设备内通道：先停上一个，再播目标通道。
+    playChannelOfDevice(ch) {
+      if (!ch) return
+      if (this.playingChannelId && this.playingChannelId !== ch.gbId) {
+        stopPlayChannel(this.playingChannelId).catch(() => {})
+      }
+      this.playingChannelId = ch.gbId
+      this.play(ch)
     },
     refreshLayer(){
       this.closeInfoBox()
@@ -375,8 +455,13 @@ export default {
       if (this.infoBoxId !== null) {
         this.$refs.mapComponent.closeInfoBox(this.infoBoxId)
       }
+      if (this.deviceInfoBoxId !== null) {
+        this.$refs.mapComponent.closeInfoBox(this.deviceInfoBoxId)
+        this.deviceInfoBoxId = null
+      }
       this.channel = null
       this.dragChannel = null
+      this.deviceInfo = null
     },
     play: function (channel) {
       this.$refs.player.openDialog('codec', channel.gbId, {
@@ -805,6 +890,19 @@ export default {
   width: 16px;
   height: 16px;
   background: url('/static/images/arrow.png') no-repeat center;
+}
+.chan-switch {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+.chan-switch-title {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+.chan-switch .el-button {
+  margin: 0 6px 6px 0;
 }
 .infobox-close {
   position: absolute;
