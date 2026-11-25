@@ -1,42 +1,17 @@
 import request from '@/utils/request'
 
-// 插件实例列表
+// 插件注册表（非设备维度）
 export function queryPlugins() {
   return request({ url: '/api/v1/plugins', method: 'get' })
 }
 
-// 插件设备
-export function queryIpcDevices() {
-  return request({ url: '/api/v1/devices/plugin/devices', method: 'get' })
-}
-
+// 插件设备专属动作（统一设备管理的 plugin 子组）
 export function addIpcDevice(data) {
   return request({ url: '/api/v1/devices/plugin/devices', method: 'post', data })
 }
 
-export function deleteIpcDevice(id) {
-  return request({ url: '/api/v1/devices/plugin/devices', method: 'delete', params: { id } })
-}
-
 export function syncIpcDevice(id) {
   return request({ url: '/api/v1/devices/plugin/devices/sync', method: 'post', params: { id } })
-}
-
-export function queryIpcChannels(deviceId) {
-  return request({ url: '/api/v1/devices/plugin/channels', method: 'get', params: { deviceId } })
-}
-
-// 播放
-export function startIpcLive(deviceId, channelId) {
-  return request({ url: '/api/v1/devices/plugin/play/start', method: 'get', params: { deviceId, channelId } })
-}
-
-export function stopIpcLive(deviceId, channelId) {
-  return request({ url: '/api/v1/devices/plugin/play/stop', method: 'get', params: { deviceId, channelId } })
-}
-
-export function ipcPtz(data) {
-  return request({ url: '/api/v1/devices/plugin/ptz', method: 'post', data })
 }
 
 // 布防 / 撤防

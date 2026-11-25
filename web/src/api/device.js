@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-// 国标设备API
+// 国标设备 API（统一设备管理的 gb 子组）
 
 export function queryDeviceSyncStatus(deviceId) {
   return request({
@@ -26,24 +26,10 @@ export function queryDevices(params) {
   })
 }
 
-export function deleteDevice(deviceId) {
-  return request({
-    method: 'delete',
-    url: `/api/v1/devices/gb/query/devices/${deviceId}/delete`
-  })
-}
-
 export function sync(deviceId) {
   return request({
     method: 'get',
     url: `/api/v1/devices/gb/query/devices/${deviceId}/sync`
-  })
-}
-
-export function updateDeviceTransport(deviceId, streamMode) {
-  return request({
-    method: 'post',
-    url: `/api/v1/devices/gb/query/transport/${deviceId}/${streamMode}`
   })
 }
 
@@ -66,14 +52,6 @@ export function resetGuard(deviceId) {
       deviceId: deviceId,
       guardCmd: 'ResetGuard'
     }
-  })
-}
-
-export function homePosition(params) {
-  return request({
-    method: 'get',
-    url: '/api/v1/devices/gb/control/home_position',
-    params
   })
 }
 
@@ -101,6 +79,7 @@ export function subscribeMobilePosition(params) {
     }
   })
 }
+
 export function subscribeForAlarm(params) {
   const { id, cycle } = params
   return request({
@@ -113,60 +92,8 @@ export function subscribeForAlarm(params) {
   })
 }
 
-export function queryBasicParam(params) {
-  return request({
-    method: 'get',
-    url: '/api/v1/devices/gb/config/query/basicParam',
-    params: params
-  })
-}
-
-export function setBasicParam(params) {
-  return request({
-    method: 'get',
-    url: '/api/v1/devices/gb/config/set/basicParam',
-    params
-  })
-}
-
-export function setVideoParamOpt(params) {
-  return request({
-    method: 'get',
-    url: '/api/v1/devices/gb/config/set/videoParamOpt',
-    params
-  })
-}
-
-export function queryChannelOne(params) {
-  const { deviceId, channelDeviceId } = params
-  return request({
-    method: 'get',
-    url: '/api/v1/devices/gb/query/channel/one',
-    params: {
-      deviceId: deviceId,
-      channelDeviceId: channelDeviceId
-    }
-  })
-}
-
-export function queryChannels(deviceId, params) {
-  const { page, count, query, online, channelType, catalogUnderDevice } = params
-  return request({
-    method: 'get',
-    url: `/api/v1/devices/gb/query/devices/${deviceId}/channels`,
-    params: {
-      page: page,
-      count: count,
-      query: query,
-      online: online,
-      channelType: channelType,
-      catalogUnderDevice: catalogUnderDevice
-    }
-  })
-}
-
 export function queryHasStreamChannels(params) {
-  const {page, count, query} = params
+  const { page, count, query } = params
   return request({
     method: 'get',
     url: `/api/v1/devices/gb/query/streams`,
@@ -178,107 +105,6 @@ export function queryHasStreamChannels(params) {
   })
 }
 
-export function deviceRecord(params) {
-  const { deviceId, channelId, recordCmdStr } = params
-  return request({
-    method: 'get',
-    url: `/api/v1/devices/gb/control/record`,
-    params: {
-      deviceId: deviceId,
-      channelId: channelId,
-      recordCmdStr: recordCmdStr
-    }
-  })
-}
-
-export function querySubChannels(params, deviceId, parentChannelId) {
-  const { page, count, query, online, channelType } = params
-  return request({
-    method: 'get',
-    url: `/api/v1/devices/gb/query/sub_channels/${deviceId}/${parentChannelId}/channels`,
-    params: {
-      page: page,
-      count: count,
-      query: query,
-      online: online,
-      channelType: channelType
-    }
-  })
-}
-
-export function queryChannelTree(params) {
-  const { parentId, page, count } = params
-  return request({
-    method: 'get',
-    url: `/api/v1/devices/gb/query/tree/channel/${this.deviceId}`,
-    params: {
-      parentId: parentId,
-      page: page,
-      count: count
-    }
-  })
-}
-
-export function changeChannelAudio(params) {
-  const { channelId, audio } = params
-  return request({
-    method: 'post',
-    url: `/api/v1/devices/gb/query/channel/audio`,
-    params: {
-      channelId: channelId,
-      audio: audio
-    }
-  })
-}
-
-export function updateChannelStreamIdentification(params) {
-  const { deviceDbId, streamIdentification, id } = params
-  return request({
-    method: 'post',
-    url: `/api/v1/devices/gb/query/channel/stream/identification/update`,
-    params: {
-      deviceDbId: deviceDbId,
-      id: id,
-      streamIdentification: streamIdentification
-    }
-  })
-}
-
-export function update(data) {
-  return request({
-    method: 'post',
-    url: `/api/v1/devices/gb/query/device/update`,
-    data: data
-  })
-}
-export function add(data) {
-  return request({
-    method: 'post',
-    url: `/api/v1/devices/gb/query/device/add`,
-    data: data
-  })
-}
-
-export function queryDeviceOne(deviceId) {
-  return request({
-    method: 'get',
-    url: `/api/v1/devices/gb/query/devices/${deviceId}`
-  })
-}
-
-export function queryDeviceTree(params, deviceId) {
-  const { page, count, parentId, onlyCatalog } = params
-  return request({
-    method: 'get',
-    url: `/api/v1/devices/gb/query/tree/${deviceId}`,
-    params: {
-      page: page,
-      count: count,
-      parentId: parentId,
-      onlyCatalog: onlyCatalog
-    }
-  })
-}
 export function getKeepaliveTimeStatistics({ deviceId, count }) {
   return request({
     method: 'get',
@@ -289,6 +115,7 @@ export function getKeepaliveTimeStatistics({ deviceId, count }) {
     }
   })
 }
+
 export function getRegisterTimeStatistics({ deviceId, count }) {
   return request({
     method: 'get',
@@ -315,4 +142,3 @@ export function dragZoomOut(params) {
     params
   })
 }
-

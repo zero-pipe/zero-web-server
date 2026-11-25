@@ -12,14 +12,9 @@ func registerPlugin(g *gin.RouterGroup, h *handler.PluginHandler) {
 }
 
 // registerPluginDevices 插件设备专属动作，挂在 /devices/plugin。
+// 仅保留前端实际使用的接口：新增（登录插件→入库）、同步。布防/撤防/状态见 routes_event_sub。
 func registerPluginDevices(parent *gin.RouterGroup, h *handler.PluginHandler) {
 	g := parent.Group("/plugin")
-	g.GET("/devices", h.ListDevices)
 	g.POST("/devices", h.CreateDevice)
-	g.DELETE("/devices", h.DeleteDevice)
-	g.GET("/channels", h.Channels)
 	g.POST("/devices/sync", h.SyncDevice)
-	g.GET("/play/start", h.StartLive)
-	g.GET("/play/stop", h.StopLive)
-	g.POST("/ptz", h.PTZ)
 }

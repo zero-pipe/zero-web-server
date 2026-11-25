@@ -38,7 +38,6 @@ func registerDevices(
 
 	registerDeviceQuery(g, deviceHandler, snapHandler) // /devices/gb/query/*
 	registerDeviceControl(g, deviceHandler)            // /devices/gb/control/*
-	registerDeviceConfig(g, deviceHandler)             // /devices/gb/config/*
 	registerOnvif(g, onvifHandler)                     // /devices/onvif/*
 	registerPluginDevices(g, pluginHandler)            // /devices/plugin/*
 }
