@@ -17,8 +17,8 @@
             <el-option label="GB28181" value="gb28181" />
             <el-option label="ONVIF" value="onvif" />
           </el-option-group>
-          <el-option-group label="插件协议">
-            <el-option label="插件" value="plugin" />
+          <el-option-group label="SDK 协议">
+            <el-option label="SDK" value="plugin" />
           </el-option-group>
         </el-select>
       </el-form-item>
@@ -43,11 +43,11 @@
       <el-table-column prop="name" label="名称" min-width="140" />
       <el-table-column prop="vendor" label="厂商" width="100" />
       <el-table-column prop="model" label="型号" width="130" show-overflow-tooltip />
-      <el-table-column label="协议" width="90">
+      <el-table-column label="协议" width="100">
         <template v-slot:default="{ row }">
-          <el-tag v-if="row.protocol === 'gb28181'" size="mini">GB28181</el-tag>
-          <el-tag v-else-if="row.protocol === 'onvif'" size="mini" style="color:#7c3aed;border-color:#ddd6fe;background:#f5f3ff">ONVIF</el-tag>
-          <el-tag v-else size="mini" type="warning">插件</el-tag>
+          <span class="proto-text">
+            <i class="proto-dot" :class="protoDotClass(row.protocol)" />{{ protoLabel(row.protocol) }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column prop="addressText" label="地址/注册信息" min-width="150" show-overflow-tooltip />
@@ -254,6 +254,12 @@ export default {
     clearInterval(this.looper)
   },
   methods: {
+    protoLabel(p) {
+      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: 'SDK' }[p] || (p || '—')
+    },
+    protoDotClass(p) {
+      return p === 'gb28181' ? 'gb' : (p === 'onvif' ? 'onvif' : 'sdk')
+    },
     hasCap(row, cap) {
       const caps = (row && row.capabilities) || []
       return caps.indexOf(cap) >= 0
@@ -447,6 +453,24 @@ export default {
 .cell-empty {
   color: #c0c4cc;
 }
+/* 协议列：彩色圆点 + 文字 */
+.proto-text {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  color: #303133;
+}
+.proto-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 7px;
+  flex: 0 0 auto;
+  background: #c0c4cc;
+}
+.proto-dot.gb { background: #1A73E8; }
+.proto-dot.onvif { background: #7c3aed; }
+.proto-dot.sdk { background: #e6a23c; }
 /* 订阅勾选框：默认灰色文字，勾选成功后文字变蓝；取消成功后恢复默认色 */
 .sub-chk {
   margin-right: 16px;
