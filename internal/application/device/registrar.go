@@ -166,6 +166,9 @@ func (s *Service) HandleKeepalive(deviceID, ip string, port int) error {
 	}
 	if wasOffline {
 		s.AutoSubscribeOnOnline(device)
+		// 离线恢复（含删除后重加、SIP 会话残留等未触发新 REGISTER 的场景）时，
+		// 也补一次目录/通道同步，避免通道列表长期为空。
+		go s.autoSyncCatalogOnce(device.DeviceID)
 	}
 	s.TouchExpiry(device)
 	return nil

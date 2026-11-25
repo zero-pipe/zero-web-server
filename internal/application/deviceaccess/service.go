@@ -360,6 +360,12 @@ func (s *Service) createGB(req CreateRequest) (*DeviceView, error) {
 	if err := s.gb.AddDevice(d); err != nil {
 		return nil, err
 	}
+	// 新增国标设备后异步补一次目录/通道同步：删除后重新添加时，设备往往仍处于
+	// SIP 已注册状态、不会重新发 REGISTER，只靠注册事件触发同步会导致通道列表为空。
+	// 这里主动同步，IPC 会立即补建默认通道，非 IPC 则发送目录查询。
+	if deviceID := strings.TrimSpace(d.DeviceID); deviceID != "" {
+		go func() { _ = s.gb.SyncCatalog(deviceID) }()
+	}
 	return viewFromGB(d), nil
 }
 
