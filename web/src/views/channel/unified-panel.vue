@@ -20,7 +20,7 @@
           <el-option label="全部" value="" />
           <el-option label="GB28181" value="gb28181" />
           <el-option label="ONVIF" value="onvif" />
-          <el-option label="插件" value="plugin" />
+          <el-option label="SDK" value="plugin" />
         </el-select>
       </el-form-item>
       <el-form-item v-if="deviceInternalCode && !deviceLocked">
@@ -188,7 +188,7 @@ export default {
       return DIRECTION_LABELS[v] || '—'
     },
     protocolLabel(p) {
-      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[p] || (p || '-')
+      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: 'SDK' }[p] || (p || '-')
     },
     load() {
       this.loading = true

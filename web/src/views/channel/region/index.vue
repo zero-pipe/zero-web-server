@@ -41,16 +41,18 @@
               <el-option label="离线" value="false" />
             </el-select>
           </el-form-item>
-          <el-form-item label="类型" >
+          <el-form-item label="协议" >
             <el-select
-              v-model="channelType"
+              v-model="protocol"
               style="width: 8rem; margin-right: 1rem;"
               placeholder="请选择"
               default-first-option
-              @change="getChannelList"
+              @change="search"
             >
               <el-option label="全部" value="" />
-              <el-option v-for="item in Object.values($channelTypeList)" :key="item.id" :label="item.name" :value="item.id" />
+              <el-option label="GB28181" value="gb28181" />
+              <el-option label="ONVIF" value="onvif" />
+              <el-option label="SDK" value="plugin" />
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -58,7 +60,7 @@
               添加设备
             </el-button>
             <el-button :disabled="multipleSelection.length === 0" type="danger" @click="remove()">
-              移除通道
+              移除设备
             </el-button>
             <el-button plain type="warning" @click="showUnusualChanel()">
               异常挂载通道
@@ -67,49 +69,42 @@
             <el-button plain @click="openMapping">编码映射</el-button>
           </el-form-item>
           <el-form-item >
-            <el-button icon="el-icon-refresh-right" circle @click="getChannelList()" />
+            <el-button icon="el-icon-refresh-right" circle @click="loadDevices()" />
           </el-form-item>
         </div>
       </el-form>
       <el-table
-        ref="channelListTable"
+        ref="deviceTable"
         size="medium"
-        :data="channelList"
+        :data="deviceList"
         :height="tableHeight"
         style="width: 100%"
         header-row-class-name="table-header"
         @selection-change="handleSelectionChange"
-        @row-dblclick="rowDblclick"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="gbName" label="名称" min-width="180" />
-        <el-table-column prop="gbManufacturer" label="厂家" min-width="100" />
-        <el-table-column label="类型" min-width="100">
+        <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
+        <el-table-column label="厂家" min-width="120" show-overflow-tooltip>
+          <template v-slot:default="scope">{{ scope.row.vendor || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="协议" min-width="120">
           <template v-slot:default="scope">
-            <div slot="reference" class="name-wrapper">
-              <el-tag
-                v-if="$channelTypeList[scope.row.dataType]"
-                size="medium"
-                effect="plain"
-                type="success"
-                :style="$channelTypeList[scope.row.dataType].style"
-              >{{ $channelTypeList[scope.row.dataType].name }}</el-tag>
-              <el-tag v-else size="medium" effect="plain" type="info">未知</el-tag>
-            </div>
+            <protocol-tag :protocol="scope.row.protocol" />
           </template>
         </el-table-column>
-        <el-table-column label="位置信息" min-width="150">
+        <el-table-column label="位置信息" min-width="170">
           <template v-slot:default="scope">
-            <span v-if="scope.row.gbLongitude && scope.row.gbLatitude">{{ scope.row.gbLongitude }}<br>{{ scope.row.gbLatitude }}</span>
-            <span v-if="!scope.row.gbLongitude || !scope.row.gbLatitude">无</span>
+            <template v-if="scope.row.longitude && scope.row.latitude">
+              <div>经度：{{ scope.row.longitude }}</div>
+              <div>纬度：{{ scope.row.latitude }}</div>
+            </template>
+            <span v-else>无</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" min-width="100">
           <template v-slot:default="scope">
-            <div slot="reference" class="name-wrapper">
-              <el-tag v-if="scope.row.gbStatus === 'ON'" size="medium">在线</el-tag>
-              <el-tag v-if="scope.row.gbStatus !== 'ON'" size="medium" type="info">离线</el-tag>
-            </div>
+            <el-tag v-if="scope.row.online" size="medium">在线</el-tag>
+            <el-tag v-else size="medium" type="info">离线</el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -176,22 +171,26 @@
 <script>
 import RegionTree from '../..//common/RegionTree.vue'
 import DeviceSelectDialog from '@/views/devices/DeviceSelectDialog.vue'
+import ProtocolTag from '@/components/ProtocolTag.vue'
 import UnusualRegionChannelSelect from './UnusualRegionChannelSelect.vue'
 import { addByCivilCode, queryChildListInBase, codeMappingList, saveCodeMapping, deleteCodeMapping } from '@/api/region'
+import { queryChannels, queryAssets } from '@/api/asset'
 
 export default {
   name: 'Region',
   components: {
     DeviceSelectDialog,
+    ProtocolTag,
     RegionTree,
     UnusualRegionChannelSelect
   },
   data() {
     return {
-      channelList: [],
+      deviceList: [],
+      allDevices: [],
       tableHeight: 'calc(100vh - 190px)',
       searchStr: '',
-      channelType: '',
+      protocol: '',
       online: '',
       currentPage: 1,
       count: 15,
@@ -218,7 +217,6 @@ export default {
 
   created() {
     this.initData()
-    this.tableHeight = `calc(100vh - ${this.$refs.queryForm.offsetHeight}px)`
   },
   destroyed() {
   },
@@ -288,41 +286,102 @@ export default {
       this.loadMappings()
     },
     initData: function() {
-      this.getChannelList()
+      this.loadDevices()
     },
     currentChange: function(val) {
       this.currentPage = val
-      this.initData()
+      this.applyPage()
     },
     handleSizeChange: function(val) {
       this.count = val
-      this.getChannelList()
+      this.currentPage = 1
+      this.applyPage()
     },
-    getChannelList: function() {
-      this.$store.dispatch('commonChanel/getCivilCodeList', {
-        page: this.currentPage,
-        count: this.count,
-        query: this.searchStr,
-        online: this.online,
-        channelType: this.channelType,
-        civilCode: this.regionDeviceId
-      })
-        .then(data => {
-          this.total = data.total
-          this.channelList = data.list
-          // 防止出现表格错位
-          this.$nextTick(() => {
-            this.$refs.channelListTable.doLayout()
-          })
+    // 拉取该区划下所有通道 → 按设备归并成设备行，再用资产详情补厂家/协议。
+    loadDevices: function() {
+      const civil = this.regionDeviceId
+      if (!civil) {
+        this.allDevices = []
+        this.deviceList = []
+        this.total = 0
+        return
+      }
+      Promise.all([
+        queryChannels({ page: 1, count: 9999 }),
+        queryAssets({ page: 1, count: 9999 })
+      ]).then(([chRes, aRes]) => {
+        const chans = ((chRes.data && chRes.data.list) || []).filter(c =>
+          c.gb && String(c.gb.civilCode || '').trim() === String(civil)
+        )
+        const assetMap = {}
+        ;((aRes.data && aRes.data.list) || []).forEach(a => {
+          if (a.device) {
+            assetMap[a.device.id] = {
+              name: a.device.name,
+              vendor: a.device.vendor,
+              protocol: (a.binding && a.binding.protocol) || ''
+            }
+          }
         })
+        const groups = {}
+        chans.forEach(c => {
+          const key = c.deviceId || ('ch' + c.resourceId)
+          if (!groups[key]) {
+            groups[key] = {
+              deviceId: key, name: '', vendor: '', protocol: '',
+              longitude: 0, latitude: 0, online: false, channelCount: 0
+            }
+          }
+          const g = groups[key]
+          g.channelCount++
+          if (c.status === 'ON') g.online = true
+          let lon = c.longitude
+          let lat = c.latitude
+          if ((!lon || !lat) && c.gb) {
+            lon = c.gb.gbLongitude || lon
+            lat = c.gb.gbLatitude || lat
+          }
+          if ((!g.longitude || !g.latitude) && lon > 0 && lat > 0) {
+            g.longitude = lon
+            g.latitude = lat
+          }
+          if (!g.name && c.deviceName) g.name = c.deviceName
+          if (!g.protocol && c.protocol) g.protocol = c.protocol
+        })
+        let rows = Object.values(groups).map(g => {
+          const a = assetMap[g.deviceId] || {}
+          return {
+            ...g,
+            name: a.name || g.name || '未命名',
+            vendor: a.vendor || '',
+            protocol: a.protocol || g.protocol || ''
+          }
+        })
+        if (this.searchStr) {
+          const kw = this.searchStr.toLowerCase()
+          rows = rows.filter(r => (r.name || '').toLowerCase().includes(kw))
+        }
+        if (this.online === 'true') rows = rows.filter(r => r.online)
+        if (this.online === 'false') rows = rows.filter(r => !r.online)
+        if (this.protocol) rows = rows.filter(r => r.protocol === this.protocol)
+        this.allDevices = rows
+        this.total = rows.length
+        this.applyPage()
+      }).catch(() => {
+        this.allDevices = []
+        this.deviceList = []
+        this.total = 0
+      })
+    },
+    applyPage: function() {
+      const start = (this.currentPage - 1) * this.count
+      this.deviceList = this.allDevices.slice(start, start + this.count)
+      this.$nextTick(() => {
+        this.$refs.deviceTable && this.$refs.deviceTable.doLayout()
+      })
     },
     handleSelectionChange: function(val) {
       this.multipleSelection = val
-    },
-    rowDblclick: function(row, rowIndex) {
-      // if (row.gbCivilCode) {
-      //   this.$refs.regionTree.refresh(row.gbCivilCode)
-      // }
     },
     add: function(row) {
       if (this.regionDeviceId === '') {
@@ -341,7 +400,7 @@ export default {
           deviceIds: deviceIds
         }).then(() => {
           this.$message.success({ showClose: true, message: '保存成功' })
-          this.getChannelList()
+          this.loadDevices()
           this.$refs.regionTree.refresh(this.regionDeviceId)
         }).catch((error) => {
           this.$message.error({ showClose: true, message: error })
@@ -368,7 +427,7 @@ export default {
             showClose: true,
             message: '保存成功'
           })
-          this.getChannelList()
+          this.loadDevices()
           this.$refs.regionTree.refresh(this.regionDeviceId)
         })
         .catch((error) => {
@@ -382,25 +441,24 @@ export default {
         })
     },
     remove: function(row) {
-      const channels = []
-      for (let i = 0; i < this.multipleSelection.length; i++) {
-        channels.push(this.multipleSelection[i].gbId)
-      }
-      if (channels.length === 0) {
+      const deviceIds = this.multipleSelection
+        .map(r => Number(r.deviceId))
+        .filter(n => !isNaN(n))
+      if (deviceIds.length === 0) {
         this.$message.info({
           showClose: true,
-          message: '请选择通道'
+          message: '请选择设备'
         })
         return
       }
       this.loading = true
-      this.$store.dispatch('commonChanel/deleteFromRegion', channels)
+      this.$store.dispatch('commonChanel/deleteDeviceFromRegion', deviceIds)
         .then(data => {
           this.$message.success({
             showClose: true,
             message: '保存成功'
           })
-          this.getChannelList()
+          this.loadDevices()
           // 刷新树节点
           this.$refs.regionTree.refresh(this.regionDeviceId)
         })
@@ -428,7 +486,8 @@ export default {
     treeNodeClickEvent: function(region) {
       this.regionDeviceId = region.deviceId
       if (region.deviceId === '') {
-        this.channelList = []
+        this.deviceList = []
+        this.allDevices = []
         this.regionParents = []
       }
       this.initData()
@@ -446,7 +505,7 @@ export default {
     },
     onChannelChange: function(deviceId) {
       if (this.regionDeviceId === deviceId) {
-        this.getChannelList()
+        this.loadDevices()
       }
     }
   }

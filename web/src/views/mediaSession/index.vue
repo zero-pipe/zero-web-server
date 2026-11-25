@@ -17,7 +17,7 @@
         <el-option label="全部来源" value="" />
         <el-option label="GB28181 推流" value="gb28181" />
         <el-option label="ONVIF 拉流" value="onvif" />
-        <el-option label="插件" value="plugin" />
+        <el-option label="SDK" value="plugin" />
         <el-option label="手动代理/其他" value="manual" />
       </el-select>
       <div class="ms-spacer" />

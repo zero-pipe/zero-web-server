@@ -157,7 +157,7 @@ export default {
       set(v) { this.$emit('update:visible', v) }
     },
     protocolLabel() {
-      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[this.info.protocol] || '—'
+      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: 'SDK' }[this.info.protocol] || '—'
     }
   },
   watch: {

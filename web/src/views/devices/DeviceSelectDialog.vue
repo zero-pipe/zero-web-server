@@ -27,7 +27,7 @@
           <el-option label="全部协议" value="" />
           <el-option label="GB28181" value="gb28181" />
           <el-option label="ONVIF" value="onvif" />
-          <el-option label="插件" value="plugin" />
+          <el-option label="SDK" value="plugin" />
         </el-select>
       </el-form-item>
       <el-form-item>
@@ -46,20 +46,23 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="50" />
-      <el-table-column prop="name" label="设备名称" min-width="180" />
-      <el-table-column label="协议" width="110">
+      <el-table-column prop="name" label="设备名称" min-width="140" show-overflow-tooltip />
+      <el-table-column label="厂家" min-width="140" show-overflow-tooltip>
+        <template slot-scope="{ row }">{{ row.vendor || '—' }}</template>
+      </el-table-column>
+      <el-table-column label="协议" min-width="140">
         <template slot-scope="{ row }">
-          <el-tag size="mini" effect="plain">{{ protocolLabel(row.protocol) }}</el-tag>
+          <protocol-tag :protocol="row.protocol" />
         </template>
       </el-table-column>
-      <el-table-column label="状态" width="90">
+      <el-table-column label="状态" min-width="140">
         <template slot-scope="{ row }">
           <el-tag size="mini" :type="row.status === 'online' ? 'success' : 'info'">
             {{ row.status === 'online' ? '在线' : '离线' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="channelCount" label="通道数" width="90" align="center" />
+      <el-table-column prop="channelCount" label="通道数" min-width="140" align="center" />
     </el-table>
 
     <el-pagination
@@ -83,9 +86,11 @@
 
 <script>
 import { listDevices } from '@/api/devices'
+import ProtocolTag from '@/components/ProtocolTag.vue'
 
 export default {
   name: 'DeviceSelectDialog',
+  components: { ProtocolTag },
   data() {
     return {
       showDialog: false,
@@ -111,7 +116,7 @@ export default {
       this.load()
     },
     protocolLabel(p) {
-      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[p] || (p || '-')
+      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: 'SDK' }[p] || (p || '-')
     },
     search() {
       this.page = 1
