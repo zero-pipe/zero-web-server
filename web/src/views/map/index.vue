@@ -119,7 +119,9 @@
         <transition name="el-zoom-in-center">
           <div class="infobox-content" v-if="deviceInfo">
             <el-descriptions class="margin-top" :title="deviceInfo.name" :column="1" :colon="true" size="mini" :labelStyle="labelStyle">
-              <el-descriptions-item label="通道数">{{ deviceInfo.channels.length }}</el-descriptions-item>
+              <el-descriptions-item label="类型">
+                <el-tag v-for="t in compositionTags(deviceInfo.channels)" :key="t" size="mini" effect="plain" style="margin-right:4px;">{{ t }}</el-tag>
+              </el-descriptions-item>
               <el-descriptions-item label="状态">{{ deviceOnline ? '有通道在线' : '全部离线' }}</el-descriptions-item>
             </el-descriptions>
             <div class="chan-switch">
@@ -152,7 +154,7 @@ import MapComponent from '../common/MapComponent.vue'
 import player from '../channel/player.vue'
 import CommonChannelEditDialog from '../dialog/commonChannelEditDialog.vue'
 import DrawThinProgress from './dialog/drawThinProgress.vue'
-import { listDevices } from '@/api/devices'
+import { queryChannels, queryAssets } from '@/api/asset'
 import { stopPlayChannel } from '@/api/commonChannel'
 
 let channelLayer, channelTileLayer = null
@@ -173,7 +175,7 @@ export default {
       dragChannel: {},
       deviceInfo: null,
       deviceInfoBoxId: null,
-      deviceNameMap: {},
+      deviceMetaMap: {},
       deviceGroups: {},
       playingChannelId: null,
       feature: null,
@@ -218,67 +220,103 @@ export default {
         channelLayer = null
       }
 
-      this.loadDeviceNameMap()
+      this.loadDeviceMeta()
 
-      this.$store.dispatch('commonChanel/getAllForMap', {})
-        .then(list => {
-          // 一个设备一个图标：按 dataDeviceId 分组合并同设备的多个通道（位置取设备首个有坐标的通道）。
-          const groups = {}
-          ;(list || []).forEach(ch => {
-            const key = ch.dataDeviceId || ('ch' + ch.gbId)
-            if (!groups[key]) groups[key] = { key, channels: [], position: null }
-            groups[key].channels.push(ch)
-            if (!groups[key].position && ch.gbLongitude > 0 && ch.gbLatitude > 0) {
-              groups[key].position = [ch.gbLongitude, ch.gbLatitude]
-            }
+      queryChannels({ page: 1, count: 5000 }).then(res => {
+        const list = (res.data && res.data.list) || []
+        // 一个设备一个图标：按 deviceId 归并同设备通道；通道统一成 {gbId, gbName, gbStatus, channelType}。
+        const groups = {}
+        list.forEach(c => {
+          const key = c.deviceId || ('ch' + c.resourceId)
+          if (!groups[key]) groups[key] = { key, name: c.deviceName || '', channels: [], position: null }
+          groups[key].channels.push({
+            gbId: c.resourceId,
+            gbName: c.name,
+            gbStatus: c.status || (c.online ? 'ON' : 'OFF'),
+            channelType: c.channelType || ''
           })
-          this.deviceGroups = groups
-          const points = []
-          Object.keys(groups).forEach(k => {
-            const g = groups[k]
-            if (!g.position) return
-            const online = g.channels.some(c => (c.gbStatus || c.status) === 'ON')
-            points.push({
-              id: 'dev-' + k,
-              position: g.position,
-              status: online ? 'ON' : 'OFF',
-              data: {
-                deviceId: k,
-                name: this.deviceNameMap[k] || this.guessDeviceName(g.channels),
-                channels: g.channels,
-                position: g.position
-              }
-            })
-          })
-          channelLayer = this.$refs.mapComponent.addPointLayer(points, this.deviceClickEvent, null)
-          if (points.length === 1) {
-            this.$refs.mapComponent.panTo(points[0].position, window.mapParam.zoom || 15)
-          } else if (points.length > 1) {
-            const lons = points.map(p => p.position[0])
-            const lats = points.map(p => p.position[1])
-            const mid = [
-              (Math.min(...lons) + Math.max(...lons)) / 2,
-              (Math.min(...lats) + Math.max(...lats)) / 2
-            ]
-            this.$refs.mapComponent.panTo(mid, window.mapParam.zoom || 15)
+          if (!groups[key].position && c.longitude > 0 && c.latitude > 0) {
+            groups[key].position = [c.longitude, c.latitude]
           }
         })
-        .catch(() => {
-          channelLayer = this.$refs.mapComponent.addPointLayer([], this.deviceClickEvent, null)
+        this.deviceGroups = groups
+        const points = []
+        Object.keys(groups).forEach(k => {
+          const g = groups[k]
+          if (!g.position) return
+          const meta = this.deviceMetaMap[k] || {}
+          const online = g.channels.some(c => c.gbStatus === 'ON')
+          const form = this.formIconBase(meta.deviceType)
+          points.push({
+            id: 'dev-' + k,
+            position: g.position,
+            status: online ? 'ON' : 'OFF',
+            image: { src: this.deviceIconSrc(form, online), anchor: [0.5, 1] },
+            data: {
+              deviceId: k,
+              name: meta.name || g.name || this.guessDeviceName(g.channels),
+              deviceType: meta.deviceType || '',
+              channels: g.channels,
+              position: g.position
+            }
+          })
         })
+        channelLayer = this.$refs.mapComponent.addPointLayerImages(points, this.deviceClickEvent, null)
+        if (points.length === 1) {
+          this.$refs.mapComponent.panTo(points[0].position, window.mapParam.zoom || 15)
+        } else if (points.length > 1) {
+          const lons = points.map(p => p.position[0])
+          const lats = points.map(p => p.position[1])
+          const mid = [
+            (Math.min(...lons) + Math.max(...lons)) / 2,
+            (Math.min(...lats) + Math.max(...lats)) / 2
+          ]
+          this.$refs.mapComponent.panTo(mid, window.mapParam.zoom || 15)
+        }
+      }).catch(() => {
+        channelLayer = this.$refs.mapComponent.addPointLayerImages([], this.deviceClickEvent, null)
+      })
     },
-    // 统一设备列表 → { 设备dbid: 设备名 }，用于设备图标标题。
-    loadDeviceNameMap() {
-      listDevices({ page: 1, count: 1000 }).then(res => {
+    // 设备元数据（名称 + 设备类型）→ { 设备dbid: {name, deviceType} }，用于图标形态与标题。
+    loadDeviceMeta() {
+      queryAssets({ page: 1, count: 1000 }).then(res => {
         const map = {}
-        ;((res.data && res.data.list) || []).forEach(d => { map[d.dbId] = d.name })
-        this.deviceNameMap = map
+        ;((res.data && res.data.list) || []).forEach(a => {
+          if (a.device) map[a.device.id] = { name: a.device.name, deviceType: a.device.deviceType || '' }
+        })
+        this.deviceMetaMap = map
       }).catch(() => {})
+    },
+    // 设备类型 → 图标底图：枪机→camera3，球机→camera2，半球→camera1，其余→camera（通用）。
+    formIconBase(deviceType) {
+      const t = (deviceType || '').trim()
+      if (t === 'bullet' || t === 'remote_ptz') return 'camera3'
+      if (t === 'ptz') return 'camera2'
+      if (t === 'dome' || t === 'remote_dome') return 'camera1'
+      return 'camera'
+    },
+    deviceIconSrc(base, online) {
+      return `static/images/gis/${base}${online ? '' : '-offline'}.png`
     },
     // 兜底设备名：通道名去掉尾部 _序号（ipc_onvif_01 → ipc_onvif）。
     guessDeviceName(channels) {
       const n = (channels && channels[0] && channels[0].gbName) || ''
       return n.replace(/_\d+$/, '') || n || '设备'
+    },
+    // 通道构成标签：双光/热成像/可见光/测温 + 单/双/多通道。
+    compositionTags(channels) {
+      const types = new Set((channels || []).map(c => c.channelType).filter(Boolean))
+      const hasVisible = types.has('visible')
+      const hasThermal = types.has('thermal') || types.has('infrared')
+      const tags = []
+      if (hasVisible && hasThermal) tags.push('双光(可见光+热成像)')
+      else if (hasThermal) tags.push(types.has('thermal') ? '热成像' : '红外')
+      else if (hasVisible) tags.push('可见光')
+      if (types.has('temperature')) tags.push('测温')
+      if (tags.length === 0) tags.push('未知类型')
+      const n = (channels || []).length
+      tags.push(n <= 1 ? '单通道' : (n === 2 ? '双通道' : `多通道(${n})`))
+      return tags
     },
     // 点击设备图标：弹设备信息 + 通道按钮，默认自动播放第一个在线通道。
     deviceClickEvent(items) {
@@ -286,7 +324,7 @@ export default {
       if (!dev || !dev.position) return
       this.closeInfoBox()
       this.deviceInfo = dev
-      const first = dev.channels.find(c => (c.gbStatus || c.status) === 'ON') || dev.channels[0]
+      const first = dev.channels.find(c => c.gbStatus === 'ON') || dev.channels[0]
       if (first) this.playChannelOfDevice(first)
       this.$nextTick(() => {
         this.deviceInfoBoxId = this.$refs.mapComponent.openInfoBox(dev.position, this.$refs.deviceInfoBox, [0, -50])

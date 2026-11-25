@@ -373,6 +373,12 @@ export default {
       olMap.addLayer(vectorLayer)
       return vectorLayer
     },
+    // 每个图元用各自的图片（data[i].image = { src, anchor }）出图标，适合按设备形态区分图标。
+    addPointLayerImages(data, clickEvent, option) {
+      let vectorLayer = this.createPointLayer2(data, clickEvent, option)
+      olMap.addLayer(vectorLayer)
+      return vectorLayer
+    },
     createPointLayer(data, clickEvent, option){
       const features = []
       let maxZoom = (option && option.maxZoom) ? option.maxZoom : olMap.getView().getMaxZoom()
