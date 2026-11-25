@@ -7,7 +7,7 @@ import (
 )
 
 func registerEventSub(g *gin.RouterGroup, h *handler.EventSubHandler) {
-	g.POST("/ipc/devices/arm", h.Arm)
-	g.POST("/ipc/devices/disarm", h.Disarm)
-	g.GET("/ipc/devices/arm/status", h.Status)
+	g.POST("/devices/plugin/devices/arm", h.Arm)
+	g.POST("/devices/plugin/devices/disarm", h.Disarm)
+	g.GET("/devices/plugin/devices/arm/status", h.Status)
 }

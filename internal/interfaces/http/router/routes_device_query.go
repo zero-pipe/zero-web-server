@@ -7,7 +7,7 @@ import (
 )
 
 func registerDeviceQuery(parent *gin.RouterGroup, deviceHandler *handler.DeviceHandler, snapHandler *handler.SnapHandler) {
-	g := parent.Group("/device/query")
+	g := parent.Group("/gb/query")
 	g.GET("/devices/:deviceId", deviceHandler.GetDevice)
 	g.GET("/devices", deviceHandler.ListDevices)
 	g.GET("/devices/:deviceId/channels", deviceHandler.ListChannels)

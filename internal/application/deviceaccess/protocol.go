@@ -5,9 +5,6 @@ import (
 	"fmt"
 )
 
-// ProtocolJT1078 部标 JT1078（占位，待接入）。
-const ProtocolJT1078 = "jt1078"
-
 // ErrProtocolNotImplemented 协议适配器尚未实现。
 var ErrProtocolNotImplemented = fmt.Errorf("协议适配器尚未实现")
 

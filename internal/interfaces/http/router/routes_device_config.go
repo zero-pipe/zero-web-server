@@ -7,7 +7,7 @@ import (
 )
 
 func registerDeviceConfig(parent *gin.RouterGroup, deviceHandler *handler.DeviceHandler) {
-	g := parent.Group("/device/config")
+	g := parent.Group("/gb/config")
 	g.GET("/query/basicParam", deviceHandler.QueryBasicParam)
 	g.GET("/set/basicParam", deviceHandler.SetBasicParam)
 }

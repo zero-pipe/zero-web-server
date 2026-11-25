@@ -5,7 +5,7 @@ import request from '@/utils/request'
 export function queryDeviceSyncStatus(deviceId) {
   return request({
     method: 'get',
-    url: `/api/v1/device/query/sync_status`,
+    url: `/api/v1/devices/gb/query/sync_status`,
     params: {
       deviceId: deviceId
     }
@@ -16,7 +16,7 @@ export function queryDevices(params) {
   const { page, count, query, status } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/devices`,
+    url: `/api/v1/devices/gb/query/devices`,
     params: {
       page: page,
       count: count,
@@ -29,28 +29,28 @@ export function queryDevices(params) {
 export function deleteDevice(deviceId) {
   return request({
     method: 'delete',
-    url: `/api/v1/device/query/devices/${deviceId}/delete`
+    url: `/api/v1/devices/gb/query/devices/${deviceId}/delete`
   })
 }
 
 export function sync(deviceId) {
   return request({
     method: 'get',
-    url: `/api/v1/device/query/devices/${deviceId}/sync`
+    url: `/api/v1/devices/gb/query/devices/${deviceId}/sync`
   })
 }
 
 export function updateDeviceTransport(deviceId, streamMode) {
   return request({
     method: 'post',
-    url: `/api/v1/device/query/transport/${deviceId}/${streamMode}`
+    url: `/api/v1/devices/gb/query/transport/${deviceId}/${streamMode}`
   })
 }
 
 export function setGuard(deviceId) {
   return request({
     method: 'get',
-    url: `/api/v1/device/control/guard`,
+    url: `/api/v1/devices/gb/control/guard`,
     params: {
       deviceId: deviceId,
       guardCmd: 'SetGuard'
@@ -61,7 +61,7 @@ export function setGuard(deviceId) {
 export function resetGuard(deviceId) {
   return request({
     method: 'get',
-    url: `/api/v1/device/control/guard`,
+    url: `/api/v1/devices/gb/control/guard`,
     params: {
       deviceId: deviceId,
       guardCmd: 'ResetGuard'
@@ -72,7 +72,7 @@ export function resetGuard(deviceId) {
 export function homePosition(params) {
   return request({
     method: 'get',
-    url: '/api/v1/device/control/home_position',
+    url: '/api/v1/devices/gb/control/home_position',
     params
   })
 }
@@ -81,7 +81,7 @@ export function subscribeCatalog(params) {
   const { id, cycle } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/subscribe/catalog`,
+    url: `/api/v1/devices/gb/query/subscribe/catalog`,
     params: {
       id: id,
       cycle: cycle
@@ -93,7 +93,7 @@ export function subscribeMobilePosition(params) {
   const { id, cycle, interval } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/subscribe/mobile-position`,
+    url: `/api/v1/devices/gb/query/subscribe/mobile-position`,
     params: {
       id: id,
       cycle: cycle,
@@ -105,7 +105,7 @@ export function subscribeForAlarm(params) {
   const { id, cycle } = params
   return request({
     method: 'get',
-    url: '/api/v1/device/query/subscribe/alarm',
+    url: '/api/v1/devices/gb/query/subscribe/alarm',
     params: {
       id: id,
       cycle: cycle
@@ -116,7 +116,7 @@ export function subscribeForAlarm(params) {
 export function queryBasicParam(params) {
   return request({
     method: 'get',
-    url: '/api/v1/device/config/query/basicParam',
+    url: '/api/v1/devices/gb/config/query/basicParam',
     params: params
   })
 }
@@ -124,7 +124,7 @@ export function queryBasicParam(params) {
 export function setBasicParam(params) {
   return request({
     method: 'get',
-    url: '/api/v1/device/config/set/basicParam',
+    url: '/api/v1/devices/gb/config/set/basicParam',
     params
   })
 }
@@ -132,7 +132,7 @@ export function setBasicParam(params) {
 export function setVideoParamOpt(params) {
   return request({
     method: 'get',
-    url: '/api/v1/device/config/set/videoParamOpt',
+    url: '/api/v1/devices/gb/config/set/videoParamOpt',
     params
   })
 }
@@ -141,7 +141,7 @@ export function queryChannelOne(params) {
   const { deviceId, channelDeviceId } = params
   return request({
     method: 'get',
-    url: '/api/v1/device/query/channel/one',
+    url: '/api/v1/devices/gb/query/channel/one',
     params: {
       deviceId: deviceId,
       channelDeviceId: channelDeviceId
@@ -153,7 +153,7 @@ export function queryChannels(deviceId, params) {
   const { page, count, query, online, channelType, catalogUnderDevice } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/devices/${deviceId}/channels`,
+    url: `/api/v1/devices/gb/query/devices/${deviceId}/channels`,
     params: {
       page: page,
       count: count,
@@ -169,7 +169,7 @@ export function queryHasStreamChannels(params) {
   const {page, count, query} = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/streams`,
+    url: `/api/v1/devices/gb/query/streams`,
     params: {
       page: page,
       count: count,
@@ -182,7 +182,7 @@ export function deviceRecord(params) {
   const { deviceId, channelId, recordCmdStr } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/control/record`,
+    url: `/api/v1/devices/gb/control/record`,
     params: {
       deviceId: deviceId,
       channelId: channelId,
@@ -195,7 +195,7 @@ export function querySubChannels(params, deviceId, parentChannelId) {
   const { page, count, query, online, channelType } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/sub_channels/${deviceId}/${parentChannelId}/channels`,
+    url: `/api/v1/devices/gb/query/sub_channels/${deviceId}/${parentChannelId}/channels`,
     params: {
       page: page,
       count: count,
@@ -210,7 +210,7 @@ export function queryChannelTree(params) {
   const { parentId, page, count } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/tree/channel/${this.deviceId}`,
+    url: `/api/v1/devices/gb/query/tree/channel/${this.deviceId}`,
     params: {
       parentId: parentId,
       page: page,
@@ -223,7 +223,7 @@ export function changeChannelAudio(params) {
   const { channelId, audio } = params
   return request({
     method: 'post',
-    url: `/api/v1/device/query/channel/audio`,
+    url: `/api/v1/devices/gb/query/channel/audio`,
     params: {
       channelId: channelId,
       audio: audio
@@ -235,7 +235,7 @@ export function updateChannelStreamIdentification(params) {
   const { deviceDbId, streamIdentification, id } = params
   return request({
     method: 'post',
-    url: `/api/v1/device/query/channel/stream/identification/update`,
+    url: `/api/v1/devices/gb/query/channel/stream/identification/update`,
     params: {
       deviceDbId: deviceDbId,
       id: id,
@@ -247,14 +247,14 @@ export function updateChannelStreamIdentification(params) {
 export function update(data) {
   return request({
     method: 'post',
-    url: `/api/v1/device/query/device/update`,
+    url: `/api/v1/devices/gb/query/device/update`,
     data: data
   })
 }
 export function add(data) {
   return request({
     method: 'post',
-    url: `/api/v1/device/query/device/add`,
+    url: `/api/v1/devices/gb/query/device/add`,
     data: data
   })
 }
@@ -262,7 +262,7 @@ export function add(data) {
 export function queryDeviceOne(deviceId) {
   return request({
     method: 'get',
-    url: `/api/v1/device/query/devices/${deviceId}`
+    url: `/api/v1/devices/gb/query/devices/${deviceId}`
   })
 }
 
@@ -270,7 +270,7 @@ export function queryDeviceTree(params, deviceId) {
   const { page, count, parentId, onlyCatalog } = params
   return request({
     method: 'get',
-    url: `/api/v1/device/query/tree/${deviceId}`,
+    url: `/api/v1/devices/gb/query/tree/${deviceId}`,
     params: {
       page: page,
       count: count,
@@ -282,7 +282,7 @@ export function queryDeviceTree(params, deviceId) {
 export function getKeepaliveTimeStatistics({ deviceId, count }) {
   return request({
     method: 'get',
-    url: '/api/v1/device/query/statistics/keepalive',
+    url: '/api/v1/devices/gb/query/statistics/keepalive',
     params: {
       deviceId: deviceId,
       count: count
@@ -292,7 +292,7 @@ export function getKeepaliveTimeStatistics({ deviceId, count }) {
 export function getRegisterTimeStatistics({ deviceId, count }) {
   return request({
     method: 'get',
-    url: '/api/v1/device/query/statistics/register',
+    url: '/api/v1/devices/gb/query/statistics/register',
     params: {
       deviceId: deviceId,
       count: count
@@ -303,7 +303,7 @@ export function getRegisterTimeStatistics({ deviceId, count }) {
 export function dragZoomIn(params) {
   return request({
     method: 'get',
-    url: '/api/v1/device/control/drag_zoom/zoom_in',
+    url: '/api/v1/devices/gb/control/drag_zoom/zoom_in',
     params
   })
 }
@@ -311,7 +311,7 @@ export function dragZoomIn(params) {
 export function dragZoomOut(params) {
   return request({
     method: 'get',
-    url: '/api/v1/device/control/drag_zoom/zoom_out',
+    url: '/api/v1/devices/gb/control/drag_zoom/zoom_out',
     params
   })
 }

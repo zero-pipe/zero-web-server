@@ -183,11 +183,6 @@ func (h *MediaServerHandler) SystemConfigInfo(c *gin.Context) {
 		"addOn": gin.H{
 			"serverId": h.serverID,
 		},
-		"jt1078Config": gin.H{
-			"port":     0,
-			"password": "",
-			"enable":   false,
-		},
 		"version": gin.H{
 			"version": h.version,
 		},

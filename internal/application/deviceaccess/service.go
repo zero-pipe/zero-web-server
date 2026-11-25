@@ -109,7 +109,6 @@ func NewService(gb *deviceapp.Service, onvif *onvifapp.Service, plugin *ipcdevic
 		gbAdapter{s: s},
 		onvifAdapter{s: s},
 		pluginAdapter{ipc: plugin},
-		jt1078Adapter{},
 	)
 	return s
 }

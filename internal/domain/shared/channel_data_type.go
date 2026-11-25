@@ -5,7 +5,6 @@ const (
 	ChannelDataTypeStreamPush  = 2
 	ChannelDataTypeStreamProxy = 3
 	ChannelDataTypeONVIF       = 4
-	ChannelDataTypeJT1078      = 200
 )
 
 func ChannelDataTypeDesc(dataType int) string {
@@ -20,8 +19,6 @@ func ChannelDataTypeDesc(dataType int) string {
 		return "ONVIF设备"
 	case ChannelDataTypeIPCPlugin:
 		return "插件设备"
-	case ChannelDataTypeJT1078:
-		return "部标设备"
 	default:
 		return "未知"
 	}

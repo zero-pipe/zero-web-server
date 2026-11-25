@@ -151,7 +151,6 @@ func Setup(r *gin.Engine, deps Deps) {
 	gbSipConfigHandler := handler.NewGbSipConfigHandler(deps.GbSipConfigService)
 	objectStoreHandler := handler.NewObjectStoreHandler(deps.ObjectStoreService)
 	snapHandler := handler.NewSnapHandler(deps.SnapService)
-	jt1078Handler := handler.NewJT1078Handler()
 	commonChannelHandler := handler.NewCommonChannelHandler(deps.CommonChannelSvc)
 	groupHandler := handler.NewGroupHandler(deps.GroupService)
 	regionHandler := handler.NewRegionHandler(deps.RegionService)
@@ -217,20 +216,8 @@ func Setup(r *gin.Engine, deps Deps) {
 
 		registerAccessToken(auth, accessTokenHandler)
 
-		registerOnvif(auth, onvifHandler)
-
-		// 统一设备接入门面（国标 + ONVIF）
-		if deps.DeviceAccessService != nil {
-			registerDevices(auth, deviceAccessHandler)
-		}
-
-		registerJt1078(auth, jt1078Handler)
-
-		registerDeviceQuery(auth, deviceHandler, snapHandler)
-
-		registerDeviceControl(auth, deviceHandler)
-
-		registerDeviceConfig(auth, deviceHandler)
+		// 设备接入唯一命名空间：/devices（统一）+ /devices/{gb,onvif,plugin}（协议专属动作）
+		registerDevices(auth, deviceAccessHandler, deviceHandler, onvifHandler, pluginHandler, snapHandler)
 
 		auth.GET("/play/start/:deviceId/:channelId", playHandler.Start)
 		auth.GET("/play/stop/:deviceId/:channelId", playHandler.Stop)

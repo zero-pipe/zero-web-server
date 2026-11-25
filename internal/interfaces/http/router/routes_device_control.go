@@ -7,7 +7,7 @@ import (
 )
 
 func registerDeviceControl(parent *gin.RouterGroup, deviceHandler *handler.DeviceHandler) {
-	g := parent.Group("/device/control")
+	g := parent.Group("/gb/control")
 	g.GET("/guard", deviceHandler.Guard)
 	g.GET("/record", deviceHandler.Record)
 	g.GET("/home_position", deviceHandler.HomePosition)
