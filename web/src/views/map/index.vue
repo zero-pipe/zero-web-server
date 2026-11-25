@@ -84,65 +84,57 @@
 
 <!--        </div>-->
 <!--      </div>-->
-      <div ref="infobox">
-        <transition name="el-zoom-in-center">
-          <div class="infobox-content" v-if="channel">
-            <el-descriptions class="margin-top" :title="channel.gbName" :column="1" :colon="true" size="mini" :labelStyle="labelStyle" >
-              <el-descriptions-item label="编号" >{{channel.gbDeviceId}}</el-descriptions-item>
-              <el-descriptions-item label="生产厂商">{{channel.gbManufacture}}</el-descriptions-item>
-              <el-descriptions-item label="安装地址" >{{channel.gbAddress == null?'未知': channel.gbAddress}}</el-descriptions-item>
-            </el-descriptions>
-            <div style="padding-top: 10px; margin: 0 auto; width: fit-content;">
-              <el-button v-bind:disabled="channel.gbStatus !== 'ON'" type="primary" size="small" title="播放" icon="el-icon-video-play" @click="play(channel)">播放</el-button>
-              <el-button type="primary" size="small" title="编辑" icon="el-icon-edit" @click="edit(channel)">编辑</el-button>
-              <el-button type="primary" size="small" title="位置" icon="el-icon-coordinate" @click="editPosition(channel)">位置</el-button>
-<!--              <el-button type="primary" size="small" title="轨迹查询" icon="el-icon-map-location" @click="getTrace(channel)">轨迹</el-button>-->
-            </div>
-            <span class="infobox-close el-icon-close" @click="closeInfoBox"></span>
-          </div>
-        </transition>
-
-      </div>
-
-      <div ref="infoboxForEdit">
-        <transition name="el-zoom-in-center">
-          <div class="infobox-edit-content" v-if="dragChannel">
-            <div style="width: 100%; line-height: 1.5rem; font-size: 14px">{{dragChannel.gbName}}  ({{dragChannel.gbDeviceId}})</div>
-            <span style="font-size: 14px">经度:</span> <el-input v-model="dragChannel.gbLongitude" placeholder="请输入经度" style="width: 7rem; margin-right: 10px"></el-input>
-            <span style="font-size: 14px">纬度: </span> <el-input v-model="dragChannel.gbLatitude" placeholder="请输入纬度" style="width: 7rem; "></el-input>
-            <el-button icon="el-icon-close" size="medium" type="text" @click="cancelEdit(dragChannel)" style="margin-left: 1rem; font-size: 18px; color: #2b2f3a"></el-button>
-            <el-button icon="el-icon-check" size="medium" type="text" @click="submitEdit(dragChannel)" style="font-size: 18px; color: #0842e2"></el-button>
-          </div>
-        </transition>
-      </div>
       <div ref="deviceInfoBox">
-        <transition name="el-zoom-in-center">
-          <div class="infobox-content" v-if="deviceInfo">
-            <el-descriptions class="margin-top" :title="deviceInfo.name" :column="1" :colon="true" size="mini" :labelStyle="labelStyle">
-              <el-descriptions-item label="类型">
-                <el-tag v-for="t in compositionTags(deviceInfo.channels)" :key="t" size="mini" effect="plain" style="margin-right:4px;">{{ t }}</el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="状态">{{ deviceOnline ? '有通道在线' : '全部离线' }}</el-descriptions-item>
-            </el-descriptions>
-            <div class="chan-switch">
-              <div class="chan-switch-title">点击通道播放（默认第一个在线通道）</div>
-              <el-button
-                v-for="ch in deviceInfo.channels"
-                :key="ch.gbId"
-                size="mini"
-                :type="playingChannelId === ch.gbId ? 'primary' : 'default'"
-                :disabled="(ch.gbStatus || ch.status) !== 'ON'"
-                @click="playChannelOfDevice(ch)"
-              >{{ ch.gbName }}</el-button>
+        <div class="popup-light" v-if="deviceInfo">
+          <div class="popup-header">
+            <div class="popup-title-wrap">
+              <div class="popup-title">{{ deviceInfo.name }}</div>
+              <div class="popup-meta">
+                <span class="status-dot" :class="{ off: !deviceOnline }">{{ deviceOnline ? '在线' : '离线' }}</span>
+                <span>·</span>
+                <span>{{ protoText(deviceInfo.protocol) }}</span>
+              </div>
             </div>
-            <span class="infobox-close el-icon-close" @click="closeInfoBox"></span>
+            <button class="close-icon" title="关闭" @click="closeInfoBox">×</button>
           </div>
-        </transition>
+
+          <div class="kv-list">
+            <div class="kv-row">
+              <span class="kv-label">编号</span>
+              <span class="kv-val mono" :class="{ empty: !deviceInfo.code }">{{ deviceInfo.code || '-' }}</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-label">厂商</span>
+              <span class="kv-val" :class="{ empty: !deviceInfo.vendor }">{{ deviceInfo.vendor || '-' }}</span>
+            </div>
+            <div class="kv-row">
+              <span class="kv-label">位置</span>
+              <span class="kv-val" :class="{ empty: !deviceInfo.address }">{{ deviceInfo.address || '未配置' }}</span>
+            </div>
+          </div>
+
+          <div class="chan-chips" v-if="deviceInfo.channels.length > 1">
+            <button
+              v-for="ch in deviceInfo.channels"
+              :key="ch.gbId"
+              class="chan-chip"
+              :class="{ active: playingChannelId === ch.gbId }"
+              :disabled="ch.gbStatus !== 'ON'"
+              @click="playChannelOfDevice(ch)"
+            >{{ ch.gbName }}</button>
+          </div>
+
+          <div class="popup-actions">
+            <button class="act-btn act-primary" :disabled="!deviceOnline" @click="playFirstChannel">▶ 播放</button>
+            <button class="act-btn act-secondary" @click="editDevice">✎ 编辑</button>
+            <button class="act-btn act-secondary" @click="locateDevice">◎ 定位</button>
+          </div>
+        </div>
       </div>
 
       <player ref="player" ></player>
       <queryTrace ref="queryTrace" ></queryTrace>
-      <CommonChannelEditDialog ref="commonChannelEditDialog" ></CommonChannelEditDialog>
+      <DeviceEditDrawer :visible.sync="deviceEditVisible" :row="deviceEditRow" @success="initChannelLayer" />
       <DrawThinProgress ref="drawThinProgress" ></DrawThinProgress>
     </div>
 </template>
@@ -152,9 +144,9 @@ import DeviceTree from '../common/DeviceTree.vue'
 import queryTrace from './queryTrace.vue'
 import MapComponent from '../common/MapComponent.vue'
 import player from '../channel/player.vue'
-import CommonChannelEditDialog from '../dialog/commonChannelEditDialog.vue'
+import DeviceEditDrawer from '@/views/devices/DeviceEditDrawer.vue'
 import DrawThinProgress from './dialog/drawThinProgress.vue'
-import { queryChannels, queryAssets } from '@/api/asset'
+import { queryChannels, queryAssets, getAssetDetail } from '@/api/asset'
 import { stopPlayChannel } from '@/api/commonChannel'
 
 let channelLayer, channelTileLayer = null
@@ -162,7 +154,7 @@ export default {
   name: 'Map',
   components: {
     DrawThinProgress,
-    CommonChannelEditDialog,
+    DeviceEditDrawer,
     DeviceTree,
     player,
     queryTrace,
@@ -170,20 +162,13 @@ export default {
   },
   data() {
     return {
-      layer: null,
-      channel: null,
-      dragChannel: {},
       deviceInfo: null,
       deviceInfoBoxId: null,
+      deviceEditVisible: false,
+      deviceEditRow: null,
       deviceMetaMap: {},
       deviceGroups: {},
       playingChannelId: null,
-      feature: null,
-      device: null,
-      infoBoxId: null,
-      labelStyle: {
-        width: '56px'
-      },
       isLoging: false,
       longitudeStr: 'longitude',
       latitudeStr: 'latitude',
@@ -233,7 +218,12 @@ export default {
             gbId: c.resourceId,
             gbName: c.name,
             gbStatus: c.status || (c.online ? 'ON' : 'OFF'),
-            channelType: c.channelType || ''
+            channelType: c.channelType || '',
+            protocol: c.protocol || '',
+            gbCode: c.gbCode || '',
+            externalKey: c.externalKey || '',
+            ptzType: c.ptzType,
+            hasAudio: c.hasAudio
           })
           if (!groups[key].position && c.longitude > 0 && c.latitude > 0) {
             groups[key].position = [c.longitude, c.latitude]
@@ -318,17 +308,73 @@ export default {
       tags.push(n <= 1 ? '单通道' : (n === 2 ? '双通道' : `多通道(${n})`))
       return tags
     },
-    // 点击设备图标：弹设备信息 + 通道按钮，默认自动播放第一个在线通道。
+    // 点击设备图标：打开设备卡片（图二样式），默认自动播放第一个在线通道。
     deviceClickEvent(items) {
       const dev = (items && items[0]) || null
-      if (!dev || !dev.position) return
+      if (!dev || !dev.deviceId) return
+      this.openDeviceCard(dev.deviceId, dev.position)
+    },
+    // 打开某设备的卡片：先按已有分组数据填，再拉一次详情补厂商/安装位置/协议/编号。
+    openDeviceCard(deviceId, position) {
+      const g = this.deviceGroups[deviceId]
+      if (!g) return
+      const meta = this.deviceMetaMap[deviceId] || {}
+      const c0 = g.channels[0] || {}
       this.closeInfoBox()
-      this.deviceInfo = dev
-      const first = dev.channels.find(c => c.gbStatus === 'ON') || dev.channels[0]
+      this.deviceInfo = {
+        deviceId: String(deviceId),
+        name: meta.name || g.name || this.guessDeviceName(g.channels),
+        deviceType: meta.deviceType || '',
+        protocol: c0.protocol || '',
+        code: c0.gbCode || c0.externalKey || '',
+        vendor: '',
+        address: '',
+        channels: g.channels,
+        position: position || g.position
+      }
+      const first = g.channels.find(c => c.gbStatus === 'ON') || g.channels[0]
       if (first) this.playChannelOfDevice(first)
+      getAssetDetail(Number(deviceId)).then(res => {
+        if (!this.deviceInfo || String(this.deviceInfo.deviceId) !== String(deviceId)) return
+        const d = res.data || {}
+        const dev = d.device || {}
+        const ext = d.ext || {}
+        const b = d.binding || {}
+        this.deviceInfo.vendor = dev.vendor || ''
+        this.deviceInfo.address = ext.address || ''
+        if (b.protocol) this.deviceInfo.protocol = b.protocol
+        if (b.protocol === 'gb28181' && b.externalId) this.deviceInfo.code = b.externalId
+        else if (dev.internalCode) this.deviceInfo.code = dev.internalCode
+      }).catch(() => {})
       this.$nextTick(() => {
-        this.deviceInfoBoxId = this.$refs.mapComponent.openInfoBox(dev.position, this.$refs.deviceInfoBox, [0, -50])
+        this.deviceInfoBoxId = this.$refs.mapComponent.openInfoBox(this.deviceInfo.position, this.$refs.deviceInfoBox, [0, -50])
       })
+    },
+    protoText(p) {
+      return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: 'SDK' }[p] || (p || '—')
+    },
+    playFirstChannel() {
+      if (!this.deviceInfo) return
+      const first = this.deviceInfo.channels.find(c => c.gbStatus === 'ON') || this.deviceInfo.channels[0]
+      if (first) this.playChannelOfDevice(first)
+    },
+    editDevice() {
+      if (this.deviceInfo) this.editDeviceById(this.deviceInfo.deviceId)
+    },
+    editDeviceById(deviceId) {
+      this.deviceEditRow = { dbId: Number(deviceId), protocol: (this.deviceInfo && this.deviceInfo.protocol) || '' }
+      this.deviceEditVisible = true
+    },
+    locateDevice() {
+      if (this.deviceInfo && this.deviceInfo.position) {
+        this.$refs.mapComponent.panTo(this.deviceInfo.position, 16)
+      }
+    },
+    // 按通道 id 反查其所属设备 id（deviceGroups 的 key）。
+    findDeviceIdByChannel(channelId) {
+      return Object.keys(this.deviceGroups).find(k =>
+        this.deviceGroups[k].channels.some(c => String(c.gbId) === String(channelId))
+      )
     },
     // 切换设备内通道：先停上一个，再播目标通道。
     playChannelOfDevice(ch) {
@@ -351,21 +397,14 @@ export default {
       }
     },
     treeChannelClickEvent: function (id) {
-      this.closeInfoBox()
-      this.$store.dispatch('commonChanel/queryOne', id)
-        .then(data => {
-          if (!data.gbLongitude || data.gbLongitude < 0 || !data.gbLatitude || data.gbLatitude < 0) {
-            this.$message.warning({
-              showClose: true,
-              message: '无位置信息'
-            })
-            return
-          }
-          let zoomExtent = this.$refs.mapComponent.getZoomExtent()
-          this.$refs.mapComponent.panTo([data.gbLongitude, data.gbLatitude], zoomExtent[1], () => {
-            this.showChannelInfo(data)
-          })
-        })
+      const deviceId = this.findDeviceIdByChannel(id)
+      if (!deviceId) {
+        this.$message.warning({ showClose: true, message: '该设备无位置信息' })
+        return
+      }
+      const pos = this.deviceGroups[deviceId].position
+      const zoomExtent = this.$refs.mapComponent.getZoomExtent()
+      this.$refs.mapComponent.panTo(pos, zoomExtent[1], () => { this.openDeviceCard(deviceId, pos) })
     },
     zoomIn: function() {
       this.$refs.mapComponent.zoomIn()
@@ -376,75 +415,27 @@ export default {
     getContextmenu: function (event) {
         return [
           {
-            label: '播放通道',
+            label: '播放',
             icon: 'el-icon-video-play',
             type: 1,
             onClick: (event, data, node) => {
-              console.log(data)
               this.$store.dispatch('commonChanel/queryOne', data.id)
-                .then(data => {
-                  this.play(data)
-                })
+                .then(d => { this.play(d) })
                 .catch((error) => {
-                  this.$message({
-                    showClose: true,
-                    message: error,
-                    type: 'error'
-                  })
+                  this.$message({ showClose: true, message: error, type: 'error' })
                 })
             }
           },
           {
-            label: '修改位置',
-            icon: 'el-icon-coordinate',
-            type: 1,
-            onClick: (event, data, node) => {
-              this.$store.dispatch('commonChanel/queryOne', data.id)
-                .then(data => {
-                  this.editPosition(data)
-                })
-                .catch((error) => {
-                  this.$message({
-                    showClose: true,
-                    message: error,
-                    type: 'error'
-                  })
-                })
-            }
-          },
-          {
-            label: '编辑通道',
+            label: '编辑设备',
             icon: 'el-icon-edit',
             type: 1,
             onClick: (event, data, node) => {
-              this.$store.dispatch('commonChanel/queryOne', data.id)
-                .then(data => {
-                  this.edit(data)
-                })
-                .catch((error) => {
-                  this.$message({
-                    showClose: true,
-                    message: error,
-                    type: 'error'
-                  })
-                })
+              const deviceId = this.findDeviceIdByChannel(data.id)
+              if (deviceId) this.editDeviceById(deviceId)
             }
           }
         ]
-    },
-    showChannelInfo: function(data) {
-      this.channel = data
-      // 此时增加临时图标
-      let position = [data.gbLongitude, data.gbLatitude]
-      let cameraData = {
-        id: data.gbId,
-        position: position,
-        data: data,
-        status: data.gbStatus
-      }
-      this.$refs.mapComponent.addFeature(channelLayer, cameraData)
-
-      this.infoBoxId = this.$refs.mapComponent.openInfoBox(position, this.$refs.infobox, [0, -50])
     },
     zoomChange: function(zoom) {},
 
@@ -460,14 +451,10 @@ export default {
       this.changeLayerType(this.layerType)
     },
     clientEvent(data){
-      this.closeInfoBox()
-      this.$nextTick(() => {
-        if (data[0].edit) {
-          this.showEditInfo(data[0])
-        }else {
-          this.showChannelInfo(data[0])
-        }
-      })
+      const ch = data && data[0]
+      if (!ch) return
+      const deviceId = this.findDeviceIdByChannel(ch.gbId != null ? ch.gbId : ch.resourceId)
+      if (deviceId) this.openDeviceCard(deviceId, this.deviceGroups[deviceId].position)
     },
     changeLayerType: function (index) {
       this.layerType = index
@@ -490,15 +477,10 @@ export default {
       channelTileLayer = this.$refs.mapComponent.addVectorTileLayer(tileUrl, this.clientEvent)
     },
     closeInfoBox: function () {
-      if (this.infoBoxId !== null) {
-        this.$refs.mapComponent.closeInfoBox(this.infoBoxId)
-      }
       if (this.deviceInfoBoxId !== null) {
         this.$refs.mapComponent.closeInfoBox(this.deviceInfoBoxId)
         this.deviceInfoBoxId = null
       }
-      this.channel = null
-      this.dragChannel = null
       this.deviceInfo = null
     },
     play: function (channel) {
@@ -514,109 +496,6 @@ export default {
         })
         .catch((error) => {
           this.$refs.player.onStreamError(error)
-        })
-    },
-    edit: function (channel) {
-      this.$refs.commonChannelEditDialog.openDialog(channel.gbId)
-    },
-    editPosition: function (channel) {
-      this.closeInfoBox()
-      // 开启图标可拖动
-      this.$refs.mapComponent.dragInteraction.addFeatureId(channel.gbId,
-        {
-          startEvent: event => {
-            this.closeInfoBox()
-          },
-          endEvent: event => {
-            channel.gbLongitude = event.lonLat[0]
-            channel.gbLatitude = event.lonLat[1]
-            this.showEditInfo(channel)
-          }
-        }
-      )
-
-      let position = null
-      if (!!channel.gbLongitude && !!channel.gbLatitude && channel.gbLongitude > 0 && channel.gbLatitude > 0) {
-        position = [channel.gbLongitude, channel.gbLatitude]
-        channel['oldLongitude'] = channel.gbLongitude
-        channel['oldLatitude'] = channel.gbLatitude
-      }else {
-        position = this.$refs.mapComponent.getCenter()
-        channel['oldLongitude'] = channel.gbLongitude
-        channel['oldLatitude'] = channel.gbLatitude
-        channel.gbLongitude = position[0]
-        channel.gbLatitude = position[1]
-      }
-
-      channel['edit'] = true
-      if (!this.$refs.mapComponent.coordinateInView(position)) {
-        this.$refs.mapComponent.panTo(position, 16, () => {
-          this.showEditInfo(channel)
-        })
-      }else {
-        this.showEditInfo(channel)
-      }
-
-      // 标记可编辑图标为红色
-      this.$refs.mapComponent.setFeaturePositionById(channelLayer, channel.gbId, {
-        id: channel.gbId,
-        position: position,
-        data: channel,
-        status: 'checked'
-      })
-      // 如果开启了瓦片图层，此时应该让瓦片图层不再显示这个feature
-      if (channelTileLayer) {
-        this.$refs.mapComponent.hideFeature(channelTileLayer, channel.gbId)
-      }
-    },
-    showEditInfo: function(data) {
-      this.dragChannel = data
-      this.infoBoxId = this.$refs.mapComponent.openInfoBox([data.gbLongitude, data.gbLatitude], this.$refs.infoboxForEdit, [0, -50])
-    },
-    cancelEdit: function(channel) {
-      this.closeInfoBox()
-      this.$refs.mapComponent.dragInteraction.removeFeatureId(channel.gbId)
-      channel.gbLongitude = channel.oldLongitude
-      channel.gbLatitude = channel.oldLatitude
-      channel['edit'] = false
-      this.$refs.mapComponent.setFeaturePositionById(channelLayer, channel.gbId, {
-        id: channel.gbId,
-        position: [channel.gbLongitude, channel.gbLatitude],
-        data: channel,
-        status: channel.gbStatus
-      })
-      if (channelTileLayer) {
-        this.$refs.mapComponent.cancelHideFeature(channelTileLayer, channel.gbId)
-      }
-    },
-    submitEdit: function(channel) {
-      let position = [channel.gbLongitude, channel.gbLatitude]
-      this.$store.dispatch('commonChanel/update', channel)
-        .then(data => {
-          this.$message.success({
-            showClose: true,
-            message: '保存成功'
-          })
-          this.closeInfoBox()
-          channel['edit'] = false
-          this.$refs.mapComponent.dragInteraction.removeFeatureId(channel.gbId)
-
-          this.$refs.mapComponent.setFeaturePositionById(channelLayer, channel.gbId, {
-            id: channel.gbId,
-            position: position,
-            data: channel,
-            status: channel.gbStatus
-          })
-          // 刷星树菜单
-          this.$refs.deviceTree.refresh('channel' + channel.gbId)
-
-        })
-        .catch((error) => {
-          this.$message({
-            showClose: true,
-            message: error,
-            type: 'error'
-          })
         })
     },
     showDrawThinBox: function(show){
@@ -892,68 +771,186 @@ export default {
   margin: 0;
 }
 
-.infobox-content{
-  width: 270px;
-  background-color: #FFFFFF;
-  padding: 10px;
+/* 设备气泡卡片（现代轻量白底） */
+.popup-light {
+  position: relative;
+  width: 260px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  border: 1px solid #868686;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .14);
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  font-family: inherit;
 }
-
-.infobox-content::after {
-  position: absolute;
-  bottom: -11px;
-  left: calc(50% - 8px);
-  display: block;
+.popup-light::after {
   content: "";
-  width: 16px;
-  height: 16px;
-  background: url('/static/images/arrow.png') no-repeat center;
-}
-
-.infobox-edit-content{
-  width: 400px;
-  background-color: #FFFFFF;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid #868686;
-}
-
-.infobox-edit-content::after {
   position: absolute;
-  bottom: -11px;
-  left: calc(50% - 8px);
-  display: block;
-  content: "";
-  width: 16px;
-  height: 16px;
-  background: url('/static/images/arrow.png') no-repeat center;
+  bottom: -7px;
+  left: calc(50% - 7px);
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  transform: rotate(45deg);
 }
-.chan-switch {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #eee;
+.popup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eef2f7;
 }
-.chan-switch-title {
+.popup-title-wrap {
+  min-width: 0;
+}
+.popup-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.popup-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
   font-size: 12px;
-  color: #909399;
-  margin-bottom: 6px;
+  color: #94a3b8;
 }
-.chan-switch .el-button {
-  margin: 0 6px 6px 0;
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #16a34a;
+  font-weight: 500;
 }
-.infobox-close {
-  position: absolute;
-  right: 1rem;
-  top: 1rem;
-  color: #000000;
-  cursor:pointer
+.status-dot::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
 }
-.el-descriptions__title {
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 20px 20px 0px 23px;
-  text-align: center;
-  width: 100%;
+.status-dot.off {
+  color: #94a3b8;
+}
+.status-dot.off::before {
+  background: #cbd5e1;
+}
+.close-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 18px;
+  line-height: 18px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.close-icon:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+.kv-list {
+  padding: 10px 0 4px;
+}
+.kv-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.kv-label {
+  flex: 0 0 40px;
+  color: #94a3b8;
+}
+.kv-val {
+  flex: 1;
+  min-width: 0;
+  color: #334155;
+  word-break: break-all;
+}
+.kv-val.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .2px;
+}
+.kv-val.empty {
+  color: #cbd5e1;
+}
+.chan-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+.chan-chip {
+  padding: 2px 10px;
+  font-size: 12px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chan-chip:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+.chan-chip.active {
+  color: #1a73e8;
+  background: #e8f1fe;
+  border-color: #bcd7fb;
+}
+.chan-chip:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+.popup-actions {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.act-btn {
+  height: 32px;
+  border-radius: 7px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.act-primary {
+  background: #1a73e8;
+  color: #fff;
+}
+.act-primary:hover:not(:disabled) {
+  background: #1667d1;
+}
+.act-primary:disabled {
+  background: #b9d3f7;
+  cursor: not-allowed;
+}
+.act-secondary {
+  background: #fff;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+.act-secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 </style>
