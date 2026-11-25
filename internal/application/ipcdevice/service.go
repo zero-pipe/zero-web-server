@@ -221,7 +221,36 @@ func (s *Service) StartLive(ctx context.Context, deviceID int, channelID, stream
 		App: streamApp, Stream: stream, NodeID: node.ID(),
 		PluginID: dev.PluginID, DeviceUID: dev.DeviceUID, ChannelID: channelID,
 	})
+	// 等 ZMS 真正收到首帧再返回播放地址：插件拉流有启动延迟（RTSP 握手、SPS 解析），
+	// 直接返回会让播放器“有时黑屏、有时马上有画面”。与国标侧 waitGBStreamReady 一致。
+	if info := s.waitLiveReady(ctx, node, streamApp, stream, pluginFirstFrameWait); info != nil {
+		applog.Infof("[ipc] 直播就绪 stream=%s bytesSpeed=%d fps=%d", stream, info.BytesSpeed, info.VideoFps)
+	} else {
+		applog.Warnf("[ipc] 直播未在等待窗口内就绪，仍返回地址 stream=%s", stream)
+	}
 	return s.buildContent(ctx, stream)
+}
+
+// pluginFirstFrameWait 是插件起流到首帧到达的就绪等待上限（拉流握手+首关键帧）。
+const pluginFirstFrameWait = 15 * time.Second
+
+// waitLiveReady 轮询探测直到该插件直播流在 ZMS 可播（有码率或帧率）或到达 maxWait；
+// ctx 取消则提前返回 nil。探测节点不可达时按“未就绪”处理（到点返回 nil 即可）。
+func (s *Service) waitLiveReady(ctx context.Context, node port.MediaEndpoint, app, stream string, maxWait time.Duration) *port.StreamProbe {
+	deadline := time.Now().Add(maxWait)
+	for {
+		if info := node.LookupStream(ctx, app, stream); info != nil && (info.BytesSpeed > 0 || info.VideoFps > 0) {
+			return info
+		}
+		if time.Now().After(deadline) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
 }
 
 // Command 通用命令透传（自定义能力）：平台不解析 params/result 语义。
