@@ -8,6 +8,7 @@ type PhysicalDevice struct {
 	Vendor       string `json:"vendor"`
 	Model        string `json:"model"`
 	SerialNumber string `json:"serialNumber"`
+	DeviceType   string `json:"deviceType"`
 	Enabled      bool   `json:"enabled"`
 	Online       bool   `json:"online"`
 	CreateTime   string `json:"createTime"`
@@ -50,6 +51,7 @@ type Resource struct {
 	Kind            string  `json:"kind"`
 	ExternalKey     string  `json:"externalKey"`
 	Name            string  `json:"name"`
+	ChannelType     string  `json:"channelType"`
 	Status          string  `json:"status"`
 	ProtocolChannelID int     `json:"-"`
 	AttrsJSON       string  `json:"attrsJson"`
@@ -57,6 +59,7 @@ type Resource struct {
 	Latitude        float64 `json:"latitude"`
 	MapLevel        int     `json:"mapLevel"`
 	PTZType         int     `json:"ptzType"`
+	Direction       int     `json:"direction"`
 	HasAudio        bool    `json:"hasAudio"`
 	Tags            string  `json:"tags"`
 	Enabled         bool    `json:"enabled"`
@@ -118,9 +121,20 @@ type DeviceSummary struct {
 	ResourceCount int             `json:"resourceCount"`
 }
 
+// DeviceExt 设备扩展信息（位置等，设备级）。
+type DeviceExt struct {
+	Longitude   float64 `json:"longitude"`
+	Latitude    float64 `json:"latitude"`
+	Address     string  `json:"address"`
+	GeoCoordSys string  `json:"geoCoordSys"`
+	Remark      string  `json:"remark"`
+	Tags        string  `json:"tags"`
+}
+
 // DeviceDetail 用于详情展示。
 type DeviceDetail struct {
 	Device       *PhysicalDevice `json:"device"`
+	Ext          *DeviceExt      `json:"ext"`
 	Binding      *AccessBinding  `json:"binding"`
 	Resources    []*Resource     `json:"resources"`
 	Capabilities []*Capability   `json:"capabilities"`
@@ -133,7 +147,15 @@ type DevicePatch struct {
 	Vendor       *string `json:"vendor"`
 	Model        *string `json:"model"`
 	SerialNumber *string `json:"serialNumber"`
+	DeviceType   *string `json:"deviceType"`
 	Enabled      *bool   `json:"enabled"`
+	// 位置（写 zws_device_ext，并同步到该设备所有通道）
+	Longitude   *float64 `json:"longitude"`
+	Latitude    *float64 `json:"latitude"`
+	Address     *string  `json:"address"`
+	GeoCoordSys *string  `json:"geoCoordSys"`
+	Remark      *string  `json:"remark"`
+	Tags        *string  `json:"tags"`
 }
 
 // ResourcePatch 是通道可编辑字段（nil 表示不修改）。
@@ -143,6 +165,8 @@ type ResourcePatch struct {
 	Latitude  *float64 `json:"latitude"`
 	MapLevel  *int     `json:"mapLevel"`
 	PTZType   *int     `json:"ptzType"`
+	Direction *int     `json:"direction"`
+	ChannelType *string `json:"channelType"`
 	HasAudio  *bool    `json:"hasAudio"`
 	Tags      *string  `json:"tags"`
 	Enabled   *bool    `json:"enabled"`
@@ -178,11 +202,13 @@ type ChannelView struct {
 	Protocol           string  `json:"protocol"`
 	Name               string  `json:"name"`
 	Kind               string  `json:"kind"`
+	ChannelType        string  `json:"channelType"`
 	ExternalKey        string  `json:"externalKey"` // GB 通道编码 / ONVIF ProfileToken / 插件通道号
 	GBCode             string  `json:"gbCode"`
 	Status             string  `json:"status"`
 	Online             bool    `json:"online"`
 	PTZType            int     `json:"ptzType"`
+	Direction          int     `json:"direction"`
 	HasAudio           bool    `json:"hasAudio"`
 	Longitude          float64 `json:"longitude"`
 	Latitude           float64 `json:"latitude"`
@@ -209,6 +235,7 @@ type Repository interface {
 	GetDeviceByInternalCode(code string) (*PhysicalDevice, error)
 	ListDevices(page, count int, query, protocol, status string) ([]*DeviceSummary, int64, error)
 	UpdateDeviceFields(id string, patch DevicePatch) error
+	GetDeviceExt(deviceID string) (*DeviceExt, error)
 
 	CreateBinding(b *AccessBinding) error
 	UpsertBinding(b *AccessBinding) error

@@ -113,8 +113,9 @@ func (s *Service) GetDetail(deviceID string) (*domainasset.DeviceDetail, error) 
 	}
 	caps, _ := s.repo.ListCapabilities("device", deviceID)
 	events, _ := s.repo.ListEventSources(deviceID)
+	ext, _ := s.repo.GetDeviceExt(deviceID)
 	return &domainasset.DeviceDetail{
-		Device: dev, Binding: binding, Resources: resources,
+		Device: dev, Ext: ext, Binding: binding, Resources: resources,
 		Capabilities: caps, EventSources: events,
 	}, nil
 }

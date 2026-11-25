@@ -65,7 +65,7 @@ func (r *OnvifDeviceRepository) Create(ctx context.Context, device *domainonvif.
 	now := time.Now().Format("2006-01-02 15:04:05")
 	m := &model.Device{
 		InternalCode: device.InternalCode, GbCode: device.GbCode, Name: device.Name,
-		Manufacturer: device.Manufacturer, Model: device.Model, Firmware: device.Firmware,
+		DeviceType: device.DeviceType, Manufacturer: device.Manufacturer, Model: device.Model, Firmware: device.Firmware,
 		SerialNumber: device.SerialNumber, Online: device.OnLine, Enabled: true,
 		Status: onlineStatus(device.OnLine), CreateTime: now, UpdateTime: now,
 	}
@@ -164,7 +164,7 @@ func (r *OnvifDeviceRepository) UpdateOnlineStatus(ctx context.Context, id int64
 func (r *OnvifDeviceRepository) hydrateOnvifDevice(m *model.Device) *domainonvif.Device {
 	d := &domainonvif.Device{
 		ID: m.ID, InternalCode: m.InternalCode, GbCode: m.GbCode, Name: m.Name,
-		Manufacturer: m.Manufacturer, Model: m.Model, Firmware: m.Firmware,
+		DeviceType: m.DeviceType, Manufacturer: m.Manufacturer, Model: m.Model, Firmware: m.Firmware,
 		SerialNumber: m.SerialNumber, OnLine: m.Online,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}

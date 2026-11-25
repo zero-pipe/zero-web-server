@@ -1,13 +1,5 @@
 <template>
   <div class="unified-channel">
-    <!-- 编辑与国标通道完全复用整页表单：国标码默认为空、需手工填写 -->
-    <channel-edit
-      v-if="editCtx"
-      :internal-code="editCtx.internalCode"
-      :protocol="editCtx.protocol"
-      :close-edit="closeEdit"
-    />
-    <template v-else>
     <el-form :inline="true" size="mini">
       <el-form-item v-if="embedded" style="margin-right: 2rem">
         <el-page-header content="通道列表" @back="$emit('back')" />
@@ -71,13 +63,6 @@
             :loading="row._loading"
             @click="play(row)"
           >播放</el-button>
-          <el-divider direction="vertical" />
-          <el-button
-            type="text"
-            size="medium"
-            icon="el-icon-edit"
-            @click="openEdit(row)"
-          >编辑</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -94,13 +79,11 @@
 
     <!-- 与标准接入一致的播放器（编码信息/实时视频；PTZ 暂不对插件开放） -->
     <device-player ref="devicePlayer" @closed="onPlayerClosed" />
-    </template>
   </div>
 </template>
 
 <script>
 import DevicePlayer from '@/views/device/dialog/devicePlayer.vue'
-import ChannelEdit from '@/views/device/channel/edit.vue'
 import { queryChannels, startResourceLive, stopResourceLive, getResourceDetail } from '@/api/asset'
 
 // 能力集展示模板：决定「展示哪些能力图标」，顺序即展示顺序。
@@ -117,7 +100,7 @@ const CAP_TEMPLATE = [
 
 export default {
   name: 'UnifiedChannelPanel',
-  components: { DevicePlayer, ChannelEdit },
+  components: { DevicePlayer },
   props: {
     // 固定设备内码（设备详情下钻时传入）
     deviceInternalCode: { type: String, default: '' },
@@ -140,7 +123,6 @@ export default {
       query: '',
       protocolFilter: this.protocol,
       deviceCode: this.deviceInternalCode,
-      editCtx: null,
       playingRow: null,
       capTemplate: CAP_TEMPLATE
     }
@@ -220,11 +202,7 @@ export default {
       }).finally(() => { row._profilesLoading = false })
     },
     openEdit(row) {
-      this.editCtx = { internalCode: row.internalCode, protocol: row.protocol }
-    },
-    closeEdit() {
-      this.editCtx = null
-      this.load()
+      // 通道编辑已收敛到设备编辑（设备详情抽屉），此入口不再使用。
     },
     search() {
       this.page = 1

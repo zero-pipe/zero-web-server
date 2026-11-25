@@ -32,7 +32,8 @@ func (r *AssetRepository) CreateDevice(d *domainasset.PhysicalDevice) error {
 	now := nowText()
 	m := &model.Device{
 		InternalCode: d.InternalCode, Name: d.Name, Manufacturer: d.Vendor,
-		Model: d.Model, SerialNumber: d.SerialNumber, Enabled: d.Enabled, Online: d.Online,
+		Model: d.Model, SerialNumber: d.SerialNumber, DeviceType: d.DeviceType,
+		Enabled: d.Enabled, Online: d.Online,
 		Status: onlineStatus(d.Online), CreateTime: now, UpdateTime: now,
 	}
 	if err := r.db.Create(m).Error; err != nil {
@@ -47,7 +48,8 @@ func (r *AssetRepository) UpsertDevice(d *domainasset.PhysicalDevice) error {
 	if id, ok := parseID(d.ID); ok && id > 0 {
 		return r.db.Model(&model.Device{}).Where("id = ?", id).Updates(map[string]any{
 			"internal_code": d.InternalCode, "name": d.Name, "manufacturer": d.Vendor,
-			"model": d.Model, "serial_number": d.SerialNumber, "enabled": d.Enabled,
+			"model": d.Model, "serial_number": d.SerialNumber, "device_type": d.DeviceType,
+			"enabled": d.Enabled,
 			"online": d.Online, "status": onlineStatus(d.Online), "update_time": nowText(),
 		}).Error
 	}
@@ -162,7 +164,8 @@ func (r *AssetRepository) UpdateDeviceFields(id string, patch domainasset.Device
 	if !ok {
 		return gorm.ErrRecordNotFound
 	}
-	fields := map[string]any{"update_time": nowText()}
+	now := nowText()
+	fields := map[string]any{"update_time": now}
 	if patch.Name != nil {
 		fields["name"] = strings.TrimSpace(*patch.Name)
 	}
@@ -175,10 +178,107 @@ func (r *AssetRepository) UpdateDeviceFields(id string, patch domainasset.Device
 	if patch.SerialNumber != nil {
 		fields["serial_number"] = strings.TrimSpace(*patch.SerialNumber)
 	}
+	if patch.DeviceType != nil {
+		fields["device_type"] = strings.TrimSpace(*patch.DeviceType)
+	}
 	if patch.Enabled != nil {
 		fields["enabled"] = *patch.Enabled
 	}
-	return r.db.Model(&model.Device{}).Where("id = ?", pk).Updates(fields).Error
+	if err := r.db.Model(&model.Device{}).Where("id = ?", pk).Updates(fields).Error; err != nil {
+		return err
+	}
+
+	// 位置：写 zws_device_ext，并同步到该设备所有通道
+	extFields := map[string]any{}
+	if patch.Longitude != nil {
+		extFields["longitude"] = *patch.Longitude
+	}
+	if patch.Latitude != nil {
+		extFields["latitude"] = *patch.Latitude
+	}
+	if patch.Address != nil {
+		extFields["address"] = strings.TrimSpace(*patch.Address)
+	}
+	if patch.GeoCoordSys != nil {
+		extFields["geo_coord_sys"] = strings.TrimSpace(*patch.GeoCoordSys)
+	}
+	if patch.Remark != nil {
+		extFields["remark"] = strings.TrimSpace(*patch.Remark)
+	}
+	if patch.Tags != nil {
+		extFields["tags"] = strings.TrimSpace(*patch.Tags)
+	}
+	if len(extFields) > 0 {
+		var ext model.DeviceExt
+		err := r.db.Where("device_id = ?", pk).First(&ext).Error
+		if err == gorm.ErrRecordNotFound {
+			ne := model.DeviceExt{DeviceID: pk, CreateTime: now, UpdateTime: now}
+			applyDeviceExtPatch(&ne, patch)
+			if err := r.db.Create(&ne).Error; err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		} else {
+			extFields["update_time"] = now
+			if err := r.db.Model(&model.DeviceExt{}).Where("id = ?", ext.ID).Updates(extFields).Error; err != nil {
+				return err
+			}
+		}
+	}
+	// 经纬度同步到该设备所有通道（channel_ext）
+	if patch.Longitude != nil || patch.Latitude != nil {
+		updates := map[string]any{"update_time": now}
+		if patch.Longitude != nil {
+			updates["longitude"] = *patch.Longitude
+		}
+		if patch.Latitude != nil {
+			updates["latitude"] = *patch.Latitude
+		}
+		_ = r.db.Model(&model.ChannelExt{}).
+			Where("channel_id IN (?)", r.db.Model(&model.Channel{}).Select("id").Where("device_id = ?", pk)).
+			Updates(updates).Error
+	}
+	return nil
+}
+
+func applyDeviceExtPatch(ext *model.DeviceExt, p domainasset.DevicePatch) {
+	if p.Longitude != nil {
+		ext.Longitude = *p.Longitude
+	}
+	if p.Latitude != nil {
+		ext.Latitude = *p.Latitude
+	}
+	if p.Address != nil {
+		ext.Address = strings.TrimSpace(*p.Address)
+	}
+	if p.GeoCoordSys != nil {
+		ext.GeoCoordSys = strings.TrimSpace(*p.GeoCoordSys)
+	}
+	if p.Remark != nil {
+		ext.Remark = strings.TrimSpace(*p.Remark)
+	}
+	if p.Tags != nil {
+		ext.Tags = strings.TrimSpace(*p.Tags)
+	}
+}
+
+func (r *AssetRepository) GetDeviceExt(deviceID string) (*domainasset.DeviceExt, error) {
+	pk, ok := parseID(deviceID)
+	if !ok {
+		return &domainasset.DeviceExt{}, nil
+	}
+	var ext model.DeviceExt
+	if err := r.db.Where("device_id = ?", pk).First(&ext).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return &domainasset.DeviceExt{}, nil
+		}
+		return nil, err
+	}
+	return &domainasset.DeviceExt{
+		Longitude: ext.Longitude, Latitude: ext.Latitude, Address: ext.Address,
+		GeoCoordSys: ext.GeoCoordSys, Remark: ext.Remark, Tags: ext.Tags,
+	}, nil
 }
 
 // --- Binding ---
@@ -343,7 +443,8 @@ func (r *AssetRepository) GetResourceByInternalCode(code string) (*domainasset.R
 func (r *AssetRepository) hydrateAssetResource(m *model.Channel) *domainasset.Resource {
 	res := &domainasset.Resource{
 		ID: formatID(m.ID), InternalCode: m.InternalCode, DeviceID: formatID(m.DeviceID),
-		Kind: m.Kind, ExternalKey: m.ExternalKey, Name: m.Name, Status: m.Status,
+		Kind: m.Kind, ExternalKey: m.ExternalKey, Name: m.Name, ChannelType: m.ChannelType,
+		Status: m.Status,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime, Enabled: true,
 		ProtocolChannelID: int(m.ID),
 	}
@@ -357,6 +458,7 @@ func (r *AssetRepository) hydrateAssetResource(m *model.Channel) *domainasset.Re
 		res.Latitude = ext.Latitude
 		res.MapLevel = ext.MapLevel
 		res.PTZType = ext.PTZType
+		res.Direction = ext.Direction
 		res.HasAudio = ext.HasAudio
 		res.Enabled = ext.Enabled
 		res.Tags = ext.Tags
@@ -374,9 +476,16 @@ func (r *AssetRepository) UpdateResourceFields(id string, patch domainasset.Reso
 	if err := r.db.First(&m, pk).Error; err != nil {
 		return err
 	}
+	channelUpdates := map[string]any{}
 	if patch.Name != nil {
-		if err := r.db.Model(&model.Channel{}).Where("id = ?", pk).
-			Updates(map[string]any{"name": strings.TrimSpace(*patch.Name), "update_time": nowText()}).Error; err != nil {
+		channelUpdates["name"] = strings.TrimSpace(*patch.Name)
+	}
+	if patch.ChannelType != nil {
+		channelUpdates["channel_type"] = strings.TrimSpace(*patch.ChannelType)
+	}
+	if len(channelUpdates) > 0 {
+		channelUpdates["update_time"] = nowText()
+		if err := r.db.Model(&model.Channel{}).Where("id = ?", pk).Updates(channelUpdates).Error; err != nil {
 			return err
 		}
 	}
@@ -402,6 +511,9 @@ func (r *AssetRepository) UpdateResourceFields(id string, patch domainasset.Reso
 	}
 	if patch.PTZType != nil {
 		updates["ptz_type"] = *patch.PTZType
+	}
+	if patch.Direction != nil {
+		updates["direction"] = *patch.Direction
 	}
 	if patch.HasAudio != nil {
 		updates["has_audio"] = *patch.HasAudio
@@ -478,11 +590,13 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		Protocol           string  `gorm:"column:protocol"`
 		Name               string  `gorm:"column:name"`
 		Kind               string  `gorm:"column:kind"`
+		ChannelType        string  `gorm:"column:channel_type"`
 		ExternalKey        string  `gorm:"column:external_key"`
 		GbCode             string  `gorm:"column:gb_code"`
 		Status             string  `gorm:"column:status"`
 		Online             bool    `gorm:"column:online"`
 		PTZType            int     `gorm:"column:ptz_type"`
+		Direction          int     `gorm:"column:direction"`
 		HasAudio           bool    `gorm:"column:has_audio"`
 		Longitude          float64 `gorm:"column:longitude"`
 		Latitude           float64 `gorm:"column:latitude"`
@@ -493,8 +607,8 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 	}
 	var rows []row
 	err := q.Select(`c.id AS channel_id, c.internal_code, c.device_id, d.internal_code AS device_internal_code,
-			d.name AS device_name, b.protocol, c.name, c.kind, c.external_key, c.gb_code, c.status, c.online,
-			COALESCE(e.ptz_type,0) AS ptz_type, COALESCE(e.has_audio,0) AS has_audio,
+			d.name AS device_name, b.protocol, c.name, c.kind, c.channel_type, c.external_key, c.gb_code, c.status, c.online,
+			COALESCE(e.ptz_type,0) AS ptz_type, COALESCE(e.direction,0) AS direction, COALESCE(e.has_audio,0) AS has_audio,
 			COALESCE(e.longitude,0) AS longitude, COALESCE(e.latitude,0) AS latitude,
 			COALESCE(e.map_level,0) AS map_level, COALESCE(e.tags,'') AS tags,
 			COALESCE(e.enabled,1) AS enabled, COALESCE(e.gb_json,'') AS gb_json`).
@@ -510,8 +624,8 @@ func (r *AssetRepository) ListChannels(page, count int, query, protocol, deviceI
 		view := &domainasset.ChannelView{
 			ResourceID: formatID(x.ChannelID), InternalCode: x.InternalCode, DeviceID: formatID(x.DeviceID),
 			DeviceInternalCode: x.DeviceInternalCode, DeviceName: x.DeviceName, Protocol: x.Protocol,
-			Name: x.Name, Kind: x.Kind, ExternalKey: x.ExternalKey, GBCode: x.GbCode, Status: x.Status,
-			Online: x.Online, PTZType: x.PTZType, HasAudio: x.HasAudio,
+			Name: x.Name, Kind: x.Kind, ChannelType: x.ChannelType, ExternalKey: x.ExternalKey, GBCode: x.GbCode, Status: x.Status,
+			Online: x.Online, PTZType: x.PTZType, Direction: x.Direction, HasAudio: x.HasAudio,
 			Longitude: x.Longitude, Latitude: x.Latitude, MapLevel: x.MapLevel,
 			Tags: x.Tags, Enabled: x.Enabled,
 		}
@@ -715,7 +829,8 @@ func (r *AssetRepository) ListEventSources(deviceID string) ([]*domainasset.Even
 func toDomainAssetDevice(m *model.Device) *domainasset.PhysicalDevice {
 	return &domainasset.PhysicalDevice{
 		ID: formatID(m.ID), InternalCode: m.InternalCode, Name: m.Name, Vendor: m.Manufacturer,
-		Model: m.Model, SerialNumber: m.SerialNumber, Enabled: m.Enabled, Online: m.Online,
+		Model: m.Model, SerialNumber: m.SerialNumber, DeviceType: m.DeviceType,
+		Enabled: m.Enabled, Online: m.Online,
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }

@@ -87,6 +87,7 @@ func (s *Service) Discover(ctx context.Context, timeoutSec int) ([]*domainonvif.
 type AddDeviceRequest struct {
 	Name     string `json:"name"`
 	Vendor   string `json:"vendor"`
+	DeviceType string `json:"deviceType"`
 	IP       string `json:"ip"`
 	Port     int    `json:"port"`
 	Username string `json:"username"`
@@ -143,6 +144,7 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 
 	device := &domainonvif.Device{
 		Name:          name,
+		DeviceType:    strings.TrimSpace(req.DeviceType),
 		IP:            host,
 		Port:          port,
 		Username:      req.Username,

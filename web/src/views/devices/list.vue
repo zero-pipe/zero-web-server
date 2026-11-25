@@ -188,7 +188,7 @@
     />
 
     <add-wizard :visible.sync="wizardVisible" @success="loadList" />
-    <edit-dialog :visible.sync="editVisible" :row="editRow" @success="loadList" />
+    <device-edit-drawer :visible.sync="editVisible" :row="editRow" @success="loadList" />
     <config-info ref="configInfo" />
     <sync-channel-progress ref="syncChannelProgress" />
     <time-statistics ref="timeStatistics" />
@@ -215,14 +215,14 @@ import { listDevices, syncDevice, deleteDevice as deleteUnifiedDevice } from '@/
 import { discoverDevices, setEventSubscribe } from '@/api/onvif'
 import { armIpcDevice, disarmIpcDevice, getIpcArmStatus, syncIpcDevice } from '@/api/plugin'
 import addWizard from './addWizard.vue'
-import editDialog from './editDialog.vue'
+import DeviceEditDrawer from './DeviceEditDrawer.vue'
 import configInfo from '@/views/dialog/configInfo.vue'
 import syncChannelProgress from '@/views/device/dialog/SyncChannelProgress.vue'
 import timeStatistics from '@/views/device/dialog/timeStatistics.vue'
 
 export default {
   name: 'DevicesList',
-  components: { addWizard, editDialog, configInfo, syncChannelProgress, timeStatistics },
+  components: { addWizard, DeviceEditDrawer, configInfo, syncChannelProgress, timeStatistics },
   data() {
     return {
       loading: false,

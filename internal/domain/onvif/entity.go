@@ -7,6 +7,7 @@ type Device struct {
 	InternalCode  string `json:"internalCode"`
 	GbCode        string `json:"gbCode"`
 	Name          string `json:"name"`
+	DeviceType    string `json:"deviceType"`
 	IP            string `json:"ip"`
 	Port          int    `json:"port"`
 	Username      string `json:"username"`

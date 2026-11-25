@@ -14,6 +14,7 @@ type Device struct {
 	Model        string `gorm:"column:model;size:255" json:"model"`
 	Firmware     string `gorm:"column:firmware;size:255" json:"firmware"`
 	SerialNumber string `gorm:"column:serial_number;size:255" json:"serialNumber"`
+	DeviceType   string `gorm:"column:device_type;size:64" json:"deviceType"`
 	Online       bool   `gorm:"column:online" json:"online"`
 	Enabled      bool   `gorm:"column:enabled;default:true" json:"enabled"`
 	Status       string `gorm:"column:status;size:32" json:"status"`
@@ -49,6 +50,7 @@ type Channel struct {
 	GbCode       string `gorm:"column:gb_code;size:20" json:"gbCode"`
 	ExternalKey  string `gorm:"column:external_key;size:255" json:"externalKey"`
 	Kind         string `gorm:"column:kind;size:32" json:"kind"`
+	ChannelType  string `gorm:"column:channel_type;size:32" json:"channelType"`
 	Name         string `gorm:"column:name;size:255" json:"name"`
 	Online       bool   `gorm:"column:online" json:"online"`
 	Status       string `gorm:"column:status;size:32" json:"status"`
@@ -83,6 +85,7 @@ type ChannelExt struct {
 	Latitude     float64 `gorm:"column:latitude"`
 	MapLevel     int     `gorm:"column:map_level"`
 	PTZType      int     `gorm:"column:ptz_type"`
+	Direction    int     `gorm:"column:direction"`
 	HasAudio     bool    `gorm:"column:has_audio"`
 	Enabled      bool    `gorm:"column:enabled;default:true"`
 	Tags         string  `gorm:"column:tags;size:255"`

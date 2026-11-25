@@ -345,6 +345,7 @@ func (s *Service) createGB(req CreateRequest) (*DeviceView, error) {
 	d := &domaindevice.Device{
 		DeviceID:          strings.TrimSpace(req.GB.DeviceID),
 		Name:              name,
+		DeviceType:        strings.TrimSpace(req.DeviceType),
 		Manufacturer:      strings.TrimSpace(req.Vendor),
 		Password:          req.GB.Password,
 		MediaServerID:     mediaServerID,
@@ -371,12 +372,13 @@ func (s *Service) createONVIF(ctx context.Context, req CreateRequest) (*DeviceVi
 		port = 80
 	}
 	dev, err := s.onvif.AddDevice(ctx, onvifapp.AddDeviceRequest{
-		Name:     strings.TrimSpace(req.Name),
-		Vendor:   strings.TrimSpace(req.Vendor),
-		IP:       strings.TrimSpace(req.Onvif.IP),
-		Port:     port,
-		Username: req.Onvif.Username,
-		Password: req.Onvif.Password,
+		Name:       strings.TrimSpace(req.Name),
+		Vendor:     strings.TrimSpace(req.Vendor),
+		DeviceType: strings.TrimSpace(req.DeviceType),
+		IP:         strings.TrimSpace(req.Onvif.IP),
+		Port:       port,
+		Username:   req.Onvif.Username,
+		Password:   req.Onvif.Password,
 	})
 	if err != nil {
 		return nil, err

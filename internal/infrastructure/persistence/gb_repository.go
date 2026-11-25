@@ -119,7 +119,7 @@ func (r *DeviceRepository) GetByInternalCode(code string) (*domaindevice.Device,
 func (r *DeviceRepository) hydrateDevice(m *model.Device) (*domaindevice.Device, error) {
 	d := &domaindevice.Device{
 		ID: int(m.ID), InternalCode: m.InternalCode, DeviceID: m.GbCode,
-		Name: m.Name, Manufacturer: m.Manufacturer, Model: m.Model, Firmware: m.Firmware,
+		Name: m.Name, DeviceType: m.DeviceType, Manufacturer: m.Manufacturer, Model: m.Model, Firmware: m.Firmware,
 		OnLine: m.Online, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 	var b model.AccessBinding
@@ -164,7 +164,7 @@ func (r *DeviceRepository) Create(device *domaindevice.Device) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	m := &model.Device{
 		InternalCode: device.InternalCode, GbCode: device.DeviceID, Name: device.Name,
-		Manufacturer: device.Manufacturer, Model: device.Model, Firmware: device.Firmware,
+		DeviceType: device.DeviceType, Manufacturer: device.Manufacturer, Model: device.Model, Firmware: device.Firmware,
 		Online: device.OnLine, Status: onlineStatus(device.OnLine),
 		CreateTime: now, UpdateTime: now,
 	}
@@ -180,7 +180,7 @@ func (r *DeviceRepository) Update(device *domaindevice.Device) error {
 	now := time.Now().Format("2006-01-02 15:04:05")
 	m := &model.Device{
 		ID: int64(device.ID), InternalCode: device.InternalCode, GbCode: device.DeviceID,
-		Name: device.Name, Manufacturer: device.Manufacturer, Model: device.Model,
+		Name: device.Name, DeviceType: device.DeviceType, Manufacturer: device.Manufacturer, Model: device.Model,
 		Firmware: device.Firmware, Online: device.OnLine, Status: onlineStatus(device.OnLine),
 		CreateTime: device.CreateTime, UpdateTime: now,
 	}

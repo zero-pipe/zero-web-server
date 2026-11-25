@@ -45,18 +45,12 @@
         </el-form-item>
         <el-form-item label="厂商">
           <el-select v-model="vendor" clearable placeholder="不限 / 未知" style="width: 100%;">
-            <el-option label="海康" value="海康" />
-            <el-option label="大华" value="大华" />
-            <el-option label="宇视" value="宇视" />
-            <el-option label="其他" value="其他" />
+            <el-option v-for="it in dicts.manufacturer" :key="it.value" :label="it.label" :value="it.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="设备类型">
           <el-select v-model="deviceType" clearable placeholder="不强制" style="width: 100%;">
-            <el-option label="IPC" value="IPC" />
-            <el-option label="NVR" value="NVR" />
-            <el-option label="球机" value="球机" />
-            <el-option label="其他" value="其他" />
+            <el-option v-for="it in dicts.device_type" :key="it.value" :label="it.label" :value="it.value" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -184,6 +178,7 @@ import { createDevice } from '@/api/devices'
 import { addIpcDevice, queryPlugins } from '@/api/plugin'
 import { queryAgents, queryAgentPlugins } from '@/api/agent'
 import { getGbSipConfig } from '@/api/server'
+import { listDictItems } from '@/api/dict'
 
 export default {
   name: 'AddWizard',
@@ -198,6 +193,7 @@ export default {
       protocol: 'gb28181',
       vendor: '',
       deviceType: '',
+      dicts: { manufacturer: [], device_type: [] },
       accessTip: '',
       step1: { name: '' },
       gb: {
@@ -245,6 +241,8 @@ export default {
   },
   mounted() {
     this.$root.$on('devices-prefill-onvif', this.prefillOnvif)
+    listDictItems('manufacturer', true).then(res => { this.dicts.manufacturer = (res.data && res.data.list) || [] }).catch(() => {})
+    listDictItems('device_type', true).then(res => { this.dicts.device_type = (res.data && res.data.list) || [] }).catch(() => {})
   },
   beforeDestroy() {
     this.$root.$off('devices-prefill-onvif', this.prefillOnvif)

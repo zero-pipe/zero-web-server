@@ -5,6 +5,7 @@ type Device struct {
 	InternalCode                     string `json:"internalCode"`
 	DeviceID                         string `json:"deviceId"`
 	Name                             string `json:"name"`
+	DeviceType                       string `json:"deviceType"`
 	Manufacturer                     string `json:"manufacturer"`
 	Model                            string `json:"model"`
 	Firmware                         string `json:"firmware"`
