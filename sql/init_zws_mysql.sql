@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS zws_device
     create_time    VARCHAR(50)  NOT NULL DEFAULT '',
     update_time    VARCHAR(50)  NOT NULL DEFAULT '',
     UNIQUE KEY uk_device_internal_code (internal_code),
-    UNIQUE KEY uk_device_gb_code (gb_code)
+    UNIQUE KEY uk_device_gb_code ((NULLIF(gb_code, '')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备（物理资产，稳定信息）';
 
 DROP TABLE IF EXISTS zws_access_binding;
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS zws_channel
     create_time   VARCHAR(50) NOT NULL DEFAULT '',
     update_time   VARCHAR(50) NOT NULL DEFAULT '',
     UNIQUE KEY uk_channel_internal_code (internal_code),
-    UNIQUE KEY uk_channel_gb_code (gb_code),
+    UNIQUE KEY uk_channel_gb_code ((NULLIF(gb_code, ''))),
     KEY idx_channel_device (device_id),
     CONSTRAINT fk_channel_device FOREIGN KEY (device_id) REFERENCES zws_device (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通道（业务唯一事实来源）';

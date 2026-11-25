@@ -8,7 +8,7 @@ package model
 type Device struct {
 	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_device_internal_code" json:"internalCode"`
-	GbCode       string `gorm:"column:gb_code;size:20;uniqueIndex:uk_device_gb_code" json:"gbCode"`
+	GbCode       string `gorm:"column:gb_code;size:20" json:"gbCode"`
 	Name         string `gorm:"column:name;size:255" json:"name"`
 	Manufacturer string `gorm:"column:manufacturer;size:255" json:"manufacturer"`
 	Model        string `gorm:"column:model;size:255" json:"model"`
@@ -46,7 +46,7 @@ type Channel struct {
 	ID           int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
 	DeviceID     int64  `gorm:"column:device_id;index" json:"deviceId"`
 	InternalCode string `gorm:"column:internal_code;size:32;uniqueIndex:uk_channel_internal_code" json:"internalCode"`
-	GbCode       string `gorm:"column:gb_code;size:20;uniqueIndex:uk_channel_gb_code" json:"gbCode"`
+	GbCode       string `gorm:"column:gb_code;size:20" json:"gbCode"`
 	ExternalKey  string `gorm:"column:external_key;size:255" json:"externalKey"`
 	Kind         string `gorm:"column:kind;size:32" json:"kind"`
 	Name         string `gorm:"column:name;size:255" json:"name"`
