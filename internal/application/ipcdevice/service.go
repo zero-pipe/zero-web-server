@@ -127,7 +127,16 @@ func (s *Service) SyncChannels(ctx context.Context, deviceID int) ([]*domainplug
 	}
 	channels, err := client.ListChannels(ctx, dev.DeviceUID)
 	if err != nil {
-		return nil, err
+		if isNotLoggedIn(err) {
+			// 插件重启后会话丢失：补登录后重试一次。
+			if e := s.EnsureLogin(ctx, deviceID); e != nil {
+				return nil, err
+			}
+			channels, err = client.ListChannels(ctx, dev.DeviceUID)
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 	if err := s.repo.ReplaceChannels(deviceID, toDomainChannels(channels)); err != nil {
 		return nil, err
@@ -337,6 +346,14 @@ func (s *Service) ProbeAll(ctx context.Context) error {
 		_, lerr := s.factory.For(p.Endpoint).ListChannels(probeCtx, dev.DeviceUID)
 		cancel()
 		online := lerr == nil
+		if !online && isNotLoggedIn(lerr) {
+			// 插件进程重启会丢失设备登录会话（DEVICE_UNREACHABLE: device not logged in）。
+			// 仅在"未登录"时补一次登录（避免真正离线时反复登录触发相机账号锁定），
+			// 登录成功即视为在线。
+			if e := s.EnsureLogin(ctx, dev.ID); e == nil {
+				online = true
+			}
+		}
 		if online != dev.Online {
 			dev.Online = online
 			_ = s.repo.UpdateDevice(dev)
@@ -346,6 +363,14 @@ func (s *Service) ProbeAll(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// isNotLoggedIn 判断插件错误是否为"设备未登录"（插件进程重启后登录会话丢失的典型错误）。
+func isNotLoggedIn(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "not logged in")
 }
 
 // UpdateDevice 保存插件设备（名称等可编辑字段）。统一接入的编辑入口复用。
