@@ -34,6 +34,16 @@
     <el-table v-loading="loading" :data="list" size="small" style="width: 100%; font-size: 12px;" header-row-class-name="table-header">
       <el-table-column prop="_ordinal" label="通道号" width="90" align="center" />
       <el-table-column prop="name" label="名称" min-width="180" />
+      <el-table-column label="通道类型" width="110">
+        <template slot-scope="{ row }">
+          <span>{{ channelTypeLabel(row.channelType) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="监视方位" width="100">
+        <template slot-scope="{ row }">
+          <span>{{ directionLabel(row.direction) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column v-if="showDeviceColumn" label="所属设备" min-width="180">
         <template slot-scope="{ row }">
           <div class="device-link" @click="openDevice(row)">{{ row.deviceName }}</div>
@@ -85,6 +95,15 @@
 <script>
 import DevicePlayer from '@/views/device/dialog/devicePlayer.vue'
 import { queryChannels, startResourceLive, stopResourceLive, getResourceDetail } from '@/api/asset'
+import { listDictItems } from '@/api/dict'
+
+// 监视方位：GB28181 方向枚举的只读展示标签（值 → 短标签）。
+const DIRECTION_LABELS = {
+  1: '东', 2: '西', 3: '南', 4: '北',
+  5: '东南', 6: '东北', 7: '西南', 8: '西北',
+  91: '左', 92: '后', 93: '前', 94: '右',
+  95: '左前', 96: '右前', 97: '左后', 98: '右后'
+}
 
 // 能力集展示模板：决定「展示哪些能力图标」，顺序即展示顺序。
 // 点亮与否由后端每行的 caps（驱动真实实现 ∩ 通道事实）决定——扩展一个能力，
@@ -124,7 +143,8 @@ export default {
       protocolFilter: this.protocol,
       deviceCode: this.deviceInternalCode,
       playingRow: null,
-      capTemplate: CAP_TEMPLATE
+      capTemplate: CAP_TEMPLATE,
+      channelTypeMap: {}
     }
   },
   computed: {
@@ -149,9 +169,24 @@ export default {
     }
   },
   mounted() {
+    this.loadChannelTypeDict()
     this.load()
   },
   methods: {
+    loadChannelTypeDict() {
+      listDictItems('channel_type', true).then(res => {
+        const map = {}
+        ;((res.data && res.data.list) || []).forEach(it => { map[it.value] = it.label })
+        this.channelTypeMap = map
+      }).catch(() => {})
+    },
+    channelTypeLabel(v) {
+      if (!v) return '—'
+      return this.channelTypeMap[v] || v
+    },
+    directionLabel(v) {
+      return DIRECTION_LABELS[v] || '—'
+    },
     protocolLabel(p) {
       return { gb28181: 'GB28181', onvif: 'ONVIF', plugin: '插件' }[p] || (p || '-')
     },
