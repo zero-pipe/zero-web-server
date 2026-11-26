@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strconv"
@@ -38,7 +39,30 @@ func (h *AlarmHandler) List(c *gin.Context) {
 		response.FromError(c, err)
 		return
 	}
+	ctx := c.Request.Context()
+	for _, a := range list {
+		a.SnapURL = h.snapURL(ctx, a.SnapPath)
+	}
 	response.OK(c, dto.NewPageInfo(list, total, page, count))
+}
+
+// snapURL 把快照对象键解析为浏览器可直接加载的地址（http 直链或对象存储预签名）。
+// 前端 <img> 无法带 access-token，故不能依赖鉴权的 /alarm/snap/:id。
+func (h *AlarmHandler) snapURL(ctx context.Context, key string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	if strings.HasPrefix(key, "http://") || strings.HasPrefix(key, "https://") {
+		return key
+	}
+	if h.store == nil {
+		return ""
+	}
+	if url, err := h.store.Store().PresignGet(ctx, key, time.Hour); err == nil && url != "" {
+		return url
+	}
+	return ""
 }
 
 func (h *AlarmHandler) SetStatus(c *gin.Context) {

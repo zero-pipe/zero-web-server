@@ -5,6 +5,9 @@ type Alarm struct {
 	ChannelID           int     `json:"channelId"`
 	Description         string  `json:"description"`
 	SnapPath            string  `json:"snapPath"`
+	// SnapURL 是可直接被浏览器加载的快照地址（对象存储直链/预签名）。
+	// 前端 <img> 无法携带 access-token，故列表直接下发可直连 URL，而不是走鉴权接口。
+	SnapURL             string  `json:"snapUrl"`
 	RecordPath          string  `json:"recordPath"`
 	Longitude           float64 `json:"longitude"`
 	Latitude            float64 `json:"latitude"`
