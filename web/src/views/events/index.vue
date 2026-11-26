@@ -45,18 +45,18 @@
       <el-table-column label="时间" width="165">
         <template slot-scope="{ row }">{{ formatTime(row.occurredAt) }}</template>
       </el-table-column>
-      <el-table-column label="事件类型" min-width="160">
+      <el-table-column label="事件类型" width="160">
         <template slot-scope="{ row }">
           <div>{{ typeName(row.eventType) }}</div>
           <div class="sub">{{ categoryName(row.category) }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="设备" min-width="160">
+      <el-table-column label="设备" width="160">
         <template slot-scope="{ row }">
           <div>{{ row.deviceName || '未关联设备' }}</div>
         </template>
       </el-table-column>
-      <el-table-column label="通道" min-width="130">
+      <el-table-column label="通道" width="140">
         <template slot-scope="{ row }">{{ row.channelName || '—' }}</template>
       </el-table-column>
       <el-table-column label="状态" width="90" align="center">
@@ -78,7 +78,7 @@
           <span v-else class="sub">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right" align="center">
+      <el-table-column label="操作" width="150" align="center">
         <template slot-scope="{ row }">
           <el-button type="text" size="medium" icon="el-icon-view" @click="openDetail(row)">详情</el-button>
           <el-divider direction="vertical" />

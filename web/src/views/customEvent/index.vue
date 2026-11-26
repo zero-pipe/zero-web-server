@@ -46,16 +46,16 @@
       <el-table-column label="时间" width="165">
         <template slot-scope="{ row }">{{ formatTime(row.occurAt) }}</template>
       </el-table-column>
-      <el-table-column label="大类" min-width="120">
+      <el-table-column label="大类" width="120">
         <template slot-scope="{ row }">{{ row.majorType || '—' }}</template>
       </el-table-column>
-      <el-table-column label="小类" min-width="150">
+      <el-table-column label="小类" width="150">
         <template slot-scope="{ row }">{{ row.minorType || '—' }}</template>
       </el-table-column>
-      <el-table-column label="设备内码" min-width="160">
+      <el-table-column label="设备内码" width="170">
         <template slot-scope="{ row }">{{ row.deviceInternalCode || '—' }}</template>
       </el-table-column>
-      <el-table-column label="通道内码" min-width="160">
+      <el-table-column label="通道内码" width="170">
         <template slot-scope="{ row }">{{ row.channelInternalCode || '—' }}</template>
       </el-table-column>
       <el-table-column label="级别" width="90" align="center">
@@ -75,7 +75,7 @@
           <span v-else class="sub">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="110" fixed="right" align="center">
+      <el-table-column label="操作" width="110" align="center">
         <template slot-scope="{ row }">
           <el-button type="text" size="medium" icon="el-icon-view" @click="openDetail(row)">详情</el-button>
         </template>

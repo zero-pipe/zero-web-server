@@ -55,8 +55,8 @@
         header-row-class-name="table-header"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="alarmType" label="报警类型" width="160">
+        <el-table-column type="selection" width="45" />
+        <el-table-column label="报警类型" width="120">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="getAlarmTypeTagType(scope.row.alarmType)">
               {{ scope.row.alarmCode ? eventTypeLabel(scope.row.alarmCode) : getAlarmTypeLabel(scope.row.alarmType) }}
@@ -73,34 +73,31 @@
             <el-tag size="mini" :type="statusType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="快照" width="90" align="center">
+        <el-table-column label="快照" width="80" align="center">
           <template v-slot:default="scope">
             <el-image
-              v-if="scope.row.snapPath"
-              :src="getSnapUrl(scope.row.id)"
-              :preview-src-list="[getSnapUrl(scope.row.id)]"
+              v-if="scope.row.snapUrl"
+              :src="scope.row.snapUrl"
+              :preview-src-list="[scope.row.snapUrl]"
               fit="cover"
-              style="width: 64px; height: 48px; cursor: pointer;"
+              style="width: 64px; height: 44px; border-radius: 4px; cursor: pointer;"
               lazy
             >
-              <div slot="error" style="width: 64px; height: 48px; line-height: 48px; text-align: center; color: #c0c4cc; font-size: 12px;">
+              <div slot="error" style="width: 64px; height: 44px; line-height: 44px; text-align: center; color: #c0c4cc; font-size: 12px;">
                 <i class="el-icon-picture-outline" />
               </div>
             </el-image>
             <span v-else style="color: #c0c4cc; font-size: 12px;">无</span>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="报警描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="deviceName" label="设备" width="140" show-overflow-tooltip />
-        <el-table-column prop="channelName" label="通道名称" width="140" show-overflow-tooltip />
-        <el-table-column prop="longitude" label="经度" width="100" />
-        <el-table-column prop="latitude" label="纬度" width="100" />
+        <el-table-column prop="deviceName" label="设备" width="150" show-overflow-tooltip />
+        <el-table-column prop="channelName" label="通道名称" width="150" show-overflow-tooltip />
         <el-table-column label="报警时间" width="165">
           <template v-slot:default="scope">
             {{ formatTime(scope.row.alarmTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="400" fixed="right" align="center">
+        <el-table-column label="操作" width="330">
           <template v-slot:default="scope">
             <el-button size="medium" icon="el-icon-view" type="text" @click="openDetail(scope.row)">详情</el-button>
             <el-divider direction="vertical" />
@@ -169,8 +166,8 @@
           <el-descriptions-item label="级别">{{ severityLabel(detail.severity) }}</el-descriptions-item>
           <el-descriptions-item label="处置">{{ statusLabel(detail.status) }}</el-descriptions-item>
         </el-descriptions>
-        <div v-if="detail.snapPath" style="margin-top:14px;text-align:center">
-          <el-image :src="getSnapUrl(detail.id)" :preview-src-list="[getSnapUrl(detail.id)]" fit="contain" style="max-width:100%;max-height:340px" />
+        <div v-if="detail.snapUrl" style="margin-top:14px;text-align:center">
+          <el-image :src="detail.snapUrl" :preview-src-list="[detail.snapUrl]" fit="contain" style="max-width:100%;max-height:340px" />
         </div>
         <el-collapse v-if="detail.bboxJson" style="margin-top:14px">
           <el-collapse-item title="高级信息（排障用）" name="advanced">
@@ -335,10 +332,6 @@ export default {
       }).catch(error => {
         console.log(error)
       })
-    },
-    getSnapUrl(id) {
-      const baseUrl = window.baseUrl ? window.baseUrl : ''
-      return ((process.env.NODE_ENV === 'development') ? process.env.VUE_APP_BASE_API : baseUrl) + `/api/v1/alarm/snap/${id}`
     },
     openDetail(row) {
       this.detail = row
