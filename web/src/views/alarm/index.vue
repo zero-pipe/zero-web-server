@@ -82,25 +82,20 @@
         </el-table-column>
         <el-table-column label="快照" width="80" align="center">
           <template v-slot:default="scope">
-            <el-image
-              v-if="scope.row.snapUrl"
-              :src="scope.row.snapUrl"
-              :preview-src-list="[scope.row.snapUrl]"
-              fit="cover"
-              style="width: 64px; height: 44px; border-radius: 4px; cursor: pointer;"
-              lazy
-            >
-              <div slot="error" style="width: 64px; height: 44px; line-height: 44px; text-align: center; color: #c0c4cc; font-size: 12px;">
-                <i class="el-icon-picture-outline" />
-              </div>
-            </el-image>
+            <div v-if="scope.row.snapUrl" class="snap-thumb" @click="openSnap(scope.row)">
+              <img :src="scope.row.snapUrl" @load="onSnapLoad(scope.row, $event)">
+              <i
+                v-for="(b, i) in boxesOf(scope.row)"
+                :key="i"
+                class="bbox"
+                :style="b"
+              />
+            </div>
             <span v-else style="color: #c0c4cc; font-size: 12px;">无</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="330" align="left">
+        <el-table-column label="操作" min-width="280" align="left">
           <template v-slot:default="scope">
-            <el-button size="medium" icon="el-icon-view" type="text" @click="openDetail(scope.row)">详情</el-button>
-            <el-divider direction="vertical" />
             <el-button size="medium" icon="el-icon-video-play" type="text" @click="openPlayback(scope.row)">回放</el-button>
             <template v-if="scope.row.status !== 'handled'">
               <el-divider direction="vertical" />
@@ -156,29 +151,12 @@
       </span>
     </el-dialog>
 
-    <el-dialog title="报警详情" :visible.sync="detailVisible" width="720px">
-      <template v-if="detail">
-        <el-descriptions :column="2" size="small" border>
-          <el-descriptions-item label="报警类型">{{ detail.alarmCode ? eventTypeLabel(detail.alarmCode) : getAlarmTypeLabel(detail.alarmType) }}</el-descriptions-item>
-          <el-descriptions-item label="时间">{{ formatTime(detail.alarmTime) }}</el-descriptions-item>
-          <el-descriptions-item label="设备">{{ detail.deviceName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="通道">{{ detail.channelName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="级别">{{ severityLabel(detail.severity) }}</el-descriptions-item>
-          <el-descriptions-item label="处置">{{ statusLabel(detail.status) }}</el-descriptions-item>
-        </el-descriptions>
-        <div v-if="detail.snapUrl" style="margin-top:14px;text-align:center">
-          <el-image :src="detail.snapUrl" :preview-src-list="[detail.snapUrl]" fit="contain" style="max-width:100%;max-height:340px" />
-        </div>
-        <el-collapse v-if="detail.bboxJson" style="margin-top:14px">
-          <el-collapse-item title="高级信息（排障用）" name="advanced">
-            <div class="section-title">目标框数据</div>
-            <pre class="json">{{ pretty(detail.bboxJson) }}</pre>
-          </el-collapse-item>
-        </el-collapse>
-        <div style="margin-top:14px">
-          <el-button size="small" type="primary" :disabled="!detail.channelId" @click="openPlayback(detail)">查看回放</el-button>
-        </div>
-      </template>
+    <el-dialog title="报警快照" :visible.sync="snapVisible" width="auto" custom-class="snap-dialog">
+      <div v-if="snapRow" class="bbox-wrap">
+        <img :src="snapRow.snapUrl" @load="onSnapLoad(snapRow, $event)">
+        <i v-for="(b, i) in boxesOf(snapRow)" :key="i" class="bbox" :style="b" />
+        <div v-if="!boxesOf(snapRow).length" class="bbox-empty">该报警无目标框数据</div>
+      </div>
     </el-dialog>
 
     <el-dialog title="删除报警记录" :visible.sync="deleteVisible" width="460px">
@@ -288,8 +266,8 @@ export default {
       playbackStreamInfo: null,
       playbackTitle: '录像回放',
       currentPlaybackChannelId: null,
-      detailVisible: false,
-      detail: null,
+      snapVisible: false,
+      snapRow: null,
       deleteVisible: false,
       deleteAll: false,
       deleteRange: [],
@@ -333,9 +311,57 @@ export default {
         console.log(error)
       })
     },
-    openDetail(row) {
-      this.detail = row
-      this.detailVisible = true
+    openSnap(row) {
+      this.snapRow = row
+      this.snapVisible = true
+    },
+    // 图片加载完成后按自然尺寸把目标框换算成百分比，缩略图与大图共用。
+    onSnapLoad(row, e) {
+      const img = e && e.target
+      if (!img) return
+      const natW = img.naturalWidth || img.width
+      const natH = img.naturalHeight || img.height
+      const boxes = this.parseBBox(row.bboxJson)
+      this.$set(row, '_boxesPct', this.boxesToPct(boxes, natW, natH))
+    },
+    boxesOf(row) {
+      return (row && row._boxesPct) || []
+    },
+    // 解析目标框：兼容数组/对象、[x,y,w,h]/{x,y,w,h}/{left,top,right,bottom}/{x1,y1,x2,y2}。
+    parseBBox(raw) {
+      if (!raw) return []
+      let data
+      try { data = typeof raw === 'string' ? JSON.parse(raw) : raw } catch (e) { return [] }
+      if (!data) return []
+      let arr = Array.isArray(data) ? data
+        : (data.boxes || data.targets || data.list || data.rects
+          || (data.rect ? [data.rect] : (data.x != null || data.left != null || data.x1 != null ? [data] : [])))
+      if (!Array.isArray(arr)) return []
+      const out = []
+      arr.forEach(b => {
+        if (!b) return
+        if (Array.isArray(b) && b.length >= 4) {
+          out.push({ x: +b[0], y: +b[1], w: +b[2], h: +b[3] })
+        } else if (typeof b === 'object') {
+          if (b.x != null && b.w != null) out.push({ x: +b.x, y: +b.y, w: +b.w, h: +b.h })
+          else if (b.left != null && b.right != null) out.push({ x: +b.left, y: +b.top, w: (+b.right) - (+b.left), h: (+b.bottom) - (+b.top) })
+          else if (b.x1 != null && b.x2 != null) out.push({ x: +b.x1, y: +b.y1, w: (+b.x2) - (+b.x1), h: (+b.y2) - (+b.y1) })
+        }
+      })
+      return out
+    },
+    // 归一化(0~1)则直接转百分比；像素坐标则按图片自然尺寸换算。
+    boxesToPct(boxes, natW, natH) {
+      if (!boxes.length || !natW || !natH) return []
+      const maxV = Math.max.apply(null, boxes.map(b => Math.max(Math.abs(b.x + b.w), Math.abs(b.y + b.h))))
+      const norm = maxV <= 1.001
+      return boxes.map(b => {
+        const l = norm ? b.x * 100 : b.x / natW * 100
+        const t = norm ? b.y * 100 : b.y / natH * 100
+        const w = norm ? b.w * 100 : b.w / natW * 100
+        const h = norm ? b.h * 100 : b.h / natH * 100
+        return { left: l + '%', top: t + '%', width: w + '%', height: h + '%' }
+      })
     },
     setStatus(row, status) {
       const label = status === 'handled' ? '确认' : '忽略'
@@ -364,9 +390,6 @@ export default {
     },
     severityLabel(severity) {
       return { critical: '严重', major: '重要', warning: '一般', info: '提示' }[severity] || '提示'
-    },
-    pretty(raw) {
-      try { return JSON.stringify(JSON.parse(raw), null, 2) } catch (e) { return raw }
     },
     openPlayback(row) {
       if (!row.channelId) {
@@ -524,6 +547,51 @@ export default {
 <style scoped>
 .sub-text { color: #80868B; font-size: 11px; line-height: 14px; }
 .delete-tip { color: #606266; font-size: 13px; margin-bottom: 12px; }
-.section-title { font-weight: 600; margin-bottom: 6px; color: #303133; }
-.json { background: #f5f7fa; padding: 10px; border-radius: 6px; max-height: 240px; overflow: auto; font-size: 12px; }
+
+/* 快照缩略图 + 目标框叠加 */
+.snap-thumb {
+  position: relative;
+  display: inline-block;
+  width: 64px;
+  height: 44px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.snap-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bbox {
+  position: absolute;
+  border: 2px solid #ff3b30;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+/* 大图预览 */
+.bbox-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+.bbox-wrap img {
+  display: block;
+  max-width: 80vw;
+  max-height: 76vh;
+  border-radius: 6px;
+}
+.bbox-wrap .bbox { border-width: 2px; }
+.bbox-empty {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .55);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+}
 </style>
