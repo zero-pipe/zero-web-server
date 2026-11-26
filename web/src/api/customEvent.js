@@ -9,8 +9,8 @@ export function getCustomEvent(id) {
   return request({ url: `/api/v1/custom-events/${id}`, method: 'get' })
 }
 
-export function getCustomEventTypes(deviceCode) {
-  return request({ url: '/api/v1/custom-events/types', method: 'get', params: { deviceCode } })
+export function getCustomEventTypes(deviceName) {
+  return request({ url: '/api/v1/custom-events/types', method: 'get', params: { deviceName } })
 }
 
 // 按时间范围清空自定义事件；all=true 时删除全部（忽略范围）。

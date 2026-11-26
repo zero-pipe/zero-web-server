@@ -26,8 +26,8 @@ func (s *Service) Get(_ context.Context, id string) (*domaince.CustomEvent, erro
 	return e, nil
 }
 
-func (s *Service) Types(_ context.Context, deviceInternalCode string) ([]domaince.TypeCount, error) {
-	return s.repo.DistinctTypes(deviceInternalCode)
+func (s *Service) Types(_ context.Context, deviceName string) ([]domaince.TypeCount, error) {
+	return s.repo.DistinctTypes(deviceName)
 }
 
 // ClearRange 按时间范围删除自定义事件；all=true 时删除全部（忽略范围）。

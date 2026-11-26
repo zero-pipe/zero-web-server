@@ -1,11 +1,11 @@
 <template>
   <div class="app-container">
     <el-form :inline="true" size="mini">
-      <el-form-item label="设备内码">
-        <el-input v-model="filters.deviceCode" clearable placeholder="D..." style="width:180px" @keyup.enter.native="reload" />
+      <el-form-item label="设备">
+        <el-input v-model="filters.deviceName" clearable placeholder="设备名称" style="width:180px" @keyup.enter.native="reload" />
       </el-form-item>
-      <el-form-item label="通道内码">
-        <el-input v-model="filters.channelCode" clearable placeholder="C..." style="width:180px" @keyup.enter.native="reload" />
+      <el-form-item label="通道">
+        <el-input v-model="filters.channelName" clearable placeholder="通道名称" style="width:180px" @keyup.enter.native="reload" />
       </el-form-item>
       <el-form-item label="大类">
         <el-select v-model="filters.majorType" clearable filterable placeholder="全部" style="width:150px" @change="onMajorChange">
@@ -52,11 +52,11 @@
       <el-table-column label="小类" width="150">
         <template slot-scope="{ row }">{{ row.minorType || '—' }}</template>
       </el-table-column>
-      <el-table-column label="设备内码" width="170">
-        <template slot-scope="{ row }">{{ row.deviceInternalCode || '—' }}</template>
+      <el-table-column label="设备" width="170" show-overflow-tooltip>
+        <template slot-scope="{ row }">{{ row.deviceName || '—' }}</template>
       </el-table-column>
-      <el-table-column label="通道内码" width="170">
-        <template slot-scope="{ row }">{{ row.channelInternalCode || '—' }}</template>
+      <el-table-column label="通道" width="170" show-overflow-tooltip>
+        <template slot-scope="{ row }">{{ row.channelName || '—' }}</template>
       </el-table-column>
       <el-table-column label="级别" width="90" align="center">
         <template slot-scope="{ row }">
@@ -98,8 +98,8 @@
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="大类">{{ detail.majorType || '—' }}</el-descriptions-item>
           <el-descriptions-item label="小类">{{ detail.minorType || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="设备内码">{{ detail.deviceInternalCode || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="通道内码">{{ detail.channelInternalCode || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="设备">{{ detail.deviceName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="通道">{{ detail.channelName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="时间">{{ formatTime(detail.occurAt) }}</el-descriptions-item>
           <el-descriptions-item label="级别">{{ detail.level || 'info' }}</el-descriptions-item>
           <el-descriptions-item label="事件ID" :span="2">{{ detail.eventId }}</el-descriptions-item>
@@ -156,7 +156,7 @@ export default {
       total: 0,
       page: 1,
       count: 20,
-      filters: { deviceCode: '', channelCode: '', majorType: '', minorType: '', range: [] },
+      filters: { deviceName: '', channelName: '', majorType: '', minorType: '', range: [] },
       types: [],
       detailVisible: false,
       detail: null,
@@ -180,7 +180,7 @@ export default {
   created() { this.load(); this.loadTypes() },
   methods: {
     loadTypes() {
-      getCustomEventTypes(this.filters.deviceCode).then(res => {
+      getCustomEventTypes(this.filters.deviceName).then(res => {
         this.types = (res && res.data) || []
       }).catch(() => {})
     },
@@ -191,8 +191,8 @@ export default {
       this.loading = true
       const params = {
         page: this.page, count: this.count,
-        deviceCode: this.filters.deviceCode,
-        channelCode: this.filters.channelCode,
+        deviceName: this.filters.deviceName,
+        channelName: this.filters.channelName,
         majorType: this.filters.majorType,
         minorType: this.filters.minorType
       }

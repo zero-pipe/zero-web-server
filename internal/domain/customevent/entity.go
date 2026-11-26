@@ -8,6 +8,8 @@ type CustomEvent struct {
 	EventID             string `json:"eventId"`
 	DeviceInternalCode  string `json:"deviceInternalCode"`
 	ChannelInternalCode string `json:"channelInternalCode"`
+	DeviceName          string `json:"deviceName"`
+	ChannelName         string `json:"channelName"`
 	DeviceID            string `json:"deviceId"`
 	ResourceID          string `json:"resourceId"`
 	MajorType           string `json:"majorType"` // 大类
@@ -21,13 +23,14 @@ type CustomEvent struct {
 }
 
 // ListFilter 自定义事件查询条件。
+// DeviceName / ChannelName 按设备、通道“名称”模糊筛选（对用户只暴露名称，不暴露内码）。
 type ListFilter struct {
-	DeviceInternalCode  string
-	ChannelInternalCode string
-	MajorType           string
-	MinorType           string
-	Begin               int64
-	End                 int64
+	DeviceName  string
+	ChannelName string
+	MajorType   string
+	MinorType   string
+	Begin       int64
+	End         int64
 }
 
 // TypeCount 是 (大类, 小类) 聚合，供筛选下拉。

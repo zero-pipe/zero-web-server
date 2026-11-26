@@ -25,12 +25,12 @@ func (h *CustomEventHandler) List(c *gin.Context) {
 	begin, _ := strconv.ParseInt(c.Query("begin"), 10, 64)
 	end, _ := strconv.ParseInt(c.Query("end"), 10, 64)
 	list, total, err := h.svc.List(c.Request.Context(), page, count, domaince.ListFilter{
-		DeviceInternalCode:  c.Query("deviceCode"),
-		ChannelInternalCode: c.Query("channelCode"),
-		MajorType:           c.Query("majorType"),
-		MinorType:           c.Query("minorType"),
-		Begin:               begin,
-		End:                 end,
+		DeviceName:  c.Query("deviceName"),
+		ChannelName: c.Query("channelName"),
+		MajorType:   c.Query("majorType"),
+		MinorType:   c.Query("minorType"),
+		Begin:       begin,
+		End:         end,
 	})
 	if err != nil {
 		response.FromError(c, err)
@@ -40,7 +40,7 @@ func (h *CustomEventHandler) List(c *gin.Context) {
 }
 
 func (h *CustomEventHandler) Types(c *gin.Context) {
-	types, err := h.svc.Types(c.Request.Context(), c.Query("deviceCode"))
+	types, err := h.svc.Types(c.Request.Context(), c.Query("deviceName"))
 	if err != nil {
 		response.FromError(c, err)
 		return

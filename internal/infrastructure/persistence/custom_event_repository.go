@@ -2,6 +2,7 @@ package persistence
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	domaince "zero-web-server/internal/domain/customevent"
@@ -67,7 +68,9 @@ func (r *CustomEventRepository) Get(id string) (*domaince.CustomEvent, error) {
 	if err := q.First(&m).Error; err != nil {
 		return nil, err
 	}
-	return customEventFromModel(&m), nil
+	e := customEventFromModel(&m)
+	r.fillNames([]*domaince.CustomEvent{e})
+	return e, nil
 }
 
 func (r *CustomEventRepository) List(page, count int, f domaince.ListFilter) ([]*domaince.CustomEvent, int64, error) {
@@ -78,11 +81,25 @@ func (r *CustomEventRepository) List(page, count int, f domaince.ListFilter) ([]
 		count = 15
 	}
 	q := r.db.Model(&model.CustomEvent{})
-	if f.DeviceInternalCode != "" {
-		q = q.Where("device_internal_code = ?", f.DeviceInternalCode)
+	if name := strings.TrimSpace(f.DeviceName); name != "" {
+		codes, err := r.deviceCodesByName(name)
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(codes) == 0 {
+			return []*domaince.CustomEvent{}, 0, nil
+		}
+		q = q.Where("device_internal_code IN ?", codes)
 	}
-	if f.ChannelInternalCode != "" {
-		q = q.Where("channel_internal_code = ?", f.ChannelInternalCode)
+	if name := strings.TrimSpace(f.ChannelName); name != "" {
+		codes, err := r.channelCodesByName(name)
+		if err != nil {
+			return nil, 0, err
+		}
+		if len(codes) == 0 {
+			return []*domaince.CustomEvent{}, 0, nil
+		}
+		q = q.Where("channel_internal_code IN ?", codes)
 	}
 	if f.MajorType != "" {
 		q = q.Where("major_type = ?", f.MajorType)
@@ -108,14 +125,80 @@ func (r *CustomEventRepository) List(page, count int, f domaince.ListFilter) ([]
 	for i := range rows {
 		out = append(out, customEventFromModel(&rows[i]))
 	}
+	r.fillNames(out)
 	return out, total, nil
 }
 
-func (r *CustomEventRepository) DistinctTypes(deviceInternalCode string) ([]domaince.TypeCount, error) {
+// deviceCodesByName / channelCodesByName 按名称模糊匹配出内码集合，供名称筛选。
+func (r *CustomEventRepository) deviceCodesByName(name string) ([]string, error) {
+	var codes []string
+	err := r.db.Table("zws_device").Where("name LIKE ?", "%"+name+"%").Pluck("internal_code", &codes).Error
+	return codes, err
+}
+
+func (r *CustomEventRepository) channelCodesByName(name string) ([]string, error) {
+	var codes []string
+	err := r.db.Table("zws_channel").Where("name LIKE ?", "%"+name+"%").Pluck("internal_code", &codes).Error
+	return codes, err
+}
+
+// fillNames 批量把内码补成设备/通道名称（列表与详情共用）。
+func (r *CustomEventRepository) fillNames(rows []*domaince.CustomEvent) {
+	if len(rows) == 0 {
+		return
+	}
+	devCodes := make([]string, 0, len(rows))
+	chCodes := make([]string, 0, len(rows))
+	for _, e := range rows {
+		if e.DeviceInternalCode != "" {
+			devCodes = append(devCodes, e.DeviceInternalCode)
+		}
+		if e.ChannelInternalCode != "" {
+			chCodes = append(chCodes, e.ChannelInternalCode)
+		}
+	}
+	devNames := map[string]string{}
+	if len(devCodes) > 0 {
+		var ds []struct {
+			InternalCode string
+			Name         string
+		}
+		if err := r.db.Table("zws_device").Select("internal_code, name").Where("internal_code IN ?", devCodes).Scan(&ds).Error; err == nil {
+			for _, d := range ds {
+				devNames[d.InternalCode] = d.Name
+			}
+		}
+	}
+	chNames := map[string]string{}
+	if len(chCodes) > 0 {
+		var cs []struct {
+			InternalCode string
+			Name         string
+		}
+		if err := r.db.Table("zws_channel").Select("internal_code, name").Where("internal_code IN ?", chCodes).Scan(&cs).Error; err == nil {
+			for _, c := range cs {
+				chNames[c.InternalCode] = c.Name
+			}
+		}
+	}
+	for _, e := range rows {
+		e.DeviceName = devNames[e.DeviceInternalCode]
+		e.ChannelName = chNames[e.ChannelInternalCode]
+	}
+}
+
+func (r *CustomEventRepository) DistinctTypes(deviceName string) ([]domaince.TypeCount, error) {
 	q := r.db.Model(&model.CustomEvent{}).
 		Select("major_type, minor_type, count(*) as count")
-	if deviceInternalCode != "" {
-		q = q.Where("device_internal_code = ?", deviceInternalCode)
+	if name := strings.TrimSpace(deviceName); name != "" {
+		codes, err := r.deviceCodesByName(name)
+		if err != nil {
+			return nil, err
+		}
+		if len(codes) == 0 {
+			return []domaince.TypeCount{}, nil
+		}
+		q = q.Where("device_internal_code IN ?", codes)
 	}
 	var rows []domaince.TypeCount
 	if err := q.Group("major_type, minor_type").Order("major_type, minor_type").Scan(&rows).Error; err != nil {
