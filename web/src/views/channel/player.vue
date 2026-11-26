@@ -9,11 +9,16 @@
       :close-on-click-modal="false"
       :visible.sync="showVideoDialog"
       @close="close()"
+      @closed="handleClosed"
     >
       <div slot="title" class="vms-player-header">
-        <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
-        <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
+        <span class="vms-live-badge" :class="{ 'is-idle': !isStreaming }">
+          <span class="vms-live-dot" />
+          <span class="vms-live-label">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
+        </span>
         <span v-if="channelName" class="vms-channel-name">{{ channelName }}</span>
+        <span v-if="channelName" class="vms-channel-type">{{ ptzTypeText }}</span>
+        <span v-if="osdClock" class="vms-header-clock">{{ osdClock }}</span>
       </div>
 
       <div class="dhsdk-player-body">
@@ -39,7 +44,9 @@
           </div>
 
           <div class="player-under panel-block control-extra">
-            <div class="panel-block-title">预置位</div>
+            <div class="panel-block-title">
+              <span class="pbt-title"><i class="pbt-bar" />预置位</span>
+            </div>
             <div v-if="!ptzCaps.direction" class="preset-muted">
               该通道为{{ ptzTypeText }}，不支持预置位
             </div>
@@ -50,7 +57,7 @@
         <div class="control-side">
           <div class="panel-block">
             <div class="panel-block-title">
-              <span>编码信息</span>
+              <span class="pbt-title"><i class="pbt-bar" />编码信息</span>
               <el-button
                 icon="el-icon-refresh-right"
                 circle
@@ -69,7 +76,7 @@
           <!-- 云台卡：按可折叠 accordion 渲染；无能力时折叠成一行但保留「展开」兜底。 -->
           <div class="panel-block is-ptz" :class="{ 'is-collapsed': !ptzExpanded }">
             <div class="panel-block-title ptz-card-head" @click="ptzExpanded = !ptzExpanded">
-              <span>云台控制</span>
+              <span class="pbt-title"><i class="pbt-bar" />云台控制</span>
               <span class="ptz-card-toggle">
                 <span v-if="!hasPtzCaps" class="ptz-card-hint">该通道未识别到云台</span>
                 <i :class="ptzExpanded ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" />
@@ -118,6 +125,8 @@ export default {
       playError: '',
       showVideoDialog: false,
       streamInfo: null,
+      osdClock: '',
+      clockTimer: null,
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
@@ -146,7 +155,26 @@ export default {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
     }
   },
+  beforeDestroy() {
+    this.stopClock()
+  },
   methods: {
+    tickClock() {
+      const d = new Date()
+      const p = n => String(n).padStart(2, '0')
+      this.osdClock = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    },
+    startClock() {
+      this.stopClock()
+      this.tickClock()
+      this.clockTimer = setInterval(this.tickClock, 1000)
+    },
+    stopClock() {
+      if (this.clockTimer) {
+        clearInterval(this.clockTimer)
+        this.clockTimer = null
+      }
+    },
     refreshMediaInfo() {
       this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo(false)
     },
@@ -164,6 +192,7 @@ export default {
       this.videoUrl = ''
       this.playError = ''
       this.showVideoDialog = true
+      this.startClock()
       if (param && param.pending) {
         this.streamInfo = null
         this.hasAudio = !!(param.hasAudio)
@@ -216,6 +245,7 @@ export default {
       if (this.$refs.mediaInfo) {
         this.$refs.mediaInfo.stopTask()
       }
+      this.stopClock()
       this.isLoging = false
       this.playError = ''
       this.streamInfo = null
@@ -225,6 +255,9 @@ export default {
       this.ptzExpanded = true
       this.extraTab = 'media'
       this.showVideoDialog = false
+    },
+    handleClosed() {
+      this.$emit('closed')
     },
     toggleDragZoom(direction) {
       this.dragZoomDirection = direction

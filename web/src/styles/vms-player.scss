@@ -1,38 +1,51 @@
-/* 播放弹窗 — 蓝白主题，与主站一致 */
+/* 播放弹窗 — 蓝白主题，厚重质感（监控台风格），与主站一致 */
 
 .vms-player-dialog {
-  --vms-bg: #F8F9FA;
+  --vms-bg: #e9edf3;
   --vms-panel: #ffffff;
-  --vms-panel-2: #F8F9FA;
-  --vms-border: #E8EAED;
-  --vms-text: #202124;
-  --vms-muted: #5F6368;
+  --vms-panel-2: #f4f6fa;
+  --vms-border: #e3e7ee;
+  --vms-border-strong: #d3d9e3;
+  --vms-text: #1b2430;
+  --vms-muted: #5f6b7a;
   --vms-accent: #1A73E8;
-  --vms-live: #34A853;
-  --vms-danger: #EA4335;
+  --vms-accent-soft: #e8f0fe;
+  --vms-live: #ea4335;
+  --vms-danger: #ea4335;
   background: var(--vms-bg) !important;
-  border-radius: 12px !important;
+  border-radius: 16px !important;
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(60, 64, 67, 0.18) !important;
+  border: 1px solid var(--vms-border-strong);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24) !important;
   margin-bottom: 0 !important;
 
   .el-dialog__header {
-    padding: 12px 16px;
-    background: var(--vms-panel);
-    border-bottom: 1px solid var(--vms-border);
+    padding: 14px 20px;
+    background: linear-gradient(180deg, #ffffff 0%, #f2f5f9 100%);
+    border-bottom: 1px solid var(--vms-border-strong);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
 
   .el-dialog__title {
     color: var(--vms-text);
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
   }
 
   .el-dialog__headerbtn {
-    top: 14px;
+    top: 15px;
+    right: 16px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    transition: background 0.15s;
     .el-dialog__close {
       color: var(--vms-muted);
+      font-size: 18px;
       &:hover { color: var(--vms-accent); }
+    }
+    &:hover {
+      background: rgba(95, 107, 122, 0.1);
     }
   }
 
@@ -43,57 +56,61 @@
   }
 }
 
+/* ---------------- 头部 ---------------- */
 .vms-player-dialog .vms-player-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--vms-text);
+  padding-right: 40px;
 }
 
-.vms-player-dialog .vms-player-select {
+/* LIVE 胶囊徽标 */
+.vms-player-dialog .vms-live-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 4px;
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--vms-muted);
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(234, 67, 53, 0.1);
+  flex: none;
 }
 
-.vms-player-dialog .vms-player-select .el-select {
-  vertical-align: middle;
-}
-
-.vms-player-dialog .vms-live-dot {
-  width: 8px;
-  height: 8px;
+.vms-player-dialog .vms-live-badge .vms-live-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--vms-live);
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+  box-shadow: 0 0 0 3px rgba(234, 67, 53, 0.18);
   animation: vms-live-pulse 1.6s ease-in-out infinite;
 }
 
-.vms-player-dialog .vms-live-dot.is-idle {
-  background: var(--vms-muted);
-  box-shadow: none;
-  animation: none;
-}
-
-.vms-player-dialog .vms-live-label {
+.vms-player-dialog .vms-live-badge .vms-live-label {
   font-size: 11px;
   color: var(--vms-live);
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
 }
 
-.vms-player-dialog .vms-live-label.is-idle {
-  color: var(--vms-muted);
+.vms-player-dialog .vms-live-badge.is-idle {
+  background: rgba(95, 107, 122, 0.1);
+
+  .vms-live-dot {
+    background: #8a94a3;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .vms-live-label {
+    color: #8a94a3;
+  }
 }
 
-/* 头部通道名：跟在 LIVE 之后，过长省略 */
 .vms-player-dialog .vms-channel-name {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--vms-text);
   max-width: 420px;
   overflow: hidden;
@@ -101,17 +118,40 @@
   white-space: nowrap;
 }
 
+.vms-player-dialog .vms-channel-type {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vms-muted);
+  padding: 2px 9px;
+  border: 1px solid var(--vms-border-strong);
+  border-radius: 999px;
+  background: var(--vms-panel-2);
+}
+
+/* 本地时间（靠右）：与摄像头烧录时间对比，看设备时钟偏差 */
+.vms-player-dialog .vms-header-clock {
+  margin-left: auto;
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--vms-text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
 @keyframes vms-live-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
 
+/* ---------------- 主体两栏 ---------------- */
 .vms-player-dialog .dhsdk-player-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 14px;
   align-items: stretch;
-  padding: 12px;
+  padding: 14px;
   max-height: calc(100vh - 140px);
   box-sizing: border-box;
 }
@@ -120,7 +160,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-height: 0;
   background: transparent;
   border: none;
@@ -128,15 +168,17 @@
   overflow: visible;
 }
 
+/* 视频台：深色监视器边框 + 内阴影，营造厚重感 */
 .vms-player-dialog .player-stage {
   width: 100%;
   flex: 0 0 auto;
   display: block;
-  background: linear-gradient(165deg, #5F6368 0%, #3a4556 46%, #323c4b 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  padding: 6px;
+  background: #12161d;
+  border: 1px solid #05070b;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.05);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   line-height: 0;
 }
 
@@ -145,6 +187,8 @@
   width: 100%;
   height: auto !important;
   margin: 0;
+  border-radius: 9px;
+  overflow: hidden;
   background: transparent;
   line-height: 0;
 }
@@ -153,12 +197,7 @@
   flex: 0 0 auto;
   max-height: 180px;
   min-height: 0;
-  background: var(--vms-panel);
-  border: 1px solid var(--vms-border);
-  border-radius: 10px;
-  padding: 4px 12px 10px;
   overflow: auto;
-  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.05);
 }
 
 .vms-player-dialog .player-tabs-wrapper {
@@ -220,24 +259,31 @@
   padding: 12px 16px;
   background: rgba(255, 255, 255, 0.95);
   border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid rgba(234, 67, 53, 0.35);
 }
 
-.vms-player-dialog .player-tabs-wrapper .el-tabs--card > .el-tabs__header {
+/* 播放控制栏：融入监视器底部，深色控制条 */
+.vms-player-dialog .player-control-bar {
+  background: #1b222c;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 12px;
+}
+
+.vms-player-dialog .el-tabs--card > .el-tabs__header {
   margin: 0;
   border: none;
   background: var(--vms-panel-2);
   border-bottom: 1px solid var(--vms-border);
 }
 
-.vms-player-dialog .player-tabs-wrapper .el-tabs--card > .el-tabs__header .el-tabs__nav {
+.vms-player-dialog .el-tabs--card > .el-tabs__header .el-tabs__nav {
   border: none;
   display: flex;
   gap: 4px;
   padding: 8px 10px;
 }
 
-.vms-player-dialog .player-tabs-wrapper .el-tabs--card > .el-tabs__header .el-tabs__item {
+.vms-player-dialog .el-tabs--card > .el-tabs__header .el-tabs__item {
   border: 1px solid transparent !important;
   border-radius: 6px;
   height: 28px;
@@ -248,19 +294,19 @@
   font-size: 12px;
 }
 
-.vms-player-dialog .player-tabs-wrapper .el-tabs--card > .el-tabs__header .el-tabs__item.is-active {
+.vms-player-dialog .el-tabs--card > .el-tabs__header .el-tabs__item.is-active {
   color: #fff;
   background: var(--vms-accent);
   border-color: var(--vms-accent) !important;
 }
 
-.vms-player-dialog .player-tabs-wrapper .el-tabs--card > .el-tabs__header .el-tabs__item:hover:not(.is-active) {
+.vms-player-dialog .el-tabs--card > .el-tabs__header .el-tabs__item:hover:not(.is-active) {
   color: var(--vms-accent);
-  background: #E8F0FE;
+  background: var(--vms-accent-soft);
 }
 
-/* 右侧控制栏：高度与左栏（视频+预置位）对齐，内部滚动，避免把弹窗撑成头重脚轻。
-   height:0 + min-height:100%：既不让自身内容把整行撑高，又能撑满左栏高度。 */
+/* ---------------- 右侧控制栏 ---------------- */
+/* height:0 + min-height:100%：既不撑高整行，又能撑满左栏高度；内部滚动。 */
 .vms-player-dialog .control-side {
   min-width: 0;
   height: 0;
@@ -268,29 +314,45 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
+/* 卡片：白底 + 实边 + 柔阴影，更有分量 */
 .vms-player-dialog .panel-block {
   background: var(--vms-panel);
-  border: 1px solid var(--vms-border);
-  border-radius: 10px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.05);
+  border: 1px solid var(--vms-border-strong);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
 }
 
 .vms-player-dialog .player-under.panel-block {
-  padding: 4px 12px 10px;
+  padding: 12px 14px;
 }
 
 .vms-player-dialog .panel-block-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--vms-accent);
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--vms-text);
+}
+
+.vms-player-dialog .pbt-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 标题左侧蓝色竖条 */
+.vms-player-dialog .pbt-bar {
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--vms-accent);
+  flex: none;
 }
 
 .vms-player-dialog .panel-block.is-ptz {
@@ -311,7 +373,7 @@
 }
 
 .vms-player-dialog .panel-block.is-ptz:not(.is-collapsed) .ptz-card-head {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .vms-player-dialog .ptz-card-toggle {
@@ -327,6 +389,26 @@
   color: var(--vms-muted);
 }
 
+/* 固定枪机提示卡 */
+.vms-player-dialog .fixed-cam-tip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  color: var(--vms-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--vms-panel-2);
+  border: 1px dashed var(--vms-border-strong);
+  border-radius: 10px;
+
+  i {
+    font-size: 18px;
+    color: var(--vms-accent);
+    flex: none;
+  }
+}
+
 .vms-player-dialog .panel-disabled-tip {
   color: var(--vms-muted);
   font-size: 13px;
@@ -335,30 +417,6 @@
   line-height: 1.6;
   background: var(--vms-panel-2);
   border-radius: 8px;
-}
-
-.vms-player-dialog .control-extra .el-tabs__header {
-  margin: 0 0 8px;
-}
-
-.vms-player-dialog .control-extra .el-tabs__item {
-  height: 36px;
-  line-height: 36px;
-  font-size: 13px;
-  color: var(--vms-muted);
-}
-
-.vms-player-dialog .control-extra .el-tabs__item.is-active {
-  color: var(--vms-accent);
-  font-weight: 600;
-}
-
-.vms-player-dialog .control-extra .el-tabs__active-bar {
-  background: var(--vms-accent);
-}
-
-.vms-player-dialog .control-extra .el-tabs__nav-wrap::after {
-  background: var(--vms-border);
 }
 
 /* Encoding info — light cards */
@@ -388,7 +446,7 @@
 .vms-player-dialog #mediaInfo .mi-stat-value {
   display: block;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--vms-text);
   font-variant-numeric: tabular-nums;
 }
@@ -410,7 +468,7 @@
 
 .vms-player-dialog #mediaInfo .mi-section-title {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--vms-muted);
   letter-spacing: 0.04em;
   margin-bottom: 8px;
@@ -435,7 +493,7 @@
 
 .vms-player-dialog #mediaInfo .mi-v {
   color: var(--vms-text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .vms-player-dialog #mediaInfo .mi-empty {

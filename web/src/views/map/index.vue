@@ -132,7 +132,7 @@
         </div>
       </div>
 
-      <player ref="player" ></player>
+      <player ref="player" @closed="onPlayerClosed"></player>
       <queryTrace ref="queryTrace" ></queryTrace>
       <DeviceEditDrawer :visible.sync="deviceEditVisible" :row="deviceEditRow" @success="initChannelLayer" />
       <DrawThinProgress ref="drawThinProgress" ></DrawThinProgress>
@@ -168,6 +168,9 @@ export default {
       deviceMetaMap: {},
       deviceGroups: {},
       playingChannelId: null,
+      playLoading: false,
+      playSeq: 0,
+      closeStopTimer: null,
       isLoging: false,
       longitudeStr: 'longitude',
       latitudeStr: 'latitude',
@@ -187,7 +190,7 @@ export default {
 
   },
   destroyed() {
-
+    this.cancelCloseStop()
   },
   computed: {
     deviceOnline() {
@@ -381,13 +384,9 @@ export default {
         this.deviceGroups[k].channels.some(c => String(c.gbId) === String(channelId))
       )
     },
-    // 切换设备内通道：先停上一个，再播目标通道。
+    // 切换设备内通道：统一交给 play()（内部会停掉上一个不同通道），避免重复起流。
     playChannelOfDevice(ch) {
       if (!ch) return
-      if (this.playingChannelId && this.playingChannelId !== ch.gbId) {
-        stopResourceLive(this.playingChannelId).catch(() => {})
-      }
-      this.playingChannelId = ch.gbId
       this.play(ch)
     },
     refreshLayer(){
@@ -490,13 +489,37 @@ export default {
     },
     play: function (channel) {
       // gbId 即通道 resourceId，走统一资源取流（GB/ONVIF/插件通用），不再走旧的国标专用接口。
-      this.$refs.player.openDialog('codec', channel.gbId, {
+      if (!channel || channel.gbId == null) return
+      // 重新点播放：撤销关闭时排定的“延时停流”，让热流继续复用（避免每次重开都重建拉流）。
+      this.cancelCloseStop()
+      const targetId = channel.gbId
+      // 同一通道正在起流中：忽略重复点击，避免并发 StartLive 在 ZMS 互相踢流。
+      if (this.playLoading && String(this.playingChannelId) === String(targetId)) return
+      // 切到别的通道/设备：先把上一路停掉，避免后台残留拉流。
+      const prev = this.playingChannelId
+      if (prev != null && String(prev) !== String(targetId)) {
+        stopResourceLive(prev).catch(() => {})
+      }
+      // 请求序号：只有最新一次请求的结果允许落到播放器，过期结果只做清理。
+      const seq = ++this.playSeq
+      this.playingChannelId = targetId
+      this.playLoading = true
+      this.$refs.player.openDialog('codec', targetId, {
         pending: true,
         name: channel.gbName,
         hasAudio: channel.hasAudio,
         ptzType: channel.ptzType
       })
-      startResourceLive(channel.gbId).then(res => {
+      startResourceLive(targetId).then(res => {
+        if (seq !== this.playSeq) {
+          // 请求已过期：只有在当前目标已不是这个通道（切走/关闭）时才清理，
+          // 避免误杀“关掉后立刻又点开同一通道”时新请求刚建好的流。
+          if (this.playingChannelId == null || String(this.playingChannelId) !== String(targetId)) {
+            stopResourceLive(targetId).catch(() => {})
+          }
+          return
+        }
+        this.playLoading = false
         const content = (res && res.data) || null
         if (!content) {
           this.$refs.player.onStreamError('未返回播放地址')
@@ -504,8 +527,35 @@ export default {
         }
         this.$refs.player.onStreamReady(content, channel.hasAudio)
       }).catch(error => {
+        if (seq !== this.playSeq) return
+        this.playLoading = false
         this.$refs.player.onStreamError((error && error.message) || '取流失败')
       })
+    },
+    // 撤销“关闭后延时停流”的定时器（重新点播放时用）。
+    cancelCloseStop() {
+      if (this.closeStopTimer) {
+        clearTimeout(this.closeStopTimer)
+        this.closeStopTimer = null
+      }
+    },
+    // 播放器弹窗真正关闭：让在途请求失效；延时一小段再停流——
+    // 快速“关掉再点”时热流还在、直接复用，不用每次重建拉流（重建偶发失败才是“有时没流”的根因）。
+    // 真正离开则到点停流，避免后台一直拉设备。
+    onPlayerClosed() {
+      this.playSeq++
+      this.playLoading = false
+      const id = this.playingChannelId
+      if (id == null) return
+      this.cancelCloseStop()
+      this.closeStopTimer = setTimeout(() => {
+        this.closeStopTimer = null
+        // 期间没被重新播放占用才停；否则热流继续复用。
+        if (this.playingChannelId != null && String(this.playingChannelId) === String(id)) {
+          stopResourceLive(id).catch(() => {})
+          this.playingChannelId = null
+        }
+      }, 800)
     },
     showDrawThinBox: function(show){
       this.showDrawThin = show

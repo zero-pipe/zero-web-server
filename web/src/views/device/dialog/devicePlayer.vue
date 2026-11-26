@@ -12,9 +12,13 @@
       @closed="$emit('closed')"
     >
       <div slot="title" class="vms-player-header">
-        <span class="vms-live-dot" :class="{ 'is-idle': !isStreaming }" />
-        <span class="vms-live-label" :class="{ 'is-idle': !isStreaming }">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
+        <span class="vms-live-badge" :class="{ 'is-idle': !isStreaming }">
+          <span class="vms-live-dot" />
+          <span class="vms-live-label">{{ isStreaming ? 'LIVE' : 'IDLE' }}</span>
+        </span>
         <span v-if="channelName" class="vms-channel-name">{{ channelName }}</span>
+        <span v-if="channelName" class="vms-channel-type">{{ ptzTypeText }}</span>
+        <span v-if="osdClock" class="vms-header-clock">{{ osdClock }}</span>
       </div>
 
       <div class="dhsdk-player-body">
@@ -40,7 +44,9 @@
           </div>
 
           <div v-if="supportsPreset" class="player-under panel-block control-extra">
-            <div class="panel-block-title">预置位</div>
+            <div class="panel-block-title">
+              <span class="pbt-title"><i class="pbt-bar" />预置位</span>
+            </div>
             <ptzPreset :device-id="deviceId" :channel-device-id="channelId" />
           </div>
         </div>
@@ -48,7 +54,7 @@
         <div class="control-side">
           <div class="panel-block">
             <div class="panel-block-title">
-              <span>编码信息</span>
+              <span class="pbt-title"><i class="pbt-bar" />编码信息</span>
               <el-button
                 icon="el-icon-refresh-right"
                 circle
@@ -69,7 +75,7 @@
                NVR 混合挂载或协议误报时，现场人员仍可手动展开调用。 -->
           <div v-if="showPtz" class="panel-block is-ptz" :class="{ 'is-collapsed': !ptzExpanded }">
             <div class="panel-block-title ptz-card-head" @click="ptzExpanded = !ptzExpanded">
-              <span>云台控制</span>
+              <span class="pbt-title"><i class="pbt-bar" />云台控制</span>
               <span class="ptz-card-toggle">
                 <span v-if="!hasPtzCaps" class="ptz-card-hint">该通道未识别到云台</span>
                 <i :class="ptzExpanded ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" />
@@ -120,6 +126,8 @@ export default {
       playError: '',
       showVideoDialog: false,
       streamInfo: null,
+      osdClock: '',
+      clockTimer: null,
       playerUrlInfo: {
         playerUrl: null,
         playUrl: null
@@ -147,9 +155,33 @@ export default {
     },
     isStreaming() {
       return !!(this.streamInfo && this.streamId) && !this.isLoging && !this.playError
+    },
+    // 依据国标目录应答的 PTZType 取中文形态名（仅用于文案展示）
+    ptzTypeText() {
+      const texts = { 1: '球机', 2: '半球', 3: '固定枪机', 4: '遥控枪机', 5: '遥控半球', 6: '全景通道', 7: '分割通道' }
+      return texts[Number(this.ptzType)] || '枪机'
     }
   },
+  beforeDestroy() {
+    this.stopClock()
+  },
   methods: {
+    tickClock() {
+      const d = new Date()
+      const p = n => String(n).padStart(2, '0')
+      this.osdClock = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    },
+    startClock() {
+      this.stopClock()
+      this.tickClock()
+      this.clockTimer = setInterval(this.tickClock, 1000)
+    },
+    stopClock() {
+      if (this.clockTimer) {
+        clearInterval(this.clockTimer)
+        this.clockTimer = null
+      }
+    },
     extraTabClick() {},
     refreshMediaInfo() {
       this.$refs.mediaInfo && this.$refs.mediaInfo.getMediaInfo()
@@ -183,6 +215,7 @@ export default {
       this.videoUrl = ''
       this.playError = ''
       this.showVideoDialog = true
+      this.startClock()
       if (param && param.pending) {
         this.streamInfo = null
         this.hasAudio = !!(param.hasAudio)
@@ -236,6 +269,7 @@ export default {
       if (this.$refs.mediaInfo) {
         this.$refs.mediaInfo.stopTask()
       }
+      this.stopClock()
       this.isLoging = false
       this.playError = ''
       this.streamInfo = null
