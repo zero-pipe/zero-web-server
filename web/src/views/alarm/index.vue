@@ -56,6 +56,11 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="45" />
+        <el-table-column label="报警时间" width="165">
+          <template v-slot:default="scope">
+            {{ formatTime(scope.row.alarmTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="报警类型" width="120">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="getAlarmTypeTagType(scope.row.alarmType)">
@@ -63,6 +68,8 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="deviceName" label="设备" width="150" show-overflow-tooltip />
+        <el-table-column prop="channelName" label="通道" width="150" show-overflow-tooltip />
         <el-table-column label="级别" width="80" align="center">
           <template v-slot:default="scope">
             <el-tag size="mini" :type="severityType(scope.row.severity)">{{ severityLabel(scope.row.severity) }}</el-tag>
@@ -88,13 +95,6 @@
               </div>
             </el-image>
             <span v-else style="color: #c0c4cc; font-size: 12px;">无</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="deviceName" label="设备" width="150" show-overflow-tooltip />
-        <el-table-column prop="channelName" label="通道名称" width="150" show-overflow-tooltip />
-        <el-table-column label="报警时间" width="165">
-          <template v-slot:default="scope">
-            {{ formatTime(scope.row.alarmTime) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" min-width="330" align="left">
