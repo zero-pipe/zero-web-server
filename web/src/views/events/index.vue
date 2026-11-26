@@ -78,7 +78,7 @@
           <span v-else class="sub">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" align="center">
+      <el-table-column label="操作" min-width="150" align="left">
         <template slot-scope="{ row }">
           <el-button type="text" size="medium" icon="el-icon-view" @click="openDetail(row)">详情</el-button>
           <el-divider direction="vertical" />

@@ -97,7 +97,7 @@
             {{ formatTime(scope.row.alarmTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="330">
+        <el-table-column label="操作" min-width="330" align="left">
           <template v-slot:default="scope">
             <el-button size="medium" icon="el-icon-view" type="text" @click="openDetail(scope.row)">详情</el-button>
             <el-divider direction="vertical" />
