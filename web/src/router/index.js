@@ -165,7 +165,7 @@ export const constantRoutes = [
         path: '',
         name: 'CustomEventCenter',
         component: () => import('@/views/customEvent/index'),
-        meta: { title: '自定义事件', icon: 'menu-record' }
+        meta: { title: '自定义事件', icon: 'customEvent' }
       }
     ]
   },

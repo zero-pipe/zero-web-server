@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 自定义事件：闪电（自定义触发） -->
+  <path d="M13 2.5 5 13.5h5.5l-1 8L18 10.5h-5.5z"/>
+</svg>
