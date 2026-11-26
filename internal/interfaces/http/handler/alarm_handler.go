@@ -59,6 +59,10 @@ func (h *AlarmHandler) snapURL(ctx context.Context, key string) string {
 	if h.store == nil {
 		return ""
 	}
+	// 与事件图片一致：优先拼 PublicBase 直链（对象存储公有前缀），否则回退预签名。
+	if cfg, err := h.store.GetOrEmpty(); err == nil && cfg != nil && strings.TrimSpace(cfg.PublicBase) != "" {
+		return strings.TrimRight(cfg.PublicBase, "/") + "/" + strings.TrimLeft(key, "/")
+	}
 	if url, err := h.store.Store().PresignGet(ctx, key, time.Hour); err == nil && url != "" {
 		return url
 	}
