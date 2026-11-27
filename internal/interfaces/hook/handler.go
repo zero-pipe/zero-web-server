@@ -162,11 +162,47 @@ func (h *Handler) onStorageKeepalive(c *gin.Context) {
 	h.onOK(c)
 }
 
-// onRecordPs 云存储分段封口回调（阶段3 落 zws_cloud_record，此处先记录）。
+// onRecordPs 云存储分段封口回调：解析后按 (node, slot) 幂等写入 zws_cloud_record。
 func (h *Handler) onRecordPs(c *gin.Context) {
-	var payload map[string]any
-	_ = c.ShouldBindJSON(&payload)
-	applog.Infof("[storage] on_record_ps %v", payload)
+	if h.cloudRecord == nil || h.storageNode == nil {
+		h.onOK(c)
+		return
+	}
+	var p struct {
+		Channel       string `json:"channel"`
+		Slot          int64  `json:"slot"`
+		StartTime     int64  `json:"startTime"`
+		EndTime       int64  `json:"endTime"`
+		DurationMs    int64  `json:"durationMs"`
+		FileSize      int64  `json:"fileSize"`
+		FilePath      string `json:"filePath"`
+		Status        int    `json:"status"`
+		MediaServerID string `json:"mediaServerId"`
+	}
+	if err := c.ShouldBindJSON(&p); err != nil {
+		applog.Warnf("[storage] on_record_ps 解析失败 remote=%s err=%v", c.ClientIP(), err)
+		h.onOK(c)
+		return
+	}
+	node := h.storageNode.ResolveHint(p.MediaServerID, c.ClientIP())
+	nodeID := p.MediaServerID
+	if node != nil {
+		nodeID = node.NodeID
+	}
+	err := h.cloudRecord.OnRecordPs(cloudrecordapp.RecordPsParam{
+		StorageNodeID: nodeID,
+		Channel:       p.Channel,
+		Slot:          p.Slot,
+		StartTime:     p.StartTime,
+		EndTime:       p.EndTime,
+		DurationMs:    p.DurationMs,
+		FileSize:      p.FileSize,
+		FilePath:      p.FilePath,
+		Status:        p.Status,
+	})
+	if err != nil {
+		applog.Warnf("[storage] on_record_ps 入库失败 channel=%s slot=%d: %v", p.Channel, p.Slot, err)
+	}
 	h.onOK(c)
 }
 

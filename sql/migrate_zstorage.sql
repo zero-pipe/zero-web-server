@@ -26,3 +26,11 @@ CREATE TABLE IF NOT EXISTS zws_storage_node
 -- 通道 → 存储节点绑定（空=不旁路录）
 ALTER TABLE zws_channel_ext
     ADD COLUMN storage_node_id VARCHAR(128) DEFAULT NULL COMMENT '旁路录制存储节点 node_id（空=不旁路录）' AFTER record_plan_id;
+
+-- 录像表增列：区分 MP4 / PS 槽位来源
+ALTER TABLE zws_cloud_record
+    ADD COLUMN storage_node_id VARCHAR(128) DEFAULT NULL COMMENT 'PS 录制的存储节点 node_id' AFTER collect,
+    ADD COLUMN container_format VARCHAR(16) NOT NULL DEFAULT 'mp4' COMMENT 'mp4|ps' AFTER storage_node_id,
+    ADD COLUMN slot_id BIGINT NOT NULL DEFAULT 0 COMMENT 'PS 槽位号（mp4 为 0）' AFTER container_format,
+    ADD COLUMN status INT NOT NULL DEFAULT 2 COMMENT '1 录制中/2 正常/3 残片恢复/4 已清理' AFTER slot_id,
+    ADD KEY idx_cloud_node_slot (storage_node_id, slot_id);

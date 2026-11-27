@@ -389,22 +389,26 @@ func (RecordPlanItem) TableName() string { return "zws_record_plan_item" }
 
 // CloudRecord 云端录像。
 type CloudRecord struct {
-	ID            int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	ChannelID     *int64  `gorm:"column:channel_id;index:idx_cloud_channel_time,priority:1" json:"channelId"`
-	App           string  `gorm:"column:app;size:64" json:"app"`
-	Stream        string  `gorm:"column:stream;size:255" json:"stream"`
-	CallID        string  `gorm:"column:call_id;size:255" json:"callId"`
-	MediaServerID string  `gorm:"column:media_server_id;size:255" json:"mediaServerId"`
-	StartTime     int64   `gorm:"column:start_time" json:"startTime"`
-	EndTime       int64   `gorm:"column:end_time" json:"endTime"`
-	FileName      string  `gorm:"column:file_name;size:255" json:"fileName"`
-	Folder        string  `gorm:"column:folder;size:255" json:"folder"`
-	FilePath      string  `gorm:"column:file_path;size:512" json:"filePath"`
-	Collect       bool    `gorm:"column:collect" json:"collect"`
-	FileSize      int64   `gorm:"column:file_size" json:"fileSize"`
-	TimeLen       float64 `gorm:"column:time_len" json:"timeLen"`
-	PlayURL       string  `gorm:"column:play_url;size:512" json:"playUrl"`
-	ServerID      string  `gorm:"column:server_id;size:50" json:"serverId"`
+	ID              int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	ChannelID       *int64  `gorm:"column:channel_id;index:idx_cloud_channel_time,priority:1" json:"channelId"`
+	App             string  `gorm:"column:app;size:64" json:"app"`
+	Stream          string  `gorm:"column:stream;size:255" json:"stream"`
+	CallID          string  `gorm:"column:call_id;size:255" json:"callId"`
+	MediaServerID   string  `gorm:"column:media_server_id;size:255" json:"mediaServerId"`
+	StartTime       int64   `gorm:"column:start_time" json:"startTime"`
+	EndTime         int64   `gorm:"column:end_time" json:"endTime"`
+	FileName        string  `gorm:"column:file_name;size:255" json:"fileName"`
+	Folder          string  `gorm:"column:folder;size:255" json:"folder"`
+	FilePath        string  `gorm:"column:file_path;size:512" json:"filePath"`
+	Collect         bool    `gorm:"column:collect" json:"collect"`
+	FileSize        int64   `gorm:"column:file_size" json:"fileSize"`
+	TimeLen         float64 `gorm:"column:time_len" json:"timeLen"`
+	PlayURL         string  `gorm:"column:play_url;size:512" json:"playUrl"`
+	ServerID        string  `gorm:"column:server_id;size:50" json:"serverId"`
+	StorageNodeID   string  `gorm:"column:storage_node_id;size:128;index:idx_cloud_node_slot,priority:1" json:"storageNodeId"`
+	ContainerFormat string  `gorm:"column:container_format;size:16;default:mp4" json:"containerFormat"`
+	SlotID          int64   `gorm:"column:slot_id;index:idx_cloud_node_slot,priority:2" json:"slotId"`
+	Status          int     `gorm:"column:status;default:2" json:"status"`
 }
 
 func (CloudRecord) TableName() string { return "zws_cloud_record" }

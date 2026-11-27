@@ -99,6 +99,60 @@ type RecordHookParam struct {
 	MediaServerID string
 }
 
+// RecordPsParam 是 zstorage on_record_ps 封口回调。
+type RecordPsParam struct {
+	StorageNodeID string
+	Channel       string // channel_key = <设备内码>_<通道内码>
+	Slot          int64
+	StartTime     int64 // UTC ms
+	EndTime       int64 // UTC ms
+	DurationMs    int64
+	FileSize      int64
+	FilePath      string
+	Status        int
+}
+
+// OnRecordPs 把 zstorage 封口的分段按 (node, slot) 幂等写入 zws_cloud_record。
+func (s *Service) OnRecordPs(p RecordPsParam) error {
+	if p.Channel == "" || p.Slot <= 0 {
+		return fmt.Errorf("on_record_ps 缺 channel/slot")
+	}
+	startMs := p.StartTime
+	if startMs > 0 && startMs < 1_000_000_000_000 {
+		startMs *= 1000
+	}
+	endMs := p.EndTime
+	if endMs > 0 && endMs < 1_000_000_000_000 {
+		endMs *= 1000
+	}
+	if endMs <= 0 && p.DurationMs > 0 {
+		endMs = startMs + p.DurationMs
+	}
+	timeLen := float64(endMs - startMs)
+	if timeLen < 0 {
+		timeLen = 0
+	}
+	rec := &domaincloudrecord.Record{
+		App:             "live",
+		Stream:          p.Channel,
+		StartTime:       startMs,
+		EndTime:         endMs,
+		TimeLen:         timeLen,
+		FileSize:        p.FileSize,
+		FilePath:        p.FilePath,
+		MediaServerID:   p.StorageNodeID,
+		StorageNodeID:   p.StorageNodeID,
+		ContainerFormat: "ps",
+		SlotID:          p.Slot,
+		Status:          p.Status,
+		ServerID:        s.serverID,
+	}
+	if rec.Status == 0 {
+		rec.Status = 2
+	}
+	return s.repo.UpsertPs(rec)
+}
+
 func (s *Service) List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]domaincloudrecord.Record, int64, error) {
 	rows, total, err := s.repo.List(page, count, app, stream, query, callID, mediaServerID, startTime, endTime, asc)
 	if err != nil {

@@ -147,3 +147,28 @@ func (s *Service) Resolve(preferID string) (*domainstoragenode.StorageNode, erro
 func (s *Service) MarkOffline(nodeID string) {
 	_ = s.repo.UpdateLastSeen(nodeID, time.Now().UnixMilli(), false)
 }
+
+// ResolveHint 依据回调里的 mediaServerId 或来源 IP 反查存储节点（用于 on_record_ps）。
+func (s *Service) ResolveHint(mediaServerID, clientIP string) *domainstoragenode.StorageNode {
+	mediaServerID = strings.TrimSpace(mediaServerID)
+	if mediaServerID != "" {
+		if n, err := s.repo.GetByNodeID(mediaServerID); err == nil && n != nil {
+			return n
+		}
+	}
+	clientIP = strings.TrimSpace(clientIP)
+	if clientIP == "" {
+		return nil
+	}
+	rows, err := s.repo.ListAll()
+	if err != nil {
+		return nil
+	}
+	for i := range rows {
+		if rows[i].IP == clientIP && rows[i].Online {
+			n := rows[i]
+			return &n
+		}
+	}
+	return nil
+}

@@ -457,7 +457,12 @@ CREATE TABLE IF NOT EXISTS zws_cloud_record
     play_url        VARCHAR(512) DEFAULT NULL,
     server_id       VARCHAR(50) DEFAULT NULL,
     collect         TINYINT(1) NOT NULL DEFAULT 0,
+    storage_node_id VARCHAR(128) DEFAULT NULL COMMENT 'PS 录制的存储节点 node_id',
+    container_format VARCHAR(16) NOT NULL DEFAULT 'mp4' COMMENT 'mp4|ps',
+    slot_id         BIGINT NOT NULL DEFAULT 0 COMMENT 'PS 槽位号（mp4 为 0）',
+    status          INT NOT NULL DEFAULT 2 COMMENT '1 录制中/2 正常/3 残片恢复/4 已清理',
     KEY idx_cloud_channel_time (channel_id, start_time),
+    KEY idx_cloud_node_slot (storage_node_id, slot_id),
     KEY idx_cloud_app_stream (app, stream),
     CONSTRAINT fk_cloud_channel FOREIGN KEY (channel_id) REFERENCES zws_channel (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='云端录像';

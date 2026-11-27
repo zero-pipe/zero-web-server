@@ -311,6 +311,8 @@ func toModelCloudRecord(d *domaincloudrecord.Record) *model.CloudRecord {
 		MediaServerID: d.MediaServerID, ServerID: d.ServerID,
 		FileName: d.FileName, Folder: d.Folder, FilePath: d.FilePath,
 		PlayURL: d.PlayURL, Collect: d.Collect, FileSize: d.FileSize, TimeLen: d.TimeLen,
+		StorageNodeID: d.StorageNodeID, ContainerFormat: d.ContainerFormat,
+		SlotID: d.SlotID, Status: d.Status,
 	}
 }
 
@@ -321,7 +323,31 @@ func toDomainCloudRecord(m *model.CloudRecord) *domaincloudrecord.Record {
 		MediaServerID: m.MediaServerID, ServerID: m.ServerID,
 		FileName: m.FileName, Folder: m.Folder, FilePath: m.FilePath,
 		PlayURL: m.PlayURL, Collect: m.Collect, FileSize: m.FileSize, TimeLen: m.TimeLen,
+		StorageNodeID: m.StorageNodeID, ContainerFormat: m.ContainerFormat,
+		SlotID: m.SlotID, Status: m.Status,
 	}
+}
+
+// UpsertPs 按 (storage_node_id, slot_id) 幂等写入 PS 旁路录像。
+func (r *CloudRecordRepository) UpsertPs(rec *domaincloudrecord.Record) error {
+	m := toModelCloudRecord(rec)
+	if m.ContainerFormat == "" {
+		m.ContainerFormat = "ps"
+	}
+	var existing model.CloudRecord
+	err := r.db.Where("storage_node_id = ? AND slot_id = ?", m.StorageNodeID, m.SlotID).
+		First(&existing).Error
+	if err == gorm.ErrRecordNotFound {
+		return r.db.Create(m).Error
+	}
+	if err != nil {
+		return err
+	}
+	m.ID = existing.ID
+	if m.Collect {
+		m.Collect = existing.Collect
+	}
+	return r.db.Save(m).Error
 }
 
 func (r *CloudRecordRepository) DateList(app, stream, mediaServerID string, year, month int) ([]string, error) {
