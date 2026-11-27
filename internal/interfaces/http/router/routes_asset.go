@@ -25,6 +25,11 @@ func registerAssets(g *gin.RouterGroup, h *handler.AssetHandler) {
 	g.GET("/resources/:id/snapshot", h.Snapshot)
 	// 云台控制（按资源 id，速度沿用前端既有取值）。
 	g.GET("/resources/:id/ptz", h.PTZ)
+	// 预置位（按资源 id，presetId 为字符串，国标为数字索引、ONVIF 为 token）。
+	g.GET("/resources/:id/preset/query", h.QueryPreset)
+	g.GET("/resources/:id/preset/call", h.CallPreset)
+	g.GET("/resources/:id/preset/add", h.AddPreset)
+	g.GET("/resources/:id/preset/delete", h.DeletePreset)
 	// 按时间回放（统一资源口径）：检索录像、起流、停流。
 	g.POST("/resources/:id/playback/records", h.QueryRecords)
 	g.POST("/resources/:id/playback/start", h.StartPlayback)

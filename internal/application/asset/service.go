@@ -12,6 +12,7 @@ import (
 
 	"zero-web-server/internal/application/channeldrv"
 	domainasset "zero-web-server/internal/domain/asset"
+	domainptz "zero-web-server/internal/domain/ptz"
 	"zero-web-server/internal/dto"
 )
 
@@ -436,6 +437,59 @@ func (s *Service) PTZ(ctx context.Context, resourceID, command string, horizonSp
 	}
 	s.markCapability("resource", res.ID, "ptz", true)
 	return nil
+}
+
+// presetTarget 解析预置位所需的资源、接入绑定与预设驱动。
+// QueryPresets 查询某资源的预置位列表。
+func (s *Service) QueryPresets(ctx context.Context, resourceID string) ([]domainptz.Preset, error) {
+	res, binding, drv, err := s.ptzTarget(resourceID)
+	if err != nil {
+		return nil, err
+	}
+	pd, ok := drv.(channeldrv.PresetDriver)
+	if !ok {
+		return nil, channeldrv.ErrPresetUnsupported
+	}
+	return pd.QueryPresets(ctx, res, binding)
+}
+
+// CallPreset 调用指定预置位。
+func (s *Service) CallPreset(ctx context.Context, resourceID, presetID string) error {
+	res, binding, drv, err := s.ptzTarget(resourceID)
+	if err != nil {
+		return err
+	}
+	pd, ok := drv.(channeldrv.PresetDriver)
+	if !ok {
+		return channeldrv.ErrPresetUnsupported
+	}
+	return pd.CallPreset(ctx, res, binding, presetID)
+}
+
+// AddPreset 设置指定预置位。
+func (s *Service) AddPreset(ctx context.Context, resourceID, presetID string) error {
+	res, binding, drv, err := s.ptzTarget(resourceID)
+	if err != nil {
+		return err
+	}
+	pd, ok := drv.(channeldrv.PresetDriver)
+	if !ok {
+		return channeldrv.ErrPresetUnsupported
+	}
+	return pd.AddPreset(ctx, res, binding, presetID)
+}
+
+// DeletePreset 删除指定预置位。
+func (s *Service) DeletePreset(ctx context.Context, resourceID, presetID string) error {
+	res, binding, drv, err := s.ptzTarget(resourceID)
+	if err != nil {
+		return err
+	}
+	pd, ok := drv.(channeldrv.PresetDriver)
+	if !ok {
+		return channeldrv.ErrPresetUnsupported
+	}
+	return pd.DeletePreset(ctx, res, binding, presetID)
 }
 
 // Snapshot 让协议侧抓一张 JPEG。

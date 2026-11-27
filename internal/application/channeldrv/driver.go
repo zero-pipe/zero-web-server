@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	playapp "zero-web-server/internal/application/play"
 	domainasset "zero-web-server/internal/domain/asset"
 	domaindevice "zero-web-server/internal/domain/device"
+	domainptz "zero-web-server/internal/domain/ptz"
 	"zero-web-server/internal/dto"
 	"zero-web-server/internal/port"
 )
@@ -61,6 +63,7 @@ type ChannelDriver interface {
 var (
 	ErrPlaybackUnsupported = errors.New("该接入方式暂不支持回放")
 	ErrSnapshotUnsupported = errors.New("该接入方式暂不支持抓图")
+	ErrPresetUnsupported   = errors.New("该接入方式暂不支持预置位")
 )
 
 // PlaybackDriver 是可选的「按时间回放」能力。
@@ -86,6 +89,18 @@ type PlaybackDriver interface {
 // 从直播流里截帧在没人在看的时候是拿不到的。
 type SnapshotDriver interface {
 	Snapshot(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]byte, error)
+}
+
+// PresetDriver 是可选的预置位能力（查询/调用/设置/删除）。
+//
+// 预置位编号在协议间语义不同：国标是通道内数字索引，ONVIF 是设备分配的
+// 字符串 token。统一族对外一律用字符串 presetId，由各驱动转换。
+// 插件（私有 SDK）当前未实现预置位，显式不实现本接口，服务层据类型断言给准确提示。
+type PresetDriver interface {
+	QueryPresets(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]domainptz.Preset, error)
+	CallPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error
+	AddPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error
+	DeletePreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error
 }
 
 // Deps 驱动所需的协议侧实现。
@@ -252,6 +267,58 @@ func (l *limited) Snapshot(ctx context.Context, res *domainasset.Resource, bindi
 	return sd.Snapshot(cctx, res, binding)
 }
 
+func (l *limited) QueryPresets(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]domainptz.Preset, error) {
+	pd, ok := l.next.(PresetDriver)
+	if !ok {
+		return nil, ErrPresetUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+	return pd.QueryPresets(cctx, res, binding)
+}
+
+func (l *limited) CallPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	pd, ok := l.next.(PresetDriver)
+	if !ok {
+		return ErrPresetUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return pd.CallPreset(cctx, res, binding, presetID)
+}
+
+func (l *limited) AddPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	pd, ok := l.next.(PresetDriver)
+	if !ok {
+		return ErrPresetUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return pd.AddPreset(cctx, res, binding, presetID)
+}
+
+func (l *limited) DeletePreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	pd, ok := l.next.(PresetDriver)
+	if !ok {
+		return ErrPresetUnsupported
+	}
+	cctx, done, err := l.begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return pd.DeletePreset(cctx, res, binding, presetID)
+}
+
 // Get 按协议取驱动。
 func (r Registry) Get(protocol string) (ChannelDriver, bool) {
 	d, ok := r[protocol]
@@ -282,7 +349,7 @@ func (d *gbDriver) Protocol() string { return "gb28181" }
 // Capabilities GB 统一驱动目前真实实现的通道能力：直播 + 云台。
 // 回放仍走旧 SIP 播放服务、抓图未实现，故不声明——声明了就必须在这里实现，
 // 否则前端会点亮一个点下去就报错的按钮。
-func (d *gbDriver) Capabilities() []string { return []string{"play", "ptz"} }
+func (d *gbDriver) Capabilities() []string { return []string{"play", "ptz", "preset"} }
 
 func (d *gbDriver) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
 	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
@@ -334,6 +401,70 @@ func (d *gbDriver) Command(ctx context.Context, res *domainasset.Resource, bindi
 	return nil, fmt.Errorf("GB28181 接入不支持自定义命令: %s", cmd)
 }
 
+// GB/T 28181 front-end preset 命令码（附录 A）。
+const (
+	gbPresetSet    = 0x81
+	gbPresetCall   = 0x82
+	gbPresetDelete = 0x83
+)
+
+func (d *gbDriver) QueryPresets(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]domainptz.Preset, error) {
+	if d.ptz == nil || d.devices == nil {
+		return nil, fmt.Errorf("GB 云台服务未启用")
+	}
+	device, err := d.devices.GetByDeviceID(binding.ExternalID)
+	if err != nil || device == nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	sn, ch := d.ptz.SendPresetQuery(device, res.ExternalKey)
+	timeout := 5 * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		if remain := time.Until(deadline); remain > 0 && remain < timeout {
+			timeout = remain
+		}
+	}
+	select {
+	case presets := <-ch:
+		if presets == nil {
+			return []domainptz.Preset{}, nil
+		}
+		return presets, nil
+	case <-ctx.Done():
+		d.ptz.CancelPresetQuery(sn)
+		return nil, ctx.Err()
+	case <-time.After(timeout):
+		d.ptz.CancelPresetQuery(sn)
+		return nil, fmt.Errorf("预置位查询超时")
+	}
+}
+
+func (d *gbDriver) presetCmd(res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string, cmdCode int) error {
+	if d.ptz == nil || d.devices == nil {
+		return fmt.Errorf("GB 云台服务未启用")
+	}
+	idx, err := strconv.Atoi(strings.TrimSpace(presetID))
+	if err != nil || idx < 1 || idx > 255 {
+		return fmt.Errorf("预置位编号需在 1-255: %s", presetID)
+	}
+	device, err := d.devices.GetByDeviceID(binding.ExternalID)
+	if err != nil || device == nil {
+		return fmt.Errorf("设备不存在")
+	}
+	return d.ptz.SendFrontEndCmd(device, res.ExternalKey, cmdCode, 0, idx, 0)
+}
+
+func (d *gbDriver) CallPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	return d.presetCmd(res, binding, presetID, gbPresetCall)
+}
+
+func (d *gbDriver) AddPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	return d.presetCmd(res, binding, presetID, gbPresetSet)
+}
+
+func (d *gbDriver) DeletePreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	return d.presetCmd(res, binding, presetID, gbPresetDelete)
+}
+
 // ---- ONVIF ----
 
 type onvifDriver struct {
@@ -343,7 +474,7 @@ type onvifDriver struct {
 func (d *onvifDriver) Protocol() string { return "onvif" }
 
 // Capabilities ONVIF 统一驱动实现了直播、云台、抓图；回放缺 Profile G 未实现。
-func (d *onvifDriver) Capabilities() []string { return []string{"play", "ptz", "snapshot"} }
+func (d *onvifDriver) Capabilities() []string { return []string{"play", "ptz", "snapshot", "preset"} }
 
 func (d *onvifDriver) StartLive(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding,
 	profile *domainasset.StreamProfile) (*dto.StreamContent, *Session, error) {
@@ -421,6 +552,36 @@ func (d *onvifDriver) Snapshot(ctx context.Context, res *domainasset.Resource, b
 		return nil, fmt.Errorf("ONVIF 服务未启用")
 	}
 	return d.onvif.Snapshot(ctx, int64(res.ProtocolChannelID), "")
+}
+
+func (d *onvifDriver) QueryPresets(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding) ([]domainptz.Preset, error) {
+	if d.onvif == nil {
+		return nil, fmt.Errorf("ONVIF 服务未启用")
+	}
+	return d.onvif.QueryPresets(ctx, int64(res.ProtocolChannelID))
+}
+
+func (d *onvifDriver) CallPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	if d.onvif == nil {
+		return fmt.Errorf("ONVIF 服务未启用")
+	}
+	return d.onvif.GotoPreset(ctx, int64(res.ProtocolChannelID), presetID)
+}
+
+func (d *onvifDriver) AddPreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	if d.onvif == nil {
+		return fmt.Errorf("ONVIF 服务未启用")
+	}
+	// ONVIF 允许空 token 由设备分配；传 presetID 作 token 时若设备不复用也无妨。
+	_, err := d.onvif.SetPreset(ctx, int64(res.ProtocolChannelID), presetID, "")
+	return err
+}
+
+func (d *onvifDriver) DeletePreset(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, presetID string) error {
+	if d.onvif == nil {
+		return fmt.Errorf("ONVIF 服务未启用")
+	}
+	return d.onvif.RemovePreset(ctx, int64(res.ProtocolChannelID), presetID)
 }
 
 // ---- 插件（私有 SDK） ----

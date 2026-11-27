@@ -229,6 +229,43 @@ func (h *AssetHandler) PTZ(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// QueryPreset 查询预置位列表。
+func (h *AssetHandler) QueryPreset(c *gin.Context) {
+	list, err := h.svc.QueryPresets(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, list)
+}
+
+// CallPreset 调用预置位。
+func (h *AssetHandler) CallPreset(c *gin.Context) {
+	if err := h.svc.CallPreset(c.Request.Context(), c.Param("id"), c.Query("presetId")); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// AddPreset 设置预置位。
+func (h *AssetHandler) AddPreset(c *gin.Context) {
+	if err := h.svc.AddPreset(c.Request.Context(), c.Param("id"), c.Query("presetId")); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// DeletePreset 删除预置位。
+func (h *AssetHandler) DeletePreset(c *gin.Context) {
+	if err := h.svc.DeletePreset(c.Request.Context(), c.Param("id"), c.Query("presetId")); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
 // Snapshot 抓一张图，直接回 JPEG 字节（不落对象存储）。
 func (h *AssetHandler) Snapshot(c *gin.Context) {
 	data, err := h.svc.Snapshot(c.Request.Context(), c.Param("id"))
