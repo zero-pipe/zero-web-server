@@ -29,7 +29,6 @@ import (
 	pluginapp "zero-web-server/internal/application/plugin"
 	pluginpkgapp "zero-web-server/internal/application/pluginpkgapp"
 	positionapp "zero-web-server/internal/application/position"
-	ptzapp "zero-web-server/internal/application/ptz"
 	publishauth "zero-web-server/internal/application/publishauth"
 	recordplanapp "zero-web-server/internal/application/recordplan"
 	regionapp "zero-web-server/internal/application/region"
@@ -55,7 +54,6 @@ type Deps struct {
 	DeviceAccessService  *deviceaccess.Service
 	PlayService          *playapp.Service
 	PlaybackService      *playbackapp.Service
-	PTZService           *ptzapp.Service
 	AlarmService         *alarmapp.Service
 	PlatformService      *upstreamapp.Service
 	PlatformChannelSvc   *upstreamapp.ChannelService

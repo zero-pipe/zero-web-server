@@ -436,7 +436,6 @@ func main() {
 		DeviceAccessService:  deviceAccessService,
 		PlayService:          playService,
 		PlaybackService:      playbackService,
-		PTZService:           ptzService,
 		AlarmService:         alarmService,
 		PlatformService:      platformService,
 		PlatformChannelSvc:   platformChannelSvc,
