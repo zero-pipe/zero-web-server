@@ -181,6 +181,7 @@
 <script>
 import playerTabs from '../common/playerTabs.vue'
 import { setAlarmStatus } from '@/api/alarm'
+import { startPlayback, stopPlayback } from '@/api/playback'
 
 const ALARM_TYPE_OPTIONS = [
   { value: 'VideoLoss', label: '视频丢失报警' },
@@ -342,6 +343,7 @@ export default {
       this.playbackError = null
       this.playbackStreamInfo = null
       this.playbackVideoUrl = null
+      // channelLegacyId = 通道表 id = 通道 resourceId，直接作为统一资源口径的路径主键。
       this.currentPlaybackChannelId = (row.playback && row.playback.channelLegacyId) || row.channelId
 
       // 优先使用后端推导的回放窗口，否则报警时间前后 10 秒。
@@ -352,11 +354,11 @@ export default {
         ? formatDatetime(row.playback.endAt)
         : formatDatetime(row.alarmTime + 10 * 1000)
 
-      this.$store.dispatch('commonChanel/playback', {
-        channelId: this.currentPlaybackChannelId,
+      startPlayback(this.currentPlaybackChannelId, {
         startTime: startTime,
         endTime: endTime
-      }).then(data => {
+      }).then(res => {
+        const data = (res && res.data) || null
         this.playbackStreamInfo = data
         this.playbackLoading = false
         this.$nextTick(() => {
@@ -375,10 +377,7 @@ export default {
         this.$refs.playbackPlayer.stop()
       }
       if (this.playbackStreamInfo && this.currentPlaybackChannelId) {
-        this.$store.dispatch('commonChanel/stopPlayback', {
-          channelId: this.currentPlaybackChannelId,
-          stream: this.playbackStreamInfo.stream
-        }).catch(err => {
+        stopPlayback(this.currentPlaybackChannelId).catch(err => {
           console.log(err)
         })
       }

@@ -10,15 +10,12 @@ import region from './modules/region'
 import device from './modules/device'
 import group from './modules/group'
 import server from './modules/server'
-import play from './modules/play'
-import playback from './modules/playback'
 import recordPlan from './modules/recordPlan'
 import cloudRecord from './modules/cloudRecord'
 import platform from './modules/platform'
 import role from './modules/role'
 import gbRecord from './modules/gbRecord'
 import log from './modules/log'
-import frontEnd from './modules/frontEnd'
 import alarm from './modules/alarm'
 
 Vue.use(Vuex)
@@ -34,15 +31,12 @@ const store = new Vuex.Store({
     device,
     group,
     server,
-    play,
-    playback,
     recordPlan,
     cloudRecord,
     platform,
     role,
     gbRecord,
     log,
-    frontEnd,
     alarm
   },
   getters

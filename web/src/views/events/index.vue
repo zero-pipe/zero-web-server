@@ -175,7 +175,7 @@
 
 <script>
 import { queryEvents, getEvent, getEventStats, getEventTypes, clearEvents } from '@/api/event'
-import { playback as startPlayback, stopPlayback } from '@/api/commonChannel'
+import { startPlayback, stopPlayback } from '@/api/playback'
 import playerTabs from '@/views/common/playerTabs.vue'
 
 function formatDatetime(ts) {
@@ -297,11 +297,11 @@ export default {
       this.playbackError = null
       this.playbackStreamInfo = null
       this.playbackChannelId = p.channelLegacyId
-      startPlayback({
-        channelId: p.channelLegacyId,
+      startPlayback(p.channelLegacyId, {
         startTime: formatDatetime(p.startAt),
         endTime: formatDatetime(p.endAt)
-      }).then(data => {
+      }).then(res => {
+        const data = (res && res.data) || null
         this.playbackStreamInfo = data
         this.playbackLoading = false
         this.$nextTick(() => {
@@ -315,7 +315,7 @@ export default {
     closePlayback() {
       if (this.$refs.playbackPlayer) this.$refs.playbackPlayer.stop()
       if (this.playbackStreamInfo && this.playbackChannelId) {
-        stopPlayback({ channelId: this.playbackChannelId, stream: this.playbackStreamInfo.stream }).catch(() => {})
+        stopPlayback(this.playbackChannelId).catch(() => {})
       }
       this.playbackDialogVisible = false
       this.playbackStreamInfo = null

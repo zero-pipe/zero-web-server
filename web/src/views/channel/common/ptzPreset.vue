@@ -17,10 +17,13 @@
 </template>
 
 <script>
+import { resourcePresetQuery, resourcePresetCall } from '@/api/asset'
+
 export default {
   name: 'ChPtzPreset',
   props: {
-    channelId: { type: String, default: null }
+    // 通道资源 id（=通道表 id=树通道叶 id）
+    resourceId: { type: String, default: null }
   },
   data() {
     return {
@@ -34,11 +37,15 @@ export default {
   },
   methods: {
     getPresetList() {
+      if (!this.resourceId) {
+        this.loaded = true
+        return
+      }
       this.loaded = false
       this.loadError = false
-      this.$store.dispatch('commonChanel/queryPreset', this.channelId)
-        .then(data => {
-          this.presetList = data || []
+      resourcePresetQuery(this.resourceId)
+        .then(res => {
+          this.presetList = (res && res.data) || []
           this.loaded = true
         })
         .catch(() => {
@@ -48,7 +55,7 @@ export default {
         })
     },
     gotoPreset(preset) {
-      this.$store.dispatch('commonChanel/callPreset', { channelId: this.channelId, presetId: preset.presetId })
+      resourcePresetCall(this.resourceId, preset.presetId)
         .then(() => {
           this.$message({
             showClose: true,

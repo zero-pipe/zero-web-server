@@ -48,7 +48,7 @@
             <div class="panel-block-title">
               <span class="pbt-title"><i class="pbt-bar" />预置位</span>
             </div>
-            <ptzPreset :device-id="deviceId" :channel-device-id="channelId" />
+            <ptzPreset :resource-id="resourceId" />
           </div>
         </div>
 
@@ -84,8 +84,7 @@
             </div>
             <devicePtzPanel
               v-show="ptzExpanded"
-              :device-id="deviceId"
-              :channel-id="channelId"
+              :resource-id="resourceId"
               :caps="effectivePtzCaps"
               @drag-zoom-start="toggleDragZoom"
             />
@@ -102,6 +101,7 @@ import playerTabs from '../../common/playerTabs.vue'
 import devicePtzPanel from '../common/devicePtzPanel.vue'
 import PtzPreset from './ptzPreset.vue'
 import mediaInfo from '../../common/mediaInfo.vue'
+import { dragZoomIn, dragZoomOut } from '@/api/device'
 
 import { derivePtzCaps, FULL_PTZ_CAPS } from '@/utils/playerStrategy'
 
@@ -117,6 +117,7 @@ export default {
       mediaServerId: '',
       deviceId: '',
       channelId: '',
+      resourceId: '',
       channelName: '',
       ptzType: 0,
       showPtz: true,
@@ -206,6 +207,7 @@ export default {
       if (this.showVideoDialog) return
       this.deviceId = deviceId
       this.channelId = channelId
+      this.resourceId = (param && param.resourceId) || ''
       this.channelName = (param && (param.name || param.channelName)) || ''
       this.ptzType = (param && param.ptzType != null) ? param.ptzType : 0
       this.showPtz = !(param && param.showPtz === false)
@@ -303,6 +305,7 @@ export default {
       this.videoUrl = ''
       this.ptzType = 0
       this.channelName = ''
+      this.resourceId = ''
       this.showPtz = true
       this.extraTab = 'media'
       this.showVideoDialog = false
@@ -310,12 +313,13 @@ export default {
     toggleDragZoom(direction) {
       this.dragZoomDirection = direction
       this.$refs.playerTabs.startDragZoom((params) => {
+        // 拖动变倍是国标专属能力，走保留的 /devices/gb/control/drag_zoom/*（需 GB 对码）
         params.deviceId = this.deviceId
         params.channelId = this.channelId
-        const action = this.dragZoomDirection === 'in' ? 'frontEnd/dragZoomIn' : 'frontEnd/dragZoomOut'
+        const req = this.dragZoomDirection === 'in' ? dragZoomIn : dragZoomOut
         const successMsg = this.dragZoomDirection === 'in' ? '拉框放大成功' : '拉框缩小成功'
         const failMsg = this.dragZoomDirection === 'in' ? '拉框放大失败' : '拉框缩小失败'
-        this.$store.dispatch(action, params).then(() => {
+        req(params).then(() => {
           this.$message({ showClose: true, message: successMsg, type: 'success' })
         }).catch(() => {
           this.$message({ showClose: true, message: failMsg, type: 'error' })

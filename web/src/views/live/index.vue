@@ -78,11 +78,11 @@
           <template v-if="currentChannelId">
             <div class="ptz-preset-section">
               <div class="section-title">预置位</div>
-              <LivePtzPreset :channel-id="String(currentChannelId)" />
+              <LivePtzPreset :resource-id="String(currentChannelId)" />
             </div>
             <div class="ptz-control-section">
               <div class="section-title">方向控制</div>
-              <channelPtzPanel :channel-id="currentChannelId" @drag-zoom-start="handleDragZoom" />
+              <channelPtzPanel :resource-id="String(currentChannelId)" @drag-zoom-start="handleDragZoom" />
             </div>
           </template>
           <div v-else class="ptz-empty-tip">请先在左侧选择通道</div>
@@ -94,7 +94,7 @@
 <script>
 
 import PlayerTabs from '../common/playerTabs.vue'
-import { startResourceLive } from '@/api/asset'
+import { startResourceLive, resourceCommand } from '@/api/asset'
 import DeviceTree from '../common/DeviceTree.vue'
 import channelPtzPanel from '../channel/common/channelPtzPanel.vue'
 import LivePtzPreset from './LivePtzPreset.vue'
@@ -314,15 +314,13 @@ export default {
       if (!ref) return
       const instance = ref instanceof Array ? ref[0] : ref
       if (!instance || !instance.startDragZoom) return
-      console.log('[live] handleDragZoom playerTabs:', refName, 'playerIdx:', this.playerIdx, 'direction:', direction)
+      if (!this.currentChannelId) return
       instance.startDragZoom((params) => {
-        console.log('[live] dragZoom before channelId:', JSON.stringify(params))
-        params.channelId = this.currentChannelId
-        console.log('[live] dragZoom after channelId:', JSON.stringify(params))
-        const action = direction === 'in' ? 'commonChanel/dragZoomIn' : 'commonChanel/dragZoomOut'
+        // 拉框变倍走通用命令族（资源 id 单 ID，平台不解析参数语义）
+        const cmd = direction === 'in' ? 'drag_zoom_in' : 'drag_zoom_out'
         const successMsg = direction === 'in' ? '拉框放大成功' : '拉框缩小成功'
         const failMsg = direction === 'in' ? '拉框放大失败' : '拉框缩小失败'
-        this.$store.dispatch(action, params).then(() => {
+        resourceCommand(this.currentChannelId, cmd, params).then(() => {
           this.$message({ showClose: true, message: successMsg, type: 'success' })
         }).catch(() => {
           this.$message({ showClose: true, message: failMsg, type: 'error' })

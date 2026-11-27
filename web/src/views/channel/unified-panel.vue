@@ -258,7 +258,7 @@ export default {
         stopResourceLive(this.playingRow.resourceId).catch(() => {})
       }
       // 先打开播放器（loading 态），取流成功后再把流内容交给播放器。
-      player.openDialog('media', '', '', { pending: true, name: row.name, hasAudio: !!row.hasAudio, ptzType: 0, showPtz: false })
+      player.openDialog('media', '', '', { pending: true, name: row.name, hasAudio: !!row.hasAudio, ptzType: 0, showPtz: false, resourceId: row.resourceId })
       row._loading = true
       this.playingRow = row
       startResourceLive(row.resourceId, row._profileId).then(res => {

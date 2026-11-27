@@ -75,6 +75,7 @@
 <script>
 import devicePlayer from "@/views/device/dialog/devicePlayer.vue";
 import elDragDialog from "@/directive/el-drag-dialog";
+import { startResourceLive, stopResourceLive } from "@/api/asset";
 
 export default {
   name: "HasStreamChannel",
@@ -121,16 +122,19 @@ export default {
     sendDevicePush: function (row) {
       const deviceId = row.parentDeviceId
       const channelId = row.deviceId
+      // 统一资源 id：优先 row.resourceId，兼容 gbId（=通道 resourceId）。
+      const resourceId = row.resourceId != null ? row.resourceId : row.gbId
       this.$set(row, "playing", true)
       this.$refs.devicePlayer.openDialog("codec", deviceId, channelId, {
         pending: true,
         name: row.name,
         hasAudio: row.hasAudio,
-        ptzType: row.ptzType
+        ptzType: row.ptzType,
+        resourceId: resourceId
       })
-      this.$store.dispatch("play/play", [deviceId, channelId])
-        .then((data) => {
-          this.$refs.devicePlayer.onStreamReady(data, row.hasAudio)
+      startResourceLive(resourceId)
+        .then((res) => {
+          this.$refs.devicePlayer.onStreamReady((res && res.data) || null, row.hasAudio)
         })
         .catch((error) => {
           this.$refs.devicePlayer.onStreamError(error)
@@ -140,10 +144,11 @@ export default {
         })
     },
     stopDevicePush: function (row) {
-      this.$store.dispatch("play/stop", [row.parentDeviceId, row.deviceId]).then(_ => {
+      const resourceId = row.resourceId != null ? row.resourceId : row.gbId
+      stopResourceLive(resourceId).then(_ => {
         this.getChannelList();
       }).catch((error) => {
-        if (error.response.status === 402) {
+        if (error.response && error.response.status === 402) {
           this.getChannelList();
         } else {
           this.$message.error({showClose: true, message: error})

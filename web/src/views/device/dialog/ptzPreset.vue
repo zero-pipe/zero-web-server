@@ -13,9 +13,14 @@
 </template>
 
 <script>
+import { resourcePresetQuery, resourcePresetCall } from '@/api/asset'
+
 export default {
   name: 'PtzPreset',
-  props: ['channelDeviceId', 'deviceId'],
+  props: {
+    // 通道资源 id（=通道表 id=树通道叶 id）
+    resourceId: { type: String, default: null }
+  },
   data() {
     return {
       presetList: []
@@ -26,13 +31,14 @@ export default {
   },
   methods: {
     getPresetList: function() {
-      this.$store.dispatch('frontEnd/queryPreset', [this.deviceId, this.channelDeviceId])
-        .then(data => {
-          this.presetList = data
+      if (!this.resourceId) return
+      resourcePresetQuery(this.resourceId)
+        .then(res => {
+          this.presetList = (res && res.data) || []
         })
     },
     gotoPreset: function(preset) {
-      this.$store.dispatch('frontEnd/callPreset', [this.deviceId, this.channelDeviceId, preset.presetId])
+      resourcePresetCall(this.resourceId, preset.presetId)
         .then(() => {
           this.$message({
             showClose: true,

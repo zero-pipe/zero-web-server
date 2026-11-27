@@ -51,7 +51,7 @@
             <div v-if="!ptzCaps.direction" class="preset-muted">
               该通道为{{ ptzTypeText }}，不支持预置位
             </div>
-            <channelPreset v-else-if="channelId" :channel-id="channelId" />
+            <channelPreset v-else-if="channelId" :resource-id="String(channelId)" />
           </div>
         </div>
 
@@ -85,7 +85,7 @@
             </div>
             <channelPtzPanel
               v-show="ptzExpanded"
-              :channel-id="channelId"
+              :resource-id="String(channelId)"
               :caps="effectivePtzCaps"
               @drag-zoom-start="toggleDragZoom"
             />
@@ -100,6 +100,7 @@
 import elDragDialog from '@/directive/el-drag-dialog'
 import playerTabs from '../common/playerTabs.vue'
 import { derivePtzCaps, FULL_PTZ_CAPS } from '@/utils/playerStrategy'
+import { resourceCommand } from '@/api/asset'
 import channelPtzPanel from './common/channelPtzPanel.vue'
 import channelPreset from './common/ptzPreset.vue'
 import mediaInfo from '../common/mediaInfo.vue'
@@ -289,11 +290,11 @@ export default {
     toggleDragZoom(direction) {
       this.dragZoomDirection = direction
       this.$refs.playerTabs.startDragZoom((params) => {
-        params.channelId = this.channelId
-        const action = this.dragZoomDirection === 'in' ? 'commonChanel/dragZoomIn' : 'commonChanel/dragZoomOut'
+        // 拉框变倍走通用命令族（资源 id 单 ID，平台不解析参数语义）
+        const cmd = this.dragZoomDirection === 'in' ? 'drag_zoom_in' : 'drag_zoom_out'
         const successMsg = this.dragZoomDirection === 'in' ? '拉框放大成功' : '拉框缩小成功'
         const failMsg = this.dragZoomDirection === 'in' ? '拉框放大失败' : '拉框缩小失败'
-        this.$store.dispatch(action, params).then(() => {
+        resourceCommand(this.channelId, cmd, params).then(() => {
           this.$message({ showClose: true, message: successMsg, type: 'success' })
         }).catch(() => {
           this.$message({ showClose: true, message: failMsg, type: 'error' })

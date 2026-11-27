@@ -1,45 +1,7 @@
 import request from '@/utils/request'
 
-// 回放流播放API
+// 设备回放（统一资源口径，按 resourceId）
 
-export function play([deviceId, channelId, startTime, endTime]) {
-  return request({
-    method: 'get',
-    url: '/api/v1/playback/start/' + deviceId + '/' + channelId + '?startTime=' + startTime + '&endTime=' + endTime
-  })
-}
-export function resume(streamId) {
-  return request({
-    method: 'get',
-    url: '/api/v1/playback/resume/' + streamId
-  })
-}
-export function pause(streamId) {
-  return request({
-    method: 'get',
-    url: '/api/v1/playback/pause/' + streamId
-  })
-}
-export function setSpeed([streamId, speed]) {
-  return request({
-    method: 'get',
-    url: `/api/v1/playback/speed/${streamId}/${speed}`
-  })
-}
-export function stop(deviceId, channelId, streamId) {
-  return request({
-    method: 'get',
-    url: '/api/v1/playback/stop/' + deviceId + '/' + channelId + '/' + streamId
-  })
-}
-export function seek(streamId, seekTime) {
-  return request({
-    method: 'get',
-    url: `/api/v1/playback/seek/${streamId}/${seekTime}`
-  })
-}
-
-// ---- 统一资源口径（按 resourceId，前端推荐用这套）----
 // 录像查询：GB 返回 RecordInfo{sumNum,recordList:[{startTime,endTime,...}]}
 export function queryRecords(resourceId, { startTime, endTime, streamType } = {}) {
   return request({

@@ -9,10 +9,13 @@
 </template>
 
 <script>
+import { resourcePresetQuery, resourcePresetCall } from '@/api/asset'
+
 export default {
   name: 'LivePtzPreset',
   props: {
-    channelId: { type: String, default: null }
+    // 通道资源 id（=通道表 id=树通道叶 id；实时页 currentChannelId 即它）
+    resourceId: { type: String, default: null }
   },
   data() {
     return {
@@ -22,7 +25,7 @@ export default {
     }
   },
   watch: {
-    channelId: {
+    resourceId: {
       immediate: true,
       handler(val) {
         if (val) {
@@ -35,12 +38,12 @@ export default {
   },
   methods: {
     getPresetList() {
-      if (!this.channelId) return
+      if (!this.resourceId) return
       this.loading = true
       this.emptyTip = '暂无预置位'
-      this.$store.dispatch('commonChanel/queryPreset', this.channelId)
-        .then(data => {
-          this.presetList = Array.isArray(data) ? data : []
+      resourcePresetQuery(this.resourceId)
+        .then(res => {
+          this.presetList = Array.isArray(res && res.data) ? res.data : []
         })
         .catch(err => {
           this.presetList = []
@@ -51,10 +54,7 @@ export default {
         })
     },
     gotoPreset(preset) {
-      this.$store.dispatch('commonChanel/callPreset', {
-        channelId: this.channelId,
-        presetId: preset.presetId
-      }).then(() => {
+      resourcePresetCall(this.resourceId, preset.presetId).then(() => {
         this.$message({ showClose: true, message: '已调用预置位 ' + preset.presetId, type: 'success' })
       }).catch(() => {
         this.$message({ showClose: true, message: '调用预置位失败', type: 'error' })
