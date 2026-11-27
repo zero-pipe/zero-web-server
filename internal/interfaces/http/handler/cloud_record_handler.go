@@ -152,3 +152,50 @@ func (h *CloudRecordHandler) TaskList(c *gin.Context) {
 	}
 	response.OK(c, list)
 }
+
+// ---- 播放器回放链路（按内码 + 绝对时间） ----
+
+// CloudSegments 按设备内码/通道内码查云端录像片段。
+func (h *CloudRecordHandler) CloudSegments(c *gin.Context) {
+	startMs := parseTimeQueryMs(c.Query("start"))
+	endMs := parseTimeQueryMs(c.Query("end"))
+	segs, err := h.svc.Segments(c.Param("deviceCode"), c.Param("channelCode"), startMs, endMs)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	if segs == nil {
+		segs = []cloudrecordapp.SegmentView{}
+	}
+	response.OK(c, segs)
+}
+
+// CloudStart 起播一个云端片段（绝对时间起播）。
+func (h *CloudRecordHandler) CloudStart(c *gin.Context) {
+	recordID, _ := strconv.Atoi(c.Query("recordId"))
+	startTime := parseTimeQueryMs(c.Query("startTime"))
+	content, err := h.svc.StartByRecord(recordID, startTime)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, content)
+}
+
+// CloudSeek 拖动到绝对时间。
+func (h *CloudRecordHandler) CloudSeek(c *gin.Context) {
+	recordID, _ := strconv.Atoi(c.Query("recordId"))
+	seekTime := parseTimeQueryMs(c.Query("seekTime"))
+	if err := h.svc.SeekByRecord(recordID, seekTime); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
+// CloudStop 关闭云端回放。
+func (h *CloudRecordHandler) CloudStop(c *gin.Context) {
+	recordID, _ := strconv.Atoi(c.Query("recordId"))
+	_ = h.svc.StopByRecord(recordID)
+	response.OK(c, nil)
+}

@@ -242,6 +242,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerGbRecord(auth, gbRecordHandler)
 
 		registerCloudRecord(auth, cloudRecordHandler)
+		registerPlaybackCloud(auth, cloudRecordHandler)
 
 		registerLogAPI(auth, logHandler)
 

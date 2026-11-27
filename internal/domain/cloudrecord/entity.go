@@ -27,6 +27,7 @@ type Repository interface {
 	Create(rec *Record) error
 	UpsertPs(rec *Record) error
 	List(page, count int, app, stream, query, callID, mediaServerID string, startTime, endTime int64, asc bool) ([]Record, int64, error)
+	ListSegments(stream string, startMs, endMs int64) ([]Record, error)
 	DateList(app, stream, mediaServerID string, year, month int) ([]string, error)
 	ListByIDs(ids []int) ([]Record, error)
 	GetByID(id int) (*Record, error)

@@ -350,6 +350,26 @@ func (r *CloudRecordRepository) UpsertPs(rec *domaincloudrecord.Record) error {
 	return r.db.Save(m).Error
 }
 
+// ListSegments 返回某流在 [startMs,endMs] 内与之重叠的云端片段（PS+MP4），按开始时间升序。
+func (r *CloudRecordRepository) ListSegments(stream string, startMs, endMs int64) ([]domaincloudrecord.Record, error) {
+	q := r.db.Model(&model.CloudRecord{}).Where("app = ?", "live").Where("stream = ?", stream)
+	if startMs > 0 {
+		q = q.Where("end_time >= ?", startMs)
+	}
+	if endMs > 0 {
+		q = q.Where("start_time <= ?", endMs)
+	}
+	var rows []model.CloudRecord
+	if err := q.Order("start_time ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]domaincloudrecord.Record, 0, len(rows))
+	for i := range rows {
+		out = append(out, *toDomainCloudRecord(&rows[i]))
+	}
+	return out, nil
+}
+
 func (r *CloudRecordRepository) DateList(app, stream, mediaServerID string, year, month int) ([]string, error) {
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
 	end := start.AddDate(0, 1, 0)
