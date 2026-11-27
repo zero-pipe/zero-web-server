@@ -20,11 +20,11 @@ import (
 var streamApp = mediaurl.LiveApp
 
 type Service struct {
-	plugins  *pluginapp.Service
-	repo     domainplugin.Repository
-	media    port.MediaCluster
-	factory  port.IPCClientFactory
-	serverID string
+	plugins   *pluginapp.Service
+	repo      domainplugin.Repository
+	media     port.MediaCluster
+	factory   port.IPCClientFactory
+	serverID  string
 	keepalive KeepalivePusher
 
 	mu     sync.Mutex
@@ -270,16 +270,18 @@ func (s *Service) Command(ctx context.Context, deviceID int, channelID, cmd stri
 	return out, nil
 }
 
-// pickTransport 优先 rtsp_url（平台侧更简单），其次 rtp_push，默认 rtsp_url。
+// pickTransport 选择流传输方式：优先 rtp_push（插件 SDK 取流 + 推送，
+// 走设备私有协议，不去拉起流代理、不与 onvif 等抢 RTSP 会话），
+// 其次 rtsp_url，默认 rtsp_url。
 func pickTransport(transports []string) string {
-	for _, t := range transports {
-		if t == "rtsp_url" {
-			return "rtsp_url"
-		}
-	}
 	for _, t := range transports {
 		if t == "rtp_push" {
 			return "rtp_push"
+		}
+	}
+	for _, t := range transports {
+		if t == "rtsp_url" {
+			return "rtsp_url"
 		}
 	}
 	return "rtsp_url"
@@ -306,6 +308,9 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 		// 变成僵尸代理继续去拉相机 RTSP，与 onvif 等其他会话抢占相机(海康主码流并发会话有限)，
 		// 互相踢断导致 err=-3 / 无帧。与 onvif resetONVIFStream 对齐：先删代理再关流。
 		_ = node.DelStreamProxy(ctx, fmt.Sprintf("__defaultVhost__/%s/%s", act.App, act.Stream))
+		// 若这路流是插件 SDK 取流(rpt_push) 推上来的，还要关掉 ZMS 的 RTP 收流槽，
+		// 释放端口与 app/stream key；槽不存在时幂等返回，不影响 rtsp_url 的情形。
+		_ = node.CloseRtpServer(ctx, act.App, act.Stream)
 		_ = node.CloseStreams(ctx, "__defaultVhost__", act.App, act.Stream)
 	}
 	s.media.UnbindStream(act.App, act.Stream)

@@ -100,18 +100,31 @@ DLL 与 `HCNetSDKCom` 必须和 exe 同目录（`bin/hik-win/` 已按此布局�
    - 启动 ISAPI `alertStream` 事件流。
 7. 事件：收到事件后抓图（`/ISAPI/Streaming/channels/<ch*100+1>/picture`），上传对象存储（`events/<内码>/YYYY/MM/DD/<eventId>.jpg`），再发布 MQTT 事件（`<topicPrefix>/<内码>`），平台消费者订阅并记录日志（Step 4 持久化）。
 
-## 5. 已知限制
+## 5. 直播取流方式（SDK 私有协议 + RTP/PS 推送）
 
-- 直播走设备 RTSP，不走 SDK 私有码流；NVR 下挂通道若 RTSP 路径/凭据不同，需用 `HIK_RTSP_TEMPLATE` 调整。
+直播默认走 **SDK 私有协议取流 → RTP/PS 推送**（`transport=rtp_push`），不再像 ONVIF 那样让 ZMS 拉 RTSP：
+
+- 用 `NET_DVR_RealPlay_V40`（`byProtoType=0` 私有协议）向设备取流，回调拿到 **PS 流**；
+- 插件把 PS 按 pack 头（`00 00 01 BA`）分帧、打成 RTP/PS，用 UDP 发到 ZMS `OpenRtpServer`
+  分配的口（平台经 `/v1/live/start` 的 `rtp:{sdp_ip,rtp_port}` 下发）；
+- 设备侧连的是私有协议端口（默认 8000），**不碰 RTSP 554**，因此不与 ONVIF 抢 RTSP 会话；
+- ZMS 收流器（`src/protocol/rtp/rtp-ps-unpack.c`）忽略 RTP marker，按「载荷以 `00 00 01 BA`
+  开头」分帧，所以每组 RTP 包首包载荷必须从 PS pack 头起始（实现已保证）。
+
+若平台未分配 RTP 口（例如老 ZMS 或未声明 `rtp_push`），插件回退为返回 RTSP URL 由 ZMS 拉流
+（`transport=rtsp_url`）。`plugin.yaml` 的 `stream_transports` 声明两种方式，平台优先 `rtp_push`。
+
+## 6. 已知限制
+
+- 直播默认走 SDK 私有协议取流（见第 5 节）；RTSP URL 仅作回退。
+- 回放（`/v1/playback/*`）仍走海康按时间回放的 RTSP 地址，由 ZMS 拉流。
 - 通道枚举依赖 `NET_DVR_GET_IPPARACFG_V40`；部分设备/权限下会回退为 1..N。
 - 事件来源目前仅 ISAPI `alertStream`；HCNetSDK 报警回调作为后续增强。
 - 事件只发布到 MQTT，平台尚未持久化（Step 4）。
-- 回放/预置位/对讲尚未接入。
 - PTZ 速度取 `z` 或 `h`（1..7），方向映射见 `main.go`。
 
-## 6. 后续扩展点
+## 7. 后续扩展点
 
-- `NET_DVR_RealPlay_V40` 回调收 PS 流，按 `rtp_push` 推给平台；
-- `NET_DVR_FindFile_V40` / `NET_DVR_PlayBackByTime_V40` 做回放；
+- 回放改 SDK 私有协议取流（`NET_DVR_PlayBackByTime_V40` + RTP/PS 推送），彻底摆脱 RTSP；
 - `NET_DVR_SetDVRMessageCallBack_V50` 上报报警/AI 事件；
-- 抓图 `NET_DVR_CaptureJPEGPicture`。
+- 抓图可切换到 `NET_DVR_CaptureJPEGPicture`（当前走 ISAPI 抓图）。

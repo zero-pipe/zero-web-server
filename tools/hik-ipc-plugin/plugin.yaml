@@ -3,7 +3,7 @@ spec: 1
 id: hik-ipc
 name: 海康 IPC
 vendor: hikvision
-version: 0.3.0
+version: 0.4.0
 protocols: [hik.private.v5]
 rpc: v1
 executable:
@@ -15,7 +15,7 @@ health: /health
 # playback 走海康按时间回放的 RTSP 地址，由 ZMS 拉流；
 # 暂停/倍速/拖放没有控制通道，/v1/playback/control 会明确回 UNSUPPORTED。
 capabilities: [login, channels, live, ptz, snapshot, arm, disarm, playback, record_query]
-stream_transports: [rtsp_url]
+stream_transports: [rtp_push, rtsp_url]
 event_types: [motion, line_crossing, intrusion, video_loss, tamper]
 config_schema: schema.json
 env:

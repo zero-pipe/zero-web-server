@@ -132,6 +132,10 @@ func (e *endpoint) ConnectRtpServer(ctx context.Context, app, stream, host strin
 	return e.node.Client.ConnectRtpServer(ctx, app, stream, host, port)
 }
 
+func (e *endpoint) CloseRtpServer(ctx context.Context, app, stream string) error {
+	return e.node.Client.CloseRtpServer(ctx, app, stream)
+}
+
 func (e *endpoint) CloseStreams(ctx context.Context, vhost, app, stream string) error {
 	_, err := e.node.Client.CloseStreams(ctx, vhost, app, stream)
 	return err

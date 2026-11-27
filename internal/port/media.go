@@ -55,6 +55,7 @@ type MediaEndpoint interface {
 
 	OpenRtpServer(ctx context.Context, app, stream string, port, tcpMode int) (rtpPort int, err error)
 	ConnectRtpServer(ctx context.Context, app, stream, host string, port int) error
+	CloseRtpServer(ctx context.Context, app, stream string) error
 	CloseStreams(ctx context.Context, vhost, app, stream string) error
 	LookupStream(ctx context.Context, app, stream string) *StreamProbe
 	AddStreamProxy(ctx context.Context, vhost, app, stream, streamURL, rtpType string, enableHLS, enableMP4, autoClose bool) (*ProxyResult, error)

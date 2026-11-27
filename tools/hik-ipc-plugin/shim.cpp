@@ -5,6 +5,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <stdint.h>
+
+/* Socket 头必须在 HCNetSDK.h(会带上 windows.h) 之前包含，避免 winsock 冲突。 */
+#if defined(_WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netdb.h>
+#endif
 
 /* HCNetSDK headers/libs must be placed under ./sdk (see README). */
 #include "HCNetSDK.h"
@@ -270,4 +283,270 @@ int hik_capture_jpeg(long user_id, long channel, int quality, char *buf, int buf
     if (returned == 0) return -1;
     *out_len = (int)returned;
     return 0;
+}
+
+/* ==========================================================================
+ * 实时预览 SDK 取流 → RTP/PS 推送
+ *
+ * 数据通路：NET_DVR_RealPlay_V40(私有协议) → 回调给 PS → 按 PS pack 头
+ * (00 00 01 BA) 分帧 → 每个 pack 作为一组 RTP 包（首包载荷从 BA 起始）→
+ * UDP 发到 ZMS openRtpServer 的端口。
+ *
+ * 与 ZMS 收流器的对齐（zmedia-server src/protocol/rtp/rtp-ps-unpack.c）：
+ *   - ZMS 忽略 RTP 的 M 位，改用「RTP 载荷是否以 00 00 01 BA 开头」判定新帧。
+ *     所以每组 RTP 包的首包载荷必须正好从 PS pack 头开始，这是正确性关键。
+ *   - ZMS 用 seq 做乱序/丢包判定，seq 必须逐包递增。
+ *   - PT 默认 96（ZMS_RTP_PS_DEFAULT_PT），SSRC 不过滤，RTP 时间戳被忽略
+ *     （PS 的 PES 自带 PTS），这里仍填合理值以兼容其他收流端。
+ * ========================================================================== */
+
+#define ZWS_RTP_PS_PT     96
+#define ZWS_RTP_MAX_PAYLOAD 1400      /* UDP 载荷上限，留足 MTU 余量 */
+#define ZWS_PS_ACC_INIT   (256 * 1024)
+#define ZWS_RP_MAX        64          /* 最大并发取流路数 */
+
+#if defined(_WIN32)
+#define ZWS_CLOSE_SOCK(s) closesocket(s)
+#else
+#define ZWS_CLOSE_SOCK(s) close(s)
+#endif
+
+typedef struct zws_realplay_ctx {
+    LONG real_handle;
+    int sock;
+    struct sockaddr_in dst;
+    uint32_t ssrc;
+    uint16_t seq;
+    uint32_t ts;
+    uint8_t *acc;      /* PS 累积缓冲 */
+    size_t acc_len;
+    size_t acc_cap;
+    volatile int stopped;
+    int logged_first;  /* 首次收到码流时打印一次诊断信息 */
+} zws_realplay_ctx;
+
+static zws_realplay_ctx *g_rp[ZWS_RP_MAX];
+
+static int zws_acc_reserve(zws_realplay_ctx *c, size_t need) {
+    size_t cap;
+    uint8_t *p;
+    if (c->acc_len + need <= c->acc_cap) return 0;
+    cap = c->acc_cap ? c->acc_cap : ZWS_PS_ACC_INIT;
+    while (cap < c->acc_len + need) cap *= 2;
+    p = (uint8_t *)realloc(c->acc, cap);
+    if (!p) return -1;
+    c->acc = p;
+    c->acc_cap = cap;
+    return 0;
+}
+
+/* 在 [from, len) 内找下一个 PS pack 头 00 00 01 BA，返回下标或 -1。 */
+static long zws_find_ps_pack(const uint8_t *b, size_t len, size_t from) {
+    size_t i = from;
+    if (len < 4) return -1;
+    for (; i + 4 <= len; i++) {
+        if (b[i] == 0x00 && b[i + 1] == 0x00 && b[i + 2] == 0x01 && b[i + 3] == 0xBA) {
+            return (long)i;
+        }
+    }
+    return -1;
+}
+
+/* 把一段完整 PS（以 BA 起始）打成 RTP 包发出去。组内首包载荷从 BA 开始。 */
+static void zws_send_rtp_frame(zws_realplay_ctx *c, const uint8_t *ps, size_t len) {
+    uint8_t pkt[12 + ZWS_RTP_MAX_PAYLOAD];
+    size_t off = 0;
+
+    if (!c || c->sock < 0 || len == 0) return;
+
+    while (off < len) {
+        size_t chunk = len - off;
+        int last;
+        if (chunk > ZWS_RTP_MAX_PAYLOAD) chunk = ZWS_RTP_MAX_PAYLOAD;
+        last = (off + chunk >= len);
+
+        pkt[0] = 0x80; /* V=2,P=0,X=0,CC=0 */
+        pkt[1] = (uint8_t)((last ? 0x80 : 0x00) | ZWS_RTP_PS_PT); /* M|PT */
+        pkt[2] = (uint8_t)(c->seq >> 8);
+        pkt[3] = (uint8_t)(c->seq & 0xff);
+        pkt[4] = (uint8_t)(c->ts >> 24);
+        pkt[5] = (uint8_t)(c->ts >> 16);
+        pkt[6] = (uint8_t)(c->ts >> 8);
+        pkt[7] = (uint8_t)(c->ts & 0xff);
+        pkt[8] = (uint8_t)(c->ssrc >> 24);
+        pkt[9] = (uint8_t)(c->ssrc >> 16);
+        pkt[10] = (uint8_t)(c->ssrc >> 8);
+        pkt[11] = (uint8_t)(c->ssrc & 0xff);
+        memcpy(pkt + 12, ps + off, chunk);
+
+        sendto(c->sock, (const char *)pkt, (int)(12 + chunk), 0,
+               (struct sockaddr *)&c->dst, sizeof(c->dst));
+
+        c->seq++;
+        off += chunk;
+    }
+    c->ts += 3600; /* 约 40ms@90kHz；ZMS 忽略此值，仅供其他端参考 */
+}
+
+/* 追加一段 SDK 回调数据到累积缓冲，并把其中完整的 PS pack 逐份发出去。 */
+static void zws_ps_feed(zws_realplay_ctx *c, const uint8_t *data, size_t len) {
+    long first, next;
+    size_t start;
+
+    if (!c || len == 0) return;
+    if (zws_acc_reserve(c, len) != 0) return;
+    memcpy(c->acc + c->acc_len, data, len);
+    c->acc_len += len;
+
+    /* 丢弃首个 PS pack 头之前的杂字节（SYSHEAD 残留等），只保留尾部 3 字节
+     * 以防 pack 头跨回调块被切断。 */
+    first = zws_find_ps_pack(c->acc, c->acc_len, 0);
+    if (first < 0) {
+        if (c->acc_len > 3) {
+            memmove(c->acc, c->acc + (c->acc_len - 3), 3);
+            c->acc_len = 3;
+        }
+        return;
+    }
+    if (first > 0) {
+        memmove(c->acc, c->acc + first, c->acc_len - (size_t)first);
+        c->acc_len -= (size_t)first;
+    }
+
+    /* acc[0] 现在是 BA。以"下一个 BA"为界逐份发出完整 pack： */
+    start = 0;
+    for (;;) {
+        next = zws_find_ps_pack(c->acc, c->acc_len, start + 4);
+        if (next < 0) break;
+        zws_send_rtp_frame(c, c->acc + start, (size_t)next - start);
+        start = (size_t)next;
+    }
+    if (start > 0) {
+        memmove(c->acc, c->acc + start, c->acc_len - start);
+        c->acc_len -= start;
+    }
+}
+
+static void CALLBACK zws_realplay_cb(LONG lRealHandle, DWORD dwDataType, BYTE *pBuffer,
+                                     DWORD dwBufSize, void *pUser) {
+    zws_realplay_ctx *c = (zws_realplay_ctx *)pUser;
+    (void)lRealHandle;
+    if (!c || c->stopped || !pBuffer || dwBufSize == 0) return;
+    /* 私有协议取流：STREAMDATA 即 PS（音视频复用在同一 PS 流里）。
+     * SYSHEAD/AUDIOSTREAMDATA 不参与 RTP/PS，忽略即可。 */
+    if (dwDataType == NET_DVR_STREAMDATA) {
+        if (!c->logged_first && dwBufSize >= 4) {
+            const unsigned char *b = (const unsigned char *)pBuffer;
+            int isPS = (b[0] == 0 && b[1] == 0 && b[2] == 1 && b[3] == 0xBA);
+            fprintf(stderr,
+                    "[hik-rtp] first STREAMDATA len=%u head=%02x%02x%02x%02x ps_header=%d\n",
+                    (unsigned)dwBufSize, b[0], b[1], b[2], b[3], isPS);
+            c->logged_first = 1;
+        }
+        zws_ps_feed(c, pBuffer, (size_t)dwBufSize);
+    }
+}
+
+#if defined(_WIN32)
+static int zws_wsa_ready = 0;
+#endif
+
+long long hik_realplay_push_start(long user_id, int channel, int stream_type, int link_mode,
+                                  const char *dst_ip, unsigned short dst_port, int mode) {
+    zws_realplay_ctx *c;
+    int slot = -1;
+    int i;
+    int sndbuf = 4 * 1024 * 1024;
+    NET_DVR_PREVIEWINFO pi;
+    LONG h;
+
+    (void)mode; /* 目前只支持 UDP 推送（对应 ZMS tcp_mode=0） */
+
+    if (!dst_ip || !dst_ip[0] || dst_port == 0) return -1;
+    for (i = 0; i < ZWS_RP_MAX; i++) {
+        if (!g_rp[i]) { slot = i; break; }
+    }
+    if (slot < 0) return -1;
+
+#if defined(_WIN32)
+    if (!zws_wsa_ready) {
+        WSADATA wsa;
+        WSAStartup(MAKEWORD(2, 2), &wsa);
+        zws_wsa_ready = 1;
+    }
+#endif
+
+    c = (zws_realplay_ctx *)calloc(1, sizeof(*c));
+    if (!c) return -1;
+    c->sock = -1;
+    c->real_handle = -1;
+    c->ssrc = (uint32_t)(0x5a4d0000u ^ ((uint32_t)channel << 8) ^ (uint32_t)time(NULL));
+    c->seq = (uint16_t)(rand() & 0xffff);
+    c->ts = 0;
+
+    c->sock = (int)socket(AF_INET, SOCK_DGRAM, 0);
+    if (c->sock < 0) {
+        free(c);
+        return -1;
+    }
+    setsockopt(c->sock, SOL_SOCKET, SO_SNDBUF, (const char *)&sndbuf, sizeof(sndbuf));
+
+    memset(&c->dst, 0, sizeof(c->dst));
+    c->dst.sin_family = AF_INET;
+    c->dst.sin_port = htons(dst_port);
+    c->dst.sin_addr.s_addr = inet_addr(dst_ip);
+    if (c->dst.sin_addr.s_addr == INADDR_NONE) {
+        struct hostent *he = gethostbyname(dst_ip);
+        if (!he || he->h_addrtype != AF_INET || he->h_length <= 0) {
+            ZWS_CLOSE_SOCK(c->sock);
+            free(c);
+            return -1;
+        }
+        memcpy(&c->dst.sin_addr, he->h_addr, (size_t)he->h_length);
+    }
+
+    memset(&pi, 0, sizeof(pi));
+    pi.lChannel = (LONG)channel;
+    pi.dwStreamType = (DWORD)(stream_type < 0 ? 0 : stream_type);
+    pi.dwLinkMode = (DWORD)(link_mode == 1 ? 1 : 0); /* 0-TCP,1-UDP */
+    pi.hPlayWnd = NULL;
+    pi.bBlocked = 0;
+    pi.byProtoType = 0; /* 0-私有协议：拿到的是 PS 流，且走私有端口不碰 RTSP */
+    pi.byReconnect = 1; /* 断线由 SDK 内部重连 */
+
+    h = NET_DVR_RealPlay_V40((LONG)user_id, &pi, zws_realplay_cb, c);
+    if (h < 0) {
+        int err = (int)NET_DVR_GetLastError();
+        ZWS_CLOSE_SOCK(c->sock);
+        free(c);
+        /* 把 SDK 错误码回填，供 Go 侧 hik_last_error() 读取。 */
+        return err > 0 ? -(long long)err : -1;
+    }
+    c->real_handle = h;
+    g_rp[slot] = c;
+    return (long long)(slot + 1);
+}
+
+void hik_realplay_push_stop(long long handle) {
+    zws_realplay_ctx *c;
+    int slot;
+    if (handle <= 0) return;
+    slot = (int)(handle - 1);
+    if (slot < 0 || slot >= ZWS_RP_MAX) return;
+    c = g_rp[slot];
+    if (!c) return;
+
+    c->stopped = 1;
+    /* StopRealPlay 返回后该句柄不会再触发回调，之后再释放 ctx 是安全的。 */
+    if (c->real_handle >= 0) {
+        NET_DVR_StopRealPlay(c->real_handle);
+        c->real_handle = -1;
+    }
+    if (c->sock >= 0) {
+        ZWS_CLOSE_SOCK(c->sock);
+        c->sock = -1;
+    }
+    free(c->acc);
+    free(c);
+    g_rp[slot] = NULL;
 }

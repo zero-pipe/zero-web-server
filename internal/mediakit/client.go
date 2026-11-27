@@ -210,6 +210,26 @@ func (c *Client) ConnectRtpServer(ctx context.Context, app, stream, host string,
 	return nil
 }
 
+// CloseRtpServer 关闭某路 RTP 收流槽（rtp_push 停流时调用，释放端口与 key）。
+// 槽位不存在时 ZMS 返回 flag:false，属于正常情况，不视为错误。
+func (c *Client) CloseRtpServer(ctx context.Context, app, stream string) error {
+	params := url.Values{
+		"app":       {app},
+		"stream_id": {stream},
+	}
+	resp, err := c.get(ctx, "rtp/close", params)
+	if err != nil {
+		applog.Warnf("[mediakit-api] closeRtpServer HTTP error app=%s stream=%s err=%v", app, stream, err)
+		return err
+	}
+	if resp.Code != 0 {
+		applog.Warnf("[mediakit-api] closeRtpServer code=%d msg=%s app=%s stream=%s", resp.Code, resp.Msg, app, stream)
+		return fmt.Errorf("closeRtpServer failed: %s", resp.Msg)
+	}
+	applog.Debugf("[mediakit-api] closeRtpServer OK app=%s stream=%s", app, stream)
+	return nil
+}
+
 // SetAuthTokens 把当前启用中的接入 token 同步到 ZMS（本地验签用）。
 // tokens 为空表示清除（ZMS 侧随之关闭推拉流鉴权）。
 func (c *Client) SetAuthTokens(ctx context.Context, tokens []string) (*APIResponse, error) {

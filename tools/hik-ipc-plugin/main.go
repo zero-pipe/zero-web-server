@@ -2,8 +2,12 @@
 
 // Command hik-ipc-plugin is a Hikvision HCNetSDK sidecar.
 //
-// It uses HCNetSDK for login / device info / channel enumeration / PTZ, and
-// returns a Hikvision RTSP URL as the live stream source (ZMS pulls it).
+// It uses HCNetSDK for login / device info / channel enumeration / PTZ, and for
+// live streaming it pulls the PS stream over the SDK private protocol (port 8000)
+// and pushes RTP/PS to ZMS's OpenRtpServer (transport=rtp_push). This path never
+// touches RTSP 554, so it does not compete with ONVIF for camera sessions.
+// If the platform does not allocate an RTP port, it falls back to returning a
+// Hikvision RTSP URL for ZMS to pull.
 package main
 
 import (
@@ -73,7 +77,46 @@ var (
 	// lastPTZ 记住每个 设备|通道 最后一次下发的云台动作码，
 	// 因为海康的"停止"必须复用同一个动作码再发一次 stop=1。
 	lastPTZ sync.Map
+
+	// SDK 取流(rtp_push) 会话表。realplayMu 串行化对 sdk 句柄的启停，
+	// 同时保护 realplays；句柄的实时回调在 SDK 线程跑，不碰这张表。
+	realplayMu sync.Mutex
+	realplays  = map[string]int64{} // "设备|通道|码流号" -> SDK 取流句柄
 )
+
+// rpKeyPrefix 是"设备|通道|"前缀；平台 StopLive 只知道设备+通道，
+// 据此把该通道下的所有码流(main/sub)取流一并停掉。
+func rpKeyPrefix(deviceUID, channelID string) string { return deviceUID + "|" + channelID + "|" }
+
+func rpKey(deviceUID, channelID string, streamNo int) string {
+	return fmt.Sprintf("%s|%s|%d", deviceUID, channelID, streamNo)
+}
+
+// stopRealPlays 停止某设备某通道下所有 SDK 取流。
+func stopRealPlays(deviceUID, channelID string) {
+	realplayMu.Lock()
+	defer realplayMu.Unlock()
+	prefix := rpKeyPrefix(deviceUID, channelID)
+	for k, h := range realplays {
+		if strings.HasPrefix(k, prefix) {
+			sdk.RealPlayPushStop(h)
+			delete(realplays, k)
+		}
+	}
+}
+
+// stopRealPlaysDevice 停止某设备下所有 SDK 取流（登出/重登时用）。
+func stopRealPlaysDevice(deviceUID string) {
+	realplayMu.Lock()
+	defer realplayMu.Unlock()
+	prefix := deviceUID + "|"
+	for k, h := range realplays {
+		if strings.HasPrefix(k, prefix) {
+			sdk.RealPlayPushStop(h)
+			delete(realplays, k)
+		}
+	}
+}
 
 func main() {
 	cfg := config{
@@ -98,7 +141,7 @@ func main() {
 	mux.HandleFunc("/v1/logout", handleLogout)
 	mux.HandleFunc("/v1/channels", handleChannels(cfg))
 	mux.HandleFunc("/v1/live/start", handleLiveStart(cfg))
-	mux.HandleFunc("/v1/live/stop", okHandler)
+	mux.HandleFunc("/v1/live/stop", handleLiveStop)
 	mux.HandleFunc("/v1/ptz", handlePTZ)
 	mux.HandleFunc("/v1/arm", handleArm)
 	mux.HandleFunc("/v1/disarm", handleDisarm)
@@ -160,6 +203,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			_ = sdk.CloseAlarm(old.AlarmHandle)
 		}
 		old.Pipeline.stop()
+		stopRealPlaysDevice(req.DeviceUID)
 		sdk.Logout(old.UserID)
 	}
 	log.Printf("hik login device=%s ip=%s uid=%d channels=%d serial=%s model=%s",
@@ -200,6 +244,7 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 			_ = sdk.CloseAlarm(s.AlarmHandle)
 		}
 		s.Pipeline.stop()
+		stopRealPlaysDevice(req.DeviceUID)
 		sdk.Logout(s.UserID)
 		delete(sessions, req.DeviceUID)
 	}
@@ -237,10 +282,16 @@ func handleChannels(cfg config) http.HandlerFunc {
 func handleLiveStart(cfg config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			DeviceUID string `json:"device_uid"`
-			ChannelID string `json:"channel_id"`
-			Stream    string `json:"stream"`     // main（默认）| sub
-			StreamKey string `json:"stream_key"` // 平台侧码流选择，与 stream 同义
+			DeviceUID       string `json:"device_uid"`
+			ChannelID       string `json:"channel_id"`
+			Stream          string `json:"stream"`     // main（默认）| sub
+			StreamKey       string `json:"stream_key"` // 平台侧码流选择，与 stream 同义
+			PreferTransport string `json:"prefer_transport"`
+			RTP             *struct {
+				SDPIP   string `json:"sdp_ip"`
+				RTPPort int    `json:"rtp_port"`
+				Mode    string `json:"mode"`
+			} `json:"rtp"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		sessionMu.Lock()
@@ -258,9 +309,52 @@ func handleLiveStart(cfg config) http.HandlerFunc {
 		if strings.TrimSpace(streamKey) == "" {
 			streamKey = req.StreamKey
 		}
-		rtsp := buildRTSPURL(cfg, s, display, streamNumber(streamKey))
+		streamNo := streamNumber(streamKey)
+
+		// 平台已为 rtp_push 分配收流口：SDK 私有协议取流，打成 RTP/PS 推给 ZMS。
+		// 这条路径走设备私有端口(8000)，不碰 RTSP，和 onvif 不抢会话。
+		if req.RTP != nil && strings.TrimSpace(req.RTP.SDPIP) != "" && req.RTP.RTPPort > 0 {
+			sdkCh := s.channelOf(req.ChannelID)
+			sdkStreamType := 0 // 0-主码流 1-子码流
+			if streamNo == 2 {
+				sdkStreamType = 1
+			}
+			// 同设备同通道先停旧句柄，避免重复点播造成句柄泄漏。
+			stopRealPlays(req.DeviceUID, req.ChannelID)
+			handle, err := sdk.RealPlayPushStart(s.UserID, sdkCh, sdkStreamType,
+				req.RTP.SDPIP, req.RTP.RTPPort)
+			if err != nil {
+				writeErr(w, "INTERNAL", "SDK 取流失败: "+err.Error())
+				return
+			}
+			realplayMu.Lock()
+			realplays[rpKey(req.DeviceUID, req.ChannelID, streamNo)] = handle
+			realplayMu.Unlock()
+			log.Printf("hik live push device=%s channel=%s sdkCh=%d streamType=%d -> %s:%d",
+				req.DeviceUID, req.ChannelID, sdkCh, sdkStreamType, req.RTP.SDPIP, req.RTP.RTPPort)
+			writeOK(w, map[string]any{"transport": "rtp_push"})
+			return
+		}
+
+		// 兜底：未分配 rtp 口时仍返回 RTSP 由 ZMS 拉流。
+		rtsp := buildRTSPURL(cfg, s, display, streamNo)
 		writeOK(w, map[string]any{"transport": "rtsp_url", "rtspUrl": rtsp})
 	}
+}
+
+// handleLiveStop 停止 SDK 取流。平台 StopLive 只带设备+通道，
+// 这里把该通道下所有码流的取流句柄一并停掉。
+func handleLiveStop(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceUID string `json:"device_uid"`
+		ChannelID string `json:"channel_id"`
+		StreamKey string `json:"stream_key"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	if req.DeviceUID != "" && req.ChannelID != "" {
+		stopRealPlays(req.DeviceUID, req.ChannelID)
+	}
+	writeOK(w, nil)
 }
 
 func handleArm(w http.ResponseWriter, r *http.Request) {

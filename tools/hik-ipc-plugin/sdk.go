@@ -6,7 +6,7 @@ package main
 #cgo CFLAGS: -I${SRCDIR}/sdk/include
 #cgo CXXFLAGS: -I${SRCDIR}/sdk/include
 #cgo linux LDFLAGS: -L${SRCDIR}/sdk/lib -lhnetsdk -lhpr -lHCCore -lstdc++ -lm -lpthread -ldl -Wl,-rpath,$ORIGIN/hik-lib
-#cgo windows LDFLAGS: -L${SRCDIR}/sdk/lib -lHCNetSDK -lHCCore -lstdc++ -static-libgcc -static-libstdc++
+#cgo windows LDFLAGS: -L${SRCDIR}/sdk/lib -lHCNetSDK -lHCCore -lstdc++ -lws2_32 -static-libgcc -static-libstdc++
 #include <stdlib.h>
 #include "shim.h"
 */
@@ -209,4 +209,23 @@ func (HikSDK) FindRecords(userID int64, channel int, start, end int64, streamTyp
 			return nil, fmt.Errorf("NET_DVR_FindNextFile_V40 failed: %d", int(C.hik_last_error()))
 		}
 	}
+}
+
+// RealPlayPushStart 用 SDK 私有协议向设备取流（主/子码流），把 PS 打成 RTP/PS，
+// 用 UDP 推到 sdpIP:rtpPort（ZMS openRtpServer 分配的收流口）。
+// 返回的句柄传给 RealPlayPushStop。整条路径走私有端口 8000，不碰 RTSP。
+func (HikSDK) RealPlayPushStart(userID int64, channel, streamType int, sdpIP string, rtpPort int) (int64, error) {
+	cIP := C.CString(sdpIP)
+	defer C.free(unsafe.Pointer(cIP))
+	h := int64(C.hik_realplay_push_start(C.long(userID), C.int(channel), C.int(streamType), C.int(0),
+		cIP, C.ushort(rtpPort), C.int(0)))
+	if h < 0 {
+		return 0, fmt.Errorf("NET_DVR_RealPlay_V40 failed: %d", int(C.hik_last_error()))
+	}
+	return h, nil
+}
+
+// RealPlayPushStop 停止某路 SDK 取流并关闭 UDP 发送。
+func (HikSDK) RealPlayPushStop(handle int64) {
+	C.hik_realplay_push_stop(C.longlong(handle))
 }

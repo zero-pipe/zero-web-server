@@ -70,6 +70,22 @@ void hik_find_close(long find_handle);
  */
 int hik_capture_jpeg(long user_id, long channel, int quality, char *buf, int buf_len, int *out_len);
 
+/*
+ * 实时预览 SDK 取流 + RTP/PS 推送（GB28181 式）。
+ *
+ * 用 SDK 私有协议(byProtoType=0)向设备取流，回调里拿到的是 PS 流；
+ * 这里把 PS 按 pack 头(00 00 01 BA)分帧、打成 RTP/PS，用 UDP 发到
+ * dst_ip:dst_port（ZMS openRtpServer 分配的收流口）。整条路径走设备的
+ * 私有协议端口(8000)，完全不碰 RTSP 554，因此不与 onvif 抢 RTSP 会话。
+ *
+ * stream_type: 0-主码流 1-子码流 ...（对应 NET_DVR_PREVIEWINFO.dwStreamType）
+ * link_mode:   0-TCP 1-UDP（设备连接方式；局域网建议 0）
+ * 返回 >=0 的句柄（传给 hik_realplay_push_stop）；-1 失败，hik_last_error() 取原因。
+ */
+long long hik_realplay_push_start(long user_id, int channel, int stream_type, int link_mode,
+                                  const char *dst_ip, unsigned short dst_port, int mode);
+void hik_realplay_push_stop(long long handle);
+
 #ifdef __cplusplus
 }
 #endif
