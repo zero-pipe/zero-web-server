@@ -4,13 +4,12 @@
       <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key"></el-tab-pane>
     </el-tabs>
     <div class="player-video-area">
-      <jessibucaPlayer
-        v-if="activePlayer === 'jessibuca'"
-        ref="jessibuca"
+      <mpegts-player
+        v-if="activePlayer === 'mpegts'"
+        ref="mpegts"
         class="player-instance"
         :has-audio="hasAudio"
         :show-button="showButton && !showControlBar"
-        fluent autoplay live
         @playTimeChange="$emit('playTimeChange', $event)"
         @playStatusChange="onPlayStatusChange"
       />
@@ -20,16 +19,6 @@
         class="player-instance"
         :has-audio="hasAudio"
         :show-controls="!showControlBar"
-        fluent autoplay live
-        @playTimeChange="$emit('playTimeChange', $event)"
-        @playStatusChange="onPlayStatusChange"
-      />
-      <h265web
-        v-if="activePlayer === 'h265web'"
-        ref="h265web"
-        class="player-instance"
-        :has-audio="hasAudio"
-        :show-button="showButton && !showControlBar"
         fluent autoplay live
         @playTimeChange="$emit('playTimeChange', $event)"
         @playStatusChange="onPlayStatusChange"
@@ -44,9 +33,6 @@
         @click="togglePlay"
       >
         <i :class="playerPlaying ? 'el-icon-video-pause' : 'el-icon-video-play'" />
-      </button>
-      <button class="pcb-btn" :title="ctrlMuted ? '取消静音' : '静音'" @click="toggleMute">
-        <i :class="ctrlMuted ? 'iconfont icon-audio-mute' : 'iconfont icon-audio-high'" />
       </button>
       <button class="pcb-btn" title="截图" @click="doScreenshot">
         <i class="el-icon-camera" />
@@ -63,29 +49,27 @@
 </template>
 
 <script>
-import jessibucaPlayer from './jessibuca.vue'
+import mpegtsPlayer from './mpegts.vue'
 import rtcPlayer from './rtcPlayer.vue'
-import h265web from './h265web.vue'
 import { resolvePlayerStrategy, PLAYER_LABELS, normalizeVideoCodec } from '@/utils/playerStrategy'
 
 const URL_KEYS = {
-  jessibuca: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
-  h265web: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
+  mpegts: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
   webRTC: ['rtc', 'rtcs']
 }
 
 export default {
   name: 'PlayerTabs',
-  components: { jessibucaPlayer, rtcPlayer, h265web },
+  components: { mpegtsPlayer, rtcPlayer },
   props: {
     hasAudio: { type: Boolean, default: false },
     showButton: { type: Boolean, default: true },
     showTab: { type: Boolean, default: true },
-    /** 限定可用播放器（覆盖策略），如 ['jessibuca'] */
+    /** 限定可用播放器（覆盖策略），如 ['mpegts'] */
     allowedPlayers: { type: Array, default: null },
     /** 覆盖默认 URL 优先级，如 ['flv','ws_flv'] */
     urlPriority: { type: Array, default: null },
-    /** 首选播放器（覆盖策略），如 jessibuca / h265web / webRTC */
+    /** 首选播放器（覆盖策略），如 mpegts / webRTC */
     preferredPlayer: { type: String, default: '' },
     /** 是否展示底部播放控制栏（并隐藏引擎内悬浮按钮）。弹窗播放器用。 */
     showControlBar: { type: Boolean, default: false }
@@ -93,7 +77,7 @@ export default {
   data() {
     return {
       streamInfo: null,
-      activePlayer: 'jessibuca',
+      activePlayer: 'mpegts',
       playerPlaying: false,
       ctrlMuted: false,
       docFull: false,
@@ -196,10 +180,13 @@ export default {
       if (!p) return
       if (this.playerPlaying) {
         p.pause && p.pause()
-      } else if (this.activePlayer === 'h265web') {
-        p.unPause && p.unPause()
       } else {
-        p.playBtnClick && p.playBtnClick()
+        // mpegts 引擎没有 playBtnClick，用暂停后重播当前流
+        if (p.playBtnClick) {
+          p.playBtnClick()
+        } else if (this.getUrlByStreamInfo()) {
+          this.play()
+        }
       }
     },
     toggleMute() {
@@ -309,7 +296,7 @@ export default {
         : (this.allowedKeys.includes(this.strategy.preferredPlayer)
           ? this.strategy.preferredPlayer
           : this.allowedKeys[0])
-      this.activePlayer = pref || 'jessibuca'
+      this.activePlayer = pref || 'mpegts'
     },
     /** URL 优先级：props 覆盖 > 策略（RTC 播放器强制只用 rtc） */
     resolveUrlKeyOrder() {
@@ -320,7 +307,7 @@ export default {
       if (this.urlPriority && this.urlPriority.length) {
         return this.urlPriority
       }
-      return URL_KEYS[this.activePlayer] || URL_KEYS.jessibuca
+      return URL_KEYS[this.activePlayer] || URL_KEYS.mpegts
     },
     getUrlByStreamInfo() {
       if (!this.streamInfo) return ''
@@ -415,7 +402,7 @@ export default {
         this.invokePlayerPlay(playUrl, 12)
         this.syncPlayerSize()
       }, 80)
-      const typeMap = { jessibuca: 0, webRTC: 1, h265web: 2 }
+      const typeMap = { mpegts: 0, webRTC: 1 }
       const type = typeMap[this.activePlayer] || 0
       const playerUrl = window.location.origin + '/#/play/share?type=' + type + '&url=' + encodeURIComponent(playUrl)
       this.$emit('playerChanged', { playUrl, playerUrl })

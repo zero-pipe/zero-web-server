@@ -225,7 +225,7 @@
   height: 100% !important;
 }
 
-.vms-player-dialog .jessibuca-container,
+.vms-player-dialog .mpegts-container,
 .vms-player-dialog .rtc-player-wrapper,
 .vms-player-dialog .rtc-player-video,
 .vms-player-dialog [id^='h265Player-'] {
@@ -233,9 +233,9 @@
   background: #3a4556 !important;
 }
 
-.vms-player-dialog .jessibuca-container,
-.vms-player-dialog .jessibuca-container canvas,
-.vms-player-dialog .jessibuca-container video,
+.vms-player-dialog .mpegts-container,
+.vms-player-dialog .mpegts-container video,
+.vms-player-dialog .mpegts-video,
 .vms-player-dialog .rtc-player-video,
 .vms-player-dialog [id^='h265Player-'],
 .vms-player-dialog [id^='h265Player-'] canvas,

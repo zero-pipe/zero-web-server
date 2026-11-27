@@ -25,6 +25,7 @@
     "js-cookie": "2.2.0",
     "moment": "^2.29.1",
     "moment-duration-format": "^2.3.2",
+    "mpegts.js": "^1.8.2",
     "normalize.css": "7.0.0",
     "nprogress": "0.2.0",
     "ol": "^10.6.1",

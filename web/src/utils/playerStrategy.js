@@ -1,33 +1,29 @@
 /**
- * 播放策略：把 jessibuca / h265web / webRTC 三个引擎“编排”成一个用户无感的播放器。
+ * 播放策略：把 mpegts.js（B站开源，HTTP-FLV/MSE）与 webRTC 两个引擎编排成用户无感的播放器。
  * 唯一决策入口 resolvePlayerStrategy，输入视频/音频编码与 ZMS WebRTC 能力，
  * 输出首选播放器、可用播放器列表与拉流 URL 优先级。
- *
- * 能力来源：ZMS 上报的 WebRTC 能力已体现在点播结果里——rtc 字段存在即代表可用，
- * 因此前端用 rtcAvailable = !!streamInfo.rtc 判断，无需硬开关。
  */
 
 /** 用户可见文案（不暴露引擎名称/术语）。 */
 export const PLAYER_LABELS = {
-  jessibuca: '标准',
-  h265web: '高清(H265)',
+  mpegts: '标准',
   webRTC: '超低延迟'
 }
 
 /** 全局播放模式：所有页面共用同一个选择，内部再按码流能力换算成具体引擎。 */
 export const PLAYER_MODE_OPTIONS = [
   { key: 'auto', label: '自动' },
-  { key: 'jessibuca', label: '标准' },
+  { key: 'mpegts', label: '标准' },
   { key: 'webRTC', label: '超低延迟' }
 ]
 
 /** 全局播放模式持久化键（沿用历史键名，兼容老版本已保存的值）。 */
 export const PLAYER_MODE_STORAGE_KEY = 'globalPlayer'
 
-/** 归一化历史/非法值：h265web 等旧值归入「自动」（H265 由策略强制高清，无需用户选择）。 */
+/** 归一化历史/非法值：jessibuca/h265web 等旧值统一归入「标准」(mpegts)。 */
 export function normalizePlayerMode(mode) {
-  if (mode === 'jessibuca' || mode === 'webRTC') return mode
-  return 'auto'
+  if (mode === 'webRTC') return 'webRTC'
+  return 'mpegts'
 }
 
 /** 模式 → PlayerTabs 的 preferredPlayer（空串表示交给策略自动决定）。 */
@@ -84,11 +80,12 @@ export function resolvePlayerStrategy(opts) {
   const hasAudio = opts.hasAudio === true || (opts.hasAudio !== false && !!audioCodec)
   const rtcAvailable = opts.rtcAvailable === true
 
-  // 1) H265：浏览器软解只有 h265web 能放，唯一选项。
+  // 1) H265：浏览器 MSE 能否解取决于浏览器(部分 Chromium 支持 H265 MSE)；统一用 mpegts 尝试。
+  //    不支持会由引擎报错，交由集成层提示，不再走独立的 h265web 软解。
   if (videoCodec === 'H265') {
     return {
-      preferredPlayer: 'h265web',
-      allowedPlayers: ['h265web'],
+      preferredPlayer: 'mpegts',
+      allowedPlayers: ['mpegts'],
       urlPriority: FLV_URL_PRIORITY.slice(),
       videoCodec,
       audioCodec,
@@ -97,19 +94,24 @@ export function resolvePlayerStrategy(opts) {
     }
   }
 
-  // 2) H264 / 未知：以 Jessibuca(HTTP-FLV) 兜底——首屏最快、兼容性与音频最稳。
-  //    用户不再手动选引擎；默认就是 FLV，H265 自动切高清，WebRTC 仅作最后可用项（不首选）。
-  const allowed = ['jessibuca']
-  const preferred = 'jessibuca'
+  // 2) H264 / 未知：mpegts.js(HTTP-FLV / MSE) 为首选。WebRTC 仅作最后备用项。
+  const allowed = ['mpegts']
+  const preferred = 'mpegts'
   const webrtcAudioOk = !hasAudio || isWebRTCAudioCodec(audioCodec)
 
-  // 已知是 H264 且 ZMS 有 WebRTC 能力时，把 WebRTC 追加为「最后」一项备用（不首选）。
   if (rtcAvailable && videoCodec === 'H264') {
     allowed.push('webRTC')
   }
 
-  const urlPriority = FLV_URL_PRIORITY.slice()
-  return { preferredPlayer: preferred, allowedPlayers: allowed, urlPriority, videoCodec, audioCodec, hasAudio, webrtcAudioOk }
+  return {
+    preferredPlayer: preferred,
+    allowedPlayers: allowed,
+    urlPriority: FLV_URL_PRIORITY.slice(),
+    videoCodec,
+    audioCodec,
+    hasAudio,
+    webrtcAudioOk
+  }
 }
 
 /**
