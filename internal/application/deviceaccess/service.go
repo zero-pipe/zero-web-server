@@ -152,8 +152,17 @@ func (s *Service) List(ctx context.Context, q ListQuery) ([]*DeviceView, int64, 
 		views = append(views, got...)
 	}
 
-	sort.Slice(views, func(i, j int) bool {
-		return views[i].UpdateTime > views[j].UpdateTime
+	sort.SliceStable(views, func(i, j int) bool {
+		// 固定顺序：按 device 表 id 升序。不能用 UpdateTime——心跳/状态刷新
+		// 会改变 UpdateTime，导致列表顺序漂移。DBID<=0 的排最后，再按内码兜底。
+		di, dj := views[i].DBID, views[j].DBID
+		if di > 0 && dj > 0 && di != dj {
+			return di < dj
+		}
+		if (di > 0) != (dj > 0) {
+			return di > 0
+		}
+		return views[i].InternalCode < views[j].InternalCode
 	})
 
 	total := int64(len(views))
