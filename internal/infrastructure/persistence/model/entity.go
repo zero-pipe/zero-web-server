@@ -390,10 +390,12 @@ func (RecordPlanItem) TableName() string { return "zws_record_plan_item" }
 
 // RecordPlanChannel 录像计划↔通道关联（按内码，非自增 id、非国标码）。
 // 业务关联唯一键：设备内码 D... + 通道内码 C...。tick 以此表驱动录制。
+// collation 固定 utf8mb4_0900_ai_ci，与 zws_channel/zws_device.internal_code 一致，
+// 否则内码等值 JOIN 会报 1267 (Illegal mix of collations)。
 type RecordPlanChannel struct {
 	PlanID      int64  `gorm:"column:plan_id;primaryKey" json:"planId"`
-	DeviceCode  string `gorm:"column:device_code;primaryKey;size:64" json:"deviceCode"`
-	ChannelCode string `gorm:"column:channel_code;primaryKey;size:64" json:"channelCode"`
+	DeviceCode  string `gorm:"column:device_code;primaryKey;size:64;type:varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci" json:"deviceCode"`
+	ChannelCode string `gorm:"column:channel_code;primaryKey;size:64;type:varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci" json:"channelCode"`
 }
 
 func (RecordPlanChannel) TableName() string { return "zws_record_plan_channel" }

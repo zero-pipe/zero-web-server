@@ -129,10 +129,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	onvifHandler := handler.NewONVIFHandler(deps.ONVIFService, deps.AssetService)
 	deviceHandler := handler.NewDeviceHandler(deps.DeviceService).WithAssetPruner(deps.AssetService)
 	deviceAccessHandler := handler.NewDeviceAccessHandler(deps.DeviceAccessService, deps.AssetService)
-	playHandler := handler.NewPlayHandler(deps.PlayService, deps.AssetService, deps.PlayTimeoutMs)
-	playbackHandler := handler.NewPlaybackHandler(deps.PlaybackService, deps.PlayTimeoutMs)
 	gbRecordHandler := handler.NewGBRecordHandler(deps.PlaybackService, deps.RecordInfoTimeoutMs)
-	ptzHandler := handler.NewPTZHandler(deps.PTZService)
 	alarmHandler := handler.NewAlarmHandler(deps.AlarmService, deps.ObjectStoreService)
 	platformHandler := handler.NewPlatformHandler(deps.PlatformService, deps.PlatformChannelSvc)
 	subordinateHandler := handler.NewSubordinateHandler(deps.SubordinateService)
@@ -227,18 +224,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		// 设备接入唯一命名空间：/devices（统一）+ /devices/{gb,onvif,plugin}（协议专属动作）
 		registerDevices(auth, deviceAccessHandler, deviceHandler, onvifHandler, pluginHandler, snapHandler)
 
-		auth.GET("/play/start/:deviceId/:channelId", playHandler.Start)
-		auth.GET("/play/stop/:deviceId/:channelId", playHandler.Stop)
-		auth.GET("/play/broadcast/:deviceId/:channelId", playHandler.Broadcast)
-		auth.GET("/play/broadcast/stop/:deviceId/:channelId", playHandler.BroadcastStop)
-
-		auth.GET("/playback/start/:deviceId/:channelId", playbackHandler.Start)
-		auth.GET("/playback/stop/:deviceId/:channelId/:streamId", playbackHandler.Stop)
-		auth.GET("/playback/pause/:streamId", playbackHandler.Pause)
-		auth.GET("/playback/resume/:streamId", playbackHandler.Resume)
-		auth.GET("/playback/speed/:streamId/:speed", playbackHandler.Speed)
-		auth.GET("/playback/seek/:streamId/:seekTime", playbackHandler.Seek)
-
+		// 直播/回放/云台统一收敛到 /resources/{id}/*（见 registerAssets / registerPlaybackCloud）。
 		registerGbRecord(auth, gbRecordHandler)
 
 		registerCloudRecord(auth, cloudRecordHandler)
@@ -263,8 +249,6 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerSubordinate(auth, subordinateHandler)
 
 		registerPosition(auth, positionHandler)
-
-		registerFrontEnd(auth, ptzHandler)
 
 		registerCommon(auth, commonChannelHandler)
 

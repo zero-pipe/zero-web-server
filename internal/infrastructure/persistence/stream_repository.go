@@ -675,7 +675,7 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 		Joins("LEFT JOIN zws_record_plan rp ON rp.id = rpc.plan_id").
 		Joins("LEFT JOIN zws_access_binding ab ON ab.device_id = c.device_id").
 		Where("wrpi.week_day = ? AND wrpi.start_min <= ? AND wrpi.stop_min >= ?", weekDay, minuteIndex, minuteIndex).
-		Group("c.id").Scan(&rows).Error
+		Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}

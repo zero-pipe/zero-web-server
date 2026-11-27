@@ -299,25 +299,6 @@ func (s *Service) StopLive(ctx context.Context, resourceID string) error {
 	return drv.StopLive(ctx, res, binding, sess)
 }
 
-// StartLiveByChannelInternalCode 按通道内码起直播（任意协议）。
-// 用于兼容旧客户端：客户端只有通道内码（非国标设备没有国标码）时也能取流。
-func (s *Service) StartLiveByChannelInternalCode(ctx context.Context, internalCode string) (*dto.StreamContent, error) {
-	res, err := s.repo.GetResourceByInternalCode(strings.TrimSpace(internalCode))
-	if err != nil || res == nil {
-		return nil, fmt.Errorf("通道不存在")
-	}
-	return s.StartLive(ctx, res.ID, "")
-}
-
-// StopLiveByChannelInternalCode 按通道内码停直播（任意协议）。
-func (s *Service) StopLiveByChannelInternalCode(ctx context.Context, internalCode string) error {
-	res, err := s.repo.GetResourceByInternalCode(strings.TrimSpace(internalCode))
-	if err != nil || res == nil {
-		return fmt.Errorf("通道不存在")
-	}
-	return s.StopLive(ctx, res.ID)
-}
-
 // ---- 按时间回放（统一资源） ----
 //
 // 回放只在驱动实现了 channeldrv.PlaybackDriver 时可用。目前只有插件（私有 SDK）
