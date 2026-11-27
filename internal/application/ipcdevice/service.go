@@ -302,6 +302,10 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 		_ = s.factory.For(p.Endpoint).StopLive(ctx, dev.DeviceUID, channelID, stream)
 	}
 	if node, nerr := s.media.Resolve(ctx, act.NodeID); nerr == nil {
+		// 必须连"拉流代理"一起删：只 CloseStreams 的话 ZMS 会保留 auto_close 代理并自动重连，
+		// 变成僵尸代理继续去拉相机 RTSP，与 onvif 等其他会话抢占相机(海康主码流并发会话有限)，
+		// 互相踢断导致 err=-3 / 无帧。与 onvif resetONVIFStream 对齐：先删代理再关流。
+		_ = node.DelStreamProxy(ctx, fmt.Sprintf("__defaultVhost__/%s/%s", act.App, act.Stream))
 		_ = node.CloseStreams(ctx, "__defaultVhost__", act.App, act.Stream)
 	}
 	s.media.UnbindStream(act.App, act.Stream)
