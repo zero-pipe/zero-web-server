@@ -333,10 +333,10 @@ func (s *Service) loadPsRecord(rec *domaincloudrecord.Record) (*dto.StreamConten
 	if stream == "" {
 		stream = rec.Stream
 	}
-	urls := client.BuildMediaURLs(app, stream)
+	urls := client.BuildMediaURLs(app, stream, node.HTTPPort, node.RTSPPort)
 	return &dto.StreamContent{
 		App: app, Stream: stream, IP: node.IP,
-		Flv: urls["flv"], WsFlv: urls["ws_flv"], Rtsp: urls["rtsp"], Rtmp: urls["rtmp"],
+		Flv: urls["flv"], WsFlv: urls["ws_flv"], Rtsp: urls["rtsp"],
 		MediaServerID: node.NodeID, ServerID: s.serverID,
 		Progress: 0, Duration: rec.TimeLen,
 	}, nil

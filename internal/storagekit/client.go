@@ -100,16 +100,39 @@ func (c *Client) PlaybackStop(ctx context.Context, app, stream string) (*APIResp
 	return c.get(ctx, "zstorage/playback/stop", url.Values{"app": {app}, "stream": {stream}})
 }
 
-// BuildMediaURLs 依据节点地址拼出回放出流地址（与 ZMS 同构，前端零改动）。
-func (c *Client) BuildMediaURLs(app, stream string) map[string]string {
-	host := strings.TrimPrefix(c.baseURL, "http://")
-	base := "http://" + host + "/" + app + "/" + stream
-	return map[string]string{
-		"flv":    base + ".live.flv",
-		"ws_flv": "ws://" + host + "/" + app + "/" + stream + ".live.flv",
-		"rtsp":   "rtsp://" + host + "/" + app + "/" + stream,
-		"rtmp":   "rtmp://" + host + "/" + app + "/" + stream,
+// BuildMediaURLs 拼出回放出流地址（与 ZMS 同构，前端零改动）。
+// httpPort 用于 FLV/WS-FLV，rtspPort 用于 RTSP（zstorage 与 ZMS 端口已分离，不能混用）。
+func (c *Client) BuildMediaURLs(app, stream string, httpPort, rtspPort int) map[string]string {
+	host := strings.TrimPrefix(c.baseURL, "http://") // 形如 1.2.3.4:<httpPort>
+	ip := host
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		ip = host[:i]
 	}
+	if httpPort <= 0 {
+		if i := strings.LastIndex(host, ":"); i >= 0 {
+			httpPort = atoiSafe(host[i+1:])
+		}
+	}
+	httpHost := fmt.Sprintf("%s:%d", ip, httpPort)
+	res := map[string]string{
+		"flv":    "http://" + httpHost + "/" + app + "/" + stream + ".live.flv",
+		"ws_flv": "ws://" + httpHost + "/" + app + "/" + stream + ".live.flv",
+	}
+	if rtspPort > 0 {
+		res["rtsp"] = fmt.Sprintf("rtsp://%s:%d/%s/%s", ip, rtspPort, app, stream)
+	}
+	return res
+}
+
+func atoiSafe(s string) int {
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return n
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
 }
 
 func (c *Client) get(ctx context.Context, api string, params url.Values) (*APIResponse, error) {
