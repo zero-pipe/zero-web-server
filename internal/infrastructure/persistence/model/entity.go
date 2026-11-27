@@ -365,11 +365,12 @@ func (StorageNode) TableName() string { return "zws_storage_node" }
 
 // RecordPlan 录像计划。
 type RecordPlan struct {
-	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	Name       string `gorm:"column:name;size:255" json:"name"`
-	Snap       bool   `gorm:"column:snap" json:"snap"`
-	CreateTime string `gorm:"column:create_time;size:50" json:"createTime"`
-	UpdateTime string `gorm:"column:update_time;size:50" json:"updateTime"`
+	ID            int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	Name          string `gorm:"column:name;size:255" json:"name"`
+	Snap          bool   `gorm:"column:snap" json:"snap"`
+	StorageNodeID string `gorm:"column:storage_node_id;size:128" json:"storageNodeId"`
+	CreateTime    string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime    string `gorm:"column:update_time;size:50" json:"updateTime"`
 }
 
 func (RecordPlan) TableName() string { return "zws_record_plan" }

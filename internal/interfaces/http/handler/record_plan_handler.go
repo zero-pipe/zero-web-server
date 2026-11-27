@@ -21,14 +21,15 @@ func NewRecordPlanHandler(svc *recordplanapp.Service) *RecordPlanHandler {
 
 func (h *RecordPlanHandler) Add(c *gin.Context) {
 	var body struct {
-		Name         string                  `json:"name"`
-		PlanItemList []domainrecordplan.Item `json:"planItemList"`
+		Name          string                  `json:"name"`
+		StorageNodeID string                  `json:"storageNodeId"`
+		PlanItemList  []domainrecordplan.Item `json:"planItemList"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, response.CodeBadReq, "参数错误")
 		return
 	}
-	if err := h.svc.Add(body.Name, body.PlanItemList); err != nil {
+	if err := h.svc.Add(body.Name, body.StorageNodeID, body.PlanItemList); err != nil {
 		response.FromError(c, err)
 		return
 	}
@@ -37,15 +38,16 @@ func (h *RecordPlanHandler) Add(c *gin.Context) {
 
 func (h *RecordPlanHandler) Update(c *gin.Context) {
 	var body struct {
-		ID           int                     `json:"id"`
-		Name         string                  `json:"name"`
-		PlanItemList []domainrecordplan.Item `json:"planItemList"`
+		ID            int                     `json:"id"`
+		Name          string                  `json:"name"`
+		StorageNodeID string                  `json:"storageNodeId"`
+		PlanItemList  []domainrecordplan.Item `json:"planItemList"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, response.CodeBadReq, "参数错误")
 		return
 	}
-	if err := h.svc.Update(body.ID, body.Name, body.PlanItemList); err != nil {
+	if err := h.svc.Update(body.ID, body.Name, body.StorageNodeID, body.PlanItemList); err != nil {
 		response.FromError(c, err)
 		return
 	}

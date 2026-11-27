@@ -420,6 +420,7 @@ CREATE TABLE IF NOT EXISTS zws_record_plan
     id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name        VARCHAR(255) NOT NULL DEFAULT '',
     snap        TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否抓图计划',
+    storage_node_id VARCHAR(128) DEFAULT NULL COMMENT '录制目标：空=本地MP4(ZMS)，非空=旁路PS录到该存储节点',
     create_time VARCHAR(50) NOT NULL DEFAULT '',
     update_time VARCHAR(50) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='录像计划';

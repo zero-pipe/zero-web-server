@@ -142,6 +142,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	streamProxyHandler := handler.NewStreamProxyHandler(deps.StreamProxyService, deps.PlayTimeoutMs)
 	mediaSessionHandler := handler.NewMediaSessionHandler(deps.MediaSessionService)
 	recordPlanHandler := handler.NewRecordPlanHandler(deps.RecordPlanService)
+	storageNodeHandler := handler.NewStorageNodeHandler(deps.StorageNodeService)
 	mediaServerHandler := handler.NewMediaServerHandler(
 		deps.MediaServerService,
 		deps.Dashboard,
@@ -251,6 +252,7 @@ func Setup(r *gin.Engine, deps Deps) {
 		registerMediaSessions(auth, mediaSessionHandler)
 
 		registerRecordPlan(auth, recordPlanHandler)
+		auth.GET("/storage/node/list", storageNodeHandler.List)
 
 		registerAlarm(auth, alarmHandler)
 		auth.GET("/alarm/snap/:id", alarmHandler.Snap)

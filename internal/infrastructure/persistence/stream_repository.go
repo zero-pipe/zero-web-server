@@ -558,14 +558,17 @@ func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query st
 		ExtHasAudio        bool    `gorm:"column:ext_has_audio"`
 		ExtGBJSON          string  `gorm:"column:ext_gb_json"`
 		ExtStorageNodeID   string  `gorm:"column:ext_storage_node_id"`
+		ExtProtocol        string  `gorm:"column:ext_protocol"`
 		DeviceInternalCode string  `gorm:"column:device_internal_code"`
 	}
 	err := q.Select(`c.*, COALESCE(e.record_plan_id,0) AS ext_record_plan_id,
 		COALESCE(e.longitude,0) AS ext_longitude, COALESCE(e.latitude,0) AS ext_latitude,
 		COALESCE(e.ptz_type,0) AS ext_ptz_type, COALESCE(e.has_audio,0) AS ext_has_audio,
-		COALESCE(e.gb_json,'') AS ext_gb_json, COALESCE(e.storage_node_id,'') AS ext_storage_node_id,
-		d.internal_code AS device_internal_code`).
+		COALESCE(e.gb_json,'') AS ext_gb_json, COALESCE(rp.storage_node_id,'') AS ext_storage_node_id,
+		COALESCE(ab.protocol,'') AS ext_protocol, d.internal_code AS device_internal_code`).
 		Joins("LEFT JOIN zws_device d ON d.id = c.device_id").
+		Joins("LEFT JOIN zws_record_plan rp ON rp.id = e.record_plan_id").
+		Joins("LEFT JOIN zws_access_binding ab ON ab.device_id = c.device_id").
 		Order("c.id ASC").Offset((page - 1) * count).Limit(count).Scan(&rows).Error
 	if err != nil {
 		return nil, 0, err
@@ -573,7 +576,7 @@ func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query st
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
 		out = append(out, channelRowToRecord(&rows[i].Channel, int(rows[i].ExtRecordPlanID),
-			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].DeviceInternalCode))
+			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].ExtProtocol, rows[i].DeviceInternalCode))
 	}
 	return out, total, nil
 }
@@ -594,17 +597,21 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 		ExtHasAudio        bool    `gorm:"column:ext_has_audio"`
 		ExtGBJSON          string  `gorm:"column:ext_gb_json"`
 		ExtStorageNodeID   string  `gorm:"column:ext_storage_node_id"`
+		ExtProtocol        string  `gorm:"column:ext_protocol"`
 		DeviceInternalCode string  `gorm:"column:device_internal_code"`
 	}
 	err := r.db.Table("zws_channel c").
 		Select(`c.*, e.record_plan_id AS ext_record_plan_id, COALESCE(e.longitude,0) AS ext_longitude,
 			COALESCE(e.latitude,0) AS ext_latitude, COALESCE(e.ptz_type,0) AS ext_ptz_type,
 			COALESCE(e.has_audio,0) AS ext_has_audio, COALESCE(e.gb_json,'') AS ext_gb_json,
-			COALESCE(e.storage_node_id,'') AS ext_storage_node_id,
+			COALESCE(rp.storage_node_id,'') AS ext_storage_node_id,
+			COALESCE(ab.protocol,'') AS ext_protocol,
 			d.internal_code AS device_internal_code`).
 		Joins("JOIN zws_channel_ext e ON e.channel_id = c.id").
 		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = e.record_plan_id").
+		Joins("LEFT JOIN zws_record_plan rp ON rp.id = e.record_plan_id").
 		Joins("LEFT JOIN zws_device d ON d.id = c.device_id").
+		Joins("LEFT JOIN zws_access_binding ab ON ab.device_id = c.device_id").
 		Where("wrpi.week_day = ? AND wrpi.start_min <= ? AND wrpi.stop_min >= ?", weekDay, minuteIndex, minuteIndex).
 		Group("c.id").Scan(&rows).Error
 	if err != nil {
@@ -613,24 +620,28 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
 		out = append(out, channelRowToRecord(&rows[i].Channel, int(rows[i].ExtRecordPlanID),
-			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].DeviceInternalCode))
+			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].ExtProtocol, rows[i].DeviceInternalCode))
 	}
 	return out, nil
 }
 
 // channelRowToRecord 把统一通道行拼成录像计划用的扁平 ChannelRecord。
-func channelRowToRecord(m *model.Channel, recordPlanID int, lon, lat float64, ptz int, hasAudio bool, gbJSON, storageNodeID, deviceInternalCode string) domainrecordplan.ChannelRecord {
+func channelRowToRecord(m *model.Channel, recordPlanID int, lon, lat float64, ptz int, hasAudio bool, gbJSON, storageNodeID, protocol, deviceInternalCode string) domainrecordplan.ChannelRecord {
 	var g gbChannelJSON
 	if strings.TrimSpace(gbJSON) != "" {
 		_ = json.Unmarshal([]byte(gbJSON), &g)
 	}
+	dataType := shared.ChannelDataTypeGB28181
+	if protocol == "onvif" || protocol == "plugin" {
+		dataType = shared.ChannelDataTypeStreamPush
+	}
 	return domainrecordplan.ChannelRecord{
 		ID: int(m.ID), InternalCode: m.InternalCode, DeviceInternalCode: deviceInternalCode,
 		Name: m.Name, Status: m.Status, Longitude: lon, Latitude: lat, PTZType: ptz,
-		HasAudio: hasAudio, RecordPlanID: recordPlanID, StorageNodeID: storageNodeID, GBDeviceID: m.GbCode,
+		HasAudio: hasAudio, RecordPlanID: recordPlanID, StorageNodeID: storageNodeID, Protocol: protocol, GBDeviceID: m.GbCode,
 		CivilCode: g.CivilCode, ParentID: g.ParentID, BusinessGroupID: g.BusinessGroupID,
 		Manufacturer: g.Manufacturer, Model: g.Model, Parental: g.Parental, SubCount: g.SubCount,
-		DataType: shared.ChannelDataTypeGB28181, DataDeviceID: int(m.DeviceID),
+		DataType: dataType, DataDeviceID: int(m.DeviceID),
 		CreateTime: m.CreateTime, UpdateTime: m.UpdateTime,
 	}
 }
@@ -679,11 +690,11 @@ var (
 )
 
 func toModelRecordPlan(d *domainrecordplan.Plan) *model.RecordPlan {
-	return &model.RecordPlan{ID: int64(d.ID), Snap: d.Snap, Name: d.Name, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime}
+	return &model.RecordPlan{ID: int64(d.ID), Snap: d.Snap, Name: d.Name, StorageNodeID: d.StorageNodeID, CreateTime: d.CreateTime, UpdateTime: d.UpdateTime}
 }
 
 func toDomainRecordPlan(m *model.RecordPlan) *domainrecordplan.Plan {
-	return &domainrecordplan.Plan{ID: int(m.ID), Snap: m.Snap, Name: m.Name, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime}
+	return &domainrecordplan.Plan{ID: int(m.ID), Snap: m.Snap, Name: m.Name, StorageNodeID: m.StorageNodeID, CreateTime: m.CreateTime, UpdateTime: m.UpdateTime}
 }
 
 func toModelRecordPlanItem(d *domainrecordplan.Item) *model.RecordPlanItem {

@@ -104,6 +104,37 @@ func (s *Service) List() ([]domainstoragenode.StorageNode, error) {
 	return s.repo.ListAll()
 }
 
+// NodeView 是给前端的安全视图（不含 secret）。
+type NodeView struct {
+	NodeID      string `json:"nodeId"`
+	Name        string `json:"name"`
+	IP          string `json:"ip"`
+	HTTPPort    int    `json:"httpPort"`
+	RTSPPort    int    `json:"rtspPort"`
+	Online      bool   `json:"online"`
+	CapacityGB  int    `json:"capacityGb"`
+	UsedGB      int    `json:"usedGb"`
+	DefaultNode bool   `json:"defaultNode"`
+	LastSeen    int64  `json:"lastSeen"`
+}
+
+// ListView 返回脱敏后的节点列表（给「录制目标」下拉用）。
+func (s *Service) ListView() ([]NodeView, error) {
+	rows, err := s.repo.ListAll()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]NodeView, 0, len(rows))
+	for i := range rows {
+		r := rows[i]
+		out = append(out, NodeView{
+			NodeID: r.NodeID, Name: r.Name, IP: r.IP, HTTPPort: r.HTTPPort, RTSPPort: r.RTSPPort,
+			Online: r.Online, CapacityGB: r.CapacityGB, UsedGB: r.UsedGB, DefaultNode: r.DefaultNode, LastSeen: r.LastSeen,
+		})
+	}
+	return out, nil
+}
+
 // Resolve 取目标存储节点：优先 preferID，否则默认节点，否则唯一在线节点。
 func (s *Service) Resolve(preferID string) (*domainstoragenode.StorageNode, error) {
 	preferID = strings.TrimSpace(preferID)

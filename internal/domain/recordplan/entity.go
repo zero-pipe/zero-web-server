@@ -2,11 +2,12 @@ package recordplan
 
 // Plan 录像计划（领域实体）。
 type Plan struct {
-	ID         int    `json:"id"`
-	Snap       bool   `json:"snap"`
-	Name       string `json:"name"`
-	CreateTime string `json:"createTime"`
-	UpdateTime string `json:"updateTime"`
+	ID            int    `json:"id"`
+	Snap          bool   `json:"snap"`
+	Name          string `json:"name"`
+	StorageNodeID string `json:"storageNodeId"` // 空=本地MP4(ZMS)；非空=旁路PS录到该存储节点
+	CreateTime    string `json:"createTime"`
+	UpdateTime    string `json:"updateTime"`
 }
 
 // Item 录像计划时段。
@@ -59,6 +60,7 @@ type ChannelRecord struct {
 	GBPTZType          int     `json:"gbPtzType"`
 	RecordPlanID       int     `json:"recordPlanId"`
 	StorageNodeID      string  `json:"storageNodeId"`
+	Protocol           string  `json:"protocol"` // 真实接入协议：gb28181/onvif/plugin
 	DataType           int     `json:"dataType"`
 	DataDeviceID       int     `json:"dataDeviceId"`
 }

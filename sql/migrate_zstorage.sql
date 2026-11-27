@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS zws_storage_node
 ALTER TABLE zws_channel_ext
     ADD COLUMN storage_node_id VARCHAR(128) DEFAULT NULL COMMENT '旁路录制存储节点 node_id（空=不旁路录）' AFTER record_plan_id;
 
+-- 录像计划 → 录制目标（方案A：计划级选存储节点；空=本地MP4/ZMS）
+ALTER TABLE zws_record_plan
+    ADD COLUMN storage_node_id VARCHAR(128) DEFAULT NULL COMMENT '录制目标：空=本地MP4(ZMS)，非空=旁路PS录到该存储节点' AFTER snap;
+
 -- 录像表增列：区分 MP4 / PS 槽位来源
 ALTER TABLE zws_cloud_record
     ADD COLUMN storage_node_id VARCHAR(128) DEFAULT NULL COMMENT 'PS 录制的存储节点 node_id' AFTER collect,

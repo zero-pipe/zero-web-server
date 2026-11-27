@@ -3,6 +3,7 @@ package recordplan
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -219,21 +220,22 @@ func (s *Service) stopRecord(channelID int) {
 	}
 }
 
-func (s *Service) Add(name string, items []domainrecordplan.Item) error {
+func (s *Service) Add(name, storageNodeID string, items []domainrecordplan.Item) error {
 	if len(items) == 0 {
 		return fmt.Errorf("录制计划不可为空")
 	}
 	now := time.Now().Format("2006-01-02 15:04:05")
-	plan := &domainrecordplan.Plan{Name: name, CreateTime: now, UpdateTime: now}
+	plan := &domainrecordplan.Plan{Name: name, StorageNodeID: strings.TrimSpace(storageNodeID), CreateTime: now, UpdateTime: now}
 	return s.repo.Create(plan, items)
 }
 
-func (s *Service) Update(id int, name string, items []domainrecordplan.Item) error {
+func (s *Service) Update(id int, name, storageNodeID string, items []domainrecordplan.Item) error {
 	plan, _, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
 	}
 	plan.Name = name
+	plan.StorageNodeID = strings.TrimSpace(storageNodeID)
 	plan.UpdateTime = time.Now().Format("2006-01-02 15:04:05")
 	return s.repo.Update(plan, items)
 }
