@@ -23,10 +23,17 @@ type Service struct {
 	storageNode *storagenodeapp.Service
 	serverID    string
 	sessions    sync.Map
+	// channelStream 由装配层注入：通道库 id → 直播流名（<设备内码>_<通道内码>）。
+	channelStream func(channelID int) (string, bool)
 }
 
 func NewService(repo domaincloudrecord.Repository, media port.MediaCluster, storageNode *storagenodeapp.Service, serverID string) *Service {
 	return &Service{repo: repo, media: media, storageNode: storageNode, serverID: serverID}
+}
+
+// SetChannelStreamResolver 注入通道库 id → 流名的解析（zplayer 用通道 id 查片段）。
+func (s *Service) SetChannelStreamResolver(fn func(channelID int) (string, bool)) {
+	s.channelStream = fn
 }
 
 func (s *Service) OnRecordMp4(param RecordHookParam) error {
@@ -458,6 +465,22 @@ func (s *Service) Segments(devCode, chCode string, startMs, endMs int64) ([]Segm
 	if stream == "" {
 		return nil, fmt.Errorf("设备/通道内码缺失")
 	}
+	return s.segmentsByStream(stream, startMs, endMs)
+}
+
+// SegmentsByChannelID 按通道库 id 查云端片段（zplayer 用）。由注入的解析器映射到流名。
+func (s *Service) SegmentsByChannelID(channelID int, startMs, endMs int64) ([]SegmentView, error) {
+	if s.channelStream == nil {
+		return nil, fmt.Errorf("未配置通道解析器")
+	}
+	stream, ok := s.channelStream(channelID)
+	if !ok || stream == "" {
+		return nil, fmt.Errorf("通道不存在或无内码")
+	}
+	return s.segmentsByStream(stream, startMs, endMs)
+}
+
+func (s *Service) segmentsByStream(stream string, startMs, endMs int64) ([]SegmentView, error) {
 	rows, err := s.repo.ListSegments(stream, startMs, endMs)
 	if err != nil {
 		return nil, err

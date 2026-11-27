@@ -63,6 +63,7 @@ import (
 	sipinfra "zero-web-server/internal/infrastructure/sip"
 	"zero-web-server/internal/interfaces/http/router"
 	"zero-web-server/internal/mediakit"
+	"zero-web-server/internal/mediaurl"
 	"zero-web-server/internal/port"
 	jwtmgr "zero-web-server/pkg/jwt"
 	applog "zero-web-server/pkg/log"
@@ -343,6 +344,19 @@ func main() {
 	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, assetService, mediaCluster, cfg.Server.Port)
 
 	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, storageNodeService, cfg.UserSettings.ServerID)
+	// 云端回放：通道库 id → 直播流名（<设备内码>_<通道内码>），供 zplayer 按通道查片段。
+	cloudRecordService.SetChannelStreamResolver(func(channelID int) (string, bool) {
+		ch, err := channelRepo.GetByID(channelID)
+		if err != nil || ch == nil {
+			return "", false
+		}
+		dev, err := deviceRepo.GetByID(ch.DataDeviceID)
+		if err != nil || dev == nil {
+			return "", false
+		}
+		stream := mediaurl.LiveStream(dev.InternalCode, ch.InternalCode)
+		return stream, stream != ""
+	})
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaCluster, cfg.UserSettings.ServerID)
 	recordPlanService := recordplanapp.NewService(recordPlanRepo, playService, publishRegistry, storageNodeService, onvifService, cfg.UserSettings.ServerID)

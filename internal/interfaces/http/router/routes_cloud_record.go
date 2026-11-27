@@ -23,6 +23,7 @@ func registerCloudRecord(parent *gin.RouterGroup, cloudRecordHandler *handler.Cl
 func registerPlaybackCloud(parent *gin.RouterGroup, h *handler.CloudRecordHandler) {
 	g := parent.Group("/playback/cloud")
 	g.GET("/segments/:deviceCode/:channelCode", h.CloudSegments)
+	g.GET("/channel-segments/:channelId", h.CloudSegmentsByChannel)
 	g.GET("/start", h.CloudStart)
 	g.GET("/seek", h.CloudSeek)
 	g.GET("/stop", h.CloudStop)

@@ -199,3 +199,19 @@ func (h *CloudRecordHandler) CloudStop(c *gin.Context) {
 	_ = h.svc.StopByRecord(recordID)
 	response.OK(c, nil)
 }
+
+// CloudSegmentsByChannel 按通道库 id 查云端片段（zplayer 回放用）。
+func (h *CloudRecordHandler) CloudSegmentsByChannel(c *gin.Context) {
+	channelID, _ := strconv.Atoi(c.Param("channelId"))
+	startMs := parseTimeQueryMs(c.Query("start"))
+	endMs := parseTimeQueryMs(c.Query("end"))
+	segs, err := h.svc.SegmentsByChannelID(channelID, startMs, endMs)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	if segs == nil {
+		segs = []cloudrecordapp.SegmentView{}
+	}
+	response.OK(c, segs)
+}
