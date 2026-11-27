@@ -239,7 +239,7 @@ const pluginFirstFrameWait = 15 * time.Second
 func (s *Service) waitLiveReady(ctx context.Context, node port.MediaEndpoint, app, stream string, maxWait time.Duration) *port.StreamProbe {
 	deadline := time.Now().Add(maxWait)
 	for {
-		if info := node.LookupStream(ctx, app, stream); info != nil && (info.BytesSpeed > 0 || info.VideoFps > 0) {
+		if info := node.LookupStream(ctx, app, stream); info != nil && (info.VideoFps > 0 || info.BytesSpeed >= minPlayBytesSpeed) {
 			return info
 		}
 		if time.Now().After(deadline) {
@@ -309,10 +309,30 @@ func (s *Service) StopLive(ctx context.Context, deviceID int, channelID string) 
 	return nil
 }
 
-// streamStalled 判断探针结果是否表示“流在、但长时间不出数据”。
+// minPlayBytesSpeed 与 onvif 侧口径一致：低于此码率且 fps=0 视为“没在有帧走”。
+const minPlayBytesSpeed int64 = 2048
+
+// streamStalled 判断探针结果是否表示“流在、但没在有帧走”（卡死僵尸流）。
 // 起播阶段本来就没有帧，用 AliveSecond 做宽限，避免误判正常慢启动的流。
+//   - 前 10 秒：宽限，不判卡死
+//   - fps>0：真有帧在走，健康
+//   - 码率足够：容忍 fps 采样瞬时为 0，健康
+//   - 其余(fps=0 且码率很低)：卡死 —— 旧实现只在 BytesSpeed==0 才算卡死，
+//     把“码率 1~2KB/s、fps=0”的僵尸误判为可用复用到播放器 → 有字节但黑屏。
 func streamStalled(p *port.StreamProbe) bool {
-	return p != nil && p.AliveSecond > 10 && p.VideoFps == 0 && p.BytesSpeed == 0
+	if p == nil {
+		return false
+	}
+	if p.AliveSecond <= 10 {
+		return false
+	}
+	if p.VideoFps > 0 {
+		return false
+	}
+	if p.BytesSpeed >= minPlayBytesSpeed {
+		return false
+	}
+	return true
 }
 
 // activeStreamHealthy 校验内存 active 标记对应的流在 ZMS 是否仍然可用。
