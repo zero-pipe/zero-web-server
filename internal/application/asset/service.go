@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/singleflight"
+
 	"zero-web-server/internal/application/channeldrv"
 	domainasset "zero-web-server/internal/domain/asset"
 	"zero-web-server/internal/dto"
@@ -27,6 +29,8 @@ type Service struct {
 
 	mu       sync.Mutex
 	sessions map[string]*channeldrv.Session
+	// sf 合并同一资源/码流的并发起流：多人同时点播只发一次信令，避免在 ZMS 互相踢流。
+	sf singleflight.Group
 }
 
 func NewService(repo domainasset.Repository, projector Projector, drivers channeldrv.Registry) *Service {
@@ -215,7 +219,21 @@ func (s *Service) Sync(ctx context.Context, deviceID string) error {
 }
 
 // StartLive 按统一资源与码流选择路由到对应协议的播放实现。
+// 并发同一资源(同码流)的点播用 singleflight 合并：只发一次信令，其余直接共享结果，
+// 避免多人同时点播时在 ZMS 反复 AddStreamProxy 互相踢流(kick_prev)。
 func (s *Service) StartLive(ctx context.Context, resourceID, profileID string) (*dto.StreamContent, error) {
+	key := resourceID + "|" + profileID
+	v, err, _ := s.sf.Do(key, func() (any, error) {
+		return s.startLiveOnce(ctx, resourceID, profileID)
+	})
+	if err != nil {
+		return nil, err
+	}
+	content, _ := v.(*dto.StreamContent)
+	return content, nil
+}
+
+func (s *Service) startLiveOnce(ctx context.Context, resourceID, profileID string) (*dto.StreamContent, error) {
 	res, err := s.repo.GetResource(resourceID)
 	if err != nil {
 		return nil, fmt.Errorf("资源不存在")
