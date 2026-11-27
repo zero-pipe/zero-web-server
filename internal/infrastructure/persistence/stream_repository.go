@@ -446,11 +446,30 @@ func (r *RecordPlanRepository) Update(plan *domainrecordplan.Plan, items []domai
 }
 
 func (r *RecordPlanRepository) Delete(id int) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	err := r.db.Transaction(func(tx *gorm.DB) error {
 		_ = tx.Model(&model.ChannelExt{}).Where("record_plan_id = ?", id).Update("record_plan_id", 0)
 		_ = tx.Where("plan_id = ?", id).Delete(&model.RecordPlanItem{})
 		return tx.Delete(&model.RecordPlan{}, id).Error
 	})
+	if err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
+}
+
+// resyncPlanChannels 重建「计划↔通道」内码关联表，作为录制的权威来源。
+// 关联以 设备内码 D... + 通道内码 C... 表达（非自增 id、非国标码）。
+// channel_ext.record_plan_id 仍作为列表/筛选的兼容缓存，两者随每次写入保持一致。
+func (r *RecordPlanRepository) resyncPlanChannels() error {
+	if err := r.db.Exec(`DELETE FROM zws_record_plan_channel`).Error; err != nil {
+		return err
+	}
+	return r.db.Exec(`INSERT INTO zws_record_plan_channel (plan_id, device_code, channel_code)
+		SELECT e.record_plan_id, COALESCE(d.internal_code,''), c.internal_code
+		FROM zws_channel_ext e
+		JOIN zws_channel c ON c.id = e.channel_id
+		LEFT JOIN zws_device d ON d.id = c.device_id
+		WHERE e.record_plan_id > 0 AND c.internal_code <> ''`).Error
 }
 
 func (r *RecordPlanRepository) GetByID(id int) (*domainrecordplan.Plan, []domainrecordplan.Item, error) {
@@ -497,40 +516,58 @@ func (r *RecordPlanRepository) LinkChannels(planID int, channelIDs []int) error 
 	if len(channelIDs) == 0 {
 		return nil
 	}
-	return r.db.Model(&model.ChannelExt{}).Where("channel_id IN ?", channelIDs).Update("record_plan_id", planID).Error
+	if err := r.db.Model(&model.ChannelExt{}).Where("channel_id IN ?", channelIDs).Update("record_plan_id", planID).Error; err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
 }
 
 func (r *RecordPlanRepository) UnlinkChannels(channelIDs []int) error {
 	if len(channelIDs) == 0 {
 		return nil
 	}
-	return r.db.Model(&model.ChannelExt{}).Where("channel_id IN ?", channelIDs).Update("record_plan_id", 0).Error
+	if err := r.db.Model(&model.ChannelExt{}).Where("channel_id IN ?", channelIDs).Update("record_plan_id", 0).Error; err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
 }
 
 func (r *RecordPlanRepository) LinkChannelsByDevice(planID int, deviceDbIDs []int) error {
 	if len(deviceDbIDs) == 0 {
 		return nil
 	}
-	return r.db.Model(&model.ChannelExt{}).
+	if err := r.db.Model(&model.ChannelExt{}).
 		Where("channel_id IN (SELECT id FROM zws_channel WHERE device_id IN ?)", deviceDbIDs).
-		Update("record_plan_id", planID).Error
+		Update("record_plan_id", planID).Error; err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
 }
 
 func (r *RecordPlanRepository) UnlinkChannelsByDevice(deviceDbIDs []int) error {
 	if len(deviceDbIDs) == 0 {
 		return nil
 	}
-	return r.db.Model(&model.ChannelExt{}).
+	if err := r.db.Model(&model.ChannelExt{}).
 		Where("channel_id IN (SELECT id FROM zws_channel WHERE device_id IN ?)", deviceDbIDs).
-		Update("record_plan_id", 0).Error
+		Update("record_plan_id", 0).Error; err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
 }
 
 func (r *RecordPlanRepository) LinkAll(planID int) error {
-	return r.db.Model(&model.ChannelExt{}).Where("1=1").Update("record_plan_id", planID).Error
+	if err := r.db.Model(&model.ChannelExt{}).Where("1=1").Update("record_plan_id", planID).Error; err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
 }
 
 func (r *RecordPlanRepository) UnlinkAll(planID int) error {
-	return r.db.Model(&model.ChannelExt{}).Where("record_plan_id = ?", planID).Update("record_plan_id", 0).Error
+	if err := r.db.Model(&model.ChannelExt{}).Where("record_plan_id = ?", planID).Update("record_plan_id", 0).Error; err != nil {
+		return err
+	}
+	return r.resyncPlanChannels()
 }
 
 func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query string, hasLink *bool, online, channelType string) ([]domainrecordplan.ChannelRecord, int64, error) {
@@ -580,12 +617,14 @@ func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query st
 		ExtStorageNodeID   string  `gorm:"column:ext_storage_node_id"`
 		ExtProtocol        string  `gorm:"column:ext_protocol"`
 		DeviceInternalCode string  `gorm:"column:device_internal_code"`
+		DeviceGbCode       string  `gorm:"column:device_gb_code"`
 	}
 	err := q.Select(`c.*, COALESCE(e.record_plan_id,0) AS ext_record_plan_id,
 		COALESCE(e.longitude,0) AS ext_longitude, COALESCE(e.latitude,0) AS ext_latitude,
 		COALESCE(e.ptz_type,0) AS ext_ptz_type, COALESCE(e.has_audio,0) AS ext_has_audio,
 		COALESCE(e.gb_json,'') AS ext_gb_json, COALESCE(rp.storage_node_id,'') AS ext_storage_node_id,
-		COALESCE(ab.protocol,'') AS ext_protocol, d.internal_code AS device_internal_code`).
+		COALESCE(ab.protocol,'') AS ext_protocol, d.internal_code AS device_internal_code,
+		COALESCE(d.gb_code,'') AS device_gb_code`).
 		Joins("LEFT JOIN zws_device d ON d.id = c.device_id").
 		Joins("LEFT JOIN zws_record_plan rp ON rp.id = e.record_plan_id").
 		Joins("LEFT JOIN zws_access_binding ab ON ab.device_id = c.device_id").
@@ -596,7 +635,7 @@ func (r *RecordPlanRepository) ChannelList(page, count int, planID int, query st
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
 		out = append(out, channelRowToRecord(&rows[i].Channel, int(rows[i].ExtRecordPlanID),
-			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].ExtProtocol, rows[i].DeviceInternalCode))
+			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].ExtProtocol, rows[i].DeviceInternalCode, rows[i].DeviceGbCode))
 	}
 	return out, total, nil
 }
@@ -619,18 +658,21 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 		ExtStorageNodeID   string  `gorm:"column:ext_storage_node_id"`
 		ExtProtocol        string  `gorm:"column:ext_protocol"`
 		DeviceInternalCode string  `gorm:"column:device_internal_code"`
+		DeviceGbCode       string  `gorm:"column:device_gb_code"`
 	}
-	err := r.db.Table("zws_channel c").
-		Select(`c.*, e.record_plan_id AS ext_record_plan_id, COALESCE(e.longitude,0) AS ext_longitude,
+	err := r.db.Table("zws_record_plan_channel rpc").
+		Select(`c.*, rpc.plan_id AS ext_record_plan_id, COALESCE(e.longitude,0) AS ext_longitude,
 			COALESCE(e.latitude,0) AS ext_latitude, COALESCE(e.ptz_type,0) AS ext_ptz_type,
 			COALESCE(e.has_audio,0) AS ext_has_audio, COALESCE(e.gb_json,'') AS ext_gb_json,
 			COALESCE(rp.storage_node_id,'') AS ext_storage_node_id,
 			COALESCE(ab.protocol,'') AS ext_protocol,
-			d.internal_code AS device_internal_code`).
-		Joins("JOIN zws_channel_ext e ON e.channel_id = c.id").
-		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = e.record_plan_id").
-		Joins("LEFT JOIN zws_record_plan rp ON rp.id = e.record_plan_id").
-		Joins("LEFT JOIN zws_device d ON d.id = c.device_id").
+			d.internal_code AS device_internal_code,
+			COALESCE(d.gb_code,'') AS device_gb_code`).
+		Joins("JOIN zws_record_plan_item wrpi ON wrpi.plan_id = rpc.plan_id").
+		Joins("JOIN zws_channel c ON c.internal_code = rpc.channel_code").
+		Joins("LEFT JOIN zws_device d ON d.internal_code = rpc.device_code").
+		Joins("LEFT JOIN zws_channel_ext e ON e.channel_id = c.id").
+		Joins("LEFT JOIN zws_record_plan rp ON rp.id = rpc.plan_id").
 		Joins("LEFT JOIN zws_access_binding ab ON ab.device_id = c.device_id").
 		Where("wrpi.week_day = ? AND wrpi.start_min <= ? AND wrpi.stop_min >= ?", weekDay, minuteIndex, minuteIndex).
 		Group("c.id").Scan(&rows).Error
@@ -640,13 +682,13 @@ func (r *RecordPlanRepository) QueryRecordingChannels(weekDay, minuteIndex int) 
 	out := make([]domainrecordplan.ChannelRecord, 0, len(rows))
 	for i := range rows {
 		out = append(out, channelRowToRecord(&rows[i].Channel, int(rows[i].ExtRecordPlanID),
-			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].ExtProtocol, rows[i].DeviceInternalCode))
+			rows[i].ExtLongitude, rows[i].ExtLatitude, rows[i].ExtPTZType, rows[i].ExtHasAudio, rows[i].ExtGBJSON, rows[i].ExtStorageNodeID, rows[i].ExtProtocol, rows[i].DeviceInternalCode, rows[i].DeviceGbCode))
 	}
 	return out, nil
 }
 
 // channelRowToRecord 把统一通道行拼成录像计划用的扁平 ChannelRecord。
-func channelRowToRecord(m *model.Channel, recordPlanID int, lon, lat float64, ptz int, hasAudio bool, gbJSON, storageNodeID, protocol, deviceInternalCode string) domainrecordplan.ChannelRecord {
+func channelRowToRecord(m *model.Channel, recordPlanID int, lon, lat float64, ptz int, hasAudio bool, gbJSON, storageNodeID, protocol, deviceInternalCode, deviceGbCode string) domainrecordplan.ChannelRecord {
 	var g gbChannelJSON
 	if strings.TrimSpace(gbJSON) != "" {
 		_ = json.Unmarshal([]byte(gbJSON), &g)
@@ -658,7 +700,8 @@ func channelRowToRecord(m *model.Channel, recordPlanID int, lon, lat float64, pt
 	return domainrecordplan.ChannelRecord{
 		ID: int(m.ID), InternalCode: m.InternalCode, DeviceInternalCode: deviceInternalCode,
 		Name: m.Name, Status: m.Status, Longitude: lon, Latitude: lat, PTZType: ptz,
-		HasAudio: hasAudio, RecordPlanID: recordPlanID, StorageNodeID: storageNodeID, Protocol: protocol, GBDeviceID: m.GbCode,
+		HasAudio: hasAudio, RecordPlanID: recordPlanID, StorageNodeID: storageNodeID, Protocol: protocol,
+		DeviceID: deviceGbCode, GBDeviceID: m.GbCode,
 		CivilCode: g.CivilCode, ParentID: g.ParentID, BusinessGroupID: g.BusinessGroupID,
 		Manufacturer: g.Manufacturer, Model: g.Model, Parental: g.Parental, SubCount: g.SubCount,
 		DataType: dataType, DataDeviceID: int(m.DeviceID),

@@ -120,6 +120,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.StorageNode{},
 		&model.RecordPlan{},
 		&model.RecordPlanItem{},
+		&model.RecordPlanChannel{},
 		&model.CloudRecord{},
 		&model.StreamProxy{},
 		&model.StreamPush{},

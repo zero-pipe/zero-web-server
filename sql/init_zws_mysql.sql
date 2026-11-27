@@ -439,6 +439,16 @@ CREATE TABLE IF NOT EXISTS zws_record_plan_item
     CONSTRAINT fk_plan_item_plan FOREIGN KEY (plan_id) REFERENCES zws_record_plan (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='录像计划时段';
 
+DROP TABLE IF EXISTS zws_record_plan_channel;
+CREATE TABLE IF NOT EXISTS zws_record_plan_channel
+(
+    plan_id      BIGINT      NOT NULL,
+    device_code  VARCHAR(64) NOT NULL DEFAULT '' COMMENT '设备内码 D...',
+    channel_code VARCHAR(64) NOT NULL DEFAULT '' COMMENT '通道内码 C...',
+    PRIMARY KEY (plan_id, device_code, channel_code),
+    KEY idx_rpc_channel (channel_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='录像计划↔通道关联（内码，非自增id/非国标码）';
+
 DROP TABLE IF EXISTS zws_cloud_record;
 CREATE TABLE IF NOT EXISTS zws_cloud_record
 (

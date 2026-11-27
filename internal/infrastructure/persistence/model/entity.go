@@ -388,6 +388,16 @@ type RecordPlanItem struct {
 
 func (RecordPlanItem) TableName() string { return "zws_record_plan_item" }
 
+// RecordPlanChannel 录像计划↔通道关联（按内码，非自增 id、非国标码）。
+// 业务关联唯一键：设备内码 D... + 通道内码 C...。tick 以此表驱动录制。
+type RecordPlanChannel struct {
+	PlanID      int64  `gorm:"column:plan_id;primaryKey" json:"planId"`
+	DeviceCode  string `gorm:"column:device_code;primaryKey;size:64" json:"deviceCode"`
+	ChannelCode string `gorm:"column:channel_code;primaryKey;size:64" json:"channelCode"`
+}
+
+func (RecordPlanChannel) TableName() string { return "zws_record_plan_channel" }
+
 // CloudRecord 云端录像。
 type CloudRecord struct {
 	ID              int64   `gorm:"column:id;primaryKey;autoIncrement" json:"id"`

@@ -13,9 +13,11 @@ import (
 
 // GroupRegionRepository：行政区划 / 业务分组目录 + 目录挂载。
 // 新 schema：
-//   zws_region(code=deviceId, name, alias, parent_id)
-//   zws_group(code=deviceId, name, business_group, civil_code, alias, parent_id)
-//   zws_catalog(region_id|group_id, target_type=device|channel, target_id) ← 多挂载
+//
+//	zws_region(code=deviceId, name, alias, parent_id)
+//	zws_group(code=deviceId, name, business_group, civil_code, alias, parent_id)
+//	zws_catalog(region_id|group_id, target_type=device|channel, target_id) ← 多挂载
+//
 // 通道隶属关系（gb_json.civilCode/parentId）沿用 channel_ext.gb_json 过渡语义。
 type GroupRegionRepository struct {
 	db *gorm.DB
@@ -57,9 +59,9 @@ FROM zws_group WHERE 1=1`
 
 func (r *GroupRegionRepository) GetGroupByID(id int) (*domaintree.Node, error) {
 	var row struct {
-		ID     int64  `gorm:"column:id"`
-		Code   string `gorm:"column:code"`
-		Name   string `gorm:"column:name"`
+		ID   int64  `gorm:"column:id"`
+		Code string `gorm:"column:code"`
+		Name string `gorm:"column:name"`
 	}
 	if err := r.db.Raw("SELECT id, code, name FROM zws_group WHERE id = ?", id).Scan(&row).Error; err != nil {
 		return nil, err
@@ -78,8 +80,11 @@ func (r *GroupRegionRepository) QueryGroupChannels(query, parentDeviceID string)
        JSON_UNQUOTE(JSON_EXTRACT(e.gb_json, '$.parentId')) AS parent_device_id,
        '' AS business_group,
        COALESCE(NULLIF(TRIM(c.status), ''), 'OFF') AS status,
+       c.internal_code AS internal_code,
+       COALESCE(d.internal_code, '') AS device_internal_code,
        1 AS type, 1 AS is_leaf
 FROM zws_channel c LEFT JOIN zws_channel_ext e ON e.channel_id = c.id
+LEFT JOIN zws_device d ON d.id = c.device_id
 WHERE c.kind = 'video_sensor' AND JSON_UNQUOTE(JSON_EXTRACT(e.gb_json, '$.parentId')) = ?`
 	args := []any{parentDeviceID}
 	if query != "" {
@@ -482,8 +487,8 @@ func (r *GroupRegionRepository) DeleteRegionCodeMapping(regionDeviceID string) e
 // patchChannelGBWhere 按条件批量读改写 channel_ext.gb_json（多行）。
 func (r *GroupRegionRepository) patchChannelGBWhere(cond string, arg any, fn func(g *gbChannelJSON)) error {
 	var exts []struct {
-		ID      int64  `gorm:"column:id"`
-		GBJSON  string `gorm:"column:gb_json"`
+		ID     int64  `gorm:"column:id"`
+		GBJSON string `gorm:"column:gb_json"`
 	}
 	if err := r.db.Table("zws_channel_ext").Select("id, gb_json").Where(cond, arg).Scan(&exts).Error; err != nil {
 		return err
