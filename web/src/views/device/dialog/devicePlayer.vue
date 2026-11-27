@@ -39,6 +39,7 @@
                 :show-tab="false"
                 :show-control-bar="true"
                 @playerChanged="playerChanged"
+                @playStatusChange="onPlayStatus"
               />
             </div>
           </div>
@@ -124,6 +125,7 @@ export default {
       hasAudio: false,
       isLoging: false,
       playError: '',
+      firstFrameTimer: null,
       showVideoDialog: false,
       streamInfo: null,
       osdClock: '',
@@ -164,6 +166,7 @@ export default {
   },
   beforeDestroy() {
     this.stopClock()
+    this.clearFirstFrameWatchdog()
   },
   methods: {
     tickClock() {
@@ -257,7 +260,30 @@ export default {
         if (this.$refs.mediaInfo) {
           this.$refs.mediaInfo.startTask()
         }
+        this.startFirstFrameWatchdog()
       })
+    },
+    // 首帧看门狗：地址先行后若长时间不出帧（真无信号），给超时提示而不是永远转圈。
+    startFirstFrameWatchdog() {
+      this.clearFirstFrameWatchdog()
+      this.firstFrameTimer = setTimeout(() => {
+        this.firstFrameTimer = null
+        if (this.showVideoDialog && !this.playError) {
+          this.playError = '连接超时，请点右下角刷新重试'
+        }
+      }, 12000)
+    },
+    clearFirstFrameWatchdog() {
+      if (this.firstFrameTimer) {
+        clearTimeout(this.firstFrameTimer)
+        this.firstFrameTimer = null
+      }
+    },
+    onPlayStatus(playing) {
+      if (playing) {
+        this.clearFirstFrameWatchdog()
+        if (this.playError) this.playError = ''
+      }
     },
     playerChanged(playerUrlInfo) {
       this.playerUrlInfo = playerUrlInfo
@@ -270,6 +296,7 @@ export default {
         this.$refs.mediaInfo.stopTask()
       }
       this.stopClock()
+      this.clearFirstFrameWatchdog()
       this.isLoging = false
       this.playError = ''
       this.streamInfo = null

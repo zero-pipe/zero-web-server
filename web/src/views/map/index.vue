@@ -191,6 +191,11 @@ export default {
   },
   destroyed() {
     this.cancelCloseStop()
+    // 离开地图时停掉保留的热流，避免后台一直拉设备。
+    if (this.playingChannelId != null) {
+      stopResourceLive(this.playingChannelId).catch(() => {})
+      this.playingChannelId = null
+    }
   },
   computed: {
     deviceOnline() {
@@ -539,23 +544,13 @@ export default {
         this.closeStopTimer = null
       }
     },
-    // 播放器弹窗真正关闭：让在途请求失效；延时一小段再停流——
-    // 快速“关掉再点”时热流还在、直接复用，不用每次重建拉流（重建偶发失败才是“有时没流”的根因）。
-    // 真正离开则到点停流，避免后台一直拉设备。
+    // 关闭弹窗不停流：保留这一路热流（地图同一时刻至多 1 路），再次打开秒开。
+    // 切到别的通道时 play() 会停掉上一路；离开地图（destroyed）时统一停掉。
+    // 只在途请求失效，避免回落进已关闭的弹窗。
     onPlayerClosed() {
+      this.cancelCloseStop()
       this.playSeq++
       this.playLoading = false
-      const id = this.playingChannelId
-      if (id == null) return
-      this.cancelCloseStop()
-      this.closeStopTimer = setTimeout(() => {
-        this.closeStopTimer = null
-        // 期间没被重新播放占用才停；否则热流继续复用。
-        if (this.playingChannelId != null && String(this.playingChannelId) === String(id)) {
-          stopResourceLive(id).catch(() => {})
-          this.playingChannelId = null
-        }
-      }, 800)
     },
     showDrawThinBox: function(show){
       this.showDrawThin = show

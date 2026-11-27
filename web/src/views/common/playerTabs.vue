@@ -3,7 +3,7 @@
     <el-tabs v-if="showTab && playerList.length > 1" v-model="activePlayer" type="card" :stretch="true" @tab-click="changePlayer">
       <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key"></el-tab-pane>
     </el-tabs>
-    <div class="player-video-area" :class="{ 'is-counting': countdownVisible }">
+    <div class="player-video-area">
       <jessibucaPlayer
         v-if="activePlayer === 'jessibuca'"
         ref="jessibuca"
@@ -34,12 +34,6 @@
         @playTimeChange="$emit('playTimeChange', $event)"
         @playStatusChange="onPlayStatusChange"
       />
-      <!-- 起播倒计时：点击播放后叠一个 3→2→1，真正出画即撤掉（所以常常 3 还没到 2 就开播了）。 -->
-      <transition name="cd-fade">
-        <div v-if="countdownVisible" class="player-countdown">
-          <div class="player-countdown-num">{{ countdownNum }}</div>
-        </div>
-      </transition>
     </div>
     <!-- 播放控制栏：固定在画面下方，不再是悬浮在画面里的图标。 -->
     <div v-if="showControlBar" class="player-control-bar">
@@ -372,9 +366,6 @@ export default {
       this.streamInfo = streamInfo
       this.playerPlaying = false
       this.ensureActivePlayer()
-      if (this.showControlBar) {
-        this.startCountdown()
-      }
       // 分屏首次从「无信号」切到播放器时，等 DOM/布局完成再播，避免 Jessibuca 黑屏
       this.$nextTick(() => {
         requestAnimationFrame(() => {

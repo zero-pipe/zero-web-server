@@ -253,6 +253,10 @@ export default {
     play(row) {
       const player = this.$refs.devicePlayer
       if (!player) return
+      // 切到别的通道先停掉上一路，保证后台至多 1 路热流。
+      if (this.playingRow && this.playingRow !== row && this.playingRow.resourceId !== row.resourceId) {
+        stopResourceLive(this.playingRow.resourceId).catch(() => {})
+      }
       // 先打开播放器（loading 态），取流成功后再把流内容交给播放器。
       player.openDialog('media', '', '', { pending: true, name: row.name, hasAudio: !!row.hasAudio, ptzType: 0, showPtz: false })
       row._loading = true
@@ -268,12 +272,13 @@ export default {
         player.onStreamError((err && err.message) || '取流失败')
       }).finally(() => { row._loading = false })
     },
-    // 播放器关闭（点 X 或按关闭）后停流，避免后台一直拉流。
-    onPlayerClosed() {
-      if (this.playingRow) {
-        stopResourceLive(this.playingRow.resourceId).catch(() => {})
-        this.playingRow = null
-      }
+    // 关闭播放器不停流：保留这一路热流（本页至多 1 路），再次打开秒开；离开页面时统一停。
+    onPlayerClosed() {}
+  },
+  destroyed() {
+    if (this.playingRow) {
+      stopResourceLive(this.playingRow.resourceId).catch(() => {})
+      this.playingRow = null
     }
   }
 }

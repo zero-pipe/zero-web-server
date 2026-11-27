@@ -507,6 +507,7 @@ type PlayResult struct {
 }
 
 func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken string) (*PlayResult, error) {
+	playStart := time.Now()
 	ch, err := s.channels.GetByID(ctx, channelID)
 	if err != nil {
 		return nil, err
@@ -537,36 +538,48 @@ func (s *Service) StartPlay(ctx context.Context, channelID int64, profileToken s
 	}
 
 	if info := node.LookupStream(ctx, app, stream); isStreamReadyForPlay(info, ch.StreamChannel) {
+		applog.Infof("[onvif] 复用就绪流 stream=%s bytes=%d fps=%d 耗时=%s", stream, info.BytesSpeed, info.VideoFps, time.Since(playStart))
 		return s.buildPlayResult(app, stream, ch, info, node), nil
 	}
+	resetStart := time.Now()
 	s.resetONVIFStream(ctx, vhost, app, stream, node)
+	applog.Infof("[onvif] 复位旧流 stream=%s 耗时=%s", stream, time.Since(resetStart))
 	time.Sleep(150 * time.Millisecond)
 
+	rtspStart := time.Now()
 	rtspURL, err := s.resolveRTSPURL(ctx, device, ch, ch.StreamURI == "")
 	if err != nil {
+		applog.Warnf("[onvif] 解析RTSP失败 stream=%s err=%v 耗时=%s", stream, err, time.Since(rtspStart))
 		return nil, err
 	}
+	applog.Infof("[onvif] RTSP来源就绪 stream=%s 耗时=%s", stream, time.Since(rtspStart))
 
 	// rtp_type=1: RTSP over TCP（海康等仅支持 TCP 时必需）；auto_close=false 避免切换播放器时被 ZMS 拆掉代理
+	proxyStart := time.Now()
 	resp, err := node.AddStreamProxy(ctx, vhost, app, stream, rtspURL, "1", true, false, false)
 	if err != nil {
+		applog.Warnf("[onvif] 拉流代理失败 stream=%s err=%v 耗时=%s", stream, err, time.Since(proxyStart))
 		return nil, fmt.Errorf("媒体节点拉流代理失败: %w", err)
 	}
 	if resp != nil && resp.Code != 0 {
+		applog.Warnf("[onvif] 拉流代理返回错误 stream=%s msg=%s 耗时=%s", stream, resp.Msg, time.Since(proxyStart))
 		return nil, fmt.Errorf("媒体节点拉流代理失败: %s", resp.Msg)
 	}
 	if resp != nil && resp.Key != "" {
 		s.proxyKeys.Store(stream, resp.Key)
 	}
 	s.media.BindStream(node.ID(), app, stream)
+	applog.Infof("[onvif] 拉流代理已建 stream=%s node=%s 耗时=%s", stream, node.ID(), time.Since(proxyStart))
 
-	var mediaInfo *port.StreamProbe
-	if info := s.waitStreamReady(ctx, app, stream, ch.StreamChannel, node); info != nil {
-		mediaInfo = info
+	// 地址先行：拉流代理已建（流对象已存在，播放器可连），立即返回可播地址；
+	// 不再在请求里同步死等首帧（15s）或超时报错——那会把相机 RTSP 的偶发抖动放大成“十几秒/红条”。
+	// 只给一个很短的宽限(~1.2s)尽量拿到编码信息，拿不到就用通道配置的 codec 兜底，交给播放器/ZMS 继续等帧。
+	waitStart := time.Now()
+	mediaInfo := s.waitStreamReady(ctx, app, stream, ch.StreamChannel, node)
+	if mediaInfo != nil {
+		applog.Infof("[onvif] 就绪 stream=%s bytes=%d fps=%d 等待=%s 总耗时=%s", stream, mediaInfo.BytesSpeed, mediaInfo.VideoFps, time.Since(waitStart), time.Since(playStart))
 	} else {
-		s.resetONVIFStream(ctx, vhost, app, stream, node)
-		s.media.UnbindStream(app, stream)
-		return nil, fmt.Errorf("等待%s就绪超时，请点「停止」后重试，或检查摄像机编码与带宽", streamChannelLabel(ch.StreamChannel))
+		applog.Infof("[onvif] 地址先行返回(首帧稍后就绪) stream=%s 等待=%s 总耗时=%s", stream, time.Since(waitStart), time.Since(playStart))
 	}
 
 	return s.buildPlayResult(app, stream, ch, mediaInfo, node), nil
@@ -603,18 +616,21 @@ func (s *Service) resolveRTSPURL(ctx context.Context, device *domainonvif.Device
 }
 
 func (s *Service) waitStreamReady(ctx context.Context, app, stream, streamChannel string, node port.MediaEndpoint) *port.StreamProbe {
-	attempts := waitStreamReadyAttempts(streamChannel)
-	for i := 0; i < attempts; i++ {
+	// 地址先行模式下只做很短的宽限：能立刻拿到首帧/编码信息最好，拿不到就返回(交播放器等帧)，绝不长时间阻塞请求。
+	deadline := time.Now().Add(1200 * time.Millisecond)
+	for {
 		if info := node.LookupStream(ctx, app, stream); isStreamReadyForPlay(info, streamChannel) {
 			return info
+		}
+		if time.Now().After(deadline) {
+			return nil
 		}
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-time.After(200 * time.Millisecond):
+		case <-time.After(150 * time.Millisecond):
 		}
 	}
-	return nil
 }
 
 func (s *Service) buildPlayResult(app, stream string, ch *domainonvif.Channel, info *port.StreamProbe, node port.MediaEndpoint) *PlayResult {
