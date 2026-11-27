@@ -212,6 +212,23 @@ func (h *AssetHandler) StopPlayback(c *gin.Context) {
 	response.OK(c, nil)
 }
 
+// PTZ 统一云台控制：command=方向/变倍，verSpeed/horizonSpeed 上限 255，zoomSpeed 上限 16。
+func (h *AssetHandler) PTZ(c *gin.Context) {
+	command := c.Query("command")
+	if command == "" {
+		response.Error(c, response.CodeBadReq, "缺少 command")
+		return
+	}
+	horizonSpeed, _ := strconv.Atoi(c.DefaultQuery("horizonSpeed", "100"))
+	verticalSpeed, _ := strconv.Atoi(c.DefaultQuery("verticalSpeed", "100"))
+	zoomSpeed, _ := strconv.Atoi(c.DefaultQuery("zoomSpeed", "16"))
+	if err := h.svc.PTZ(c.Request.Context(), c.Param("id"), command, horizonSpeed, verticalSpeed, zoomSpeed); err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, nil)
+}
+
 // Snapshot 抓一张图，直接回 JPEG 字节（不落对象存储）。
 func (h *AssetHandler) Snapshot(c *gin.Context) {
 	data, err := h.svc.Snapshot(c.Request.Context(), c.Param("id"))

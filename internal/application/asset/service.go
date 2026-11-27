@@ -382,6 +382,62 @@ func (s *Service) StopPlayback(ctx context.Context, resourceID string) error {
 
 var errPlaybackUnsupported = fmt.Errorf("该接入方式暂不支持回放")
 
+// ptzTarget 解析云台/预置位所需的资源、接入绑定与驱动（空能力校验，能力由调用方按需做）。
+func (s *Service) ptzTarget(resourceID string) (*domainasset.Resource, *domainasset.AccessBinding, channeldrv.ChannelDriver, error) {
+	res, err := s.repo.GetResource(resourceID)
+	if err != nil || res == nil {
+		return nil, nil, nil, fmt.Errorf("资源不存在")
+	}
+	binding, err := s.repo.GetBindingByDevice(res.DeviceID)
+	if err != nil || binding == nil {
+		return nil, nil, nil, fmt.Errorf("设备缺少接入绑定")
+	}
+	drv, ok := s.drivers.Get(binding.Protocol)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("不支持的接入协议: %s", binding.Protocol)
+	}
+	return res, binding, drv, nil
+}
+
+// normalize01 把整数速度归一到 [0,1]（速度上限 max）。
+func normalize01(v, max int) float64 {
+	if v <= 0 || max <= 0 {
+		return 0
+	}
+	f := float64(v) / float64(max)
+	if f > 1 {
+		f = 1
+	}
+	return f
+}
+
+// PTZ 统一云台控制：按资源 id 路由到协议驱动。
+// 速度沿用平台既有取值：水平/垂直上限 255，变倍上限 16；command 为方向/变倍指令。
+func (s *Service) PTZ(ctx context.Context, resourceID, command string, horizonSpeed, verticalSpeed, zoomSpeed int) error {
+	res, binding, drv, err := s.ptzTarget(resourceID)
+	if err != nil {
+		return err
+	}
+	if !s.capabilityAllowed("resource", res.ID, "ptz") {
+		return fmt.Errorf("该通道不支持云台控制")
+	}
+	maxSpeed := horizonSpeed
+	if verticalSpeed > maxSpeed {
+		maxSpeed = verticalSpeed
+	}
+	cmd := channeldrv.PTZCommand{
+		Direction: command,
+		Speed:     normalize01(maxSpeed, 255),
+		Zoom:      normalize01(zoomSpeed, 16),
+	}
+	if err := drv.PTZ(ctx, res, binding, cmd); err != nil {
+		s.markCapability("resource", res.ID, "ptz", false)
+		return err
+	}
+	s.markCapability("resource", res.ID, "ptz", true)
+	return nil
+}
+
 // Snapshot 让协议侧抓一张 JPEG。
 //
 // 抓图走协议自己的接口（ONVIF 抓图地址 / SDK 抓图），不依赖是否有人在看直播：
@@ -527,4 +583,24 @@ func (s *Service) markCapability(scopeType, scopeID, operation string, available
 		log.Printf("[asset] 更新能力状态失败 scope=%s/%s op=%s available=%v err=%v",
 			scopeType, scopeID, operation, available, err)
 	}
+}
+
+// capabilityAllowed 判断某能力当前是否可用：未声明放行；声明不支持或已降级则拒绝。
+func (s *Service) capabilityAllowed(scopeType, scopeID, operation string) bool {
+	caps, err := s.repo.ListCapabilities(scopeType, scopeID)
+	if err != nil {
+		return true
+	}
+	for _, c := range caps {
+		if c.Operation != operation {
+			continue
+		}
+		if !c.Supported {
+			return false
+		}
+		if !c.Available {
+			return false
+		}
+	}
+	return true
 }

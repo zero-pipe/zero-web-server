@@ -23,6 +23,8 @@ func registerAssets(g *gin.RouterGroup, h *handler.AssetHandler) {
 	g.POST("/resources/:id/live/start", h.StartLive)
 	g.POST("/resources/:id/live/stop", h.StopLive)
 	g.GET("/resources/:id/snapshot", h.Snapshot)
+	// 云台控制（按资源 id，速度沿用前端既有取值）。
+	g.GET("/resources/:id/ptz", h.PTZ)
 	// 按时间回放（统一资源口径）：检索录像、起流、停流。
 	g.POST("/resources/:id/playback/records", h.QueryRecords)
 	g.POST("/resources/:id/playback/start", h.StartPlayback)
