@@ -75,6 +75,43 @@ func (c *Client) NodeStatus(ctx context.Context) (*APIResponse, error) {
 	return c.get(ctx, "zstorage/node/status", nil)
 }
 
+// PlaybackStart 在存储节点打开某槽位回放，返回 {app,stream,slot,start,duration}。
+func (c *Client) PlaybackStart(ctx context.Context, slot int64, channel string, startMs int64) (*APIResponse, error) {
+	params := url.Values{
+		"slot":    {fmt.Sprintf("%d", slot)},
+		"channel": {channel},
+		"start":   {fmt.Sprintf("%d", startMs)},
+	}
+	return c.get(ctx, "zstorage/playback/start", params)
+}
+
+// PlaybackSeek 按媒体时间(ms)重定位回放，返回实际落点。
+func (c *Client) PlaybackSeek(ctx context.Context, app, stream string, stampMs int64) (*APIResponse, error) {
+	params := url.Values{
+		"app":    {app},
+		"stream": {stream},
+		"stamp":  {fmt.Sprintf("%d", stampMs)},
+	}
+	return c.get(ctx, "zstorage/playback/seek", params)
+}
+
+// PlaybackStop 关闭回放会话。
+func (c *Client) PlaybackStop(ctx context.Context, app, stream string) (*APIResponse, error) {
+	return c.get(ctx, "zstorage/playback/stop", url.Values{"app": {app}, "stream": {stream}})
+}
+
+// BuildMediaURLs 依据节点地址拼出回放出流地址（与 ZMS 同构，前端零改动）。
+func (c *Client) BuildMediaURLs(app, stream string) map[string]string {
+	host := strings.TrimPrefix(c.baseURL, "http://")
+	base := "http://" + host + "/" + app + "/" + stream
+	return map[string]string{
+		"flv":    base + ".live.flv",
+		"ws_flv": "ws://" + host + "/" + app + "/" + stream + ".live.flv",
+		"rtsp":   "rtsp://" + host + "/" + app + "/" + stream,
+		"rtmp":   "rtmp://" + host + "/" + app + "/" + stream,
+	}
+}
+
 func (c *Client) get(ctx context.Context, api string, params url.Values) (*APIResponse, error) {
 	if params == nil {
 		params = url.Values{}

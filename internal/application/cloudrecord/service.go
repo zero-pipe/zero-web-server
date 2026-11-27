@@ -2,26 +2,30 @@ package cloudrecord
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	storagenodeapp "zero-web-server/internal/application/storagenode"
 	domaincloudrecord "zero-web-server/internal/domain/cloudrecord"
 	"zero-web-server/internal/dto"
 	"zero-web-server/internal/port"
+	"zero-web-server/internal/storagekit"
 )
 
 type Service struct {
-	repo     domaincloudrecord.Repository
-	media    port.MediaCluster
-	serverID string
-	sessions sync.Map
+	repo        domaincloudrecord.Repository
+	media       port.MediaCluster
+	storageNode *storagenodeapp.Service
+	serverID    string
+	sessions    sync.Map
 }
 
-func NewService(repo domaincloudrecord.Repository, media port.MediaCluster, serverID string) *Service {
-	return &Service{repo: repo, media: media, serverID: serverID}
+func NewService(repo domaincloudrecord.Repository, media port.MediaCluster, storageNode *storagenodeapp.Service, serverID string) *Service {
+	return &Service{repo: repo, media: media, storageNode: storageNode, serverID: serverID}
 }
 
 func (s *Service) OnRecordMp4(param RecordHookParam) error {
@@ -243,6 +247,10 @@ func (s *Service) LoadRecord(ctx context.Context, app, stream string, cloudRecor
 		return nil, fmt.Errorf("录像不存在")
 	}
 	normalizeCloudRecord(rec)
+	// PS 旁路录像：走存储节点回放（zstorage/playback/start）。
+	if rec.StorageNodeID != "" && rec.SlotID > 0 {
+		return s.loadPsRecord(rec)
+	}
 	s.ensurePlayURL(rec)
 	if rec.PlayURL == "" {
 		return nil, fmt.Errorf("录像播放地址为空")
@@ -273,8 +281,65 @@ func (s *Service) LoadRecord(ctx context.Context, app, stream string, cloudRecor
 }
 
 func (s *Service) Seek(app, stream, mediaServerID string, seek float64, schema string) error {
-	_, _, _, _, _ = app, stream, mediaServerID, seek, schema
+	_ = schema
+	if s.storageNode == nil || mediaServerID == "" {
+		return nil
+	}
+	node, err := s.storageNode.Resolve(mediaServerID)
+	if err != nil || node == nil {
+		return nil // 非存储节点，交给播放端本地处理
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret).
+		PlaybackSeek(ctx, app, stream, int64(seek))
+	if err != nil {
+		return err
+	}
+	if resp.Code != 0 {
+		return fmt.Errorf("存储节点回放拖动失败: %s", resp.Msg)
+	}
 	return nil
+}
+
+// loadPsRecord 打开存储节点上的槽位回放，返回与 ZMS 同构的出流地址。
+func (s *Service) loadPsRecord(rec *domaincloudrecord.Record) (*dto.StreamContent, error) {
+	if s.storageNode == nil {
+		return nil, fmt.Errorf("未配置存储节点服务")
+	}
+	node, err := s.storageNode.Resolve(rec.StorageNodeID)
+	if err != nil || node == nil {
+		return nil, fmt.Errorf("存储节点不可用: %s", rec.StorageNodeID)
+	}
+	client := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := client.PlaybackStart(ctx, rec.SlotID, rec.Stream, 0)
+	if err != nil {
+		return nil, fmt.Errorf("存储节点回放失败: %w", err)
+	}
+	if resp.Code != 0 {
+		return nil, fmt.Errorf("存储节点回放失败: %s", resp.Msg)
+	}
+	var data struct {
+		App    string `json:"app"`
+		Stream string `json:"stream"`
+	}
+	_ = json.Unmarshal(resp.Data, &data)
+	app, stream := data.App, data.Stream
+	if app == "" {
+		app = "playback"
+	}
+	if stream == "" {
+		stream = rec.Stream
+	}
+	urls := client.BuildMediaURLs(app, stream)
+	return &dto.StreamContent{
+		App: app, Stream: stream, IP: node.IP,
+		Flv: urls["flv"], WsFlv: urls["ws_flv"], Rtsp: urls["rtsp"], Rtmp: urls["rtmp"],
+		MediaServerID: node.NodeID, ServerID: s.serverID,
+		Progress: 0, Duration: rec.TimeLen,
+	}, nil
 }
 
 func (s *Service) Speed(app, stream, mediaServerID string, speed int, schema string) error {

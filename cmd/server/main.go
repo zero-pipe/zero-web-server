@@ -342,7 +342,7 @@ func main() {
 	assetService := assetapp.NewService(assetRepo, assetProjector, drivers)
 	mediaSessionService := mediasessionapp.NewService(mediaServerService, assetRepo, assetService, mediaCluster, cfg.Server.Port)
 
-	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, cfg.UserSettings.ServerID)
+	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, storageNodeService, cfg.UserSettings.ServerID)
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaCluster, cfg.UserSettings.ServerID)
 	recordPlanService := recordplanapp.NewService(recordPlanRepo, playService, publishRegistry, storageNodeService, cfg.UserSettings.ServerID)
