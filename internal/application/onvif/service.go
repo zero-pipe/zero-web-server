@@ -85,14 +85,14 @@ func (s *Service) Discover(ctx context.Context, timeoutSec int) ([]*domainonvif.
 }
 
 type AddDeviceRequest struct {
-	Name     string `json:"name"`
-	Vendor   string `json:"vendor"`
+	Name       string `json:"name"`
+	Vendor     string `json:"vendor"`
 	DeviceType string `json:"deviceType"`
-	IP       string `json:"ip"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Endpoint string `json:"endpoint"`
+	IP         string `json:"ip"`
+	Port       int    `json:"port"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	Endpoint   string `json:"endpoint"`
 }
 
 func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domainonvif.Device, error) {
@@ -143,27 +143,27 @@ func (s *Service) AddDevice(ctx context.Context, req AddDeviceRequest) (*domaino
 	}
 
 	device := &domainonvif.Device{
-		Name:          name,
-		DeviceType:    strings.TrimSpace(req.DeviceType),
-		IP:            host,
-		Port:          port,
-		Username:      req.Username,
-		Password:      req.Password,
-		Manufacturer:  manufacturer,
-		Model:         info.Model,
-		Firmware:      info.FirmwareVersion,
-		SerialNumber:  info.SerialNumber,
-		HardwareID:    info.HardwareID,
-		DeviceURI:     endpoint,
-		MediaURI:      endpoint,
-		PTZURI:        endpoint,
-		OnLine:        true,
+		Name:           name,
+		DeviceType:     strings.TrimSpace(req.DeviceType),
+		IP:             host,
+		Port:           port,
+		Username:       req.Username,
+		Password:       req.Password,
+		Manufacturer:   manufacturer,
+		Model:          info.Model,
+		Firmware:       info.FirmwareVersion,
+		SerialNumber:   info.SerialNumber,
+		HardwareID:     info.HardwareID,
+		DeviceURI:      endpoint,
+		MediaURI:       endpoint,
+		PTZURI:         endpoint,
+		OnLine:         true,
 		EventSubscribe: false,
-		DiscoveryMode: 0,
-		MediaServerID: "auto",
-		ServerID:      s.serverID,
-		CreateTime:    now,
-		UpdateTime:    now,
+		DiscoveryMode:  0,
+		MediaServerID:  "auto",
+		ServerID:       s.serverID,
+		CreateTime:     now,
+		UpdateTime:     now,
 	}
 
 	if err := s.devices.Create(ctx, device); err != nil {
@@ -594,6 +594,21 @@ func (s *Service) resetONVIFStream(ctx context.Context, vhost, app, stream strin
 	}
 	_ = node.DelStreamProxy(ctx, fmt.Sprintf("%s/%s/%s", vhost, app, stream))
 	_ = node.CloseStreams(ctx, vhost, app, stream)
+}
+
+// PullURL 返回该通道相机的原生 RTSP 地址（含鉴权注入），供 zstorage 直连拉流录制，不经 ZMS。
+// 只读取流配置，不建 ZMS 代理、不启动任何推流。
+func (s *Service) PullURL(ctx context.Context, channelID int64) (string, error) {
+	ch, err := s.channels.GetByID(ctx, channelID)
+	if err != nil {
+		return "", err
+	}
+	device, err := s.devices.GetByID(ctx, ch.DeviceID)
+	if err != nil {
+		return "", err
+	}
+	enrichChannelDisplay(ch)
+	return s.resolveRTSPURL(ctx, device, ch, ch.StreamURI == "")
 }
 
 func (s *Service) resolveRTSPURL(ctx context.Context, device *domainonvif.Device, ch *domainonvif.Channel, forceRefresh bool) (string, error) {

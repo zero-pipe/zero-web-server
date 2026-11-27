@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	onvifapp "zero-web-server/internal/application/onvif"
 	playapp "zero-web-server/internal/application/play"
 	publishauth "zero-web-server/internal/application/publishauth"
 	storagenodeapp "zero-web-server/internal/application/storagenode"
@@ -35,6 +36,7 @@ type Service struct {
 	play        *playapp.Service
 	publish     *publishauth.PublishRegistry
 	storageNode *storagenodeapp.Service
+	onvif       *onvifapp.Service
 	serverID    string
 	active      sync.Map // channelID -> streamKey "app/stream"
 	meta        sync.Map // channelID -> activeMeta
@@ -49,11 +51,12 @@ type activeMeta struct {
 	Sidecar    bool   // 旁路录制（zstorage）
 	ChannelKey string // 旁路：zstorage 的 channel_key（内码_内码）
 	StorageID  string // 旁路：存储节点 node_id
+	StartedZMS bool   // 旁路：是否已让 ZMS 出流（GB 才需要，停时要 StopPlay）
 }
 
-func NewService(repo domainrecordplan.Repository, play *playapp.Service, publish *publishauth.PublishRegistry, storageNode *storagenodeapp.Service, serverID string) *Service {
+func NewService(repo domainrecordplan.Repository, play *playapp.Service, publish *publishauth.PublishRegistry, storageNode *storagenodeapp.Service, onvif *onvifapp.Service, serverID string) *Service {
 	return &Service{
-		repo: repo, play: play, publish: publish, storageNode: storageNode, serverID: serverID,
+		repo: repo, play: play, publish: publish, storageNode: storageNode, onvif: onvif, serverID: serverID,
 		stopCh: make(chan struct{}),
 	}
 }
@@ -107,11 +110,21 @@ func (s *Service) tick() {
 		if _, ok := s.active.Load(ch.ID); ok {
 			continue
 		}
-		if ch.DataType != shared.ChannelDataTypeGB28181 || ch.DeviceID == "" || ch.GBDeviceID == "" {
+		if !s.canRecord(ch) {
 			continue
 		}
 		go s.startRecord(ch)
 	}
+}
+
+// canRecord 判定该通道在当前计划下是否应起录。
+// 旁路(有存储节点)：GB28181 需设备/GB 编号齐全；ONVIF 只需统一通道 ID（直连相机 RTSP）。
+// 本地 MP4：沿用原 GB28181 条件，不改变既有行为。
+func (s *Service) canRecord(ch domainrecordplan.ChannelRecord) bool {
+	if ch.StorageNodeID != "" && ch.Protocol == "onvif" {
+		return ch.ID > 0
+	}
+	return ch.DataType == shared.ChannelDataTypeGB28181 && ch.DeviceID != "" && ch.GBDeviceID != ""
 }
 
 func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
@@ -147,8 +160,9 @@ func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
 	applog.Infof("[record-plan] recording start channel=%d stream=%s/%s", ch.ID, keyApp, keyStream)
 }
 
-// startSidecarRecording 在存储节点上按 channel_key 拉 ZMS 的 RTSP 旁路录 PS。
-// 需先 StartPlay 让 ZMS 出流，再从 content.Rtsp 拉流。
+// startSidecarRecording 在存储节点上按 channel_key 拉流旁路录 PS。
+// GB28181：先 StartPlay 让 ZMS 出流（StartedZMS=true），拉 ZMS 的 RTSP；
+// ONVIF：直接取相机原生 RTSP 直连录制，不经 ZMS。
 func (s *Service) startSidecarRecording(ch domainrecordplan.ChannelRecord, app, stream string) {
 	node, err := s.storageNode.Resolve(ch.StorageNodeID)
 	if err != nil {
@@ -157,39 +171,57 @@ func (s *Service) startSidecarRecording(ch domainrecordplan.ChannelRecord, app, 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	content, err := s.play.StartPlay(ctx, ch.DeviceID, ch.GBDeviceID)
-	if err != nil {
-		applog.Warnf("[record-plan] sidecar channel=%d start play %s/%s: %v", ch.ID, ch.DeviceID, ch.GBDeviceID, err)
-		return
+
+	var pullURL string
+	startedZMS := false
+	if ch.Protocol == "onvif" {
+		if s.onvif == nil {
+			applog.Warnf("[record-plan] sidecar channel=%d: onvif 服务未注入，跳过", ch.ID)
+			return
+		}
+		url, perr := s.onvif.PullURL(ctx, int64(ch.ID))
+		if perr != nil || url == "" {
+			applog.Warnf("[record-plan] sidecar channel=%d onvif 取流地址失败: %v", ch.ID, perr)
+			return
+		}
+		pullURL = url
+	} else {
+		content, perr := s.play.StartPlay(ctx, ch.DeviceID, ch.GBDeviceID)
+		if perr != nil {
+			applog.Warnf("[record-plan] sidecar channel=%d start play %s/%s: %v", ch.ID, ch.DeviceID, ch.GBDeviceID, perr)
+			return
+		}
+		startedZMS = true
+		if content != nil {
+			pullURL = content.Rtsp
+		}
+		if pullURL == "" {
+			_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
+			applog.Warnf("[record-plan] sidecar channel=%d: ZMS 未返回 RTSP 拉流地址", ch.ID)
+			return
+		}
 	}
-	pullURL := ""
-	if content != nil {
-		pullURL = content.Rtsp
-	}
-	if pullURL == "" {
-		_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
-		applog.Warnf("[record-plan] sidecar channel=%d: ZMS 未返回 RTSP 拉流地址", ch.ID)
-		return
-	}
-	client := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret)
-	resp, err := client.RecordStart(ctx, stream, pullURL)
-	if err != nil {
-		_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
-		applog.Warnf("[record-plan] sidecar channel=%d record/start node=%s: %v", ch.ID, node.NodeID, err)
-		return
-	}
-	if resp.Code != 0 {
-		_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
-		applog.Warnf("[record-plan] sidecar channel=%d record/start node=%s code=%d msg=%s", ch.ID, node.NodeID, resp.Code, resp.Msg)
+
+	cli := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret)
+	resp, rerr := cli.RecordStart(ctx, stream, pullURL)
+	if rerr != nil || resp.Code != 0 {
+		if startedZMS {
+			_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
+		}
+		msg := ""
+		if resp != nil {
+			msg = resp.Msg
+		}
+		applog.Warnf("[record-plan] sidecar channel=%d record/start node=%s err=%v msg=%s", ch.ID, node.NodeID, rerr, msg)
 		return
 	}
 	s.active.Store(ch.ID, app+"/"+stream)
 	s.meta.Store(ch.ID, activeMeta{
 		DeviceID: ch.DeviceID, ChannelID: ch.GBDeviceID,
 		App: app, Stream: stream,
-		Sidecar: true, ChannelKey: stream, StorageID: node.NodeID,
+		Sidecar: true, ChannelKey: stream, StorageID: node.NodeID, StartedZMS: startedZMS,
 	})
-	applog.Infof("[record-plan] sidecar recording start channel=%d node=%s channel_key=%s", ch.ID, node.NodeID, stream)
+	applog.Infof("[record-plan] sidecar recording start channel=%d proto=%s node=%s channel_key=%s", ch.ID, ch.Protocol, node.NodeID, stream)
 }
 
 func (s *Service) stopRecord(channelID int) {
@@ -208,7 +240,9 @@ func (s *Service) stopRecord(channelID int) {
 				cancel()
 			}
 		}
-		_ = s.play.StopPlay(m.DeviceID, m.ChannelID)
+		if m.StartedZMS {
+			_ = s.play.StopPlay(m.DeviceID, m.ChannelID)
+		}
 		applog.Infof("[record-plan] sidecar recording stop channel=%d channel_key=%s", channelID, m.ChannelKey)
 		return
 	}
