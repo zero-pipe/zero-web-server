@@ -16,7 +16,6 @@ import (
 	mediacluster "zero-web-server/internal/adapter/mediacluster"
 	"zero-web-server/internal/adapter/mqttbus"
 	accesstokenapp "zero-web-server/internal/application/accesstoken"
-	dictapp "zero-web-server/internal/application/dict"
 	agentapp "zero-web-server/internal/application/agent"
 	alarmapp "zero-web-server/internal/application/alarm"
 	assetapp "zero-web-server/internal/application/asset"
@@ -28,6 +27,7 @@ import (
 	customeventapp "zero-web-server/internal/application/customevent"
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
+	dictapp "zero-web-server/internal/application/dict"
 	downstreamapp "zero-web-server/internal/application/downstream"
 	eventingestapp "zero-web-server/internal/application/eventingest"
 	eventsubapp "zero-web-server/internal/application/eventsub"
@@ -36,6 +36,7 @@ import (
 	infraconfigapp "zero-web-server/internal/application/infraconfig"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
+	mediasessionapp "zero-web-server/internal/application/mediasession"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	onvifapp "zero-web-server/internal/application/onvif"
 	"zero-web-server/internal/application/ops"
@@ -49,9 +50,9 @@ import (
 	recordplanapp "zero-web-server/internal/application/recordplan"
 	regionapp "zero-web-server/internal/application/region"
 	snapapp "zero-web-server/internal/application/snap"
+	storagenodeapp "zero-web-server/internal/application/storagenode"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
 	streampushapp "zero-web-server/internal/application/streampush"
-	mediasessionapp "zero-web-server/internal/application/mediasession"
 	upstreamapp "zero-web-server/internal/application/upstream"
 	"zero-web-server/internal/civilcode"
 	"zero-web-server/internal/infrastructure/config"
@@ -126,6 +127,7 @@ func main() {
 	streamProxyRepo := persistence.NewStreamProxyRepository(db)
 	recordPlanRepo := persistence.NewRecordPlanRepository(db)
 	mediaServerRepo := persistence.NewMediaServerRepository(db)
+	storageNodeRepo := persistence.NewStorageNodeRepository(db)
 	groupRegionRepo := persistence.NewGroupRegionRepository(db)
 	gbSipConfigRepo := persistence.NewGbSipConfigRepository(db)
 	gbSipConfigService := gbsipconfig.NewService(gbSipConfigRepo, cfg.SIP)
@@ -156,6 +158,7 @@ func main() {
 	)
 	// 媒体节点以数据库为准；启动时允许为空，由页面动态添加
 	mediaServerService := mediaserverapp.NewService(mediaServerRepo, cfg.UserSettings.ServerID)
+	storageNodeService := storagenodeapp.NewService(storageNodeRepo, cfg.UserSettings.ServerID)
 	mediaCluster := mediacluster.New(mediaServerService)
 
 	// 对外接入密钥：可视化配置 + 同步到媒体节点本地验签。
@@ -431,6 +434,7 @@ func main() {
 		MediaSessionService:  mediaSessionService,
 		RecordPlanService:    recordPlanService,
 		MediaServerService:   mediaServerService,
+		StorageNodeService:   storageNodeService,
 		CommonChannelSvc:     commonChannelService,
 		GroupService:         groupService,
 		RegionService:        regionService,

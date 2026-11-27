@@ -11,8 +11,8 @@ import (
 	customeventapp "zero-web-server/internal/application/customevent"
 	deviceapp "zero-web-server/internal/application/device"
 	deviceaccess "zero-web-server/internal/application/deviceaccess"
-	downstreamapp "zero-web-server/internal/application/downstream"
 	dictapp "zero-web-server/internal/application/dict"
+	downstreamapp "zero-web-server/internal/application/downstream"
 	eventingest "zero-web-server/internal/application/eventingest"
 	eventsubapp "zero-web-server/internal/application/eventsub"
 	gbsipconfig "zero-web-server/internal/application/gbsipconfig"
@@ -20,6 +20,7 @@ import (
 	infraconfigapp "zero-web-server/internal/application/infraconfig"
 	ipcdevice "zero-web-server/internal/application/ipcdevice"
 	mediaserverapp "zero-web-server/internal/application/mediaserver"
+	mediasessionapp "zero-web-server/internal/application/mediasession"
 	objectstoreapp "zero-web-server/internal/application/objectstore"
 	onvifapp "zero-web-server/internal/application/onvif"
 	"zero-web-server/internal/application/ops"
@@ -33,9 +34,9 @@ import (
 	recordplanapp "zero-web-server/internal/application/recordplan"
 	regionapp "zero-web-server/internal/application/region"
 	snapapp "zero-web-server/internal/application/snap"
+	storagenodeapp "zero-web-server/internal/application/storagenode"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
 	streampushapp "zero-web-server/internal/application/streampush"
-	mediasessionapp "zero-web-server/internal/application/mediasession"
 	upstreamapp "zero-web-server/internal/application/upstream"
 	"zero-web-server/internal/infrastructure/config"
 	"zero-web-server/internal/infrastructure/persistence"
@@ -66,6 +67,7 @@ type Deps struct {
 	MediaSessionService  *mediasessionapp.Service
 	RecordPlanService    *recordplanapp.Service
 	MediaServerService   *mediaserverapp.Service
+	StorageNodeService   *storagenodeapp.Service
 	CommonChannelSvc     *channelapp.Service
 	GroupService         *groupapp.Service
 	RegionService        *regionapp.Service
@@ -178,7 +180,7 @@ func Setup(r *gin.Engine, deps Deps) {
 	mediaHook := hook.NewHandler(
 		deps.PlayService, deps.PlaybackService, deps.CloudRecordService,
 		deps.StreamPushService, deps.StreamProxyService, deps.RecordPlanService,
-		deps.MediaServerService, deps.PublishAuth, deps.StreamOnDemand,
+		deps.MediaServerService, deps.StorageNodeService, deps.PublishAuth, deps.StreamOnDemand,
 		accessTokenCheck,
 	)
 

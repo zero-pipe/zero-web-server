@@ -392,6 +392,27 @@ CREATE TABLE IF NOT EXISTS zws_media_server
     update_time           VARCHAR(50) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='媒体服务器节点';
 
+DROP TABLE IF EXISTS zws_storage_node;
+CREATE TABLE IF NOT EXISTS zws_storage_node
+(
+    id           BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    node_id      VARCHAR(191) NOT NULL COMMENT 'zstorage 上报 media_server_id',
+    name         VARCHAR(128) NOT NULL DEFAULT '',
+    ip           VARCHAR(50) DEFAULT NULL,
+    http_port    INT DEFAULT NULL COMMENT 'zstorage HTTP/API/FLV 端口',
+    rtsp_port    INT DEFAULT NULL,
+    secret       VARCHAR(50) DEFAULT NULL COMMENT '与 zstorage [api] secret 一致',
+    version      VARCHAR(50) DEFAULT NULL,
+    capacity_gb  INT NOT NULL DEFAULT 0,
+    used_gb      INT NOT NULL DEFAULT 0,
+    online       TINYINT(1) NOT NULL DEFAULT 0,
+    last_seen    BIGINT NOT NULL DEFAULT 0,
+    default_node TINYINT(1) NOT NULL DEFAULT 0,
+    create_time  VARCHAR(50) NOT NULL DEFAULT '',
+    update_time  VARCHAR(50) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_storage_node (node_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='云存储节点（旁路录制）';
+
 DROP TABLE IF EXISTS zws_record_plan;
 CREATE TABLE IF NOT EXISTS zws_record_plan
 (

@@ -341,6 +341,27 @@ type MediaServer struct {
 
 func (MediaServer) TableName() string { return "zws_media_server" }
 
+// StorageNode 云存储节点（zstorage 自注册，独立于媒体节点表）。
+type StorageNode struct {
+	ID          int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	NodeID      string `gorm:"column:node_id;size:191;uniqueIndex" json:"nodeId"`
+	Name        string `gorm:"column:name;size:128" json:"name"`
+	IP          string `gorm:"column:ip;size:64" json:"ip"`
+	HTTPPort    int    `gorm:"column:http_port" json:"httpPort"`
+	RTSPPort    int    `gorm:"column:rtsp_port" json:"rtspPort"`
+	Secret      string `gorm:"column:secret;size:128" json:"secret"`
+	Version     string `gorm:"column:version;size:64" json:"version"`
+	CapacityGB  int    `gorm:"column:capacity_gb" json:"capacityGb"`
+	UsedGB      int    `gorm:"column:used_gb" json:"usedGb"`
+	Online      bool   `gorm:"column:online" json:"online"`
+	LastSeen    int64  `gorm:"column:last_seen" json:"lastSeen"`
+	DefaultNode bool   `gorm:"column:default_node" json:"defaultNode"`
+	CreateTime  string `gorm:"column:create_time;size:50" json:"createTime"`
+	UpdateTime  string `gorm:"column:update_time;size:50" json:"updateTime"`
+}
+
+func (StorageNode) TableName() string { return "zws_storage_node" }
+
 // RecordPlan 录像计划。
 type RecordPlan struct {
 	ID         int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`

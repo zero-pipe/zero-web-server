@@ -7,6 +7,7 @@ import (
 	playbackapp "zero-web-server/internal/application/playback"
 	publishauth "zero-web-server/internal/application/publishauth"
 	recordplanapp "zero-web-server/internal/application/recordplan"
+	storagenodeapp "zero-web-server/internal/application/storagenode"
 	streamproxyapp "zero-web-server/internal/application/streamproxy"
 	streampushapp "zero-web-server/internal/application/streampush"
 	applog "zero-web-server/pkg/log"
@@ -28,6 +29,7 @@ type Handler struct {
 	recordPlan     *recordplanapp.Service
 	publishAuth    *publishauth.PublishAuth
 	mediaServer    *mediaserverapp.Service
+	storageNode    *storagenodeapp.Service
 	streamOnDemand bool
 	// accessTokenCheck(token) → (有效, 是否已启用校验)；nil 表示不做接入 token 校验。
 	accessTokenCheck func(token string) (bool, bool)
@@ -41,6 +43,7 @@ func NewHandler(
 	proxy *streamproxyapp.Service,
 	plan *recordplanapp.Service,
 	mediaServer *mediaserverapp.Service,
+	storageNode *storagenodeapp.Service,
 	publishAuth *publishauth.PublishAuth,
 	streamOnDemand bool,
 	accessTokenCheck func(token string) (bool, bool),
@@ -54,10 +57,11 @@ func NewHandler(
 	return &Handler{
 		notifiers: notifiers, play: play, cloudRecord: cloud,
 		streamPush: push, streamProxy: proxy, recordPlan: plan,
-		mediaServer:       mediaServer,
-		publishAuth:       publishAuth,
-		streamOnDemand:    streamOnDemand,
-		accessTokenCheck:  accessTokenCheck,
+		mediaServer:      mediaServer,
+		storageNode:      storageNode,
+		publishAuth:      publishAuth,
+		streamOnDemand:   streamOnDemand,
+		accessTokenCheck: accessTokenCheck,
 	}
 }
 
@@ -70,6 +74,9 @@ func (h *Handler) Register(r *gin.RouterGroup) {
 	r.POST("/on_record_mp4", h.onRecordMp4)
 	r.POST("/on_server_started", h.onServerStarted)
 	r.POST("/on_server_keepalive", h.onServerKeepalive)
+	r.POST("/on_storage_started", h.onStorageStarted)
+	r.POST("/on_storage_keepalive", h.onStorageKeepalive)
+	r.POST("/on_record_ps", h.onRecordPs)
 }
 
 // onOK 应答媒体服务器期望的标准成功包。
@@ -114,6 +121,52 @@ func (h *Handler) onServerKeepalive(c *gin.Context) {
 	}
 	// 精简心跳：仅刷新 id（ZMS 正常会带完整注册体走上面的 Register 分支）。
 	_ = h.mediaServer.Touch(req.MediaServerID)
+	h.onOK(c)
+}
+
+// onStorageStarted 云存储节点启动自注册。zstorage 上报体见 storagenode.RegisterRequest。
+func (h *Handler) onStorageStarted(c *gin.Context) {
+	if h.storageNode == nil {
+		h.onOK(c)
+		return
+	}
+	var req storagenodeapp.RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		applog.Warnf("[storage] on_storage_started 解析失败 remote=%s err=%v", c.ClientIP(), err)
+		h.onOK(c)
+		return
+	}
+	nodeID, err := h.storageNode.Register(c.Request.Context(), req)
+	if err != nil {
+		applog.Warnf("[storage] on_storage_started 注册失败 remote=%s err=%v", c.ClientIP(), err)
+		h.onOK(c)
+		return
+	}
+	c.JSON(200, gin.H{"code": 0, "msg": "success", "storageNodeId": nodeID})
+}
+
+// onStorageKeepalive 云存储节点心跳：带完整注册体则续注册，否则仅刷新在线。
+func (h *Handler) onStorageKeepalive(c *gin.Context) {
+	if h.storageNode == nil {
+		h.onOK(c)
+		return
+	}
+	var req storagenodeapp.RegisterRequest
+	if err := c.ShouldBindJSON(&req); err == nil && req.HTTPPort > 0 && (req.IP != "" || req.StreamIP != "") {
+		if nodeID, err := h.storageNode.Register(c.Request.Context(), req); err == nil {
+			c.JSON(200, gin.H{"code": 0, "msg": "success", "storageNodeId": nodeID})
+			return
+		}
+	}
+	h.storageNode.Touch(req.MediaServerID)
+	h.onOK(c)
+}
+
+// onRecordPs 云存储分段封口回调（阶段3 落 zws_cloud_record，此处先记录）。
+func (h *Handler) onRecordPs(c *gin.Context) {
+	var payload map[string]any
+	_ = c.ShouldBindJSON(&payload)
+	applog.Infof("[storage] on_record_ps %v", payload)
 	h.onOK(c)
 }
 

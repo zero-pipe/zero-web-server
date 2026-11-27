@@ -117,6 +117,7 @@ func autoMigrateAll(db *gorm.DB) error {
 		&model.EventSubscription{},
 		// 媒体 / 录像 / 位置
 		&model.MediaServer{},
+		&model.StorageNode{},
 		&model.RecordPlan{},
 		&model.RecordPlanItem{},
 		&model.CloudRecord{},
