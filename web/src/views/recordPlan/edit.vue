@@ -16,6 +16,21 @@
             <el-input v-model="planName" type="text" placeholder="请输入计划名称" />
           </el-form-item>
           <el-form-item>
+            <el-select v-model="storageNodeId" placeholder="录制目标" style="width: 100%">
+              <el-option label="本地 MP4（ZMS）" value="" />
+              <el-option
+                v-for="n in storageNodes"
+                :key="n.nodeId"
+                :label="n.name + (n.online ? '' : '（离线）')"
+                :value="n.nodeId"
+                :disabled="!n.online"
+              />
+            </el-select>
+            <div v-if="storageNodeId" class="target-hint">
+              旁路 PS 录制到该存储节点：ONVIF/IPC 直连相机 RTSP（不经 ZMS），GB28181 经 ZMS 的 RTSP。
+            </div>
+          </el-form-item>
+          <el-form-item>
             <div class="content">
               <weekTimePicker ref="weekTimePicker" :plan-array="planArray" />
             </div>
@@ -36,6 +51,7 @@
 
 import elDragDialog from '@/directive/el-drag-dialog'
 import weekTimePicker from '../common/weekTimePicker.vue'
+import { listStorageNodes } from '@/api/storageNode'
 
 export default {
   name: 'EditRecordPlan',
@@ -49,6 +65,8 @@ export default {
       edit: false,
       planName: null,
       id: null,
+      storageNodeId: '',
+      storageNodes: [],
       showDialog: false,
       endCallback: '',
       planArray: [
@@ -77,12 +95,23 @@ export default {
     }
   },
   created() {
+    this.loadStorageNodes()
   },
   methods: {
+    loadStorageNodes() {
+      listStorageNodes()
+        .then(data => {
+          this.storageNodes = (data && data.data) || data || []
+        })
+        .catch(() => {
+          this.storageNodes = []
+        })
+    },
     openDialog: function(recordPlan, endCallback) {
       this.endCallback = endCallback
       this.showDialog = true
       this.edit = false
+      this.storageNodeId = ''
       this.planArray = [
         {
           data: []
@@ -113,6 +142,9 @@ export default {
         this.id = recordPlan.id || recordPlan.ID
         this.$store.dispatch('recordPlan/getPlan', this.id)
           .then(data => {
+            if (data) {
+              this.storageNodeId = data.storageNodeId || ''
+            }
             if (data && data.planItemList) {
               this.handPlanData(data.planItemList)
             }
@@ -128,6 +160,7 @@ export default {
       if (!this.edit) {
         this.$store.dispatch('recordPlan/addPlan', {
           name: this.planName,
+          storageNodeId: this.storageNodeId,
           planList: planList
         })
           .then(data => {
@@ -152,6 +185,7 @@ export default {
         this.$store.dispatch('recordPlan/update', {
           id: this.id,
           name: this.planName,
+          storageNodeId: this.storageNodeId,
           planList: planList
         })
           .then(data => {
@@ -218,5 +252,11 @@ export default {
 }
 .content-header {
   border-bottom: 1px solid #d9d9d9;
+}
+.target-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>

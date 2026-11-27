@@ -32,6 +32,11 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="name" label="名称" />
         <el-table-column prop="channelCount" label="关联通道" />
+        <el-table-column label="录制目标">
+          <template v-slot:default="scope">
+            {{ targetLabel(scope.row.storageNodeId) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="updateTime" label="更新时间" />
         <el-table-column prop="createTime" label="创建时间" />
         <el-table-column label="操作" width="150" fixed="right">
@@ -62,6 +67,7 @@
 <script>
 import edit from './edit.vue'
 import LinkChannelRecord from './dialog/linkChannelRecord.vue'
+import { listStorageNodes } from '@/api/storageNode'
 
 export default {
   name: 'RecordPlan',
@@ -76,16 +82,32 @@ export default {
       currentPage: 1,
       count: 15,
       total: 0,
-      loading: false
+      loading: false,
+      storageNodes: []
     }
   },
 
   created() {
     this.initData()
+    this.loadStorageNodes()
   },
   destroyed() {
   },
   methods: {
+    loadStorageNodes() {
+      listStorageNodes()
+        .then(data => {
+          this.storageNodes = (data && data.data) || data || []
+        })
+        .catch(() => {
+          this.storageNodes = []
+        })
+    },
+    targetLabel(nodeId) {
+      if (!nodeId) return '本地 MP4'
+      const n = this.storageNodes.find(x => x.nodeId === nodeId)
+      return n ? n.name + (n.online ? '' : '（离线）') : nodeId
+    },
     initData: function() {
       this.getRecordPlanList()
     },

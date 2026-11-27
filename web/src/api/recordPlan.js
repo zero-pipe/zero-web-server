@@ -11,26 +11,28 @@ export function getPlan(id) {
 }
 
 export function addPlan(params) {
-  const { name, planList } = params
+  const { name, storageNodeId, planList } = params
   return request({
 
     method: 'post',
     url: '/api/v1/record/plan/add',
     data: {
       name: name,
+      storageNodeId: storageNodeId || '',
       planItemList: planList
     }
   })
 }
 
 export function update(params) {
-  const { id, name, planList } = params
+  const { id, name, storageNodeId, planList } = params
   return request({
     method: 'post',
     url: '/api/v1/record/plan/update',
     data: {
       id: id,
       name: name,
+      storageNodeId: storageNodeId || '',
       planItemList: planList
     }
   })
