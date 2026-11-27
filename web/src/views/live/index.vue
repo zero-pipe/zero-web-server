@@ -16,7 +16,6 @@
             <i class="iconfont icon-a-mti-9fenpingshi btn" :class="{active: spiltIndex === 3}" @click="spiltIndex=3" />
           </div>
           <div class="global-player-control">
-            <player-mode-select />
           </div>
           <div class="fullscreen-control">
             <i class="el-icon-full-screen btn" @click="fullScreen()" />
@@ -41,7 +40,6 @@
                 :ref="'playerTabs' + i"
                 :show-tab="false"
                 :show-button="true"
-                :preferred-player="preferredPlayer"
                 @playStatusChange="onPlayerPlayStatus(i - 1, $event)"
               />
               <div
@@ -96,8 +94,6 @@
 <script>
 
 import PlayerTabs from '../common/playerTabs.vue'
-import PlayerModeSelect from '../common/playerModeSelect.vue'
-import { modeToPreferredPlayer } from '@/utils/playerStrategy'
 import { startResourceLive } from '@/api/asset'
 import DeviceTree from '../common/DeviceTree.vue'
 import channelPtzPanel from '../channel/common/channelPtzPanel.vue'
@@ -107,7 +103,7 @@ import screenFull from 'screenfull'
 export default {
   name: 'Live',
   components: {
-    PlayerTabs, PlayerModeSelect, DeviceTree, channelPtzPanel, LivePtzPreset
+    PlayerTabs, DeviceTree, channelPtzPanel, LivePtzPreset
   },
 
   data() {
@@ -169,10 +165,6 @@ export default {
   },
 
   computed: {
-    /** 全局播放模式（store）换算成 PlayerTabs 的偏好引擎，空串交给策略自动决定 */
-    preferredPlayer() {
-      return modeToPreferredPlayer(this.$store.getters.playerMode)
-    },
     liveStyle() {
       return {
         display: 'grid',

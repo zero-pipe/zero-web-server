@@ -1,25 +1,11 @@
 <template>
   <div class="player-tabs-wrapper" ref="playerWrapper">
-    <el-tabs v-if="showTab && playerList.length > 1" v-model="activePlayer" type="card" :stretch="true" @tab-click="changePlayer">
-      <el-tab-pane v-for="p in playerList" :key="p.key" :label="p.label" :name="p.key"></el-tab-pane>
-    </el-tabs>
     <div class="player-video-area">
-      <mpegts-player
-        v-if="activePlayer === 'mpegts'"
-        ref="mpegts"
+      <jessibuca-player
+        ref="jessibuca"
         class="player-instance"
-        :has-audio="hasAudio"
+        :has-audio="false"
         :show-button="showButton && !showControlBar"
-        @playTimeChange="$emit('playTimeChange', $event)"
-        @playStatusChange="onPlayStatusChange"
-      />
-      <rtc-player
-        v-if="activePlayer === 'webRTC'"
-        ref="webRTC"
-        class="player-instance"
-        :has-audio="hasAudio"
-        :show-controls="!showControlBar"
-        fluent autoplay live
         @playTimeChange="$emit('playTimeChange', $event)"
         @playStatusChange="onPlayStatusChange"
       />
@@ -27,7 +13,6 @@
     <!-- 播放控制栏：固定在画面下方，不再是悬浮在画面里的图标。 -->
     <div v-if="showControlBar" class="player-control-bar">
       <button
-        v-if="activePlayer !== 'webRTC'"
         class="pcb-btn"
         :title="playerPlaying ? '暂停' : '播放'"
         @click="togglePlay"
@@ -49,35 +34,27 @@
 </template>
 
 <script>
-import mpegtsPlayer from './mpegts.vue'
-import rtcPlayer from './rtcPlayer.vue'
-import { resolvePlayerStrategy, PLAYER_LABELS, normalizeVideoCodec } from '@/utils/playerStrategy'
+import jessibucaPlayer from './jessibuca.vue'
+import { PLAYER_LABELS } from '@/utils/playerStrategy'
 
 const URL_KEYS = {
-  mpegts: ['flv', 'https_flv', 'ws_flv', 'wss_flv'],
-  webRTC: ['rtc', 'rtcs']
+  jessibuca: ['flv', 'https_flv', 'ws_flv', 'wss_flv']
 }
 
 export default {
   name: 'PlayerTabs',
-  components: { mpegtsPlayer, rtcPlayer },
+  components: { jessibucaPlayer },
   props: {
     hasAudio: { type: Boolean, default: false },
     showButton: { type: Boolean, default: true },
     showTab: { type: Boolean, default: true },
-    /** 限定可用播放器（覆盖策略），如 ['mpegts'] */
-    allowedPlayers: { type: Array, default: null },
-    /** 覆盖默认 URL 优先级，如 ['flv','ws_flv'] */
-    urlPriority: { type: Array, default: null },
-    /** 首选播放器（覆盖策略），如 mpegts / webRTC */
-    preferredPlayer: { type: String, default: '' },
     /** 是否展示底部播放控制栏（并隐藏引擎内悬浮按钮）。弹窗播放器用。 */
     showControlBar: { type: Boolean, default: false }
   },
   data() {
     return {
       streamInfo: null,
-      activePlayer: 'mpegts',
+      activePlayer: 'jessibuca',
       playerPlaying: false,
       ctrlMuted: false,
       docFull: false,
@@ -87,24 +64,8 @@ export default {
     }
   },
   computed: {
-    /** ZMS 是否具备 WebRTC 能力：点播结果带 rtc/rtcs 即代表可用 */
-    rtcAvailable() {
-      const s = this.streamInfo
-      return !!(s && (s.rtc || s.rtcs))
-    },
-    strategy() {
-      return resolvePlayerStrategy({
-        videoCodec: this.resolveVideoCodec(this.streamInfo),
-        audioCodec: this.resolveAudioCodec(this.streamInfo),
-        hasAudio: this.hasAudio,
-        rtcAvailable: this.rtcAvailable
-      })
-    },
     allowedKeys() {
-      if (this.allowedPlayers && this.allowedPlayers.length) {
-        return this.allowedPlayers
-      }
-      return this.strategy.allowedPlayers
+      return ['jessibuca']
     },
     playerList() {
       return this.allowedKeys.map(key => ({ key, label: PLAYER_LABELS[key] || key }))
@@ -126,33 +87,12 @@ export default {
     this.stopCountdown()
   },
   watch: {
-    // 全局播放模式变化（任意页面切换后）：按可用能力重新落位到具体引擎
-    preferredPlayer() {
-      this.$nextTick(() => this.reapplyPreference())
-    },
     activePlayer() {
       this.playerPlaying = false
       this.$nextTick(() => this.syncMuteState())
     }
   },
   methods: {
-    /** 按当前 preferredPlayer/策略重新选择引擎；仅在变化时重启播放。 */
-    reapplyPreference() {
-      const before = this.activePlayer
-      this.ensureActivePlayer()
-      if (this.activePlayer === before) return
-      if (this.$refs[before] && this.$refs[before].pause) {
-        this.$refs[before].pause()
-      }
-      this.$nextTick(() => {
-        this.play()
-        this.syncPlayerSize()
-      })
-      this.$emit('player-changed', this.activePlayer)
-    },
-    getPlayerList() {
-      return this.playerList
-    },
     /* ---------------- 播放控制栏（面向用户，隐藏引擎内悬浮按钮） ---------------- */
     activeEngine() {
       return this.$refs[this.activePlayer]
@@ -167,21 +107,16 @@ export default {
     syncMuteState() {
       const p = this.activeEngine()
       if (!p) return
-      if (this.activePlayer === 'webRTC') {
-        const v = p.$refs && p.$refs.video
-        this.ctrlMuted = v ? !!v.muted : false
-      } else if (typeof p.isNotMute === 'boolean') {
+      if (typeof p.isNotMute === 'boolean') {
         this.ctrlMuted = p.isNotMute === false
       }
     },
     togglePlay() {
-      if (this.activePlayer === 'webRTC') return
       const p = this.activeEngine()
       if (!p) return
       if (this.playerPlaying) {
         p.pause && p.pause()
       } else {
-        // mpegts 引擎没有 playBtnClick，用暂停后重播当前流
         if (p.playBtnClick) {
           p.playBtnClick()
         } else if (this.getUrlByStreamInfo()) {
@@ -192,11 +127,6 @@ export default {
     toggleMute() {
       const p = this.activeEngine()
       if (!p) return
-      if (this.activePlayer === 'webRTC') {
-        const v = p.$refs && p.$refs.video
-        if (v) { v.muted = !v.muted; this.ctrlMuted = v.muted }
-        return
-      }
       if (typeof p.isNotMute === 'boolean') {
         if (p.isNotMute) { p.mute && p.mute() } else { p.cancelMute && p.cancelMute() }
         this.ctrlMuted = !p.isNotMute
@@ -205,23 +135,9 @@ export default {
     doScreenshot() {
       const p = this.activeEngine()
       if (!p) return
-      if (this.activePlayer === 'webRTC') {
-        this.screenshotWebRTC(p)
-      } else if (p.screenshot) {
+      if (p.screenshot) {
         p.screenshot()
       }
-    },
-    screenshotWebRTC(p) {
-      const v = p.$refs && p.$refs.video
-      if (!v || !v.videoWidth) return
-      const canvas = document.createElement('canvas')
-      canvas.width = v.videoWidth
-      canvas.height = v.videoHeight
-      canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height)
-      const link = document.createElement('a')
-      link.download = 'screenshot.png'
-      link.href = canvas.toDataURL('image/png')
-      link.click()
     },
     doRefresh() {
       // 刷新 = 用当前 URL 重新起播。
@@ -230,14 +146,7 @@ export default {
     toggleFullscreen() {
       const p = this.activeEngine()
       if (!p) return
-      if (this.activePlayer === 'webRTC') {
-        const wrap = p.$refs && (p.$refs.wrapper || p.$refs.video)
-        if (!document.fullscreenElement) {
-          wrap && wrap.requestFullscreen && wrap.requestFullscreen()
-        } else {
-          document.exitFullscreen && document.exitFullscreen()
-        }
-      } else if (p.fullscreenSwich) {
+      if (p.fullscreenSwich) {
         p.fullscreenSwich()
       }
     },
@@ -265,49 +174,13 @@ export default {
     getActivePlayer() {
       return this.activePlayer
     },
-    switchPlayer(key) {
-      if (this.activePlayer === key) return
-      this.activePlayer = key
-      if (this.streamInfo) {
-        this.play()
-      }
-    },
-    resolveVideoCodec(streamInfo) {
-      if (!streamInfo) return ''
-      const direct = streamInfo.videoCodec || ''
-      if (direct) return String(direct).toUpperCase()
-      const nested = streamInfo.mediaInfo && streamInfo.mediaInfo.videoCodec
-      return nested ? String(nested).toUpperCase() : ''
-    },
-    resolveAudioCodec(streamInfo) {
-      if (!streamInfo) return ''
-      const direct = streamInfo.audioCodec || ''
-      if (direct) return String(direct).toUpperCase()
-      const nested = streamInfo.mediaInfo && streamInfo.mediaInfo.audioCodec
-      return nested ? String(nested).toUpperCase() : ''
-    },
-    isH265Codec(codec) {
-      return normalizeVideoCodec(codec) === 'H265'
-    },
-    /** 依据策略决定当前播放器：优先策略首选，其次默认第一个可用 */
+    /** 单引擎：恒为 jessibuca */
     ensureActivePlayer() {
-      const pref = this.preferredPlayer && this.allowedKeys.includes(this.preferredPlayer)
-        ? this.preferredPlayer
-        : (this.allowedKeys.includes(this.strategy.preferredPlayer)
-          ? this.strategy.preferredPlayer
-          : this.allowedKeys[0])
-      this.activePlayer = pref || 'mpegts'
+      this.activePlayer = 'jessibuca'
     },
-    /** URL 优先级：props 覆盖 > 策略（RTC 播放器强制只用 rtc） */
+    /** URL 优先级：固定 FLV 系列 */
     resolveUrlKeyOrder() {
-      if (this.activePlayer === 'webRTC') {
-        const secure = location.protocol === 'https:'
-        return secure ? ['rtcs', 'rtc'].filter(Boolean) : ['rtc']
-      }
-      if (this.urlPriority && this.urlPriority.length) {
-        return this.urlPriority
-      }
-      return URL_KEYS[this.activePlayer] || URL_KEYS.mpegts
+      return URL_KEYS.jessibuca
     },
     getUrlByStreamInfo() {
       if (!this.streamInfo) return ''
@@ -327,18 +200,6 @@ export default {
       if (retries > 0) {
         setTimeout(() => this.invokePlayerPlay(playUrl, retries - 1), 80)
       }
-    },
-    changePlayer(tab) {
-      const prev = this.activePlayer
-      this.activePlayer = tab.name
-      if (prev !== tab.name && this.$refs[prev] && this.$refs[prev].pause) {
-        this.$refs[prev].pause()
-      }
-      this.$nextTick(() => {
-        this.play()
-        this.syncPlayerSize()
-      })
-      this.$emit('player-changed', this.activePlayer)
     },
     syncPlayerSize() {
       const player = this.$refs[this.activePlayer]
@@ -363,8 +224,7 @@ export default {
       })
     },
     /**
-     * 编码信息到达（如 media_info 轮询）：合并进 streamInfo，并做“纠正式”切换——
-     * 仅当当前播放器已不在可用列表（例如发现是 H265 而正在用 Jessibuca）才自动切换，避免打扰。
+     * 编码信息到达（如 media_info 轮询）：合并进 streamInfo。单引擎无需切换。
      * @param {{videoCodec?:string, audioCodec?:string}} info
      */
     updateCodec(info) {
@@ -376,21 +236,6 @@ export default {
         videoCodec: v || (this.streamInfo && this.streamInfo.videoCodec),
         audioCodec: a || (this.streamInfo && this.streamInfo.audioCodec)
       })
-      if (!this.allowedKeys.includes(this.activePlayer)) {
-        const next = this.allowedKeys.includes(this.strategy.preferredPlayer)
-          ? this.strategy.preferredPlayer
-          : this.allowedKeys[0]
-        if (next && next !== this.activePlayer) {
-          const prev = this.activePlayer
-          this.activePlayer = next
-          if (this.$refs[prev] && this.$refs[prev].pause) this.$refs[prev].pause()
-          this.$nextTick(() => {
-            this.play()
-            this.syncPlayerSize()
-          })
-          this.$emit('player-changed', this.activePlayer)
-        }
-      }
     },
     play() {
       const playUrl = this.getUrlByStreamInfo()
@@ -402,9 +247,7 @@ export default {
         this.invokePlayerPlay(playUrl, 12)
         this.syncPlayerSize()
       }, 80)
-      const typeMap = { mpegts: 0, webRTC: 1 }
-      const type = typeMap[this.activePlayer] || 0
-      const playerUrl = window.location.origin + '/#/play/share?type=' + type + '&url=' + encodeURIComponent(playUrl)
+      const playerUrl = window.location.origin + '/#/play/share?type=0&url=' + encodeURIComponent(playUrl)
       this.$emit('playerChanged', { playUrl, playerUrl })
     },
     stop() {

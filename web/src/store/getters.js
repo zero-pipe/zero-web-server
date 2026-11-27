@@ -8,7 +8,6 @@ const getters = {
   menus: state => state.user.menus,
   roleId: state => state.user.roleId,
   visitedViews: state => state.tagsView.visitedViews,
-  cachedViews: state => state.tagsView.cachedViews,
-  playerMode: state => state.player.mode
+  cachedViews: state => state.tagsView.cachedViews
 }
 export default getters

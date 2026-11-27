@@ -225,21 +225,14 @@
   height: 100% !important;
 }
 
-.vms-player-dialog .mpegts-container,
-.vms-player-dialog .rtc-player-wrapper,
-.vms-player-dialog .rtc-player-video,
-.vms-player-dialog [id^='h265Player-'] {
+.vms-player-dialog .jessibuca-container {
   background-color: #3a4556 !important;
   background: #3a4556 !important;
 }
 
-.vms-player-dialog .mpegts-container,
-.vms-player-dialog .mpegts-container video,
-.vms-player-dialog .mpegts-video,
-.vms-player-dialog .rtc-player-video,
-.vms-player-dialog [id^='h265Player-'],
-.vms-player-dialog [id^='h265Player-'] canvas,
-.vms-player-dialog [id^='h265Player-'] video {
+.vms-player-dialog .jessibuca-container,
+.vms-player-dialog .jessibuca-container canvas,
+.vms-player-dialog .jessibuca-container video {
   width: 100% !important;
   height: 100% !important;
   max-width: none !important;

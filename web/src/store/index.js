@@ -20,7 +20,6 @@ import gbRecord from './modules/gbRecord'
 import log from './modules/log'
 import frontEnd from './modules/frontEnd'
 import alarm from './modules/alarm'
-import player from './modules/player'
 
 Vue.use(Vuex)
 
@@ -44,8 +43,7 @@ const store = new Vuex.Store({
     gbRecord,
     log,
     frontEnd,
-    alarm,
-    player
+    alarm
   },
   getters
 })
