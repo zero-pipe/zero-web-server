@@ -19,11 +19,10 @@ func registerCloudRecord(parent *gin.RouterGroup, cloudRecordHandler *handler.Cl
 	g.GET("/task/list", cloudRecordHandler.TaskList)
 }
 
-// registerPlaybackCloud 播放器云端回放（按内码 + 绝对时间）。
+// registerPlaybackCloud 播放器云端回放（按资源 id + 绝对时间）。
 func registerPlaybackCloud(parent *gin.RouterGroup, h *handler.CloudRecordHandler) {
-	g := parent.Group("/playback/cloud")
-	g.GET("/segments/:deviceCode/:channelCode", h.CloudSegments)
-	g.GET("/channel-segments/:channelId", h.CloudSegmentsByChannel)
+	g := parent.Group("/resources/:id/playback/cloud")
+	g.GET("/segments", h.ResourceCloudSegments)
 	g.GET("/start", h.CloudStart)
 	g.GET("/seek", h.CloudSeek)
 	g.GET("/stop", h.CloudStop)

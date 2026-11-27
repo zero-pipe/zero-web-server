@@ -215,3 +215,19 @@ func (h *CloudRecordHandler) CloudSegmentsByChannel(c *gin.Context) {
 	}
 	response.OK(c, segs)
 }
+
+// ResourceCloudSegments 统一族：按资源 id(=通道 id)查云端录像片段。
+func (h *CloudRecordHandler) ResourceCloudSegments(c *gin.Context) {
+	channelID, _ := strconv.Atoi(c.Param("id"))
+	startMs := parseTimeQueryMs(c.Query("start"))
+	endMs := parseTimeQueryMs(c.Query("end"))
+	segs, err := h.svc.SegmentsByChannelID(channelID, startMs, endMs)
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	if segs == nil {
+		segs = []cloudrecordapp.SegmentView{}
+	}
+	response.OK(c, segs)
+}
