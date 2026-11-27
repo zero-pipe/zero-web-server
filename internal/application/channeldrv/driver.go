@@ -335,6 +335,17 @@ func clamp01(v float64) float64 {
 	return v
 }
 
+// clampByte 把整数钳到 [0,255]（SIP 前端控制参数字节）。
+func clampByte(v int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > 255 {
+		return 255
+	}
+	return v
+}
+
 // ---- GB28181 ----
 
 type gbDriver struct {
@@ -398,7 +409,92 @@ func (d *gbDriver) PTZ(ctx context.Context, res *domainasset.Resource, binding *
 }
 
 func (d *gbDriver) Command(ctx context.Context, res *domainasset.Resource, binding *domainasset.AccessBinding, cmd string, params json.RawMessage) (json.RawMessage, error) {
-	return nil, fmt.Errorf("GB28181 接入不支持自定义命令: %s", cmd)
+	if d.ptz == nil || d.devices == nil {
+		return nil, fmt.Errorf("GB 云台服务未启用")
+	}
+	device, err := d.devices.GetByDeviceID(binding.ExternalID)
+	if err != nil || device == nil {
+		return nil, fmt.Errorf("设备不存在")
+	}
+	ch := res.ExternalKey
+	switch strings.ToLower(strings.TrimSpace(cmd)) {
+	case "focus":
+		var p struct {
+			Command string `json:"command"`
+			Speed   int    `json:"speed"`
+		}
+		_ = json.Unmarshal(params, &p)
+		code, err := gbFocusCmd(p.Command)
+		if err != nil {
+			return nil, err
+		}
+		return nil, d.ptz.SendFrontEndCmd(device, ch, code, clampByte(p.Speed), 0, 0)
+	case "iris":
+		var p struct {
+			Command string `json:"command"`
+			Speed   int    `json:"speed"`
+		}
+		_ = json.Unmarshal(params, &p)
+		code, err := gbIrisCmd(p.Command)
+		if err != nil {
+			return nil, err
+		}
+		return nil, d.ptz.SendFrontEndCmd(device, ch, code, 0, clampByte(p.Speed), 0)
+	case "wiper":
+		var p struct {
+			Command string `json:"command"`
+		}
+		_ = json.Unmarshal(params, &p)
+		code := 0x8c // aux on
+		if strings.ToLower(strings.TrimSpace(p.Command)) == "off" {
+			code = 0x8d
+		}
+		return nil, d.ptz.SendFrontEndCmd(device, ch, code, 1, 0, 0)
+	case "drag_zoom_in", "drag_zoom_out":
+		var p struct {
+			Length, Width, MidX, MidY, LengthX, LengthY int
+		}
+		_ = json.Unmarshal(params, &p)
+		zoomIn := strings.EqualFold(cmd, "drag_zoom_in")
+		return nil, d.ptz.SendDragZoom(device, ch, zoomIn, p.Length, p.Width, p.MidX, p.MidY, p.LengthX, p.LengthY)
+	default:
+		return nil, fmt.Errorf("GB28181 接入不支持该命令: %s", cmd)
+	}
+}
+
+// GB/T 28181 聚焦/光圈命令码。
+const (
+	gbFiStop      = 0x40
+	gbFiFocusFar  = 0x41
+	gbFiFocusNear = 0x42
+	gbFiIrisOpen  = 0x44
+	gbFiIrisClose = 0x48
+)
+
+func gbFocusCmd(command string) (int, error) {
+	switch strings.ToLower(strings.TrimSpace(command)) {
+	case "near":
+		return gbFiFocusNear, nil
+	case "far":
+		return gbFiFocusFar, nil
+	case "stop":
+		return gbFiStop, nil
+	default:
+		return 0, fmt.Errorf("无效聚焦命令: %s", command)
+	}
+}
+
+func gbIrisCmd(command string) (int, error) {
+	switch strings.ToLower(strings.TrimSpace(command)) {
+	case "in", "open":
+		return gbFiIrisOpen, nil
+	case "out", "close":
+		return gbFiIrisClose, nil
+	case "stop":
+		return gbFiStop, nil
+	default:
+		return 0, fmt.Errorf("无效光圈命令: %s", command)
+	}
 }
 
 // GB/T 28181 front-end preset 命令码（附录 A）。

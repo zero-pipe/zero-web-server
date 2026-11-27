@@ -47,6 +47,7 @@ type GBPTZNode interface {
 	SendPresetQuery(device *domaindevice.Device, channelID string) (string, <-chan []domainptz.Preset)
 	CancelPresetQuery(sn string)
 	SendFrontEndCmd(device *domaindevice.Device, channelID string, cmdCode, parameter1, parameter2, combineCode2 int) error
+	SendDragZoom(device *domaindevice.Device, channelID string, zoomIn bool, length, width, midX, midY, lengthX, lengthY int) error
 }
 
 // GBDeviceControl 注册后设备控制 / 订阅用到的 SIP 能力。
