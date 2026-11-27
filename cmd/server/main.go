@@ -345,7 +345,7 @@ func main() {
 	cloudRecordService := cloudrecordapp.NewService(cloudRecordRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamPushService := streampushapp.NewService(streamPushRepo, mediaCluster, cfg.UserSettings.ServerID)
 	streamProxyService := streamproxyapp.NewService(streamProxyRepo, mediaCluster, cfg.UserSettings.ServerID)
-	recordPlanService := recordplanapp.NewService(recordPlanRepo, playService, publishRegistry, cfg.UserSettings.ServerID)
+	recordPlanService := recordplanapp.NewService(recordPlanRepo, playService, publishRegistry, storageNodeService, cfg.UserSettings.ServerID)
 	recordPlanService.Start()
 	defer recordPlanService.Stop()
 

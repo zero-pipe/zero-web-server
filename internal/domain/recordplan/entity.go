@@ -58,6 +58,7 @@ type ChannelRecord struct {
 	GBBusinessGroupID  string  `json:"gbBusinessGroupId"`
 	GBPTZType          int     `json:"gbPtzType"`
 	RecordPlanID       int     `json:"recordPlanId"`
+	StorageNodeID      string  `json:"storageNodeId"`
 	DataType           int     `json:"dataType"`
 	DataDeviceID       int     `json:"dataDeviceId"`
 }

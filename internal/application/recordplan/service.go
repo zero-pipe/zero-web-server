@@ -8,9 +8,11 @@ import (
 
 	playapp "zero-web-server/internal/application/play"
 	publishauth "zero-web-server/internal/application/publishauth"
+	storagenodeapp "zero-web-server/internal/application/storagenode"
 	domainrecordplan "zero-web-server/internal/domain/recordplan"
 	"zero-web-server/internal/domain/shared"
 	"zero-web-server/internal/mediaurl"
+	"zero-web-server/internal/storagekit"
 	applog "zero-web-server/pkg/log"
 )
 
@@ -28,25 +30,29 @@ type LinkParam struct {
 }
 
 type Service struct {
-	repo     domainrecordplan.Repository
-	play     *playapp.Service
-	publish  *publishauth.PublishRegistry
-	serverID string
-	active   sync.Map // channelID -> streamKey "app/stream"
-	meta     sync.Map // channelID -> activeMeta
-	stopCh   chan struct{}
+	repo        domainrecordplan.Repository
+	play        *playapp.Service
+	publish     *publishauth.PublishRegistry
+	storageNode *storagenodeapp.Service
+	serverID    string
+	active      sync.Map // channelID -> streamKey "app/stream"
+	meta        sync.Map // channelID -> activeMeta
+	stopCh      chan struct{}
 }
 
 type activeMeta struct {
-	DeviceID  string
-	ChannelID string
-	App       string
-	Stream    string
+	DeviceID   string
+	ChannelID  string
+	App        string
+	Stream     string
+	Sidecar    bool   // 旁路录制（zstorage）
+	ChannelKey string // 旁路：zstorage 的 channel_key（内码_内码）
+	StorageID  string // 旁路：存储节点 node_id
 }
 
-func NewService(repo domainrecordplan.Repository, play *playapp.Service, publish *publishauth.PublishRegistry, serverID string) *Service {
+func NewService(repo domainrecordplan.Repository, play *playapp.Service, publish *publishauth.PublishRegistry, storageNode *storagenodeapp.Service, serverID string) *Service {
 	return &Service{
-		repo: repo, play: play, publish: publish, serverID: serverID,
+		repo: repo, play: play, publish: publish, storageNode: storageNode, serverID: serverID,
 		stopCh: make(chan struct{}),
 	}
 }
@@ -114,6 +120,11 @@ func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
 		applog.Warnf("[record-plan] skip channel=%d: device/channel internal code missing", ch.ID)
 		return
 	}
+	// 旁路录制（zstorage）：通道绑定 storage_node_id 时走 PS 槽位录制，不再启用 MP4。
+	if ch.StorageNodeID != "" && s.storageNode != nil {
+		s.startSidecarRecording(ch, app, stream)
+		return
+	}
 	s.publish.EnableMP4(app, stream)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -135,6 +146,51 @@ func (s *Service) startRecord(ch domainrecordplan.ChannelRecord) {
 	applog.Infof("[record-plan] recording start channel=%d stream=%s/%s", ch.ID, keyApp, keyStream)
 }
 
+// startSidecarRecording 在存储节点上按 channel_key 拉 ZMS 的 RTSP 旁路录 PS。
+// 需先 StartPlay 让 ZMS 出流，再从 content.Rtsp 拉流。
+func (s *Service) startSidecarRecording(ch domainrecordplan.ChannelRecord, app, stream string) {
+	node, err := s.storageNode.Resolve(ch.StorageNodeID)
+	if err != nil {
+		applog.Warnf("[record-plan] sidecar channel=%d resolve storage node %q: %v", ch.ID, ch.StorageNodeID, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	content, err := s.play.StartPlay(ctx, ch.DeviceID, ch.GBDeviceID)
+	if err != nil {
+		applog.Warnf("[record-plan] sidecar channel=%d start play %s/%s: %v", ch.ID, ch.DeviceID, ch.GBDeviceID, err)
+		return
+	}
+	pullURL := ""
+	if content != nil {
+		pullURL = content.Rtsp
+	}
+	if pullURL == "" {
+		_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
+		applog.Warnf("[record-plan] sidecar channel=%d: ZMS 未返回 RTSP 拉流地址", ch.ID)
+		return
+	}
+	client := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret)
+	resp, err := client.RecordStart(ctx, stream, pullURL)
+	if err != nil {
+		_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
+		applog.Warnf("[record-plan] sidecar channel=%d record/start node=%s: %v", ch.ID, node.NodeID, err)
+		return
+	}
+	if resp.Code != 0 {
+		_ = s.play.StopPlay(ch.DeviceID, ch.GBDeviceID)
+		applog.Warnf("[record-plan] sidecar channel=%d record/start node=%s code=%d msg=%s", ch.ID, node.NodeID, resp.Code, resp.Msg)
+		return
+	}
+	s.active.Store(ch.ID, app+"/"+stream)
+	s.meta.Store(ch.ID, activeMeta{
+		DeviceID: ch.DeviceID, ChannelID: ch.GBDeviceID,
+		App: app, Stream: stream,
+		Sidecar: true, ChannelKey: stream, StorageID: node.NodeID,
+	})
+	applog.Infof("[record-plan] sidecar recording start channel=%d node=%s channel_key=%s", ch.ID, node.NodeID, stream)
+}
+
 func (s *Service) stopRecord(channelID int) {
 	v, ok := s.meta.Load(channelID)
 	s.active.Delete(channelID)
@@ -143,6 +199,18 @@ func (s *Service) stopRecord(channelID int) {
 		return
 	}
 	m := v.(activeMeta)
+	if m.Sidecar {
+		if s.storageNode != nil {
+			if node, err := s.storageNode.Resolve(m.StorageID); err == nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				_, _ = storagekit.NewClient(node.IP, node.HTTPPort, node.Secret).RecordStop(ctx, m.ChannelKey)
+				cancel()
+			}
+		}
+		_ = s.play.StopPlay(m.DeviceID, m.ChannelID)
+		applog.Infof("[record-plan] sidecar recording stop channel=%d channel_key=%s", channelID, m.ChannelKey)
+		return
+	}
 	s.publish.DisableMP4(m.App, m.Stream)
 	if err := s.play.StopPlay(m.DeviceID, m.ChannelID); err != nil {
 		applog.Warnf("[record-plan] stop play failed channel=%d %s/%s: %v", channelID, m.DeviceID, m.ChannelID, err)

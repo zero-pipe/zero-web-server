@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS zws_channel_ext
     enabled        TINYINT(1) NOT NULL DEFAULT 1,
     tags           VARCHAR(255) DEFAULT NULL,
     record_plan_id BIGINT DEFAULT NULL COMMENT '绑定的录像计划',
+    storage_node_id VARCHAR(128) DEFAULT NULL COMMENT '旁路录制存储节点 node_id（空=不旁路录）',
     gb_json        LONGTEXT COMMENT '国标原始属性（原 gb_* 列存档）',
     extra_json     LONGTEXT COMMENT '协议长尾（profileToken/resolution/codec…）',
     create_time    VARCHAR(50) NOT NULL DEFAULT '',

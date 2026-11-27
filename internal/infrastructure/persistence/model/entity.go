@@ -79,21 +79,22 @@ func (DeviceExt) TableName() string { return "zws_device_ext" }
 
 // ChannelExt 通道扩展信息（易变：经纬度/PTZ/标签/录像计划）。
 type ChannelExt struct {
-	ID           int64   `gorm:"column:id;primaryKey;autoIncrement"`
-	ChannelID    int64   `gorm:"column:channel_id;uniqueIndex:uk_channel_ext_channel"`
-	Longitude    float64 `gorm:"column:longitude"`
-	Latitude     float64 `gorm:"column:latitude"`
-	MapLevel     int     `gorm:"column:map_level"`
-	PTZType      int     `gorm:"column:ptz_type"`
-	Direction    int     `gorm:"column:direction"`
-	HasAudio     bool    `gorm:"column:has_audio"`
-	Enabled      bool    `gorm:"column:enabled;default:true"`
-	Tags         string  `gorm:"column:tags;size:255"`
-	RecordPlanID int64   `gorm:"column:record_plan_id"`
-	GBJSON       string  `gorm:"column:gb_json;type:longtext"`
-	ExtraJSON    string  `gorm:"column:extra_json;type:longtext"`
-	CreateTime   string  `gorm:"column:create_time;size:50"`
-	UpdateTime   string  `gorm:"column:update_time;size:50"`
+	ID            int64   `gorm:"column:id;primaryKey;autoIncrement"`
+	ChannelID     int64   `gorm:"column:channel_id;uniqueIndex:uk_channel_ext_channel"`
+	Longitude     float64 `gorm:"column:longitude"`
+	Latitude      float64 `gorm:"column:latitude"`
+	MapLevel      int     `gorm:"column:map_level"`
+	PTZType       int     `gorm:"column:ptz_type"`
+	Direction     int     `gorm:"column:direction"`
+	HasAudio      bool    `gorm:"column:has_audio"`
+	Enabled       bool    `gorm:"column:enabled;default:true"`
+	Tags          string  `gorm:"column:tags;size:255"`
+	RecordPlanID  int64   `gorm:"column:record_plan_id"`
+	StorageNodeID string  `gorm:"column:storage_node_id;size:128"`
+	GBJSON        string  `gorm:"column:gb_json;type:longtext"`
+	ExtraJSON     string  `gorm:"column:extra_json;type:longtext"`
+	CreateTime    string  `gorm:"column:create_time;size:50"`
+	UpdateTime    string  `gorm:"column:update_time;size:50"`
 }
 
 func (ChannelExt) TableName() string { return "zws_channel_ext" }
@@ -198,21 +199,21 @@ func (EventType) TableName() string { return "zws_event_type" }
 
 // Event 平台事件记录（统一信封）。
 type Event struct {
-	ID                   int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	EventID              string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
-	DeviceID             int64  `gorm:"column:device_id;index:idx_event_device_time,priority:1" json:"deviceId"`
-	ChannelID            *int64 `gorm:"column:channel_id;index:idx_event_channel_time,priority:1" json:"channelId"`
-	EventType            string `gorm:"column:event_type;size:64;index:idx_event_type_time,priority:1" json:"eventType"`
-	Severity             string `gorm:"column:severity;size:16" json:"severity"`
-	Status               string `gorm:"column:status;size:16" json:"status"`
-	OccurredAt           int64  `gorm:"column:occurred_at;index:idx_event_device_time,priority:2;index:idx_event_channel_time,priority:2;index:idx_event_type_time,priority:2" json:"occurredAt"`
-	ReceivedAt           int64  `gorm:"column:received_at" json:"receivedAt"`
-	DeviceInternalCode   string `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
-	ChannelInternalCode  string `gorm:"column:channel_internal_code;size:64" json:"channelInternalCode"`
-	BBoxJSON             string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
-	ImageURL             string `gorm:"column:image_url;size:1024" json:"imageUrl"`
-	RawJSON              string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
-	CreateTime           string `gorm:"column:create_time;size:50" json:"createTime"`
+	ID                  int64  `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	EventID             string `gorm:"column:event_id;size:64;uniqueIndex:uk_event_id" json:"eventId"`
+	DeviceID            int64  `gorm:"column:device_id;index:idx_event_device_time,priority:1" json:"deviceId"`
+	ChannelID           *int64 `gorm:"column:channel_id;index:idx_event_channel_time,priority:1" json:"channelId"`
+	EventType           string `gorm:"column:event_type;size:64;index:idx_event_type_time,priority:1" json:"eventType"`
+	Severity            string `gorm:"column:severity;size:16" json:"severity"`
+	Status              string `gorm:"column:status;size:16" json:"status"`
+	OccurredAt          int64  `gorm:"column:occurred_at;index:idx_event_device_time,priority:2;index:idx_event_channel_time,priority:2;index:idx_event_type_time,priority:2" json:"occurredAt"`
+	ReceivedAt          int64  `gorm:"column:received_at" json:"receivedAt"`
+	DeviceInternalCode  string `gorm:"column:device_internal_code;size:64" json:"deviceInternalCode"`
+	ChannelInternalCode string `gorm:"column:channel_internal_code;size:64" json:"channelInternalCode"`
+	BBoxJSON            string `gorm:"column:bbox_json;type:text" json:"bboxJson"`
+	ImageURL            string `gorm:"column:image_url;size:1024" json:"imageUrl"`
+	RawJSON             string `gorm:"column:raw_json;type:longtext" json:"rawJson"`
+	CreateTime          string `gorm:"column:create_time;size:50" json:"createTime"`
 }
 
 func (Event) TableName() string { return "zws_event" }
