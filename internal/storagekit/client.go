@@ -85,16 +85,6 @@ func (c *Client) PlaybackStart(ctx context.Context, slot int64, channel string, 
 	return c.get(ctx, "zstorage/playback/start", params)
 }
 
-// PlaybackSeek 按媒体时间(ms)重定位回放，返回实际落点。
-func (c *Client) PlaybackSeek(ctx context.Context, app, stream string, stampMs int64) (*APIResponse, error) {
-	params := url.Values{
-		"app":    {app},
-		"stream": {stream},
-		"stamp":  {fmt.Sprintf("%d", stampMs)},
-	}
-	return c.get(ctx, "zstorage/playback/seek", params)
-}
-
 // PlaybackStop 关闭回放会话。
 func (c *Client) PlaybackStop(ctx context.Context, app, stream string) (*APIResponse, error) {
 	return c.get(ctx, "zstorage/playback/stop", url.Values{"app": {app}, "stream": {stream}})

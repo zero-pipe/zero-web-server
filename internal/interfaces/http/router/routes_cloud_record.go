@@ -13,7 +13,6 @@ func registerCloudRecord(parent *gin.RouterGroup, cloudRecordHandler *handler.Cl
 	g.DELETE("/delete", cloudRecordHandler.Delete)
 	g.GET("/play/path", cloudRecordHandler.PlayPath)
 	g.GET("/loadRecord", cloudRecordHandler.LoadRecord)
-	g.GET("/seek", cloudRecordHandler.Seek)
 	g.GET("/speed", cloudRecordHandler.Speed)
 	g.GET("/task/add", cloudRecordHandler.AddTask)
 	g.GET("/task/list", cloudRecordHandler.TaskList)
@@ -24,6 +23,5 @@ func registerPlaybackCloud(parent *gin.RouterGroup, h *handler.CloudRecordHandle
 	g := parent.Group("/resources/:id/playback/cloud")
 	g.GET("/segments", h.ResourceCloudSegments)
 	g.GET("/start", h.CloudStart)
-	g.GET("/seek", h.CloudSeek)
 	g.GET("/stop", h.CloudStop)
 }

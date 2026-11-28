@@ -112,15 +112,6 @@ func (h *CloudRecordHandler) LoadRecord(c *gin.Context) {
 	response.OK(c, content)
 }
 
-func (h *CloudRecordHandler) Seek(c *gin.Context) {
-	seek, _ := strconv.ParseFloat(c.Query("seek"), 64)
-	if err := h.svc.Seek(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"), seek, c.Query("schema")); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.OK(c, nil)
-}
-
 func (h *CloudRecordHandler) Speed(c *gin.Context) {
 	speed, _ := strconv.Atoi(c.Query("speed"))
 	if err := h.svc.Speed(c.Query("app"), c.Query("stream"), c.Query("mediaServerId"), speed, c.Query("schema")); err != nil {
@@ -180,17 +171,6 @@ func (h *CloudRecordHandler) CloudStart(c *gin.Context) {
 		return
 	}
 	response.OK(c, content)
-}
-
-// CloudSeek 拖动到绝对时间。
-func (h *CloudRecordHandler) CloudSeek(c *gin.Context) {
-	recordID, _ := strconv.Atoi(c.Query("recordId"))
-	seekTime := parseTimeQueryMs(c.Query("seekTime"))
-	if err := h.svc.SeekByRecord(recordID, seekTime); err != nil {
-		response.FromError(c, err)
-		return
-	}
-	response.OK(c, nil)
 }
 
 // CloudStop 关闭云端回放。

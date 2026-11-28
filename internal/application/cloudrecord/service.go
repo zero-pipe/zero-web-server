@@ -288,28 +288,6 @@ func (s *Service) LoadRecord(ctx context.Context, app, stream string, cloudRecor
 	return out, nil
 }
 
-func (s *Service) Seek(app, stream, mediaServerID string, seek float64, schema string) error {
-	_ = schema
-	if s.storageNode == nil || mediaServerID == "" {
-		return nil
-	}
-	node, err := s.storageNode.Resolve(mediaServerID)
-	if err != nil || node == nil {
-		return nil // 非存储节点，交给播放端本地处理
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	resp, err := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret).
-		PlaybackSeek(ctx, app, stream, int64(seek))
-	if err != nil {
-		return err
-	}
-	if resp.Code != 0 {
-		return fmt.Errorf("存储节点回放拖动失败: %s", resp.Msg)
-	}
-	return nil
-}
-
 // loadPsRecord 打开存储节点上的槽位回放，返回与 ZMS 同构的出流地址。
 // offsetMs 为段内相对毫秒（= 绝对起播时刻 - 段 StartTime）。
 func (s *Service) loadPsRecord(rec *domaincloudrecord.Record, offsetMs int64) (*dto.StreamContent, error) {
@@ -534,36 +512,6 @@ func (s *Service) StartByRecord(recordID int, absStartMs int64) (*dto.StreamCont
 		return s.loadPsRecord(rec, off)
 	}
 	return s.LoadRecord(context.Background(), rec.App, rec.Stream, recordID)
-}
-
-// SeekByRecord 播放器拖动：绝对时间 → 段内相对偏移再下沉。
-func (s *Service) SeekByRecord(recordID int, absSeekMs int64) error {
-	rec, err := s.getRecord(recordID)
-	if err != nil {
-		return err
-	}
-	if rec.StorageNodeID == "" || rec.SlotID <= 0 {
-		return nil // MP4 暂由播放端/ZMS 处理
-	}
-	off := absSeekMs - rec.StartTime
-	if off < 0 {
-		off = 0
-	}
-	node, err := s.storageNode.Resolve(rec.StorageNodeID)
-	if err != nil || node == nil {
-		return fmt.Errorf("存储节点不可用: %s", rec.StorageNodeID)
-	}
-	app, stream := psSessionKey(rec)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	resp, err := storagekit.NewClient(node.IP, node.HTTPPort, node.Secret).PlaybackSeek(ctx, app, stream, off)
-	if err != nil {
-		return err
-	}
-	if resp.Code != 0 {
-		return fmt.Errorf("回放拖动失败: %s", resp.Msg)
-	}
-	return nil
 }
 
 // StopByRecord 关闭回放（PS 关闭 zstorage 会话）。

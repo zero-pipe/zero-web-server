@@ -447,7 +447,7 @@ CREATE TABLE IF NOT EXISTS zws_record_plan_channel
     channel_code VARCHAR(64) NOT NULL DEFAULT '' COMMENT '通道内码 C...',
     PRIMARY KEY (plan_id, device_code, channel_code),
     KEY idx_rpc_channel (channel_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='录像计划↔通道关联（内码，非自增id/非国标码）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='录像计划↔通道关联（内码，非自增id/非国标码）';
 
 DROP TABLE IF EXISTS zws_cloud_record;
 CREATE TABLE IF NOT EXISTS zws_cloud_record

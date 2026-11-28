@@ -76,9 +76,6 @@ export function resourceCloudSegments(id, { start, end } = {}) {
 export function resourceCloudStart(id, { recordId, startTime } = {}) {
   return request({ url: `/api/v1/resources/${id}/playback/cloud/start`, method: 'get', params: { recordId, startTime } })
 }
-export function resourceCloudSeek(id, { recordId, seekTime } = {}) {
-  return request({ url: `/api/v1/resources/${id}/playback/cloud/seek`, method: 'get', params: { recordId, seekTime } })
-}
 export function resourceCloudStop(id, { recordId } = {}) {
   return request({ url: `/api/v1/resources/${id}/playback/cloud/stop`, method: 'get', params: { recordId } })
 }
