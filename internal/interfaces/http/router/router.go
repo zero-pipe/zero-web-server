@@ -234,6 +234,8 @@ func Setup(r *gin.Engine, deps Deps) {
 
 		registerProxy(auth, streamProxyHandler)
 
+		// 国标收流列表（dashboard 弹窗）：返回在线 GB 通道，播放仍走 resources 族。
+		auth.GET("/devices/gb/query/streams", mediaSessionHandler.GBReceivingChannels)
 		registerMediaSessions(auth, mediaSessionHandler)
 
 		registerRecordPlan(auth, recordPlanHandler)

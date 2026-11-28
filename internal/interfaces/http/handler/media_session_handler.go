@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	mediasessionapp "zero-web-server/internal/application/mediasession"
 	"zero-web-server/pkg/response"
 
@@ -23,6 +25,19 @@ func (h *MediaSessionHandler) List(c *gin.Context) {
 		return
 	}
 	response.OK(c, gin.H{"list": list, "total": len(list)})
+}
+
+// GBReceivingChannels 国标收流列表（dashboard「国标收流」弹窗）。
+// 返回正在收流的国标通道，resourceId 供统一族播放使用。
+func (h *MediaSessionHandler) GBReceivingChannels(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
+	count, _ := strconv.Atoi(c.Query("count"))
+	result, err := h.svc.GBReceivingChannels(c.Request.Context(), page, count, c.Query("query"))
+	if err != nil {
+		response.FromError(c, err)
+		return
+	}
+	response.OK(c, result)
 }
 
 func (h *MediaSessionHandler) Stop(c *gin.Context) {

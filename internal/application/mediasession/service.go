@@ -45,10 +45,16 @@ type StreamAddress struct {
 type View struct {
 	App                 string          `json:"app"`
 	Stream              string          `json:"stream"`
+	ResourceID          string          `json:"resourceId"`
 	DeviceInternalCode  string          `json:"deviceInternalCode"`
 	ChannelInternalCode string          `json:"channelInternalCode"`
 	DeviceName          string          `json:"deviceName"`
 	ChannelName         string          `json:"channelName"`
+	GBDeviceCode        string          `json:"gbDeviceCode"`  // 设备国标编号（展示用，不参与路由）
+	GBChannelCode       string          `json:"gbChannelCode"` // 通道国标编号（展示用，不参与路由）
+	PTZType             int             `json:"ptzType"`
+	PTZTypeText         string          `json:"ptzTypeText"`
+	HasAudio            bool            `json:"hasAudio"`
 	SourceType          string          `json:"sourceType"`  // gb28181 | onvif | plugin | manual
 	SourceLabel         string          `json:"sourceLabel"` // 人读来源
 	MediaServerID       string          `json:"mediaServerId"`
@@ -124,6 +130,52 @@ func (s *Service) List(ctx context.Context) ([]*View, error) {
 	return out, nil
 }
 
+// GBReceivingResult 国标收流列表查询结果。
+type GBReceivingResult struct {
+	List  []*View `json:"list"`
+	Total int     `json:"total"`
+}
+
+// GBReceivingChannels 返回 ZMS 上正在收流的国标通道（按流名反查资源）。
+// 只做查询，不建立流；provider 只区分来源，播放仍走 /resources/{id}/live/start。
+func (s *Service) GBReceivingChannels(ctx context.Context, page, count int, query string) (*GBReceivingResult, error) {
+	all, err := s.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*View, 0)
+	q := strings.ToLower(strings.TrimSpace(query))
+	for _, v := range all {
+		if v.SourceType != "gb28181" || v.ResourceID == "" {
+			continue
+		}
+		if q != "" && !strings.Contains(strings.ToLower(v.ChannelName), q) &&
+			!strings.Contains(strings.ToLower(v.DeviceName), q) &&
+			!strings.Contains(strings.ToLower(v.GBChannelCode), q) &&
+			!strings.Contains(strings.ToLower(v.GBDeviceCode), q) {
+			continue
+		}
+		out = append(out, v)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Stream < out[j].Stream })
+	total := len(out)
+	if page <= 0 {
+		page = 1
+	}
+	if count <= 0 {
+		count = 15
+	}
+	start := (page - 1) * count
+	if start >= total {
+		return &GBReceivingResult{List: []*View{}, Total: total}, nil
+	}
+	end := start + count
+	if end > total {
+		end = total
+	}
+	return &GBReceivingResult{List: out[start:end], Total: total}, nil
+}
+
 func (s *Service) toView(ctx context.Context, nodeID string, it *mediaItem) *View {
 	readers := it.TotalReaderCount
 	if readers == 0 {
@@ -190,10 +242,16 @@ func (s *Service) enrich(v *View) {
 	v.DeviceName = dev.Name
 	if chCode != "" {
 		if res, rerr := s.assets.GetResourceByInternalCode(chCode); rerr == nil && res != nil {
+			v.ResourceID = res.ID
 			v.ChannelName = res.Name
+			v.PTZType = res.PTZType
+			v.PTZTypeText = ptzTypeText(res.PTZType)
+			v.HasAudio = res.HasAudio
+			v.GBChannelCode = res.ExternalKey
 		}
 	}
 	if binding, berr := s.assets.GetBindingByDevice(dev.ID); berr == nil && binding != nil {
+		v.GBDeviceCode = binding.ExternalID
 		switch binding.Protocol {
 		case "gb28181":
 			v.SourceType, v.SourceLabel = "gb28181", "GB28181 · RTP/PS 推流"
@@ -216,6 +274,17 @@ func splitStream(stream string) (devCode, chCode string) {
 		return parts[0], parts[1]
 	}
 	return parts[0], ""
+}
+
+func ptzTypeText(t int) string {
+	texts := map[int]string{
+		0: "未知", 1: "球机", 2: "半球", 3: "固定枪机",
+		4: "遥控枪机", 5: "遥控半球", 6: "全景通道", 7: "分割通道",
+	}
+	if s := texts[t]; s != "" {
+		return s
+	}
+	return texts[0]
 }
 
 func pluginTransportLabel(origin string) string {
