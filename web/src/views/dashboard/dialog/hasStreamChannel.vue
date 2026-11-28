@@ -23,10 +23,10 @@
       </el-form>
 
       <el-table v-loading="loading" :data="channelList" :height="500" stripe>
-        <el-table-column prop="parentDeviceId" label="设备编号" min-width="180"/>
-        <el-table-column prop="parentName" label="设备名称" min-width="180"/>
-        <el-table-column prop="deviceId" label="通道编号" min-width="180"/>
-        <el-table-column prop="name" label="通道名称" min-width="180"/>
+        <el-table-column prop="gbDeviceCode" label="设备编号" min-width="180"/>
+        <el-table-column prop="deviceName" label="设备名称" min-width="180"/>
+        <el-table-column prop="gbChannelCode" label="通道编号" min-width="180"/>
+        <el-table-column prop="channelName" label="通道名称" min-width="180"/>
         <el-table-column prop="ptzType" label="摄像头类型" min-width="100">
           <template v-slot:default="scope">
             <div>{{ scope.row.ptzTypeText }}</div>
@@ -120,14 +120,15 @@ export default {
       this.getChannelList()
     },
     sendDevicePush: function (row) {
-      const deviceId = row.parentDeviceId
-      const channelId = row.deviceId
-      // 统一资源 id：优先 row.resourceId，兼容 gbId（=通道 resourceId）。
-      const resourceId = row.resourceId != null ? row.resourceId : row.gbId
+      const resourceId = row.resourceId
+      if (!resourceId) {
+        this.$message.warning('该通道缺少资源ID，无法播放')
+        return
+      }
       this.$set(row, "playing", true)
-      this.$refs.devicePlayer.openDialog("codec", deviceId, channelId, {
+      this.$refs.devicePlayer.openDialog("codec", row.gbDeviceCode, row.gbChannelCode, {
         pending: true,
-        name: row.name,
+        name: row.channelName,
         hasAudio: row.hasAudio,
         ptzType: row.ptzType,
         resourceId: resourceId
@@ -144,7 +145,8 @@ export default {
         })
     },
     stopDevicePush: function (row) {
-      const resourceId = row.resourceId != null ? row.resourceId : row.gbId
+      const resourceId = row.resourceId
+      if (!resourceId) return
       stopResourceLive(resourceId).then(_ => {
         this.getChannelList();
       }).catch((error) => {
